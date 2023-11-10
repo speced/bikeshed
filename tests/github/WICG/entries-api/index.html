@@ -690,6 +690,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -2320,8 +2357,6 @@ for suggestions, reviews, and other feedback.</p>
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -2569,7 +2604,6 @@ for suggestions, reviews, and other feedback.</p>
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -3051,6 +3085,310 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://html.spec.whatwg.org/multipage/input.html#htmlinputelement'] = {"text": "HTMLInputElement", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/input.html#htmlinputelement", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/dnd.html#datatransferitem'] = {"text": "DataTransferItem", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dnd.html#datatransferitem", "export": true, "normative": true, "for_": []};
+window.refsData['#name'] = {"text": "name", "type": "dfn", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#name", "export": true, "normative": true, "for_": []};
+window.refsData['#path-segment'] = {"text": "path segment", "type": "dfn", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#path-segment", "export": true, "normative": true, "for_": []};
+window.refsData['#relative-path'] = {"text": "relative path", "type": "dfn", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#relative-path", "export": true, "normative": true, "for_": []};
+window.refsData['#absolute-path'] = {"text": "absolute path", "type": "dfn", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#absolute-path", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-USVString'] = {"text": "USVString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-USVString", "export": true, "normative": true, "for_": []};
+window.refsData['#path'] = {"text": "path", "type": "dfn", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#path", "export": true, "normative": true, "for_": []};
+window.refsData['#file'] = {"text": "file", "type": "dfn", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#file", "export": true, "normative": true, "for_": []};
+window.refsData['#directory'] = {"text": "directory", "type": "dfn", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#directory", "export": true, "normative": true, "for_": []};
+window.refsData['#root-directory'] = {"text": "root directory", "type": "dfn", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#root-directory", "export": true, "normative": true, "for_": []};
+window.refsData['#parent'] = {"text": "parent", "type": "dfn", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#parent", "export": true, "normative": true, "for_": []};
+window.refsData['#file-system-name'] = {"text": "name", "type": "dfn", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#file-system-name", "export": true, "normative": true, "for_": ["file system"]};
+window.refsData['#file-system'] = {"text": "file system", "type": "dfn", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#file-system", "export": true, "normative": true, "for_": []};
+window.refsData['#entry-concept'] = {"text": "entry", "type": "dfn", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#entry-concept", "export": true, "normative": true, "for_": []};
+window.refsData['#entry-root'] = {"text": "root", "type": "dfn", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#entry-root", "export": true, "normative": true, "for_": ["entry"]};
+window.refsData['#directory-entry'] = {"text": "directory entry", "type": "dfn", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#directory-entry", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#strictly-split'] = {"text": "strictly split", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#strictly-split", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/FileAPI/#dfn-file'] = {"text": "File", "type": "interface", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#dfn-file", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-file-webkitrelativepath'] = {"text": "webkitRelativePath", "type": "attribute", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#dom-file-webkitrelativepath", "export": true, "normative": true, "for_": ["File"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-frozen-array'] = {"text": "FrozenArray", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-frozen-array", "export": true, "normative": true, "for_": []};
+window.refsData['#filesystementry'] = {"text": "FileSystemEntry", "type": "interface", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#filesystementry", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/input.html#the-input-element'] = {"text": "input", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/input.html#the-input-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/input.html#attr-input-type'] = {"text": "type", "type": "element-attr", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/input.html#attr-input-type", "export": true, "normative": true, "for_": ["input"]};
+window.refsData['https://html.spec.whatwg.org/multipage/forms.html#file-upload-state-(type=file)'] = {"text": "file upload", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/forms.html#file-upload-state-(type=file)", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-htmlinputelement-webkitdirectory'] = {"text": "webkitdirectory", "type": "attribute", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#dom-htmlinputelement-webkitdirectory", "export": true, "normative": true, "for_": ["HTMLInputElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/input.html#dom-input-files'] = {"text": "files", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/input.html#dom-input-files", "export": true, "normative": true, "for_": ["HTMLInputElement"]};
+window.refsData['https://w3c.github.io/FileAPI/#dfn-name'] = {"text": "name", "type": "attribute", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#dfn-name", "export": true, "normative": true, "for_": ["File"]};
+window.refsData['https://html.spec.whatwg.org/multipage/input.html#dom-input-accept'] = {"text": "accept", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/input.html#dom-input-accept", "export": true, "normative": true, "for_": ["HTMLInputElement"]};
+window.refsData['#dom-htmlinputelement-webkitentries'] = {"text": "webkitEntries", "type": "attribute", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#dom-htmlinputelement-webkitentries", "export": true, "normative": true, "for_": ["HTMLInputElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/forms.html#concept-input-type-file-selected'] = {"text": "selected files", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/forms.html#concept-input-type-file-selected", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#drag-data-store'] = {"text": "drag data store", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/interaction.html#drag-data-store", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#drag-data-store-item-list'] = {"text": "drag data store item list", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/interaction.html#drag-data-store-item-list", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransferitem-getasfile'] = {"text": "getAsFile()", "type": "method", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransferitem-getasfile", "export": true, "normative": true, "for_": ["DataTransferItem"]};
+window.refsData['#dom-datatransferitem-webkitgetasentry'] = {"text": "webkitGetAsEntry()", "type": "method", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#dom-datatransferitem-webkitgetasentry", "export": true, "normative": true, "for_": ["DataTransferItem"]};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#concept-dnd-rw'] = {"text": "read/write mode", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/interaction.html#concept-dnd-rw", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#concept-dnd-ro'] = {"text": "read-only mode", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/interaction.html#concept-dnd-ro", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#the-drag-data-item-kind'] = {"text": "drag data item kind", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/interaction.html#the-drag-data-item-kind", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#typemismatcherror'] = {"text": "TypeMismatchError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#typemismatcherror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#exceptiondef-typeerror'] = {"text": "TypeError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#exceptiondef-typeerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMException'] = {"text": "DOMException", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMException", "export": true, "normative": true, "for_": []};
+window.refsData['#callbackdef-errorcallback'] = {"text": "ErrorCallback", "type": "callback", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#callbackdef-errorcallback", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-filesystementry-isfile'] = {"text": "isFile", "type": "attribute", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#dom-filesystementry-isfile", "export": true, "normative": true, "for_": ["FileSystemEntry"]};
+window.refsData['#dom-filesystementry-isdirectory'] = {"text": "isDirectory", "type": "attribute", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#dom-filesystementry-isdirectory", "export": true, "normative": true, "for_": ["FileSystemEntry"]};
+window.refsData['#dom-filesystementry-name'] = {"text": "name", "type": "attribute", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#dom-filesystementry-name", "export": true, "normative": true, "for_": ["FileSystemEntry"]};
+window.refsData['#dom-filesystementry-fullpath'] = {"text": "fullPath", "type": "attribute", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#dom-filesystementry-fullpath", "export": true, "normative": true, "for_": ["FileSystemEntry"]};
+window.refsData['#filesystem'] = {"text": "FileSystem", "type": "interface", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#filesystem", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-filesystementry-filesystem'] = {"text": "filesystem", "type": "attribute", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#dom-filesystementry-filesystem", "export": true, "normative": true, "for_": ["FileSystemEntry"]};
+window.refsData['#dom-filesystementry-getparent'] = {"text": "getParent(successCallback, errorCallback)", "type": "method", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#dom-filesystementry-getparent", "export": true, "normative": true, "for_": ["FileSystemEntry"]};
+window.refsData['#callbackdef-filesystementrycallback'] = {"text": "FileSystemEntryCallback", "type": "callback", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#callbackdef-filesystementrycallback", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#this'] = {"text": "this", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#this", "export": true, "normative": true, "for_": []};
+window.refsData['#file-entry'] = {"text": "file entry", "type": "dfn", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#file-entry", "export": true, "normative": true, "for_": []};
+window.refsData['#entry-name'] = {"text": "name", "type": "dfn", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#entry-name", "export": true, "normative": true, "for_": ["entry"]};
+window.refsData['#full-path'] = {"text": "full path", "type": "dfn", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#full-path", "export": true, "normative": true, "for_": []};
+window.refsData['#entry-file-system'] = {"text": "file system", "type": "dfn", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#entry-file-system", "export": true, "normative": true, "for_": ["entry"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task'] = {"text": "queue a task", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task", "export": true, "normative": true, "for_": []};
+window.refsData['#resolve-a-relative-path'] = {"text": "resolve a relative path", "type": "dfn", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#resolve-a-relative-path", "export": true, "normative": true, "for_": []};
+window.refsData['#evaluate-a-path'] = {"text": "evaluate a path", "type": "dfn", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#evaluate-a-path", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#invoke-a-callback-function'] = {"text": "invoke", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invoke-a-callback-function", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-create-exception'] = {"text": "created", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-create-exception", "export": true, "normative": true, "for_": ["exception"]};
+window.refsData['https://webidl.spec.whatwg.org/#notfounderror'] = {"text": "NotFoundError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#notfounderror", "export": true, "normative": true, "for_": []};
+window.refsData['#directory-name'] = {"text": "name", "type": "dfn", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#directory-name", "export": true, "normative": true, "for_": ["directory"]};
+window.refsData['#filesystemdirectoryentry'] = {"text": "FileSystemDirectoryEntry", "type": "interface", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#filesystemdirectoryentry", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-promise-objects'] = {"text": "promise", "type": "dfn", "spec": "ecma262", "shortname": "ecma262", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-promise-objects", "export": true, "normative": true, "for_": []};
+window.refsData['#filesystemdirectoryreader'] = {"text": "FileSystemDirectoryReader", "type": "interface", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#filesystemdirectoryreader", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-filesystemdirectoryentry-createreader'] = {"text": "createReader()", "type": "method", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#dom-filesystemdirectoryentry-createreader", "export": true, "normative": true, "for_": ["FileSystemDirectoryEntry"]};
+window.refsData['#dom-filesystemdirectoryentry-getfile'] = {"text": "getFile(path, options, successCallback, errorCallback)", "type": "method", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#dom-filesystemdirectoryentry-getfile", "export": true, "normative": true, "for_": ["FileSystemDirectoryEntry"]};
+window.refsData['#dictdef-filesystemflags'] = {"text": "FileSystemFlags", "type": "dictionary", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#dictdef-filesystemflags", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-filesystemdirectoryentry-getdirectory'] = {"text": "getDirectory(path, options, successCallback, errorCallback)", "type": "method", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#dom-filesystemdirectoryentry-getdirectory", "export": true, "normative": true, "for_": ["FileSystemDirectoryEntry"]};
+window.refsData['#dom-filesystemflags-create'] = {"text": "create", "type": "dict-member", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#dom-filesystemflags-create", "export": true, "normative": true, "for_": ["FileSystemFlags"]};
+window.refsData['#dom-filesystemflags-exclusive'] = {"text": "exclusive", "type": "dict-member", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#dom-filesystemflags-exclusive", "export": true, "normative": true, "for_": ["FileSystemFlags"]};
+window.refsData['#directory-reader'] = {"text": "directory reader", "type": "dfn", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#directory-reader", "export": true, "normative": true, "for_": []};
+window.refsData['#valid-path'] = {"text": "valid path", "type": "dfn", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#valid-path", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#securityerror'] = {"text": "SecurityError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#securityerror", "export": true, "normative": true, "for_": []};
+window.refsData['#file-name'] = {"text": "name", "type": "dfn", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#file-name", "export": true, "normative": true, "for_": ["file"]};
+window.refsData['#filesystemfileentry'] = {"text": "FileSystemFileEntry", "type": "interface", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#filesystemfileentry", "export": true, "normative": true, "for_": []};
+window.refsData['#callbackdef-filesystementriescallback'] = {"text": "FileSystemEntriesCallback", "type": "callback", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#callbackdef-filesystementriescallback", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['#reading-flag'] = {"text": "reading flag", "type": "dfn", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#reading-flag", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#invalidstateerror'] = {"text": "InvalidStateError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invalidstateerror", "export": true, "normative": true, "for_": []};
+window.refsData['#reader-error'] = {"text": "reader error", "type": "dfn", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#reader-error", "export": true, "normative": true, "for_": []};
+window.refsData['#done-flag'] = {"text": "done flag", "type": "dfn", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#done-flag", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-asynciterator-interface'] = {"text": "asynciterator", "type": "dfn", "spec": "ecma262", "shortname": "ecma262", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-asynciterator-interface", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-filesystemfileentry-file'] = {"text": "file(successCallback, errorCallback)", "type": "method", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#dom-filesystemfileentry-file", "export": true, "normative": true, "for_": ["FileSystemFileEntry"]};
+window.refsData['#callbackdef-filecallback'] = {"text": "FileCallback", "type": "callback", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#callbackdef-filecallback", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/FileAPI/#dfn-filereader'] = {"text": "FileReader", "type": "interface", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#dfn-filereader", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-filesystem-name'] = {"text": "name", "type": "attribute", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#dom-filesystem-name", "export": true, "normative": true, "for_": ["FileSystem"]};
+window.refsData['#dom-filesystem-root'] = {"text": "root", "type": "attribute", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#dom-filesystem-root", "export": true, "normative": true, "for_": ["FileSystem"]};
+window.refsData['#file-system-root'] = {"text": "root", "type": "dfn", "spec": "entries-api-1", "shortname": "entries-api", "level": "1", "status": "local", "url": "#file-system-root", "export": true, "normative": true, "for_": ["file system"]};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

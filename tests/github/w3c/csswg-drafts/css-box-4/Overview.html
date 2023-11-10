@@ -692,6 +692,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -1948,8 +1985,6 @@ body { padding: 1em 2em 3em } /* top=1em, right=2em, bottom=3em, left=2em */
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -2197,7 +2232,6 @@ body { padding: 1em 2em 3em } /* top=1em, right=2em, bottom=3em, left=2em */
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -2676,4 +2710,313 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://dom.spec.whatwg.org/#concept-document-tree'] = {"text": "document tree", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-document-tree", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#box'] = {"text": "box", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#box", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['https://svgwg.org/svg2-draft/coords.html#TermCanvas'] = {"text": "canvas", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/coords.html#TermCanvas", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#box-tree'] = {"text": "box tree", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#box-tree", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#sizing-property'] = {"text": "sizing property", "type": "dfn", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#sizing-property", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-padding'] = {"text": "padding", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-padding", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border'] = {"text": "border", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-margin'] = {"text": "margin", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-margin", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#css-wide-keywords'] = {"text": "css-wide keywords", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-first-line'] = {"text": "::first-line", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-first-line", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-first-letter'] = {"text": "::first-letter", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-first-letter", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#replaced-element'] = {"text": "replaced element", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#replaced-element", "export": true, "normative": true, "for_": []};
+window.refsData['#box-edge'] = {"text": "edge", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#box-edge", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#containing-block'] = {"text": "containing block", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#containing-block", "export": true, "normative": true, "for_": []};
+window.refsData['#content-edge'] = {"text": "content edge", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#content-edge", "export": true, "normative": true, "for_": []};
+window.refsData['#padding-edge'] = {"text": "padding edge", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#padding-edge", "export": true, "normative": true, "for_": []};
+window.refsData['#content-area'] = {"text": "content area", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#content-area", "export": true, "normative": true, "for_": []};
+window.refsData['#padding-area'] = {"text": "padding area", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#padding-area", "export": true, "normative": true, "for_": []};
+window.refsData['#border-edge'] = {"text": "border edge", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#border-edge", "export": true, "normative": true, "for_": []};
+window.refsData['#border-area'] = {"text": "border area", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#border-area", "export": true, "normative": true, "for_": []};
+window.refsData['#margin-edge'] = {"text": "margin edge", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#margin-edge", "export": true, "normative": true, "for_": []};
+window.refsData['#margin-area'] = {"text": "margin area", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#margin-area", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-background'] = {"text": "background", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-break-4/#box-fragment'] = {"text": "box fragment", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-break-4/#box-fragment", "export": true, "normative": true, "for_": []};
+window.refsData['#content-box'] = {"text": "content box", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#content-box", "export": true, "normative": true, "for_": []};
+window.refsData['#padding-box'] = {"text": "padding box", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#padding-box", "export": true, "normative": true, "for_": []};
+window.refsData['#border-box'] = {"text": "border box", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#border-box", "export": true, "normative": true, "for_": []};
+window.refsData['#margin-box'] = {"text": "margin box", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#margin-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-break-4/#propdef-box-decoration-break'] = {"text": "box-decoration-break", "type": "property", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-break-4/#propdef-box-decoration-break", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-transforms-1/#propdef-transform-box'] = {"text": "transform-box", "type": "property", "spec": "css-transforms-1", "shortname": "css-transforms", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transforms-1/#propdef-transform-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-background-clip'] = {"text": "background-clip", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background-clip", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-box-fill-box'] = {"text": "fill-box", "type": "value", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#valdef-box-fill-box", "export": true, "normative": true, "for_": ["<box>", "<geometry-box>", "<shape-box>"]};
+window.refsData['#valdef-box-stroke-box'] = {"text": "stroke-box", "type": "value", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#valdef-box-stroke-box", "export": true, "normative": true, "for_": ["<box>", "<geometry-box>", "<shape-box>"]};
+window.refsData['https://svgwg.org/svg2-draft/coords.html#TermObjectBoundingBox'] = {"text": "object bounding box", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/coords.html#TermObjectBoundingBox", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-box-content-box'] = {"text": "content-box", "type": "value", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#valdef-box-content-box", "export": true, "normative": true, "for_": ["<box>", "<geometry-box>", "<shape-box>"]};
+window.refsData['https://svgwg.org/svg2-draft/coords.html#TermStrokeBoundingBox'] = {"text": "stroke bounding box", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/coords.html#TermStrokeBoundingBox", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-box-border-box'] = {"text": "border-box", "type": "value", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#valdef-box-border-box", "export": true, "normative": true, "for_": ["<box>", "<geometry-box>", "<shape-box>"]};
+window.refsData['https://svgwg.org/svg2-draft/coords.html#TermSVGViewport'] = {"text": "svg viewports", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/coords.html#TermSVGViewport", "export": true, "normative": true, "for_": []};
+window.refsData['#box-svg-viewport-origin-box'] = {"text": "origin box", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#box-svg-viewport-origin-box", "export": true, "normative": true, "for_": ["<box>", "<geometry-box>", "<shape-box>"]};
+window.refsData['#typedef-visual-box'] = {"text": "<visual-box>", "type": "type", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#typedef-visual-box", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-layout-box'] = {"text": "<layout-box>", "type": "type", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#typedef-layout-box", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-paint-box'] = {"text": "<paint-box>", "type": "type", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#typedef-paint-box", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-coord-box'] = {"text": "<coord-box>", "type": "type", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#typedef-coord-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#shorthand-property'] = {"text": "shorthand property", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#shorthand-property", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#longhand'] = {"text": "longhand property", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#longhand", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#physical'] = {"text": "physical", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#physical", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#flow-relative'] = {"text": "flow-relative", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#flow-relative", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#block-layout'] = {"text": "block layout", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#block-layout", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-break-4/#fragmentation-break'] = {"text": "fragmentation break", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-break-4/#fragmentation-break", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-margin-top'] = {"text": "margin-top", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-margin-top", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-margin-right'] = {"text": "margin-right", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-margin-right", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-margin-bottom'] = {"text": "margin-bottom", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-margin-bottom", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-margin-left'] = {"text": "margin-left", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-margin-left", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#typedef-length-percentage'] = {"text": "<length-percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#typedef-length-percentage", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#internal-table-element'] = {"text": "internal table element", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#internal-table-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-ruby-1/#ruby-base-container-box'] = {"text": "ruby base container", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-ruby-1/#ruby-base-container-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-ruby-1/#ruby-annotation-container-box'] = {"text": "ruby annotation container", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-ruby-1/#ruby-annotation-container-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#logical-width'] = {"text": "logical width", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#logical-width", "export": true, "normative": true, "for_": []};
+window.refsData['#margin'] = {"text": "margin", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#margin", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-num-range'] = {"text": "{a,b}", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-num-range", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-margin-trim'] = {"text": "margin-trim", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-margin-trim", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#block-container'] = {"text": "block container", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#block-container", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-multicol-1/#multi-column-container'] = {"text": "multi-column container", "type": "dfn", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-multicol-1/#multi-column-container", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-margin-trim-in-flow'] = {"text": "in-flow", "type": "value", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#valdef-margin-trim-in-flow", "export": true, "normative": true, "for_": ["margin-trim"]};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#block-start'] = {"text": "block-start", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#block-start", "export": true, "normative": true, "for_": []};
+window.refsData['#outer-edge'] = {"text": "outer edge", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#outer-edge", "export": true, "normative": true, "for_": []};
+window.refsData['#inner-edge'] = {"text": "inner edge", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#inner-edge", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#inline-start'] = {"text": "inline-start", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#inline-start", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#inline-end'] = {"text": "inline-end", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#inline-end", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#inline-axis'] = {"text": "inline-axis", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#inline-axis", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#intrinsic-size-contribution'] = {"text": "intrinsic size contribution", "type": "dfn", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#intrinsic-size-contribution", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#size'] = {"text": "size", "type": "dfn", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#size", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#block-end'] = {"text": "block-end", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#block-end", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#block-size'] = {"text": "block size", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#block-size", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#block-formatting-context-root'] = {"text": "block formatting context root", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#block-formatting-context-root", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-flexbox-1/#flex-container'] = {"text": "flex container", "type": "dfn", "spec": "css-flexbox-1", "shortname": "css-flexbox", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-flexbox-1/#flex-container", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-grid-2/#grid-container'] = {"text": "grid container", "type": "dfn", "spec": "css-grid-2", "shortname": "css-grid", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-grid-2/#grid-container", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-break-4/#propdef-margin-break'] = {"text": "margin-break", "type": "property", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-break-4/#propdef-margin-break", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-break-4/#fragmentation-context'] = {"text": "fragmentation context", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-break-4/#fragmentation-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-background-origin'] = {"text": "background-origin", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background-origin", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-padding-top'] = {"text": "padding-top", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-padding-top", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-padding-right'] = {"text": "padding-right", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-padding-right", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-padding-bottom'] = {"text": "padding-bottom", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-padding-bottom", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-padding-left'] = {"text": "padding-left", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-padding-left", "export": true, "normative": true, "for_": []};
+window.refsData['#padding'] = {"text": "padding", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#padding", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#writing-mode'] = {"text": "writing mode", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#writing-mode", "export": true, "normative": true, "for_": []};window.refsData['#propdef-margin'] = {"text": "margin", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-margin", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-margin-bottom'] = {"text": "margin-bottom", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-margin-bottom", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-margin-left'] = {"text": "margin-left", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-margin-left", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-margin-right'] = {"text": "margin-right", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-margin-right", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-margin-top'] = {"text": "margin-top", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-margin-top", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-margin-trim'] = {"text": "margin-trim", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-margin-trim", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-padding'] = {"text": "padding", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-padding", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-padding-bottom'] = {"text": "padding-bottom", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-padding-bottom", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-padding-left'] = {"text": "padding-left", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-padding-left", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-padding-right'] = {"text": "padding-right", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-padding-right", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-padding-top'] = {"text": "padding-top", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-padding-top", "export": true, "normative": true, "for_": []};
 </script>

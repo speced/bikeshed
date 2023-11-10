@@ -471,6 +471,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -1138,8 +1175,6 @@ dfn > a.self-link::before      { content: "#"; }
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -1387,7 +1422,6 @@ dfn > a.self-link::before      { content: "#"; }
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -1777,4 +1811,257 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request'] = {"text": "request", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-url'] = {"text": "url", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-url", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://w3c.github.io/webappsec-secure-contexts/#potentially-trustworthy-url'] = {"text": "potentially trustworthy url", "type": "dfn", "spec": "secure-contexts", "shortname": "secure-contexts", "level": "1", "status": "current", "url": "https://w3c.github.io/webappsec-secure-contexts/#potentially-trustworthy-url", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response'] = {"text": "response", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response", "export": true, "normative": true, "for_": []};
+window.refsData['#unauthenticated-response'] = {"text": "unauthenticated response", "type": "dfn", "spec": "mixed-content-2-2", "shortname": "mixed-content-2", "level": "2", "status": "local", "url": "#unauthenticated-response", "export": true, "normative": true, "for_": []};
+window.refsData['#blockable-mixed-content'] = {"text": "blockable", "type": "dfn", "spec": "mixed-content-2-2", "shortname": "mixed-content-2", "level": "2", "status": "local", "url": "#blockable-mixed-content", "export": true, "normative": true, "for_": []};
+window.refsData['#upgradeable-mixed-content'] = {"text": "upgradeable", "type": "dfn", "spec": "mixed-content-2-2", "shortname": "mixed-content-2", "level": "2", "status": "local", "url": "#upgradeable-mixed-content", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response-url'] = {"text": "url", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response-url", "export": true, "normative": true, "for_": ["response"]};
+window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#concept-document-bc'] = {"text": "browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#concept-document-bc", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#doc-container-document'] = {"text": "container document", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#doc-container-document", "export": false, "normative": true, "for_": []};
+window.refsData['#mixed-content'] = {"text": "mixed content", "type": "dfn", "spec": "mixed-content-2-2", "shortname": "mixed-content-2", "level": "2", "status": "local", "url": "#mixed-content", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-initiator'] = {"text": "initiator", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-initiator", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-destination'] = {"text": "destination", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-destination", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element'] = {"text": "img", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-background-image'] = {"text": "background-image", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background-image", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border-image'] = {"text": "border-image", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-image", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/images.html#use-srcset-or-picture'] = {"text": "use srcset or picture", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/images.html#use-srcset-or-picture", "export": false, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#video'] = {"text": "video", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#video", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#the-source-element'] = {"text": "source", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#the-source-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#audio'] = {"text": "audio", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#audio", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#plugin'] = {"text": "plugin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#plugin", "export": false, "normative": true, "for_": []};
+window.refsData['https://xhr.spec.whatwg.org/#xmlhttprequest'] = {"text": "XMLHttpRequest", "type": "interface", "spec": "xhr", "shortname": "xhr", "level": "1", "status": "current", "url": "https://xhr.spec.whatwg.org/#xmlhttprequest", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#navigation-request'] = {"text": "navigation request", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#navigation-request", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context'] = {"text": "top-level browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-client'] = {"text": "client", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-client", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-mode'] = {"text": "mode", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-mode", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://url.spec.whatwg.org/#concept-url-scheme'] = {"text": "scheme", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-scheme", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object'] = {"text": "environment settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-origin'] = {"text": "origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-origin", "export": true, "normative": true, "for_": ["environment settings object"]};
+window.refsData['https://w3c.github.io/webappsec-secure-contexts/#potentially-trustworthy-origin'] = {"text": "potentially trustworthy origin", "type": "dfn", "spec": "secure-contexts", "shortname": "secure-contexts", "level": "1", "status": "current", "url": "https://w3c.github.io/webappsec-secure-contexts/#potentially-trustworthy-origin", "export": true, "normative": true, "for_": []};
+window.refsData['#embedding-document'] = {"text": "embedding document", "type": "dfn", "spec": "mixed-content-2-2", "shortname": "mixed-content-2", "level": "2", "status": "local", "url": "#embedding-document", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object'] = {"text": "relevant settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-environment-target-browsing-context'] = {"text": "target browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-environment-target-browsing-context", "export": true, "normative": true, "for_": ["environment"]};
+window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#nav-document'] = {"text": "active document", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#nav-document", "export": true, "normative": true, "for_": ["navigable"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-document-url'] = {"text": "url", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-document-url", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response-url-list'] = {"text": "url list", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response-url-list", "export": true, "normative": true, "for_": ["response"]};
+window.refsData['https://html.spec.whatwg.org/multipage/links.html#downloading-hyperlinks'] = {"text": "download the hyperlink", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/links.html#downloading-hyperlinks", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-node-document'] = {"text": "node document", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-node-document", "export": true, "normative": true, "for_": ["Node"]};
+window.refsData['https://html.spec.whatwg.org/multipage/forms.html#the-form-element'] = {"text": "form", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/forms.html#the-form-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#attr-fs-action'] = {"text": "action", "type": "element-attr", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#attr-fs-action", "export": true, "normative": true, "for_": ["form", "button"]};
 </script>

@@ -481,6 +481,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -3504,8 +3541,6 @@ simply as removing the animation from its animation? <a class="issue-return" hre
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -3753,7 +3788,6 @@ simply as removing the animation from its animation? <a class="issue-return" hre
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -4244,4 +4278,360 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#group-effect'] = {"text": "group effect", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#group-effect", "export": true, "normative": true, "for_": []};
+window.refsData['#sequence-effect'] = {"text": "sequence effect", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#sequence-effect", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#animation-effect'] = {"text": "animation effect", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#animation-effect", "export": true, "normative": true, "for_": []};
+window.refsData['#animation-effect-playback-rate'] = {"text": "animation effect playback rate", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#animation-effect-playback-rate", "export": true, "normative": true, "for_": []};
+window.refsData['#custom-effect'] = {"text": "custom effect", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#custom-effect", "export": true, "normative": true, "for_": []};
+window.refsData['#descendant'] = {"text": "descendant", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#descendant", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#timeline'] = {"text": "timeline", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#timeline", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#animation-play-state'] = {"text": "play state", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#animation-play-state", "export": true, "normative": true, "for_": ["animation"]};
+window.refsData['https://drafts.csswg.org/web-animations-1/#current-time'] = {"text": "current time", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#current-time", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-gcpm-3/#propdef-running'] = {"text": "running", "type": "property", "spec": "css-gcpm-3", "shortname": "css-gcpm", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-gcpm-3/#propdef-running", "export": true, "normative": false, "for_": []};
+window.refsData['https://drafts.csswg.org/css-transitions-1/#transition-start-time'] = {"text": "start time", "type": "dfn", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transitions-1/#transition-start-time", "export": true, "normative": true, "for_": ["transition"]};
+window.refsData['https://drafts.csswg.org/web-animations-1/#animation-hold-time'] = {"text": "hold time", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#animation-hold-time", "export": true, "normative": true, "for_": ["animation"]};
+window.refsData['#set-the-current-time'] = {"text": "set the current time", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#set-the-current-time", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#unresolved'] = {"text": "unresolved", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#unresolved", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#finished-play-state'] = {"text": "finished play state", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#finished-play-state", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#iteration-progress'] = {"text": "iteration progress", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#iteration-progress", "export": true, "normative": true, "for_": []};
+window.refsData['#pending-play-task'] = {"text": "pending play task", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#pending-play-task", "export": true, "normative": true, "for_": []};
+window.refsData['#parent-group'] = {"text": "parent group", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#parent-group", "export": true, "normative": true, "for_": []};
+window.refsData['#remove-an-animation-effect'] = {"text": "remove an animation effect", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#remove-an-animation-effect", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#target-effect'] = {"text": "target effect", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#target-effect", "export": true, "normative": true, "for_": []};
+window.refsData['#inclusive-descendant'] = {"text": "inclusive descendant", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#inclusive-descendant", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#keyframe-effect'] = {"text": "keyframe effect", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#keyframe-effect", "export": true, "normative": true, "for_": []};
+window.refsData['https://heycam.github.io/webidl/#dfn-throw'] = {"text": "throw", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "", "status": "anchor-block", "url": "https://heycam.github.io/webidl/#dfn-throw", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#inactive-timeline'] = {"text": "inactive timeline", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#inactive-timeline", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#time-value'] = {"text": "time value", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#time-value", "export": true, "normative": true, "for_": []};
+window.refsData['#silently-set-the-current-time'] = {"text": "silently set the current time", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#silently-set-the-current-time", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#animation'] = {"text": "animation", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#animation", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#invalidstateerror'] = {"text": "InvalidStateError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invalidstateerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMException'] = {"text": "DOMException", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMException", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#a-new-promise'] = {"text": "a new promise", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#a-new-promise", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-realm'] = {"text": "relevant realm", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-realm", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#ready'] = {"text": "ready", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#ready", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#animation-associated-effect'] = {"text": "associated effect", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#animation-associated-effect", "export": true, "normative": true, "for_": ["animation"]};
+window.refsData['https://drafts.csswg.org/web-animations-1/#current-finished-promise'] = {"text": "current finished promise", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#current-finished-promise", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#perform-a-microtask-checkpoint'] = {"text": "perform a microtask checkpoint", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#perform-a-microtask-checkpoint", "export": true, "normative": true, "for_": []};
+window.refsData['#play-an-animation'] = {"text": "play an animation", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#play-an-animation", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#pause-an-animation'] = {"text": "pause an animation", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#pause-an-animation", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#cancel-an-animation'] = {"text": "cancel an animation", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#cancel-an-animation", "export": true, "normative": true, "for_": []};
+window.refsData['#root'] = {"text": "root", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#root", "export": true, "normative": true, "for_": []};
+window.refsData['#ancestor'] = {"text": "ancestor", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#ancestor", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#active-interval'] = {"text": "active interval", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#active-interval", "export": true, "normative": true, "for_": []};
+window.refsData['#animation-effect-start-time'] = {"text": "animation effect start time", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#animation-effect-start-time", "export": true, "normative": true, "for_": []};
+window.refsData['#start-delay'] = {"text": "start delay", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#start-delay", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#end-delay'] = {"text": "end delay", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#end-delay", "export": true, "normative": true, "for_": []};
+window.refsData['#inherited-time'] = {"text": "inherited time", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#inherited-time", "export": true, "normative": true, "for_": []};
+window.refsData['#local-time'] = {"text": "local time", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#local-time", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#active-time'] = {"text": "active time", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#active-time", "export": true, "normative": true, "for_": []};
+window.refsData['#end-time'] = {"text": "end time", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#end-time", "export": true, "normative": true, "for_": []};
+window.refsData['#active-duration'] = {"text": "active duration", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#active-duration", "export": true, "normative": true, "for_": []};
+window.refsData['#transformed-time'] = {"text": "transformed time", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#transformed-time", "export": true, "normative": true, "for_": []};
+window.refsData['#in-play'] = {"text": "in play", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#in-play", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#active-phase'] = {"text": "active phase", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#active-phase", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#fill-mode'] = {"text": "fill mode", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#fill-mode", "export": true, "normative": true, "for_": []};
+window.refsData['#current'] = {"text": "current", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#current", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#before-phase'] = {"text": "before phase", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#before-phase", "export": true, "normative": true, "for_": []};
+window.refsData['#associated-with-an-animation'] = {"text": "associated with an animation", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#associated-with-an-animation", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#after-phase'] = {"text": "after phase", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#after-phase", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-easing-2/#easing-function'] = {"text": "timing function", "type": "dfn", "spec": "css-easing-2", "shortname": "css-easing", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-easing-2/#easing-function", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#iteration-duration'] = {"text": "iteration duration", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#iteration-duration", "export": true, "normative": true, "for_": []};
+window.refsData['#intrinsic-iteration-duration'] = {"text": "intrinsic iteration duration", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#intrinsic-iteration-duration", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#animation-playback-rate'] = {"text": "animation playback rate", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#animation-playback-rate", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#iteration-count'] = {"text": "iteration count", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#iteration-count", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#transformed-progress'] = {"text": "transformed progress", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#transformed-progress", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#iteration-start'] = {"text": "iteration start", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#iteration-start", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#overall-progress'] = {"text": "overall progress", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#overall-progress", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#simple-iteration-progress'] = {"text": "simple iteration progress", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#simple-iteration-progress", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#directed-progress'] = {"text": "directed progress", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#directed-progress", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#playback-direction'] = {"text": "playback direction", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#playback-direction", "export": true, "normative": true, "for_": []};
+window.refsData['#repeated-duration'] = {"text": "repeated duration", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#repeated-duration", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-easing-1/#linear-easing-function'] = {"text": "linear timing function", "type": "dfn", "spec": "css-easing-1", "shortname": "css-easing", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-easing-1/#linear-easing-function", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#before-flag'] = {"text": "before flag", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#before-flag", "export": true, "normative": true, "for_": []};
+window.refsData['#child-effect'] = {"text": "child effect", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#child-effect", "export": true, "normative": true, "for_": []};
+window.refsData['#previous-sibling'] = {"text": "previous sibling", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#previous-sibling", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#not-animatable'] = {"text": "not animatable", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#not-animatable", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#effect-value'] = {"text": "effect value", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#effect-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#target-property'] = {"text": "target property", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#target-property", "export": true, "normative": true, "for_": []};
+window.refsData['#iteration-composite-operation'] = {"text": "iteration composite operation", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#iteration-composite-operation", "export": true, "normative": true, "for_": []};
+window.refsData['#iteration-composite-operation-accumulate'] = {"text": "iteration composite operation accumulate", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#iteration-composite-operation-accumulate", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#accumulation'] = {"text": "value accumulation", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#accumulation", "export": true, "normative": true, "for_": []};
+window.refsData['#tree-order'] = {"text": "tree order", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#tree-order", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#current-iteration'] = {"text": "current iteration", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#current-iteration", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#update-animations-and-send-events'] = {"text": "update animations and send events", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#update-animations-and-send-events", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#in-effect'] = {"text": "in effect", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#in-effect", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#target-element'] = {"text": "target element", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#target-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#animationtimeline'] = {"text": "AnimationTimeline", "type": "interface", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#animationtimeline", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-animationtimeline-play'] = {"text": "play()", "type": "method", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#dom-animationtimeline-play", "export": true, "normative": true, "for_": ["AnimationTimeline"]};
+window.refsData['https://drafts.csswg.org/web-animations-1/#animationeffect'] = {"text": "AnimationEffect", "type": "interface", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#animationeffect", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-animationtimeline-play-effect-effect'] = {"text": "effect", "type": "argument", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#dom-animationtimeline-play-effect-effect", "export": true, "normative": true, "for_": ["AnimationTimeline/play(effect)"]};
+window.refsData['https://drafts.csswg.org/web-animations-1/#dom-animation-animation'] = {"text": "Animation()", "type": "constructor", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#dom-animation-animation", "export": true, "normative": true, "for_": ["Animation"]};
+window.refsData['#groupeffect'] = {"text": "GroupEffect", "type": "interface", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#groupeffect", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-animationeffect-parent'] = {"text": "parent", "type": "attribute", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#dom-animationeffect-parent", "export": true, "normative": true, "for_": ["AnimationEffect"]};
+window.refsData['#dom-animationeffect-previoussibling'] = {"text": "previousSibling", "type": "attribute", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#dom-animationeffect-previoussibling", "export": true, "normative": true, "for_": ["AnimationEffect"]};
+window.refsData['#dom-animationeffect-nextsibling'] = {"text": "nextSibling", "type": "attribute", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#dom-animationeffect-nextsibling", "export": true, "normative": true, "for_": ["AnimationEffect"]};
+window.refsData['#dom-animationeffect-before'] = {"text": "before()", "type": "method", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#dom-animationeffect-before", "export": true, "normative": true, "for_": ["AnimationEffect"]};
+window.refsData['#dom-animationeffect-after'] = {"text": "after()", "type": "method", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#dom-animationeffect-after", "export": true, "normative": true, "for_": ["AnimationEffect"]};
+window.refsData['#dom-animationeffect-replace'] = {"text": "replace()", "type": "method", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#dom-animationeffect-replace", "export": true, "normative": true, "for_": ["AnimationEffect"]};
+window.refsData['#dom-animationeffect-remove'] = {"text": "remove()", "type": "method", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#dom-animationeffect-remove", "export": true, "normative": true, "for_": ["AnimationEffect"]};
+window.refsData['#next-sibling'] = {"text": "next sibling", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#next-sibling", "export": true, "normative": true, "for_": []};
+window.refsData['#inclusive-ancestor'] = {"text": "inclusive ancestor", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#inclusive-ancestor", "export": true, "normative": true, "for_": []};
+window.refsData['#insert-children'] = {"text": "insert children", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#insert-children", "export": true, "normative": true, "for_": []};
+window.refsData['#next-sibling-not-included'] = {"text": "next sibling not included", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#next-sibling-not-included", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#dictdef-effecttiming'] = {"text": "EffectTiming", "type": "dictionary", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#dictdef-effecttiming", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-double'] = {"text": "double", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-double", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-effecttiming-playbackrate'] = {"text": "playbackRate", "type": "dict-member", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#dom-effecttiming-playbackrate", "export": true, "normative": true, "for_": ["EffectTiming"]};
+window.refsData['https://drafts.csswg.org/web-animations-1/#dictdef-optionaleffecttiming'] = {"text": "OptionalEffectTiming", "type": "dictionary", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#dictdef-optionaleffecttiming", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#dictdef-computedeffecttiming'] = {"text": "ComputedEffectTiming", "type": "dictionary", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#dictdef-computedeffecttiming", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-computedeffecttiming-starttime'] = {"text": "startTime", "type": "dict-member", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#dom-computedeffecttiming-starttime", "export": true, "normative": true, "for_": ["ComputedEffectTiming"]};
+window.refsData['https://drafts.csswg.org/web-animations-1/#keyframeeffect'] = {"text": "KeyframeEffect", "type": "interface", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#keyframeeffect", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-groupeffect-groupeffect'] = {"text": "GroupEffect(children, timing)", "type": "constructor", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#dom-groupeffect-groupeffect", "export": true, "normative": true, "for_": ["GroupEffect"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-groupeffect-groupeffect-children-timing-children'] = {"text": "children", "type": "argument", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#dom-groupeffect-groupeffect-children-timing-children", "export": true, "normative": true, "for_": ["GroupEffect/GroupEffect(children, timing)"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unrestricted-double'] = {"text": "unrestricted double", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unrestricted-double", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-groupeffect-groupeffect-children-timing-timing'] = {"text": "timing", "type": "argument", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#dom-groupeffect-groupeffect-children-timing-timing", "export": true, "normative": true, "for_": ["GroupEffect/GroupEffect(children, timing)"]};
+window.refsData['#animationnodelist'] = {"text": "AnimationNodeList", "type": "interface", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#animationnodelist", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-groupeffect-children'] = {"text": "children", "type": "attribute", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#dom-groupeffect-children", "export": true, "normative": true, "for_": ["GroupEffect"]};
+window.refsData['#dom-groupeffect-firstchild'] = {"text": "firstChild", "type": "attribute", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#dom-groupeffect-firstchild", "export": true, "normative": true, "for_": ["GroupEffect"]};
+window.refsData['#dom-groupeffect-lastchild'] = {"text": "lastChild", "type": "attribute", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#dom-groupeffect-lastchild", "export": true, "normative": true, "for_": ["GroupEffect"]};
+window.refsData['#dom-groupeffect-clone'] = {"text": "clone()", "type": "method", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#dom-groupeffect-clone", "export": true, "normative": true, "for_": ["GroupEffect"]};
+window.refsData['#dom-groupeffect-prepend'] = {"text": "prepend()", "type": "method", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#dom-groupeffect-prepend", "export": true, "normative": true, "for_": ["GroupEffect"]};
+window.refsData['#dom-groupeffect-append'] = {"text": "append()", "type": "method", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#dom-groupeffect-append", "export": true, "normative": true, "for_": ["GroupEffect"]};
+window.refsData['#process-a-timing-argument'] = {"text": "process a timing argument", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#process-a-timing-argument", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-2/#dom-effecttiming-duration'] = {"text": "duration", "type": "dict-member", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "current", "url": "https://drafts.csswg.org/web-animations-2/#dom-effecttiming-duration", "export": true, "normative": true, "for_": ["EffectTiming"]};
+window.refsData['https://drafts.csswg.org/web-animations-1/#update-the-timing-properties-of-an-animation-effect'] = {"text": "update the timing properties of an animation effect", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#update-the-timing-properties-of-an-animation-effect", "export": true, "normative": true, "for_": []};
+window.refsData['#first-child'] = {"text": "first child", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#first-child", "export": true, "normative": true, "for_": []};
+window.refsData['#last-child'] = {"text": "last child", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#last-child", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-sequenceeffect-sequenceeffect'] = {"text": "SequenceEffect()", "type": "constructor", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#dom-sequenceeffect-sequenceeffect", "export": true, "normative": true, "for_": ["SequenceEffect"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-long'] = {"text": "unsigned long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-long", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-animationnodelist-length'] = {"text": "length", "type": "attribute", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#dom-animationnodelist-length", "export": true, "normative": true, "for_": ["AnimationNodeList"]};
+window.refsData['#dom-animationnodelist-item'] = {"text": "item(index)", "type": "method", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#dom-animationnodelist-item", "export": true, "normative": true, "for_": ["AnimationNodeList"]};
+window.refsData['#sequenceeffect'] = {"text": "SequenceEffect", "type": "interface", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#sequenceeffect", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-sequenceeffect-clone'] = {"text": "clone()", "type": "method", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#dom-sequenceeffect-clone", "export": true, "normative": true, "for_": ["SequenceEffect"]};
+window.refsData['#enumdef-iterationcompositeoperation'] = {"text": "IterationCompositeOperation", "type": "enum", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#enumdef-iterationcompositeoperation", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-keyframeeffect-iterationcomposite'] = {"text": "iterationComposite", "type": "attribute", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#dom-keyframeeffect-iterationcomposite", "export": true, "normative": true, "for_": ["KeyframeEffect"]};
+window.refsData['https://drafts.csswg.org/web-animations-1/#dictdef-keyframeeffectoptions'] = {"text": "KeyframeEffectOptions", "type": "dictionary", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#dictdef-keyframeeffectoptions", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#dom-keyframeeffect-composite'] = {"text": "composite", "type": "attribute", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#dom-keyframeeffect-composite", "export": true, "normative": true, "for_": ["KeyframeEffect"]};
+window.refsData['https://drafts.csswg.org/web-animations-1/#dom-keyframeeffect-keyframeeffect-source-source'] = {"text": "source", "type": "argument", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#dom-keyframeeffect-keyframeeffect-source-source", "export": true, "normative": true, "for_": ["KeyframeEffect/KeyframeEffect(source)"]};
+window.refsData['#iterationcompositeoperation'] = {"text": "iterationcompositeoperation", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#iterationcompositeoperation", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#propdef-visibility'] = {"text": "visibility", "type": "property", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#propdef-visibility", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-keyframeeffectoptions-iterationcomposite'] = {"text": "iterationComposite", "type": "dict-member", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#dom-keyframeeffectoptions-iterationcomposite", "export": true, "normative": true, "for_": ["KeyframeEffectOptions"]};
+window.refsData['#iteration-composite-operation-replace'] = {"text": "iteration composite operation replace", "type": "dfn", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#iteration-composite-operation-replace", "export": true, "normative": true, "for_": []};
+window.refsData['#callbackdef-effectcallback'] = {"text": "EffectCallback", "type": "callback", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "local", "url": "#callbackdef-effectcallback", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#element'] = {"text": "Element", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#element", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#csspseudoelement'] = {"text": "CSSPseudoElement", "type": "interface", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#csspseudoelement", "export": true, "normative": true, "for_": []};
 </script>

@@ -480,6 +480,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -1569,8 +1606,6 @@ CSS<c- p>.</c->highlights<c- p>.</c->set<c- p>(</c-><c- t>'bar'</c-><c- p>,</c->
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -1818,7 +1853,6 @@ CSS<c- p>.</c->highlights<c- p>.</c->set<c- p>(</c-><c- t>'bar'</c-><c- p>,</c->
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -2217,6 +2251,271 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#highlight-pseudo-element'] = {"text": "highlight pseudo-element", "type": "dfn", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#highlight-pseudo-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-selection'] = {"text": "::selection", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-selection", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-spelling-error'] = {"text": "::spelling-error", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-spelling-error", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-range'] = {"text": "range", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-range", "export": true, "normative": true, "for_": []};
+window.refsData['#selectordef-highlight-custom-highlight-name'] = {"text": "::highlight(<custom-highlight-name>)", "type": "selector", "spec": "css-highlight-api-1", "shortname": "css-highlight-api", "level": "1", "status": "local", "url": "#selectordef-highlight-custom-highlight-name", "export": true, "normative": true, "for_": []};
+window.refsData['#highlight'] = {"text": "Highlight", "type": "interface", "spec": "css-highlight-api-1", "shortname": "css-highlight-api", "level": "1", "status": "local", "url": "#highlight", "export": true, "normative": true, "for_": []};
+window.refsData['#highlightregistry'] = {"text": "HighlightRegistry", "type": "interface", "spec": "css-highlight-api-1", "shortname": "css-highlight-api", "level": "1", "status": "local", "url": "#highlightregistry", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#range'] = {"text": "Range", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#range", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/selectors-4/#pseudo-element'] = {"text": "pseudo-element", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "current", "url": "https://drafts.csswg.org/selectors-4/#pseudo-element", "export": true, "normative": true, "for_": []};
+window.refsData['#custom-highlight'] = {"text": "custom highlight", "type": "dfn", "spec": "css-highlight-api-1", "shortname": "css-highlight-api", "level": "1", "status": "local", "url": "#custom-highlight", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-setlike'] = {"text": "setlike", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-setlike", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-set-entries'] = {"text": "set entries", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-set-entries", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#abstractrange'] = {"text": "AbstractRange", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#abstractrange", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#staticrange'] = {"text": "StaticRange", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#staticrange", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-highlight-highlight'] = {"text": "Highlight(...initialRanges)", "type": "constructor", "spec": "css-highlight-api-1", "shortname": "css-highlight-api", "level": "1", "status": "local", "url": "#dom-highlight-highlight", "export": true, "normative": true, "for_": ["Highlight"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-long'] = {"text": "long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-long", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-highlight-priority'] = {"text": "priority", "type": "attribute", "spec": "css-highlight-api-1", "shortname": "css-highlight-api", "level": "1", "status": "local", "url": "#dom-highlight-priority", "export": true, "normative": true, "for_": ["Highlight"]};
+window.refsData['#dom-highlight-highlight-initialranges-initialranges'] = {"text": "initialRanges", "type": "argument", "spec": "css-highlight-api-1", "shortname": "css-highlight-api", "level": "1", "status": "local", "url": "#dom-highlight-highlight-initialranges-initialranges", "export": true, "normative": true, "for_": ["Highlight/Highlight()", "Highlight/Highlight(...initialRanges)", "Highlight/constructor()", "Highlight/constructor(...initialRanges)"]};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-convert-idl-to-ecmascript-value'] = {"text": "converted to an ecmascript value", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-convert-idl-to-ecmascript-value", "export": true, "normative": true, "for_": []};
+window.refsData['#registered'] = {"text": "registered", "type": "dfn", "spec": "css-highlight-api-1", "shortname": "css-highlight-api", "level": "1", "status": "local", "url": "#registered", "export": true, "normative": true, "for_": []};
+window.refsData['#highlight-registry'] = {"text": "highlight registry", "type": "dfn", "spec": "css-highlight-api-1", "shortname": "css-highlight-api", "level": "1", "status": "local", "url": "#highlight-registry", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-css-highlights'] = {"text": "highlights", "type": "attribute", "spec": "css-highlight-api-1", "shortname": "css-highlight-api", "level": "1", "status": "local", "url": "#dom-css-highlights", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['https://drafts.csswg.org/cssom-1/#namespacedef-css'] = {"text": "CSS", "type": "namespace", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#namespacedef-css", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#current-global-object'] = {"text": "current global object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#current-global-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#concept-document-window'] = {"text": "associated document", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#concept-document-window", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-maplike'] = {"text": "maplike", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-maplike", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-map-entries'] = {"text": "map entries", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-map-entries", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['#custom-highlight-name'] = {"text": "custom highlight name", "type": "dfn", "spec": "css-highlight-api-1", "shortname": "css-highlight-api", "level": "1", "status": "local", "url": "#custom-highlight-name", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#css-css-identifier'] = {"text": "identifier", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-css-identifier", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#style-rule'] = {"text": "style rule", "type": "dfn", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#style-rule", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/selectors-4/#specificity'] = {"text": "specificity", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "current", "url": "https://drafts.csswg.org/selectors-4/#specificity", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-custom-highlight-name'] = {"text": "<custom-highlight-name>", "type": "type", "spec": "css-highlight-api-1", "shortname": "css-highlight-api", "level": "1", "status": "local", "url": "#typedef-custom-highlight-name", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#contained'] = {"text": "contained", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#contained", "export": true, "normative": true, "for_": ["live range"]};
+window.refsData['https://dom.spec.whatwg.org/#partially-contained'] = {"text": "partially contained", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#partially-contained", "export": true, "normative": true, "for_": ["live range"]};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#typedef-ident-token'] = {"text": "<ident-token>", "type": "type", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#typedef-ident-token", "export": true, "normative": true, "for_": []};
+window.refsData['#custom-highlight-pseudo-element'] = {"text": "custom highlight pseudo-element", "type": "dfn", "spec": "css-highlight-api-1", "shortname": "css-highlight-api", "level": "1", "status": "local", "url": "#custom-highlight-pseudo-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-cascade-6/#cascade'] = {"text": "cascade", "type": "dfn", "spec": "css-cascade-6", "shortname": "css-cascade", "level": "6", "status": "current", "url": "https://drafts.csswg.org/css-cascade-6/#cascade", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#css-inheritance'] = {"text": "inheritance", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#css-inheritance", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['https://dom.spec.whatwg.org/#range-collapsed'] = {"text": "collapsed", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#range-collapsed", "export": true, "normative": true, "for_": ["range"]};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#highlight-overlay'] = {"text": "highlight overlay", "type": "dfn", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#highlight-overlay", "export": false, "normative": true, "for_": []};
+window.refsData['#priority'] = {"text": "priority", "type": "dfn", "spec": "css-highlight-api-1", "shortname": "css-highlight-api", "level": "1", "status": "local", "url": "#priority", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-range-bp'] = {"text": "boundary point", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-range-bp", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-live-range'] = {"text": "live ranges", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-live-range", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-range-start-node'] = {"text": "start node", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-range-start-node", "export": true, "normative": true, "for_": ["range"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-range-end-node'] = {"text": "end node", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-range-end-node", "export": true, "normative": true, "for_": ["range"]};
+window.refsData['https://dom.spec.whatwg.org/#node'] = {"text": "Node", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#node", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#in-a-document-tree'] = {"text": "in a document tree", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#in-a-document-tree", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-range-start-offset'] = {"text": "start offset", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-range-start-offset", "export": true, "normative": true, "for_": ["range"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-range-end-offset'] = {"text": "end offset", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-range-end-offset", "export": true, "normative": true, "for_": ["range"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-node-length'] = {"text": "length", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-node-length", "export": true, "normative": true, "for_": ["Node"]};
+window.refsData['https://drafts.csswg.org/css-contain-2/#style-containment'] = {"text": "style containment", "type": "dfn", "spec": "css-contain-2", "shortname": "css-contain", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-contain-2/#style-containment", "export": true, "normative": true, "for_": []};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

@@ -488,6 +488,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -2479,8 +2516,6 @@ authoring advice.</p>
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -2728,7 +2763,6 @@ authoring advice.</p>
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -3229,6 +3263,373 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://html.spec.whatwg.org/multipage/dom.html#dom-document-cookie'] = {"text": "cookie", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dom.html#dom-document-cookie", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['#script-visible'] = {"text": "script-visible", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#script-visible", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-document'] = {"text": "document", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-document", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#dfn-service-worker'] = {"text": "service worker", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#dfn-service-worker", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-window-cookiestore'] = {"text": "cookieStore", "type": "attribute", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-window-cookiestore", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['#dom-cookiestore-get-options'] = {"text": "get()", "type": "method", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-cookiestore-get-options", "export": true, "normative": true, "for_": ["CookieStore"]};
+window.refsData['#dom-cookiestore-getall-options'] = {"text": "getAll()", "type": "method", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-cookiestore-getall-options", "export": true, "normative": true, "for_": ["CookieStore"]};
+window.refsData['#cookiestore'] = {"text": "CookieStore", "type": "interface", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#cookiestore", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-promise-objects'] = {"text": "promise", "type": "dfn", "spec": "ecma262", "shortname": "ecma262", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-promise-objects", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-fetch'] = {"text": "fetch", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-fetch", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#dfn-scope-url'] = {"text": "scope url", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#dfn-scope-url", "export": true, "normative": true, "for_": ["service worker registration"]};
+window.refsData['#dom-cookiestoregetoptions-url'] = {"text": "url", "type": "dict-member", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-cookiestoregetoptions-url", "export": true, "normative": true, "for_": ["CookieStoreGetOptions"]};
+window.refsData['#cookie-name'] = {"text": "name", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#cookie-name", "export": true, "normative": true, "for_": ["cookie"]};
+window.refsData['#cookie-value'] = {"text": "value", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#cookie-value", "export": true, "normative": true, "for_": ["cookie"]};
+window.refsData['#dom-cookiestore-set'] = {"text": "set(name, value)", "type": "method", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-cookiestore-set", "export": true, "normative": true, "for_": ["CookieStore"]};
+window.refsData['#dom-cookiestore-delete'] = {"text": "delete(name)", "type": "method", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-cookiestore-delete", "export": true, "normative": true, "for_": ["CookieStore"]};
+window.refsData['#dom-cookiestoremanager-subscribe'] = {"text": "subscribe(subscriptions)", "type": "method", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-cookiestoremanager-subscribe", "export": true, "normative": true, "for_": ["CookieStoreManager"]};
+window.refsData['https://w3c.github.io/ServiceWorker/#dfn-service-worker-registration'] = {"text": "service worker registration", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#dfn-service-worker-registration", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-color-3/#window'] = {"text": "window", "type": "dfn", "spec": "css-color-3", "shortname": "css-color", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-color-3/#window", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cookiestoremanager-getsubscriptions'] = {"text": "getSubscriptions()", "type": "method", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-cookiestoremanager-getsubscriptions", "export": true, "normative": true, "for_": ["CookieStoreManager"]};
+window.refsData['#cookie'] = {"text": "cookie", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#cookie", "export": true, "normative": true, "for_": []};
+window.refsData['#cookie-store'] = {"text": "cookie store", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#cookie-store", "export": true, "normative": true, "for_": []};
+window.refsData['#process-cookie-changes'] = {"text": "process cookie changes", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#process-cookie-changes", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list'] = {"text": "list", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list", "export": true, "normative": true, "for_": []};
+window.refsData['#cookie-change-subscription'] = {"text": "cookie change subscription", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#cookie-change-subscription", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#tuple'] = {"text": "tuple", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#tuple", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#SecureContext'] = {"text": "SecureContext", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SecureContext", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#eventtarget'] = {"text": "EventTarget", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#eventtarget", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-promise'] = {"text": "Promise", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-promise", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-cookielistitem'] = {"text": "CookieListItem", "type": "dictionary", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dictdef-cookielistitem", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cookiestore-get'] = {"text": "get(name)", "type": "method", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-cookiestore-get", "export": true, "normative": true, "for_": ["CookieStore"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-USVString'] = {"text": "USVString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-USVString", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-cookiestoregetoptions'] = {"text": "CookieStoreGetOptions", "type": "dictionary", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dictdef-cookiestoregetoptions", "export": true, "normative": true, "for_": []};
+window.refsData['#typedefdef-cookielist'] = {"text": "CookieList", "type": "typedef", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#typedefdef-cookielist", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cookiestore-getall'] = {"text": "getAll(name)", "type": "method", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-cookiestore-getall", "export": true, "normative": true, "for_": ["CookieStore"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cookiestore-set-options'] = {"text": "set(options)", "type": "method", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-cookiestore-set-options", "export": true, "normative": true, "for_": ["CookieStore"]};
+window.refsData['#dictdef-cookieinit'] = {"text": "CookieInit", "type": "dictionary", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dictdef-cookieinit", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cookiestore-delete-options'] = {"text": "delete(options)", "type": "method", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-cookiestore-delete-options", "export": true, "normative": true, "for_": ["CookieStore"]};
+window.refsData['#dictdef-cookiestoredeleteoptions'] = {"text": "CookieStoreDeleteOptions", "type": "dictionary", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dictdef-cookiestoredeleteoptions", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler'] = {"text": "EventHandler", "type": "typedef", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler", "export": true, "normative": true, "for_": []};
+window.refsData['#enumdef-cookiesamesite'] = {"text": "CookieSameSite", "type": "enum", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#enumdef-cookiesamesite", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-history-replacestate'] = {"text": "replaceState(data, unused, url)", "type": "method", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-history-replacestate", "export": true, "normative": true, "for_": ["History"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#dom-document-domain'] = {"text": "domain", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#dom-document-domain", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#current-settings-object'] = {"text": "current settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#current-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#concept-origin'] = {"text": "origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-origin", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#concept-origin-opaque'] = {"text": "opaque origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-origin-opaque", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#a-promise-rejected-with'] = {"text": "a promise rejected with", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#a-promise-rejected-with", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#securityerror'] = {"text": "SecurityError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#securityerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMException'] = {"text": "DOMException", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMException", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-environment-creation-url'] = {"text": "creation url", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-environment-creation-url", "export": true, "normative": true, "for_": ["environment"]};
+window.refsData['https://webidl.spec.whatwg.org/#a-new-promise'] = {"text": "a new promise", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#a-new-promise", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel'] = {"text": "in parallel", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel", "export": true, "normative": true, "for_": []};
+window.refsData['#query-cookies'] = {"text": "query cookies", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#query-cookies", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#reject'] = {"text": "reject", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#reject", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#exceptiondef-typeerror'] = {"text": "TypeError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#exceptiondef-typeerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-is-empty'] = {"text": "is empty", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-is-empty", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['https://webidl.spec.whatwg.org/#resolve'] = {"text": "resolve", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#resolve", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#concept-basic-url-parser'] = {"text": "basic url parser", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-basic-url-parser", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#this'] = {"text": "this", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#this", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object'] = {"text": "relevant settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#api-base-url'] = {"text": "api base url", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#api-base-url", "export": true, "normative": true, "for_": ["environment settings object"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#current-global-object'] = {"text": "current global object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#current-global-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#window'] = {"text": "Window", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#concept-url-equals'] = {"text": "equal", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-equals", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['https://url.spec.whatwg.org/#concept-url-origin'] = {"text": "origin", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-origin", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#same-origin'] = {"text": "same origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#same-origin", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cookiestoregetoptions-name'] = {"text": "name", "type": "dict-member", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-cookiestoregetoptions-name", "export": true, "normative": true, "for_": ["CookieStoreGetOptions"]};
+window.refsData['#set-a-cookie'] = {"text": "set a cookie", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#set-a-cookie", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cookieinit-name'] = {"text": "name", "type": "dict-member", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-cookieinit-name", "export": true, "normative": true, "for_": ["CookieInit"]};
+window.refsData['#dom-cookieinit-value'] = {"text": "value", "type": "dict-member", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-cookieinit-value", "export": true, "normative": true, "for_": ["CookieInit"]};
+window.refsData['#dom-cookieinit-expires'] = {"text": "expires", "type": "dict-member", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-cookieinit-expires", "export": true, "normative": true, "for_": ["CookieInit"]};
+window.refsData['#dom-cookieinit-domain'] = {"text": "domain", "type": "dict-member", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-cookieinit-domain", "export": true, "normative": true, "for_": ["CookieInit"]};
+window.refsData['#dom-cookieinit-path'] = {"text": "path", "type": "dict-member", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-cookieinit-path", "export": true, "normative": true, "for_": ["CookieInit"]};
+window.refsData['#dom-cookieinit-samesite'] = {"text": "sameSite", "type": "dict-member", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-cookieinit-samesite", "export": true, "normative": true, "for_": ["CookieInit"]};
+window.refsData['#delete-a-cookie'] = {"text": "delete a cookie", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#delete-a-cookie", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cookiesamesite-strict'] = {"text": "\"strict\"", "type": "enum-value", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-cookiesamesite-strict", "export": true, "normative": true, "for_": ["CookieSameSite"]};
+window.refsData['#dom-cookiestoredeleteoptions-name'] = {"text": "name", "type": "dict-member", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-cookiestoredeleteoptions-name", "export": true, "normative": true, "for_": ["CookieStoreDeleteOptions"]};
+window.refsData['#dom-cookiestoredeleteoptions-domain'] = {"text": "domain", "type": "dict-member", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-cookiestoredeleteoptions-domain", "export": true, "normative": true, "for_": ["CookieStoreDeleteOptions"]};
+window.refsData['#dom-cookiestoredeleteoptions-path'] = {"text": "path", "type": "dict-member", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-cookiestoredeleteoptions-path", "export": true, "normative": true, "for_": ["CookieStoreDeleteOptions"]};
+window.refsData['#cookiestoremanager'] = {"text": "CookieStoreManager", "type": "interface", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#cookiestoremanager", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cookiestoremanager-unsubscribe'] = {"text": "unsubscribe(subscriptions)", "type": "method", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-cookiestoremanager-unsubscribe", "export": true, "normative": true, "for_": ["CookieStoreManager"]};
+window.refsData['#cookiestoremanager-registration'] = {"text": "registration", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#cookiestoremanager-registration", "export": true, "normative": true, "for_": ["CookieStoreManager"]};
+window.refsData['#cookie-change-subscription-list'] = {"text": "cookie change subscription list", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#cookie-change-subscription-list", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-iterate'] = {"text": "for each", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-iterate", "export": true, "normative": true, "for_": ["list", "set"]};
+window.refsData['https://infra.spec.whatwg.org/#list-contain'] = {"text": "contain", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-contain", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['https://infra.spec.whatwg.org/#list-append'] = {"text": "append", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-append", "export": true, "normative": true, "for_": ["list"]};
+window.refsData['#cookie-change-subscription-name'] = {"text": "name", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#cookie-change-subscription-name", "export": true, "normative": true, "for_": ["cookie change subscription"]};
+window.refsData['#cookie-change-subscription-url'] = {"text": "url", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#cookie-change-subscription-url", "export": true, "normative": true, "for_": ["cookie change subscription"]};
+window.refsData['https://infra.spec.whatwg.org/#list-remove'] = {"text": "remove", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-remove", "export": true, "normative": true, "for_": ["list", "set"]};
+window.refsData['https://infra.spec.whatwg.org/#list-item'] = {"text": "item", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-item", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['https://w3c.github.io/ServiceWorker/#serviceworkerregistration'] = {"text": "ServiceWorkerRegistration", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#serviceworkerregistration", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-serviceworkerregistration-cookies'] = {"text": "cookies", "type": "attribute", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-serviceworkerregistration-cookies", "export": true, "normative": true, "for_": ["ServiceWorkerRegistration"]};
+window.refsData['https://webidl.spec.whatwg.org/#SameObject'] = {"text": "SameObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SameObject", "export": true, "normative": true, "for_": []};
+window.refsData['#cookiechangeevent'] = {"text": "CookieChangeEvent", "type": "interface", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#cookiechangeevent", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-event-dispatch'] = {"text": "dispatch", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-event-dispatch", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#event'] = {"text": "Event", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#event", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-cookiechangeeventinit'] = {"text": "CookieChangeEventInit", "type": "dictionary", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dictdef-cookiechangeeventinit", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-frozen-array'] = {"text": "FrozenArray", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-frozen-array", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#dictdef-eventinit'] = {"text": "EventInit", "type": "dictionary", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dictdef-eventinit", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cookiechangeevent-changed'] = {"text": "changed", "type": "attribute", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-cookiechangeevent-changed", "export": true, "normative": true, "for_": ["CookieChangeEvent"]};
+window.refsData['#dom-cookiechangeevent-deleted'] = {"text": "deleted", "type": "attribute", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-cookiechangeevent-deleted", "export": true, "normative": true, "for_": ["CookieChangeEvent"]};
+window.refsData['#extendablecookiechangeevent'] = {"text": "ExtendableCookieChangeEvent", "type": "interface", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#extendablecookiechangeevent", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#serviceworkerglobalscope'] = {"text": "ServiceWorkerGlobalScope", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#serviceworkerglobalscope", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#extendableevent'] = {"text": "ExtendableEvent", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#extendableevent", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-extendablecookiechangeeventinit'] = {"text": "ExtendableCookieChangeEventInit", "type": "dictionary", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dictdef-extendablecookiechangeeventinit", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#dictdef-extendableeventinit'] = {"text": "ExtendableEventInit", "type": "dictionary", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#dictdef-extendableeventinit", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-extendablecookiechangeevent-changed'] = {"text": "changed", "type": "attribute", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-extendablecookiechangeevent-changed", "export": true, "normative": true, "for_": ["ExtendableCookieChangeEvent"]};
+window.refsData['#dom-extendablecookiechangeevent-deleted'] = {"text": "deleted", "type": "attribute", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-extendablecookiechangeevent-deleted", "export": true, "normative": true, "for_": ["ExtendableCookieChangeEvent"]};
+window.refsData['#window-associated-cookiestore'] = {"text": "associated cookiestore", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#window-associated-cookiestore", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['#dom-serviceworkerglobalscope-cookiestore'] = {"text": "cookieStore", "type": "attribute", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-serviceworkerglobalscope-cookiestore", "export": true, "normative": true, "for_": ["ServiceWorkerGlobalScope"]};
+window.refsData['#serviceworkerglobalscope-associated-cookiestore'] = {"text": "associated cookiestore", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#serviceworkerglobalscope-associated-cookiestore", "export": true, "normative": true, "for_": ["ServiceWorkerGlobalScope"]};
+window.refsData['https://infra.spec.whatwg.org/#byte-sequence'] = {"text": "byte sequence", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#byte-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['https://encoding.spec.whatwg.org/#utf-8-encode'] = {"text": "utf-8 encode", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "1", "status": "current", "url": "https://encoding.spec.whatwg.org/#utf-8-encode", "export": true, "normative": true, "for_": []};
+window.refsData['https://encoding.spec.whatwg.org/#utf-8-decode-without-bom'] = {"text": "utf-8 decode without bom", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "1", "status": "current", "url": "https://encoding.spec.whatwg.org/#utf-8-decode-without-bom", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-time-values-and-time-range'] = {"text": "time values", "type": "dfn", "spec": "ecma262", "shortname": "ecma262", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-time-values-and-time-range", "export": true, "normative": true, "for_": []};
+window.refsData['#cookie-http-only-flag'] = {"text": "http-only-flag", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#cookie-http-only-flag", "export": true, "normative": true, "for_": ["cookie"]};
+window.refsData['#decode'] = {"text": "decode", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#decode", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#iteration-continue'] = {"text": "continue", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#iteration-continue", "export": true, "normative": true, "for_": ["iteration"]};
+window.refsData['#create-a-cookielistitem'] = {"text": "create a cookielistitem", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#create-a-cookielistitem", "export": true, "normative": true, "for_": []};
+window.refsData['#cookie-domain'] = {"text": "domain", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#cookie-domain", "export": true, "normative": true, "for_": ["cookie"]};
+window.refsData['#cookie-path'] = {"text": "path", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#cookie-path", "export": true, "normative": true, "for_": ["cookie"]};
+window.refsData['#cookie-expiry-time'] = {"text": "expiry-time", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#cookie-expiry-time", "export": true, "normative": true, "for_": ["cookie"]};
+window.refsData['#as-a-timestamp'] = {"text": "as a timestamp", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#as-a-timestamp", "export": true, "normative": true, "for_": []};
+window.refsData['#cookie-secure-only-flag'] = {"text": "secure-only-flag", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#cookie-secure-only-flag", "export": true, "normative": true, "for_": ["cookie"]};
+window.refsData['#cookie-same-site-flag'] = {"text": "same-site-flag", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#cookie-same-site-flag", "export": true, "normative": true, "for_": ["cookie"]};
+window.refsData['#dom-cookiesamesite-none'] = {"text": "\"none\"", "type": "enum-value", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-cookiesamesite-none", "export": true, "normative": true, "for_": ["CookieSameSite"]};
+window.refsData['#dom-cookiesamesite-lax'] = {"text": "\"lax\"", "type": "enum-value", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-cookiesamesite-lax", "export": true, "normative": true, "for_": ["CookieSameSite"]};
+window.refsData['#cookie-creation-time'] = {"text": "creation-time", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#cookie-creation-time", "export": true, "normative": true, "for_": ["cookie"]};
+window.refsData['#cookie-last-access-time'] = {"text": "last-access-time", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#cookie-last-access-time", "export": true, "normative": true, "for_": ["cookie"]};
+window.refsData['#cookie-persistent-flag'] = {"text": "persistent-flag", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#cookie-persistent-flag", "export": true, "normative": true, "for_": ["cookie"]};
+window.refsData['#cookie-host-only-flag'] = {"text": "host-only-flag", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#cookie-host-only-flag", "export": true, "normative": true, "for_": ["cookie"]};
+window.refsData['https://infra.spec.whatwg.org/#string-length'] = {"text": "length", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#string-length", "export": true, "normative": true, "for_": ["string", "JavaScript string", "scalar value string"]};
+window.refsData['https://url.spec.whatwg.org/#concept-url-host'] = {"text": "host", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-host", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['#encode'] = {"text": "encode", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#encode", "export": true, "normative": true, "for_": []};
+window.refsData['#date-serialize'] = {"text": "date serialize", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#date-serialize", "export": true, "normative": true, "for_": []};
+window.refsData['#observable-changes'] = {"text": "observable changes", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#observable-changes", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-global-task'] = {"text": "queue a global task", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-global-task", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#dom-manipulation-task-source'] = {"text": "dom manipulation task source", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#dom-manipulation-task-source", "export": true, "normative": true, "for_": []};
+window.refsData['#fire-a-change-event'] = {"text": "fire a change event", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#fire-a-change-event", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ordered-set'] = {"text": "set", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ordered-set", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#set-append'] = {"text": "append", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#set-append", "export": true, "normative": true, "for_": ["set"]};
+window.refsData['https://infra.spec.whatwg.org/#iteration-break'] = {"text": "break", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#iteration-break", "export": true, "normative": true, "for_": ["iteration"]};
+window.refsData['#prepare-lists'] = {"text": "prepare lists", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#prepare-lists", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#fire-functional-event'] = {"text": "fire a functional event", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#fire-functional-event", "export": true, "normative": true, "for_": []};
+window.refsData['#cookie-change'] = {"text": "cookie change", "type": "dfn", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#cookie-change", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-event-create'] = {"text": "creating an event", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-event-create", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#dom-event-type'] = {"text": "type", "type": "attribute", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-event-type", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['https://dom.spec.whatwg.org/#dom-event-bubbles'] = {"text": "bubbles", "type": "attribute", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-event-bubbles", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['https://dom.spec.whatwg.org/#dom-event-cancelable'] = {"text": "cancelable", "type": "attribute", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-event-cancelable", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['#dom-cookielistitem-value'] = {"text": "value", "type": "dict-member", "spec": "cookiestore-1", "shortname": "cookiestore", "level": "1", "status": "local", "url": "#dom-cookielistitem-value", "export": true, "normative": true, "for_": ["CookieListItem"]};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

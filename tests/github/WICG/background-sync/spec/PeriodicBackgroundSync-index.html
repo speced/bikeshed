@@ -689,6 +689,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -1740,8 +1777,6 @@ Note: This can be used to mitigate concerns raised in <a href="#security">§ 6
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -1989,7 +2024,6 @@ Note: This can be used to mitigate concerns raised in <a href="#security">§ 6
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -2458,6 +2492,297 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#secure-context'] = {"text": "secure context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#secure-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#browsing-context'] = {"text": "browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['#periodicsync-event'] = {"text": "periodicsync event", "type": "dfn", "spec": "periodic-background-sync-1", "shortname": "periodic-background-sync", "level": "1", "status": "local", "url": "#periodicsync-event", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#dfn-service-worker'] = {"text": "service worker", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#dfn-service-worker", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#cache'] = {"text": "Cache", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#cache", "export": true, "normative": true, "for_": []};
+window.refsData['#periodic-sync-registration'] = {"text": "periodic sync registration", "type": "dfn", "spec": "periodic-background-sync-1", "shortname": "periodic-background-sync", "level": "1", "status": "local", "url": "#periodic-sync-registration", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#dfn-service-worker-client'] = {"text": "service worker client", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#dfn-service-worker-client", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#dfn-service-worker-client-frame-type'] = {"text": "frame type", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#dfn-service-worker-client-frame-type", "export": false, "normative": true, "for_": ["Client"]};
+window.refsData['https://w3c.github.io/ServiceWorker/#service-worker-client-origin'] = {"text": "origin", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#service-worker-client-origin", "export": true, "normative": true, "for_": ["service worker client"]};
+window.refsData['#periodic-sync-registration-service-worker-registration'] = {"text": "service worker registration", "type": "dfn", "spec": "periodic-background-sync-1", "shortname": "periodic-background-sync", "level": "1", "status": "local", "url": "#periodic-sync-registration-service-worker-registration", "export": true, "normative": true, "for_": ["periodic sync registration"]};
+window.refsData['https://w3c.github.io/ServiceWorker/#dfn-service-worker-registration'] = {"text": "service worker registration", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#dfn-service-worker-registration", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ordered-map'] = {"text": "map", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ordered-map", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#starting-a-new-parallel-queue'] = {"text": "starting a new parallel queue", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#starting-a-new-parallel-queue", "export": true, "normative": true, "for_": []};
+window.refsData['#periodic-sync-registration-minimum-interval'] = {"text": "minimum interval", "type": "dfn", "spec": "periodic-background-sync-1", "shortname": "periodic-background-sync", "level": "1", "status": "local", "url": "#periodic-sync-registration-minimum-interval", "export": true, "normative": true, "for_": ["periodic sync registration"]};
+window.refsData['#periodic-sync-scheduler'] = {"text": "periodic sync scheduler", "type": "dfn", "spec": "periodic-background-sync-1", "shortname": "periodic-background-sync", "level": "1", "status": "local", "url": "#periodic-sync-scheduler", "export": true, "normative": true, "for_": []};
+window.refsData['#active-periodic-sync-registrations'] = {"text": "active periodic sync registrations", "type": "dfn", "spec": "periodic-background-sync-1", "shortname": "periodic-background-sync", "level": "1", "status": "local", "url": "#active-periodic-sync-registrations", "export": true, "normative": true, "for_": []};
+window.refsData['#minimum-periodic-sync-interval-for-any-origin'] = {"text": "minimum periodic sync interval for any origin", "type": "dfn", "spec": "periodic-background-sync-1", "shortname": "periodic-background-sync", "level": "1", "status": "local", "url": "#minimum-periodic-sync-interval-for-any-origin", "export": true, "normative": true, "for_": []};
+window.refsData['#effective-minimum-sync-interval-for-origin'] = {"text": "effective minimum sync interval for origin", "type": "dfn", "spec": "periodic-background-sync-1", "shortname": "periodic-background-sync", "level": "1", "status": "local", "url": "#effective-minimum-sync-interval-for-origin", "export": true, "normative": true, "for_": []};
+window.refsData['#process-periodic-sync-registrations'] = {"text": "process periodic sync registrations", "type": "dfn", "spec": "periodic-background-sync-1", "shortname": "periodic-background-sync", "level": "1", "status": "local", "url": "#process-periodic-sync-registrations", "export": true, "normative": true, "for_": []};
+window.refsData['#minimum-periodic-sync-interval-across-origins'] = {"text": "minimum periodic sync interval across origins", "type": "dfn", "spec": "periodic-background-sync-1", "shortname": "periodic-background-sync", "level": "1", "status": "local", "url": "#minimum-periodic-sync-interval-across-origins", "export": true, "normative": true, "for_": []};
+window.refsData['#maximum-number-of-retries'] = {"text": "maximum number of retries", "type": "dfn", "spec": "periodic-background-sync-1", "shortname": "periodic-background-sync", "level": "1", "status": "local", "url": "#maximum-number-of-retries", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dom-permissionstate'] = {"text": "PermissionState", "type": "enum", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dom-permissionstate", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dom-permissiondescriptor'] = {"text": "PermissionDescriptor", "type": "dictionary", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dom-permissiondescriptor", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dom-permissionstate-granted'] = {"text": "granted", "type": "enum-value", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dom-permissionstate-granted", "export": true, "normative": true, "for_": ["PermissionState"]};
+window.refsData['#periodicsync-event-in-the-background'] = {"text": "in the background", "type": "dfn", "spec": "periodic-background-sync-1", "shortname": "periodic-background-sync", "level": "1", "status": "local", "url": "#periodicsync-event-in-the-background", "export": true, "normative": true, "for_": ["periodicsync event"]};
+window.refsData['#periodicsyncevent'] = {"text": "PeriodicSyncEvent", "type": "interface", "spec": "periodic-background-sync-1", "shortname": "periodic-background-sync", "level": "1", "status": "local", "url": "#periodicsyncevent", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#extendableevent-timed-out-flag'] = {"text": "timed out flag", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#extendableevent-timed-out-flag", "export": true, "normative": true, "for_": ["ExtendableEvent"]};
+window.refsData['https://w3c.github.io/ServiceWorker/#extendableevent'] = {"text": "ExtendableEvent", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#extendableevent", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-periodicsyncmanager-register'] = {"text": "register(tag, options)", "type": "method", "spec": "periodic-background-sync-1", "shortname": "periodic-background-sync", "level": "1", "status": "local", "url": "#dom-periodicsyncmanager-register", "export": true, "normative": true, "for_": ["PeriodicSyncManager"]};
+window.refsData['https://wicg.github.io/background-fetch/#background-fetch'] = {"text": "background fetch", "type": "dfn", "spec": "background-fetch", "shortname": "background-fetch", "level": "", "status": "anchor-block", "url": "https://wicg.github.io/background-fetch/#background-fetch", "export": true, "normative": true, "for_": []};
+window.refsData['https://wicg.github.io/background-fetch/#backgroundfetchmanager'] = {"text": "BackgroundFetchManager", "type": "interface", "spec": "background-fetch", "shortname": "background-fetch", "level": "", "status": "anchor-block", "url": "https://wicg.github.io/background-fetch/#backgroundfetchmanager", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel'] = {"text": "in parallel", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#dfn-service-worker-registration-unregistered'] = {"text": "unregistered", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#dfn-service-worker-registration-unregistered", "export": true, "normative": true, "for_": ["service worker registration"]};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#enqueue-the-following-steps'] = {"text": "enqueue the following steps", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#enqueue-the-following-steps", "export": true, "normative": true, "for_": ["parallel queue"]};
+window.refsData['#periodic-sync-processing-queue'] = {"text": "periodic sync processing queue", "type": "dfn", "spec": "periodic-background-sync-1", "shortname": "periodic-background-sync", "level": "1", "status": "local", "url": "#periodic-sync-processing-queue", "export": true, "normative": true, "for_": []};
+window.refsData['#periodic-sync-scheduler-time-of-last-fire'] = {"text": "time of last fire", "type": "dfn", "spec": "periodic-background-sync-1", "shortname": "periodic-background-sync", "level": "1", "status": "local", "url": "#periodic-sync-scheduler-time-of-last-fire", "export": true, "normative": true, "for_": ["periodic sync scheduler"]};
+window.refsData['https://infra.spec.whatwg.org/#iteration-continue'] = {"text": "continue", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#iteration-continue", "export": true, "normative": true, "for_": ["iteration"]};
+window.refsData['#periodic-sync-registration-state'] = {"text": "state", "type": "dfn", "spec": "periodic-background-sync-1", "shortname": "periodic-background-sync", "level": "1", "status": "local", "url": "#periodic-sync-registration-state", "export": true, "normative": true, "for_": ["periodic sync registration"]};
+window.refsData['#periodic-sync-registration-anchor-time'] = {"text": "anchor time", "type": "dfn", "spec": "periodic-background-sync-1", "shortname": "periodic-background-sync", "level": "1", "status": "local", "url": "#periodic-sync-registration-anchor-time", "export": true, "normative": true, "for_": ["periodic sync registration"]};
+window.refsData['#fire-a-periodicsync-event'] = {"text": "fire a periodicsync event", "type": "dfn", "spec": "periodic-background-sync-1", "shortname": "periodic-background-sync", "level": "1", "status": "local", "url": "#fire-a-periodicsync-event", "export": true, "normative": true, "for_": []};
+window.refsData['#respond-to-permission-revocation'] = {"text": "respond to permission revocation", "type": "dfn", "spec": "periodic-background-sync-1", "shortname": "periodic-background-sync", "level": "1", "status": "local", "url": "#respond-to-permission-revocation", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#serviceworkerglobalscope'] = {"text": "ServiceWorkerGlobalScope", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#serviceworkerglobalscope", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler'] = {"text": "EventHandler", "type": "typedef", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#serviceworkerregistration'] = {"text": "ServiceWorkerRegistration", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#serviceworkerregistration", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['#periodicsyncmanager'] = {"text": "PeriodicSyncManager", "type": "interface", "spec": "periodic-background-sync-1", "shortname": "periodic-background-sync", "level": "1", "status": "local", "url": "#periodicsyncmanager", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-serviceworkerregistration-periodicsync'] = {"text": "periodicSync", "type": "attribute", "spec": "periodic-background-sync-1", "shortname": "periodic-background-sync", "level": "1", "status": "local", "url": "#dom-serviceworkerregistration-periodicsync", "export": true, "normative": true, "for_": ["ServiceWorkerRegistration"]};
+window.refsData['#serviceworkerregistration-periodic-sync-manager'] = {"text": "periodic sync manager", "type": "dfn", "spec": "periodic-background-sync-1", "shortname": "periodic-background-sync", "level": "1", "status": "local", "url": "#serviceworkerregistration-periodic-sync-manager", "export": true, "normative": true, "for_": ["ServiceWorkerRegistration"]};
+window.refsData['#periodicsyncmanager-service-worker-registration'] = {"text": "service worker registration", "type": "dfn", "spec": "periodic-background-sync-1", "shortname": "periodic-background-sync", "level": "1", "status": "local", "url": "#periodicsyncmanager-service-worker-registration", "export": true, "normative": true, "for_": ["PeriodicSyncManager"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-promise'] = {"text": "Promise", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-promise", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-backgroundsyncoptions'] = {"text": "BackgroundSyncOptions", "type": "dictionary", "spec": "periodic-background-sync-1", "shortname": "periodic-background-sync", "level": "1", "status": "local", "url": "#dictdef-backgroundsyncoptions", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-periodicsyncmanager-gettags'] = {"text": "getTags()", "type": "method", "spec": "periodic-background-sync-1", "shortname": "periodic-background-sync", "level": "1", "status": "local", "url": "#dom-periodicsyncmanager-gettags", "export": true, "normative": true, "for_": ["PeriodicSyncManager"]};
+window.refsData['#dom-periodicsyncmanager-unregister'] = {"text": "unregister(tag)", "type": "method", "spec": "periodic-background-sync-1", "shortname": "periodic-background-sync", "level": "1", "status": "local", "url": "#dom-periodicsyncmanager-unregister", "export": true, "normative": true, "for_": ["PeriodicSyncManager"]};
+window.refsData['https://webidl.spec.whatwg.org/#EnforceRange'] = {"text": "EnforceRange", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#EnforceRange", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-long-long'] = {"text": "unsigned long long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-long-long", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#a-new-promise'] = {"text": "a new promise", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#a-new-promise", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#dfn-active-worker'] = {"text": "active worker", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#dfn-active-worker", "export": true, "normative": true, "for_": ["service worker registration"]};
+window.refsData['https://webidl.spec.whatwg.org/#reject'] = {"text": "reject", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#reject", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#invalidstateerror'] = {"text": "InvalidStateError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invalidstateerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dfn-request-permission-to-use'] = {"text": "request permission to use", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-request-permission-to-use", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#notallowederror'] = {"text": "NotAllowedError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#notallowederror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#invalidaccesserror'] = {"text": "InvalidAccessError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invalidaccesserror", "export": true, "normative": true, "for_": []};
+window.refsData['#periodic-sync-registration-tag'] = {"text": "tag", "type": "dfn", "spec": "periodic-background-sync-1", "shortname": "periodic-background-sync", "level": "1", "status": "local", "url": "#periodic-sync-registration-tag", "export": true, "normative": true, "for_": ["periodic sync registration"]};
+window.refsData['#dom-backgroundsyncoptions-mininterval'] = {"text": "minInterval", "type": "dict-member", "spec": "periodic-background-sync-1", "shortname": "periodic-background-sync", "level": "1", "status": "local", "url": "#dom-backgroundsyncoptions-mininterval", "export": true, "normative": true, "for_": ["BackgroundSyncOptions"]};
+window.refsData['https://webidl.spec.whatwg.org/#resolve'] = {"text": "resolve", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#resolve", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list'] = {"text": "list", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-append'] = {"text": "append", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-append", "export": true, "normative": true, "for_": ["list"]};
+window.refsData['https://w3c.github.io/ServiceWorker/#dictdef-extendableeventinit'] = {"text": "ExtendableEventInit", "type": "dictionary", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#dictdef-extendableeventinit", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-periodicsynceventinit'] = {"text": "PeriodicSyncEventInit", "type": "dictionary", "spec": "periodic-background-sync-1", "shortname": "periodic-background-sync", "level": "1", "status": "local", "url": "#dictdef-periodicsynceventinit", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-periodicsyncevent-tag'] = {"text": "tag", "type": "attribute", "spec": "periodic-background-sync-1", "shortname": "periodic-background-sync", "level": "1", "status": "local", "url": "#dom-periodicsyncevent-tag", "export": true, "normative": true, "for_": ["PeriodicSyncEvent"]};
+window.refsData['https://infra.spec.whatwg.org/#assert'] = {"text": "assert", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#assert", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#fire-functional-event'] = {"text": "fire functional event", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#fire-functional-event", "export": true, "normative": true, "for_": []};
+window.refsData['#periodicsyncevent-tag'] = {"text": "tag", "type": "dfn", "spec": "periodic-background-sync-1", "shortname": "periodic-background-sync", "level": "1", "status": "local", "url": "#periodicsyncevent-tag", "export": true, "normative": true, "for_": ["PeriodicSyncEvent"]};
+window.refsData['https://webidl.spec.whatwg.org/#wait-for-all'] = {"text": "waiting for all", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#wait-for-all", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#extendableevent-extend-lifetime-promises'] = {"text": "extend lifetime promises", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#extendableevent-extend-lifetime-promises", "export": true, "normative": true, "for_": ["ExtendableEvent"]};
+window.refsData['https://webidl.spec.whatwg.org/#upon-fulfillment'] = {"text": "upon fulfillment", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#upon-fulfillment", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#upon-rejection'] = {"text": "upon rejection", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#upon-rejection", "export": true, "normative": true, "for_": []};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

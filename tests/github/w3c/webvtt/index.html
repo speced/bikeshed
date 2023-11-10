@@ -483,6 +483,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -5848,8 +5885,6 @@ originally specified. <a data-link-type="biblio" href="#biblio-html" title="HTML
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -6097,7 +6132,6 @@ originally specified. <a data-link-type="biblio" href="#biblio-html" title="HTML
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -6762,6 +6796,537 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#webvtt-cue'] = {"text": "webvtt cue", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#text-track-kind'] = {"text": "text track kind", "type": "dfn", "spec": "", "shortname": "webvtt1", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#text-track-kind", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#video'] = {"text": "video", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#video", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webvtt/#selectordef-cue'] = {"text": "::cue", "type": "selector", "spec": "webvtt1", "shortname": "webvtt", "level": "1", "status": "current", "url": "https://w3c.github.io/webvtt/#selectordef-cue", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webvtt/#selectordef-cue-region'] = {"text": "::cue-region", "type": "selector", "spec": "webvtt1", "shortname": "webvtt", "level": "1", "status": "current", "url": "https://w3c.github.io/webvtt/#selectordef-cue-region", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/semantics.html#the-style-element'] = {"text": "style", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/semantics.html#the-style-element", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-bold-object'] = {"text": "webvtt bold object", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-bold-object", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-box'] = {"text": "webvtt cue box", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-box", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-file'] = {"text": "webvtt file", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-file", "export": true, "normative": true, "for_": []};
+window.refsData['#text-vtt'] = {"text": "text/vtt", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#text-vtt", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-caption-or-subtitle-cue-text'] = {"text": "webvtt caption or subtitle cue text", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-caption-or-subtitle-cue-text", "export": true, "normative": true, "for_": []};
+window.refsData['#user-agents-that-do-not-support-a-full-html-css-engine'] = {"text": "user agents that do not support a full html css engine", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#user-agents-that-do-not-support-a-full-html-css-engine", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt'] = {"text": "webvtt", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#text-track'] = {"text": "text track", "type": "dfn", "spec": "", "shortname": "webvtt1", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#text-track", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#text-track-cue'] = {"text": "text track cue", "type": "dfn", "spec": "", "shortname": "webvtt1", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#text-track-cue", "export": true, "normative": true, "for_": []};
+window.refsData['#cue-text'] = {"text": "cue text", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#cue-text", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-position'] = {"text": "webvtt cue position", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-position", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-line'] = {"text": "webvtt cue line", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-line", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-size'] = {"text": "webvtt cue size", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-size", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-writing-direction'] = {"text": "webvtt cue writing direction", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-writing-direction", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-horizontal-writing-direction'] = {"text": "webvtt cue horizontal writing direction", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-horizontal-writing-direction", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-vertical-growing-left-writing-direction'] = {"text": "webvtt cue vertical growing left writing direction", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-vertical-growing-left-writing-direction", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-vertical-growing-right-writing-direction'] = {"text": "webvtt cue vertical growing right writing direction", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-vertical-growing-right-writing-direction", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-snap-to-lines-flag'] = {"text": "webvtt cue snap-to-lines flag", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-snap-to-lines-flag", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-line-automatic'] = {"text": "webvtt cue line automatic", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-line-automatic", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-parser'] = {"text": "webvtt parser", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-parser", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-vttcue-snaptolines'] = {"text": "snapToLines", "type": "attribute", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#dom-vttcue-snaptolines", "export": true, "normative": true, "for_": ["VTTCue"]};
+window.refsData['#dom-vttcue-line'] = {"text": "line", "type": "attribute", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#dom-vttcue-line", "export": true, "normative": true, "for_": ["VTTCue"]};
+window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#text-track-list-of-cues'] = {"text": "text track list of cues", "type": "dfn", "spec": "", "shortname": "webvtt1", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#text-track-list-of-cues", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#list-of-text-tracks'] = {"text": "list of text tracks", "type": "dfn", "spec": "", "shortname": "webvtt1", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#list-of-text-tracks", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#media-element'] = {"text": "media element", "type": "dfn", "spec": "", "shortname": "webvtt1", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#media-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#text-track-mode'] = {"text": "text track mode", "type": "dfn", "spec": "", "shortname": "webvtt1", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#text-track-mode", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#text-track-showing'] = {"text": "text track showing", "type": "dfn", "spec": "", "shortname": "webvtt1", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#text-track-showing", "export": true, "normative": true, "for_": []};
+window.refsData['#cue-computed-line'] = {"text": "cue computed line", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#cue-computed-line", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-line-alignment'] = {"text": "webvtt cue line alignment", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-line-alignment", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-line-start-alignment'] = {"text": "webvtt cue line start alignment", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-line-start-alignment", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-text-alignment'] = {"text": "webvtt cue text alignment", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-text-alignment", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-region'] = {"text": "webvtt region", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-region", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-automatic-position'] = {"text": "webvtt cue automatic position", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-automatic-position", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-left-alignment'] = {"text": "webvtt cue left alignment", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-left-alignment", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-right-alignment'] = {"text": "webvtt cue right alignment", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-right-alignment", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-position-alignment'] = {"text": "webvtt cue position alignment", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-position-alignment", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-center-alignment'] = {"text": "webvtt cue center alignment", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-center-alignment", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-start-alignment'] = {"text": "webvtt cue start alignment", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-start-alignment", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-end-alignment'] = {"text": "webvtt cue end alignment", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-end-alignment", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-position-automatic-alignment'] = {"text": "webvtt cue position automatic alignment", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-position-automatic-alignment", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-position-line-left-alignment'] = {"text": "webvtt cue position line-left alignment", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-position-line-left-alignment", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-position-line-right-alignment'] = {"text": "webvtt cue position line-right alignment", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-position-line-right-alignment", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#valdef-unicode-bidi-plaintext'] = {"text": "plaintext", "type": "value", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#valdef-unicode-bidi-plaintext", "export": true, "normative": true, "for_": ["unicode-bidi"]};
+window.refsData['https://drafts.csswg.org/css-writing-modes-3/#propdef-unicode-bidi'] = {"text": "unicode-bidi", "type": "property", "spec": "css-writing-modes-3", "shortname": "css-writing-modes", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-3/#propdef-unicode-bidi", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#rules-for-updating-the-text-track-rendering'] = {"text": "rules for updating the text track rendering", "type": "dfn", "spec": "", "shortname": "webvtt1", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#rules-for-updating-the-text-track-rendering", "export": true, "normative": true, "for_": []};
+window.refsData['#rules-for-updating-the-display-of-webvtt-text-tracks'] = {"text": "rules for updating the display of webvtt text tracks", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#rules-for-updating-the-display-of-webvtt-text-tracks", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#text-track-cue-active-flag'] = {"text": "text track cue active flag", "type": "dfn", "spec": "", "shortname": "webvtt1", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#text-track-cue-active-flag", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-region'] = {"text": "webvtt cue region", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-region", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#text-track-cue-display-state'] = {"text": "text track cue display state", "type": "dfn", "spec": "", "shortname": "webvtt1", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#text-track-cue-display-state", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-caption-or-subtitle-cue'] = {"text": "webvtt caption or subtitle cue", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-caption-or-subtitle-cue", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-file-body'] = {"text": "webvtt file body", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-file-body", "export": true, "normative": true, "for_": []};
+window.refsData['https://mimesniff.spec.whatwg.org/#mime-type'] = {"text": "mime type", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "1", "status": "current", "url": "https://mimesniff.spec.whatwg.org/#mime-type", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-line-terminator'] = {"text": "webvtt line terminator", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-line-terminator", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-region-definition-block'] = {"text": "webvtt region definition block", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-region-definition-block", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-style-block'] = {"text": "webvtt style block", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-style-block", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-comment-block'] = {"text": "webvtt comment block", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-comment-block", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-block'] = {"text": "webvtt cue block", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-block", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-region-settings-list'] = {"text": "webvtt region settings list", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-region-settings-list", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-identifier'] = {"text": "webvtt cue identifier", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-identifier", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-timings'] = {"text": "webvtt cue timings", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-timings", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-settings-list'] = {"text": "webvtt cue settings list", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-settings-list", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-chapter-title-text'] = {"text": "webvtt chapter title text", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-chapter-title-text", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-metadata-text'] = {"text": "webvtt metadata text", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-metadata-text", "export": true, "normative": true, "for_": []};
+window.refsData['#cue-payload'] = {"text": "cue payload", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#cue-payload", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-timestamp'] = {"text": "webvtt timestamp", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-timestamp", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#ascii-digits'] = {"text": "ascii digits", "type": "dfn", "spec": "", "shortname": "webvtt1", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#ascii-digits", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#current-playback-position'] = {"text": "current playback position", "type": "dfn", "spec": "", "shortname": "webvtt1", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#current-playback-position", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-setting-name'] = {"text": "webvtt cue setting name", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-setting-name", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-setting-value'] = {"text": "webvtt cue setting value", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-setting-value", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-percentage'] = {"text": "webvtt percentage", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-percentage", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-caption-or-subtitle-cue-components'] = {"text": "webvtt caption or subtitle cue components", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-caption-or-subtitle-cue-components", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-class-span'] = {"text": "webvtt cue class span", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-class-span", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-italics-span'] = {"text": "webvtt cue italics span", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-italics-span", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-bold-span'] = {"text": "webvtt cue bold span", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-bold-span", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-underline-span'] = {"text": "webvtt cue underline span", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-underline-span", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-ruby-span'] = {"text": "webvtt cue ruby span", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-ruby-span", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-voice-span'] = {"text": "webvtt cue voice span", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-voice-span", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-language-span'] = {"text": "webvtt cue language span", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-language-span", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-timestamp'] = {"text": "webvtt cue timestamp", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-timestamp", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-text-span'] = {"text": "webvtt cue text span", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-text-span", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/syntax.html#syntax-charref'] = {"text": "character references", "type": "dfn", "spec": "", "shortname": "webvtt1", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/syntax.html#syntax-charref", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-span-start-tag'] = {"text": "webvtt cue span start tag", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-span-start-tag", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-internal-text'] = {"text": "webvtt cue internal text", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-internal-text", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-span-end-tag'] = {"text": "webvtt cue span end tag", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-span-end-tag", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-span-start-tag-annotation-text'] = {"text": "webvtt cue span start tag annotation text", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-span-start-tag-annotation-text", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-region-identifier-setting'] = {"text": "webvtt region identifier setting", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-region-identifier-setting", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-region-width-setting'] = {"text": "webvtt region width setting", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-region-width-setting", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-region-lines-setting'] = {"text": "webvtt region lines setting", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-region-lines-setting", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-region-anchor-setting'] = {"text": "webvtt region anchor setting", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-region-anchor-setting", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-region-viewport-anchor-setting'] = {"text": "webvtt region viewport anchor setting", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-region-viewport-anchor-setting", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-region-scroll-setting'] = {"text": "webvtt region scroll setting", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-region-scroll-setting", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ascii-whitespace'] = {"text": "ascii whitespace", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-whitespace", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-setting'] = {"text": "webvtt cue setting", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-setting", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-vertical-text-cue-setting'] = {"text": "webvtt vertical text cue setting", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-vertical-text-cue-setting", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-line-cue-setting'] = {"text": "webvtt line cue setting", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-line-cue-setting", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-position-cue-setting'] = {"text": "webvtt position cue setting", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-position-cue-setting", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-size-cue-setting'] = {"text": "webvtt size cue setting", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-size-cue-setting", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-alignment-cue-setting'] = {"text": "webvtt alignment cue setting", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-alignment-cue-setting", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-region-cue-setting'] = {"text": "webvtt region cue setting", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-region-cue-setting", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-line-center-alignment'] = {"text": "webvtt cue line center alignment", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-line-center-alignment", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-line-end-alignment'] = {"text": "webvtt cue line end alignment", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-line-end-alignment", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-position-center-alignment'] = {"text": "webvtt cue position center alignment", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-position-center-alignment", "export": true, "normative": true, "for_": []};
+window.refsData['#cue-computed-position-alignment'] = {"text": "cue computed position alignment", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#cue-computed-position-alignment", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-region-identifier'] = {"text": "webvtt region identifier", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-region-identifier", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-file-using-only-nested-cues'] = {"text": "webvtt file using only nested cues", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-file-using-only-nested-cues", "export": true, "normative": true, "for_": []};
+window.refsData['#cue-component-class-names'] = {"text": "cue component class names", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#cue-component-class-names", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-color-4/#propdef-color'] = {"text": "color", "type": "property", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-color-4/#propdef-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/rendering.html#presentational-hints'] = {"text": "presentational hints", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/rendering.html#presentational-hints", "export": false, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-color-4/#valdef-color-green'] = {"text": "green", "type": "value", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-color-4/#valdef-color-green", "export": true, "normative": true, "for_": ["<color>"]};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-background-color'] = {"text": "background-color", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-background'] = {"text": "background", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-cascade-6/#cascade'] = {"text": "cascade", "type": "dfn", "spec": "css-cascade-6", "shortname": "css-cascade", "level": "6", "status": "current", "url": "https://drafts.csswg.org/css-cascade-6/#cascade", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-1/#css-style-sheet'] = {"text": "css style sheet", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#css-style-sheet", "export": true, "normative": true, "for_": []};
+window.refsData['https://encoding.spec.whatwg.org/#utf-8-decode'] = {"text": "utf-8 decode", "type": "dfn", "spec": "", "shortname": "webvtt1", "level": "", "status": "anchor-block", "url": "https://encoding.spec.whatwg.org/#utf-8-decode", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-parser-algorithm'] = {"text": "webvtt parser algorithm", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-parser-algorithm", "export": true, "normative": true, "for_": []};
+window.refsData['#incremental-webvtt-parser'] = {"text": "incremental webvtt parser", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#incremental-webvtt-parser", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#collect-a-sequence-of-code-points'] = {"text": "collect a sequence of code points", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#collect-a-sequence-of-code-points", "export": true, "normative": true, "for_": []};
+window.refsData['#collect-a-webvtt-block'] = {"text": "collect a webvtt block", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#collect-a-webvtt-block", "export": true, "normative": true, "for_": []};
+window.refsData['#text-track-list-of-regions'] = {"text": "text track list of regions", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#text-track-list-of-regions", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-region-object'] = {"text": "webvtt region object", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-region-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#text-track-cue-identifier'] = {"text": "text track cue identifier", "type": "dfn", "spec": "", "shortname": "webvtt1", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#text-track-cue-identifier", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#text-track-cue-pause-on-exit-flag'] = {"text": "text track cue pause-on-exit flag", "type": "dfn", "spec": "", "shortname": "webvtt1", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#text-track-cue-pause-on-exit-flag", "export": true, "normative": true, "for_": []};
+window.refsData['#collect-webvtt-cue-timings-and-settings'] = {"text": "collect webvtt cue timings and settings", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#collect-webvtt-cue-timings-and-settings", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-1/#create-a-css-style-sheet'] = {"text": "create a css style sheet", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#create-a-css-style-sheet", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-location'] = {"text": "location", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-location", "export": false, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-parent-css-style-sheet'] = {"text": "parent css style sheet", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-parent-css-style-sheet", "export": false, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-owner-node'] = {"text": "owner node", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-owner-node", "export": false, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-owner-css-rule'] = {"text": "owner css rule", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-owner-css-rule", "export": false, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-media'] = {"text": "media", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-media", "export": false, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-title'] = {"text": "title", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-title", "export": false, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-alternate-flag'] = {"text": "alternate flag", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-alternate-flag", "export": false, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-origin-clean-flag'] = {"text": "origin-clean flag", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-origin-clean-flag", "export": false, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['#webvtt-region-width'] = {"text": "webvtt region width", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-region-width", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-region-lines'] = {"text": "webvtt region lines", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-region-lines", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-region-anchor'] = {"text": "webvtt region anchor", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-region-anchor", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-region-viewport-anchor'] = {"text": "webvtt region viewport anchor", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-region-viewport-anchor", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-region-scroll'] = {"text": "webvtt region scroll", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-region-scroll", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-region-scroll-none'] = {"text": "webvtt region scroll none", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-region-scroll-none", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#parse-a-stylesheet'] = {"text": "parse a stylesheet", "type": "dfn", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#parse-a-stylesheet", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-css-rules'] = {"text": "css rules", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-css-rules", "export": false, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['#collect-webvtt-region-settings'] = {"text": "collect webvtt region settings", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#collect-webvtt-region-settings", "export": true, "normative": true, "for_": []};
+window.refsData['#list-of-webvtt-node-objects'] = {"text": "list of webvtt node objects", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#list-of-webvtt-node-objects", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#split-a-string-on-spaces'] = {"text": "split a string on spaces", "type": "dfn", "spec": "", "shortname": "webvtt1", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#split-a-string-on-spaces", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/i18n-glossary/#def_case_sensitive'] = {"text": "case-sensitive", "type": "dfn", "spec": "i18n-glossary", "shortname": "i18n-glossary", "level": "1", "status": "current", "url": "https://w3c.github.io/i18n-glossary/#def_case_sensitive", "export": true, "normative": false, "for_": []};
+window.refsData['#parse-a-percentage-string'] = {"text": "parse a percentage string", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#parse-a-percentage-string", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-region-scroll-up'] = {"text": "webvtt region scroll up", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-region-scroll-up", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/common-microsyntaxes.html#rules-for-parsing-floating-point-number-values'] = {"text": "rules for parsing floating-point number values", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/common-microsyntaxes.html#rules-for-parsing-floating-point-number-values", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#skip-whitespace'] = {"text": "skip whitespace", "type": "dfn", "spec": "", "shortname": "webvtt1", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#skip-whitespace", "export": true, "normative": true, "for_": []};
+window.refsData['#collect-a-webvtt-timestamp'] = {"text": "collect a webvtt timestamp", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#collect-a-webvtt-timestamp", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#text-track-cue-start-time'] = {"text": "text track cue start time", "type": "dfn", "spec": "", "shortname": "webvtt1", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#text-track-cue-start-time", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#text-track-cue-end-time'] = {"text": "text track cue end time", "type": "dfn", "spec": "", "shortname": "webvtt1", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#text-track-cue-end-time", "export": true, "normative": true, "for_": []};
+window.refsData['#parse-the-webvtt-cue-settings'] = {"text": "parse the webvtt cue settings", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#parse-the-webvtt-cue-settings", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-node-object'] = {"text": "webvtt node object", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-node-object", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-internal-node-object'] = {"text": "webvtt internal node object", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-internal-node-object", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-leaf-node-object'] = {"text": "webvtt leaf node object", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-leaf-node-object", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-node-objects-applicable-language'] = {"text": "webvtt node object's applicable language", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-node-objects-applicable-language", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-node-objects-applicable-classes'] = {"text": "webvtt node object's applicable classes", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-node-objects-applicable-classes", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-ruby-text-span'] = {"text": "webvtt cue ruby text span", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-ruby-text-span", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-voice-object'] = {"text": "webvtt voice object", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-voice-object", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-text-object'] = {"text": "webvtt text object", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-text-object", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-timestamp-object'] = {"text": "webvtt timestamp object", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-timestamp-object", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-text-tokenizer'] = {"text": "webvtt cue text tokenizer", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-text-tokenizer", "export": true, "normative": true, "for_": []};
+window.refsData['#attach-a-webvtt-internal-node-object'] = {"text": "attach a webvtt internal node object", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#attach-a-webvtt-internal-node-object", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-class-object'] = {"text": "webvtt class object", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-class-object", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-italic-object'] = {"text": "webvtt italic object", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-italic-object", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-underline-object'] = {"text": "webvtt underline object", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-underline-object", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-ruby-object'] = {"text": "webvtt ruby object", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-ruby-object", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-ruby-text-object'] = {"text": "webvtt ruby text object", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-ruby-text-object", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-language-object'] = {"text": "webvtt language object", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-language-object", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-data-state'] = {"text": "webvtt data state", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-data-state", "export": true, "normative": true, "for_": []};
+window.refsData['#html-character-reference-in-data-state'] = {"text": "html character reference in data state", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#html-character-reference-in-data-state", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-tag-state'] = {"text": "webvtt tag state", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-tag-state", "export": true, "normative": true, "for_": []};
+window.refsData['#consume-an-html-character-reference'] = {"text": "consume an html character reference", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#consume-an-html-character-reference", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-start-tag-annotation-state'] = {"text": "webvtt start tag annotation state", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-start-tag-annotation-state", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-start-tag-class-state'] = {"text": "webvtt start tag class state", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-start-tag-class-state", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-end-tag-state'] = {"text": "webvtt end tag state", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-end-tag-state", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-timestamp-tag-state'] = {"text": "webvtt timestamp tag state", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-timestamp-tag-state", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-start-tag-state'] = {"text": "webvtt start tag state", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-start-tag-state", "export": true, "normative": true, "for_": []};
+window.refsData['#html-character-reference-in-annotation-state'] = {"text": "html character reference in annotation state", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#html-character-reference-in-annotation-state", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-vttcue-getcueashtml'] = {"text": "getCueAsHTML()", "type": "method", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#dom-vttcue-getcueashtml", "export": true, "normative": true, "for_": ["VTTCue"]};
+window.refsData['#vttcue'] = {"text": "VTTCue", "type": "interface", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#vttcue", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#documentfragment'] = {"text": "DocumentFragment", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#documentfragment", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-span-element'] = {"text": "span", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-span-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-i-element'] = {"text": "i", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-i-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-b-element'] = {"text": "b", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-b-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-u-element'] = {"text": "u", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-u-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-ruby-element'] = {"text": "ruby", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-ruby-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-rt-element'] = {"text": "rt", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-rt-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/dom.html#attr-title'] = {"text": "title", "type": "element-attr", "spec": "", "shortname": "webvtt1", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/dom.html#attr-title", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/dom.html#attr-lang'] = {"text": "lang", "type": "element-attr", "spec": "", "shortname": "webvtt1", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/dom.html#attr-lang", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#text'] = {"text": "Text", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#text", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#dom-characterdata-data'] = {"text": "data", "type": "attribute", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-characterdata-data", "export": true, "normative": true, "for_": ["CharacterData"]};
+window.refsData['https://dom.spec.whatwg.org/#processinginstruction'] = {"text": "ProcessingInstruction", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#processinginstruction", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#dom-processinginstruction-target'] = {"text": "target", "type": "attribute", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-processinginstruction-target", "export": true, "normative": true, "for_": ["ProcessingInstruction"]};
+window.refsData['https://infra.spec.whatwg.org/#html-namespace'] = {"text": "html namespace", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#html-namespace", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/dom.html#classes'] = {"text": "class", "type": "element-attr", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dom.html#classes", "export": true, "normative": true, "for_": ["global"]};
+window.refsData['https://dom.spec.whatwg.org/#dom-node-ownerdocument'] = {"text": "ownerDocument", "type": "attribute", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-node-ownerdocument", "export": true, "normative": true, "for_": ["Node"]};
+window.refsData['#webvtt-cue-text-parsing-rules'] = {"text": "webvtt cue text parsing rules", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-text-parsing-rules", "export": true, "normative": true, "for_": []};
+window.refsData['#user-agents-that-do-not-support-css'] = {"text": "user agents that do not support css", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#user-agents-that-do-not-support-css", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#audio'] = {"text": "audio", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#audio", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#expose-a-user-interface-to-the-user'] = {"text": "expose a user interface to the user", "type": "dfn", "spec": "", "shortname": "webvtt1", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#expose-a-user-interface-to-the-user", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#valdef-length-vw'] = {"text": "vw", "type": "value", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#valdef-length-vw", "export": true, "normative": true, "for_": ["<length>"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#valdef-length-vh'] = {"text": "vh", "type": "value", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#valdef-length-vh", "export": true, "normative": true, "for_": ["<length>"]};
+window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#text-track-cue-order'] = {"text": "text track cue order", "type": "dfn", "spec": "", "shortname": "webvtt1", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#text-track-cue-order", "export": true, "normative": true, "for_": []};
+window.refsData['#apply-webvtt-cue-settings'] = {"text": "apply webvtt cue settings", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#apply-webvtt-cue-settings", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-transitions-1/#propdef-transition-property'] = {"text": "transition-property", "type": "property", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transitions-1/#propdef-transition-property", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-transitions-1/#propdef-transition-duration'] = {"text": "transition-duration", "type": "property", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transitions-1/#propdef-transition-duration", "export": true, "normative": true, "for_": []};
+window.refsData['#cue-computed-position'] = {"text": "cue computed position", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#cue-computed-position", "export": true, "normative": true, "for_": []};
+window.refsData['#obtain-a-set-of-css-boxes'] = {"text": "obtain a set of css boxes", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#obtain-a-set-of-css-boxes", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#valdef-width-auto'] = {"text": "auto", "type": "value", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#valdef-width-auto", "export": true, "normative": true, "for_": ["width", "height", "min-width", "min-height"]};
+window.refsData['https://drafts.csswg.org/selectors-4/#originating-element'] = {"text": "originating element", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "current", "url": "https://drafts.csswg.org/selectors-4/#originating-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#at-ruledef-import'] = {"text": "@import", "type": "at-rule", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#at-ruledef-import", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-background-image'] = {"text": "background-image", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background-image", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#the-track-element'] = {"text": "track", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#the-track-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-3/#propdef-display'] = {"text": "display", "type": "property", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-display-3/#propdef-display", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#valdef-display-inline'] = {"text": "inline", "type": "value", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#valdef-display-inline", "export": true, "normative": true, "for_": ["display", "<display-outside>"]};
+window.refsData['https://drafts.csswg.org/css-ruby-1/#valdef-display-ruby-base'] = {"text": "ruby-base", "type": "value", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-ruby-1/#valdef-display-ruby-base", "export": true, "normative": true, "for_": ["display"]};
+window.refsData['https://drafts.csswg.org/css-position-3/#propdef-position'] = {"text": "position", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-position", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-position-3/#valdef-position-absolute'] = {"text": "absolute", "type": "value", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#valdef-position-absolute", "export": true, "normative": true, "for_": ["position"]};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#propdef-writing-mode'] = {"text": "writing-mode", "type": "property", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#propdef-writing-mode", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-position-3/#propdef-top'] = {"text": "top", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-top", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-position-3/#propdef-left'] = {"text": "left", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-left", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#propdef-width'] = {"text": "width", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-width", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#propdef-height'] = {"text": "height", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-height", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-4/#propdef-overflow-wrap'] = {"text": "overflow-wrap", "type": "property", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#propdef-overflow-wrap", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-4/#valdef-overflow-wrap-break-word'] = {"text": "break-word", "type": "value", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#valdef-overflow-wrap-break-word", "export": true, "normative": true, "for_": ["overflow-wrap"]};
+window.refsData['https://drafts.csswg.org/css-text-4/#propdef-text-wrap'] = {"text": "text-wrap", "type": "property", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#propdef-text-wrap", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-4/#valdef-text-wrap-balance'] = {"text": "balance", "type": "value", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#valdef-text-wrap-balance", "export": true, "normative": true, "for_": ["text-wrap"]};
+window.refsData['https://drafts.csswg.org/css-text-3/#propdef-text-align'] = {"text": "text-align", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-text-3/#propdef-text-align", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-4/#valdef-text-align-start'] = {"text": "start", "type": "value", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#valdef-text-align-start", "export": true, "normative": true, "for_": ["text-align"]};
+window.refsData['https://drafts.csswg.org/css-text-4/#valdef-text-align-center'] = {"text": "center", "type": "value", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#valdef-text-align-center", "export": true, "normative": true, "for_": ["text-align"]};
+window.refsData['https://drafts.csswg.org/css-text-4/#valdef-text-align-end'] = {"text": "end", "type": "value", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#valdef-text-align-end", "export": true, "normative": true, "for_": ["text-align"]};
+window.refsData['https://drafts.csswg.org/css-text-4/#valdef-text-align-left'] = {"text": "left", "type": "value", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#valdef-text-align-left", "export": true, "normative": true, "for_": ["text-align"]};
+window.refsData['https://drafts.csswg.org/css-text-4/#valdef-text-align-right'] = {"text": "right", "type": "value", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#valdef-text-align-right", "export": true, "normative": true, "for_": ["text-align"]};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font'] = {"text": "font", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-background-box'] = {"text": "webvtt cue background box", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-background-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-4/#propdef-white-space'] = {"text": "white-space", "type": "property", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#propdef-white-space", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-4/#valdef-white-space-pre-line'] = {"text": "pre-line", "type": "value", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#valdef-white-space-pre-line", "export": true, "normative": true, "for_": ["white-space"]};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#valdef-font-style-italic'] = {"text": "italic", "type": "value", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#valdef-font-style-italic", "export": true, "normative": true, "for_": ["font-style"]};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#valdef-font-weight-bold'] = {"text": "bold", "type": "value", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#valdef-font-weight-bold", "export": true, "normative": true, "for_": ["font-weight"]};
+window.refsData['https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration'] = {"text": "text-decoration", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css2/#valdef-text-decoration-underline'] = {"text": "underline", "type": "value", "spec": "css22", "shortname": "css", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css2/#valdef-text-decoration-underline", "export": true, "normative": true, "for_": ["text-decoration"]};
+window.refsData['https://drafts.csswg.org/css-ruby-1/#valdef-display-ruby'] = {"text": "ruby", "type": "value", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-ruby-1/#valdef-display-ruby", "export": true, "normative": true, "for_": ["display"]};
+window.refsData['https://drafts.csswg.org/css-ruby-1/#valdef-display-ruby-text'] = {"text": "ruby-text", "type": "value", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-ruby-1/#valdef-display-ruby-text", "export": true, "normative": true, "for_": ["display"]};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#valdef-writing-mode-horizontal-tb'] = {"text": "horizontal-tb", "type": "value", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#valdef-writing-mode-horizontal-tb", "export": true, "normative": true, "for_": ["writing-mode"]};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#propdef-overflow'] = {"text": "overflow", "type": "property", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#propdef-overflow", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#valdef-overflow-hidden'] = {"text": "hidden", "type": "value", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#valdef-overflow-hidden", "export": true, "normative": true, "for_": ["overflow", "overflow-x", "overflow-y"]};
+window.refsData['https://drafts.csswg.org/css2/#propdef-min-height'] = {"text": "min-height", "type": "property", "spec": "css22", "shortname": "css", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css2/#propdef-min-height", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css2/#propdef-max-height'] = {"text": "max-height", "type": "property", "spec": "css22", "shortname": "css", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css2/#propdef-max-height", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-flexbox-1/#valdef-display-inline-flex'] = {"text": "inline-flex", "type": "value", "spec": "css-flexbox-1", "shortname": "css-flexbox", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-flexbox-1/#valdef-display-inline-flex", "export": true, "normative": true, "for_": ["display"]};
+window.refsData['https://drafts.csswg.org/css-flexbox-1/#propdef-flex-flow'] = {"text": "flex-flow", "type": "property", "spec": "css-flexbox-1", "shortname": "css-flexbox", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-flexbox-1/#propdef-flex-flow", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-align-3/#propdef-justify-content'] = {"text": "justify-content", "type": "property", "spec": "css-align-3", "shortname": "css-align", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-align-3/#propdef-justify-content", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-align-3/#valdef-self-position-flex-end'] = {"text": "flex-end", "type": "value", "spec": "css-align-3", "shortname": "css-align", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-align-3/#valdef-self-position-flex-end", "export": true, "normative": true, "for_": ["<self-position>", "<content-position>", "justify-self", "align-self", "justify-content", "align-content"]};
+window.refsData['https://drafts.csswg.org/css-position-3/#valdef-position-relative'] = {"text": "relative", "type": "value", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#valdef-position-relative", "export": true, "normative": true, "for_": ["position"]};
+window.refsData['https://drafts.csswg.org/selectors-4/#past-pseudo'] = {"text": ":past", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "current", "url": "https://drafts.csswg.org/selectors-4/#past-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/selectors-4/#future-pseudo'] = {"text": ":future", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "current", "url": "https://drafts.csswg.org/selectors-4/#future-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/selectors-4/#id-selector'] = {"text": "id selector", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "current", "url": "https://drafts.csswg.org/selectors-4/#id-selector", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/selectors-4/#type-selector'] = {"text": "type selector", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "current", "url": "https://drafts.csswg.org/selectors-4/#type-selector", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/selectors-4/#class-selector'] = {"text": "class selector", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "current", "url": "https://drafts.csswg.org/selectors-4/#class-selector", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/selectors-4/#attribute-selector'] = {"text": "attribute selector", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "current", "url": "https://drafts.csswg.org/selectors-4/#attribute-selector", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#attr-track-srclang'] = {"text": "srclang", "type": "element-attr", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#attr-track-srclang", "export": true, "normative": true, "for_": ["track"]};
+window.refsData['https://drafts.csswg.org/css2/#selectordef-lang'] = {"text": ":lang()", "type": "selector", "spec": "css22", "shortname": "css", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css2/#selectordef-lang", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css2/#propdef-line-height'] = {"text": "line-height", "type": "property", "spec": "css22", "shortname": "css", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css2/#propdef-line-height", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-color-4/#propdef-opacity'] = {"text": "opacity", "type": "property", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-color-4/#propdef-opacity", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#propdef-visibility'] = {"text": "visibility", "type": "property", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#propdef-visibility", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-decor-4/#propdef-text-shadow'] = {"text": "text-shadow", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-decor-4/#propdef-text-shadow", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-ui-4/#propdef-outline'] = {"text": "outline", "type": "property", "spec": "css-ui-4", "shortname": "css-ui", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-ui-4/#propdef-outline", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#propdef-text-combine-upright'] = {"text": "text-combine-upright", "type": "property", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#propdef-text-combine-upright", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-ruby-1/#propdef-ruby-position'] = {"text": "ruby-position", "type": "property", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-ruby-1/#propdef-ruby-position", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-double'] = {"text": "double", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-double", "export": true, "normative": true, "for_": []};
+window.refsData['#enumdef-autokeyword'] = {"text": "AutoKeyword", "type": "enum", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#enumdef-autokeyword", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#texttrackcue'] = {"text": "TextTrackCue", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#texttrackcue", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-vttcue-vttcue'] = {"text": "VTTCue(startTime, endTime, text)", "type": "constructor", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#dom-vttcue-vttcue", "export": true, "normative": true, "for_": ["VTTCue"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['#vttregion'] = {"text": "VTTRegion", "type": "interface", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#vttregion", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-vttcue-region'] = {"text": "region", "type": "attribute", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#dom-vttcue-region", "export": true, "normative": true, "for_": ["VTTCue"]};
+window.refsData['#enumdef-directionsetting'] = {"text": "DirectionSetting", "type": "enum", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#enumdef-directionsetting", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-vttcue-vertical'] = {"text": "vertical", "type": "attribute", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#dom-vttcue-vertical", "export": true, "normative": true, "for_": ["VTTCue"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['#typedefdef-lineandpositionsetting'] = {"text": "LineAndPositionSetting", "type": "typedef", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#typedefdef-lineandpositionsetting", "export": true, "normative": true, "for_": []};
+window.refsData['#enumdef-linealignsetting'] = {"text": "LineAlignSetting", "type": "enum", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#enumdef-linealignsetting", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-vttcue-linealign'] = {"text": "lineAlign", "type": "attribute", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#dom-vttcue-linealign", "export": true, "normative": true, "for_": ["VTTCue"]};
+window.refsData['#dom-vttcue-position'] = {"text": "position", "type": "attribute", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#dom-vttcue-position", "export": true, "normative": true, "for_": ["VTTCue"]};
+window.refsData['#enumdef-positionalignsetting'] = {"text": "PositionAlignSetting", "type": "enum", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#enumdef-positionalignsetting", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-vttcue-positionalign'] = {"text": "positionAlign", "type": "attribute", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#dom-vttcue-positionalign", "export": true, "normative": true, "for_": ["VTTCue"]};
+window.refsData['#dom-vttcue-size'] = {"text": "size", "type": "attribute", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#dom-vttcue-size", "export": true, "normative": true, "for_": ["VTTCue"]};
+window.refsData['#enumdef-alignsetting'] = {"text": "AlignSetting", "type": "enum", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#enumdef-alignsetting", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-vttcue-align'] = {"text": "align", "type": "attribute", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#dom-vttcue-align", "export": true, "normative": true, "for_": ["VTTCue"]};
+window.refsData['#dom-vttcue-text'] = {"text": "text", "type": "attribute", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#dom-vttcue-text", "export": true, "normative": true, "for_": ["VTTCue"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#dom-texttrack-addcue'] = {"text": "addCue(cue)", "type": "method", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#dom-texttrack-addcue", "export": true, "normative": true, "for_": ["TextTrack"]};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#html-elements'] = {"text": "html elements", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#html-elements", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#rules-for-extracting-the-chapter-title'] = {"text": "rules for extracting the chapter title", "type": "dfn", "spec": "", "shortname": "webvtt1", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#rules-for-extracting-the-chapter-title", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-rules-for-extracting-the-chapter-title'] = {"text": "webvtt rules for extracting the chapter title", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-rules-for-extracting-the-chapter-title", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#indexsizeerror'] = {"text": "IndexSizeError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#indexsizeerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#entry-settings-object'] = {"text": "entry settings object", "type": "dfn", "spec": "", "shortname": "webvtt1", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#entry-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['#webvtt-cue-text-dom-construction-rules'] = {"text": "webvtt cue text dom construction rules", "type": "dfn", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#webvtt-cue-text-dom-construction-rules", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-vttregion-vttregion'] = {"text": "VTTRegion()", "type": "constructor", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#dom-vttregion-vttregion", "export": true, "normative": true, "for_": ["VTTRegion"]};
+window.refsData['#dom-vttregion-id'] = {"text": "id", "type": "attribute", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#dom-vttregion-id", "export": true, "normative": true, "for_": ["VTTRegion"]};
+window.refsData['#dom-vttregion-width'] = {"text": "width", "type": "attribute", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#dom-vttregion-width", "export": true, "normative": true, "for_": ["VTTRegion"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-long'] = {"text": "unsigned long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-long", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-vttregion-lines'] = {"text": "lines", "type": "attribute", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#dom-vttregion-lines", "export": true, "normative": true, "for_": ["VTTRegion"]};
+window.refsData['#dom-vttregion-regionanchorx'] = {"text": "regionAnchorX", "type": "attribute", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#dom-vttregion-regionanchorx", "export": true, "normative": true, "for_": ["VTTRegion"]};
+window.refsData['#dom-vttregion-regionanchory'] = {"text": "regionAnchorY", "type": "attribute", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#dom-vttregion-regionanchory", "export": true, "normative": true, "for_": ["VTTRegion"]};
+window.refsData['#dom-vttregion-viewportanchorx'] = {"text": "viewportAnchorX", "type": "attribute", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#dom-vttregion-viewportanchorx", "export": true, "normative": true, "for_": ["VTTRegion"]};
+window.refsData['#dom-vttregion-viewportanchory'] = {"text": "viewportAnchorY", "type": "attribute", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#dom-vttregion-viewportanchory", "export": true, "normative": true, "for_": ["VTTRegion"]};
+window.refsData['#enumdef-scrollsetting'] = {"text": "ScrollSetting", "type": "enum", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#enumdef-scrollsetting", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-vttregion-scroll'] = {"text": "scroll", "type": "attribute", "spec": "webvtt1", "shortname": "webvtt1", "level": "", "status": "local", "url": "#dom-vttregion-scroll", "export": true, "normative": true, "for_": ["VTTRegion"]};
+window.refsData['https://drafts.csswg.org/selectors-3/#sel-before'] = {"text": "::before", "type": "selector", "spec": "selectors-3", "shortname": "selectors", "level": "3", "status": "current", "url": "https://drafts.csswg.org/selectors-3/#sel-before", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/selectors-3/#sel-after'] = {"text": "::after", "type": "selector", "spec": "selectors-3", "shortname": "selectors", "level": "3", "status": "current", "url": "https://drafts.csswg.org/selectors-3/#sel-after", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-1/#dom-window-getcomputedstyle'] = {"text": "getComputedStyle(elt)", "type": "method", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#dom-window-getcomputedstyle", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#honor-user-preferences-for-automatic-text-track-selection'] = {"text": "honor user preferences for automatic text track selection", "type": "dfn", "spec": "", "shortname": "webvtt1", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#honor-user-preferences-for-automatic-text-track-selection", "export": true, "normative": true, "for_": []};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

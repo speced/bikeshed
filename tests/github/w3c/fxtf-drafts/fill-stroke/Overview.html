@@ -599,6 +599,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -4282,8 +4319,6 @@ Light gray represents dash pattern based on center of inset path.</p>
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -4531,7 +4566,6 @@ Light gray represents dash pattern based on center of inset path.</p>
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -4992,6 +5026,359 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://www.w3.org/TR/SVG2/paths.html#elementdef-path'] = {"text": "path", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "snapshot", "url": "https://www.w3.org/TR/SVG2/paths.html#elementdef-path", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/SVG2/shapes.html#elementdef-rect'] = {"text": "rect", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "snapshot", "url": "https://www.w3.org/TR/SVG2/shapes.html#elementdef-rect", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-color-4/#typedef-color'] = {"text": "<color>", "type": "type", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-color-4/#typedef-color", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-paint'] = {"text": "<paint>", "type": "type", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#typedef-paint", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-images-3/#typedef-image'] = {"text": "<image>", "type": "type", "spec": "css-images-3", "shortname": "css-images", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-images-3/#typedef-image", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-svg-paint'] = {"text": "<svg-paint>", "type": "type", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#typedef-svg-paint", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-values-4/#url-value'] = {"text": "<url>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-4/#url-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-images-3/#css-ambiguous-image-url'] = {"text": "ambiguous image url", "type": "dfn", "spec": "css-images-3", "shortname": "css-images", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-images-3/#css-ambiguous-image-url", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['https://www.w3.org/TR/css-values-4/#integer-value'] = {"text": "<integer>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-4/#integer-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/SVG2/painting.html#TermPaintServerElement'] = {"text": "paint server element", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "snapshot", "url": "https://www.w3.org/TR/SVG2/painting.html#TermPaintServerElement", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-values-4/#functional-notation'] = {"text": "functional notation", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-4/#functional-notation", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-stroke'] = {"text": "stroke", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-fill'] = {"text": "fill", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-fill", "export": true, "normative": true, "for_": []};
+window.refsData['#fill'] = {"text": "fill", "type": "dfn", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#fill", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-fill-color'] = {"text": "fill-color", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-fill-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-fill-image'] = {"text": "fill-image", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-fill-image", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-break-4/#propdef-box-decoration-break'] = {"text": "box-decoration-break", "type": "property", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-break-4/#propdef-box-decoration-break", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-fill-break'] = {"text": "fill-break", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-fill-break", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-stroke-break'] = {"text": "stroke-break", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-break", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-fill-rule'] = {"text": "fill-rule", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-fill-rule", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-break-3/#fragment'] = {"text": "fragment", "type": "dfn", "spec": "css-break-3", "shortname": "css-break", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-break-3/#fragment", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-color-4/#propdef-color'] = {"text": "color", "type": "property", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-color-4/#propdef-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-backgrounds-3/#propdef-background-color'] = {"text": "background-color", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-backgrounds-3/#propdef-background-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-images-4/#invalid-image'] = {"text": "invalid image", "type": "dfn", "spec": "css-images-4", "shortname": "css-images", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-images-4/#invalid-image", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-images-4/#funcdef-image'] = {"text": "image()", "type": "function", "spec": "css-images-4", "shortname": "css-images", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-images-4/#funcdef-image", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-stroke-color'] = {"text": "stroke-color", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-values-4/#mult-comma'] = {"text": "#", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-4/#mult-comma", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-backgrounds-3/#propdef-background-image'] = {"text": "background-image", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-backgrounds-3/#propdef-background-image", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-fill-origin'] = {"text": "fill-origin", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-fill-origin", "export": true, "normative": true, "for_": []};
+window.refsData['#fill-positioning-area'] = {"text": "fill positioning area", "type": "dfn", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#fill-positioning-area", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-display-3/#initial-containing-block'] = {"text": "initial containing block", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-display-3/#initial-containing-block", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-fill-origin-content-box'] = {"text": "content-box", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#valdef-fill-origin-content-box", "export": true, "normative": true, "for_": ["fill-origin"]};
+window.refsData['#valdef-fill-origin-padding-box'] = {"text": "padding-box", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#valdef-fill-origin-padding-box", "export": true, "normative": true, "for_": ["fill-origin"]};
+window.refsData['#valdef-fill-origin-fill-box'] = {"text": "fill-box", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#valdef-fill-origin-fill-box", "export": true, "normative": true, "for_": ["fill-origin"]};
+window.refsData['#valdef-fill-origin-border-box'] = {"text": "border-box", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#valdef-fill-origin-border-box", "export": true, "normative": true, "for_": ["fill-origin"]};
+window.refsData['#valdef-fill-origin-stroke-box'] = {"text": "stroke-box", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#valdef-fill-origin-stroke-box", "export": true, "normative": true, "for_": ["fill-origin"]};
+window.refsData['https://www.w3.org/TR/SVG2/coords.html#TermObjectBoundingBox'] = {"text": "object bounding box", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "snapshot", "url": "https://www.w3.org/TR/SVG2/coords.html#TermObjectBoundingBox", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/SVG2/coords.html#TermStrokeBoundingBox'] = {"text": "stroke bounding box", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "snapshot", "url": "https://www.w3.org/TR/SVG2/coords.html#TermStrokeBoundingBox", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-fill-origin-match-parent'] = {"text": "match-parent", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#valdef-fill-origin-match-parent", "export": true, "normative": true, "for_": ["fill-origin"]};
+window.refsData['#propdef-fill-position'] = {"text": "fill-position", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-fill-position", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-values-4/#typedef-position'] = {"text": "<position>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-4/#typedef-position", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/web-animations-1/#repeatable-list'] = {"text": "repeatable list", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "snapshot", "url": "https://www.w3.org/TR/web-animations-1/#repeatable-list", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-backgrounds-3/#propdef-background-position'] = {"text": "background-position", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-backgrounds-3/#propdef-background-position", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-fill-size'] = {"text": "fill-size", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-fill-size", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-backgrounds-3/#typedef-bg-size'] = {"text": "<bg-size>", "type": "type", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-backgrounds-3/#typedef-bg-size", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-backgrounds-3/#valdef-background-size-auto'] = {"text": "auto", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-backgrounds-3/#valdef-background-size-auto", "export": true, "normative": true, "for_": ["background-size"]};
+window.refsData['https://www.w3.org/TR/css-backgrounds-3/#propdef-background-size'] = {"text": "background-size", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-backgrounds-3/#propdef-background-size", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-fill-repeat'] = {"text": "fill-repeat", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-fill-repeat", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-backgrounds-3/#typedef-repeat-style'] = {"text": "<repeat-style>", "type": "type", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-backgrounds-3/#typedef-repeat-style", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-backgrounds-3/#propdef-background-repeat'] = {"text": "background-repeat", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-backgrounds-3/#propdef-background-repeat", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-backgrounds-3/#propdef-background'] = {"text": "background", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-backgrounds-3/#propdef-background", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-cascade-5/#shorthand-property'] = {"text": "shorthand", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "snapshot", "url": "https://www.w3.org/TR/css-cascade-5/#shorthand-property", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-color-4/#valdef-color-transparent'] = {"text": "transparent", "type": "value", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-color-4/#valdef-color-transparent", "export": true, "normative": true, "for_": ["<color>"]};
+window.refsData['#propdef-fill-opacity'] = {"text": "fill-opacity", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-fill-opacity", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-color-4/#propdef-opacity'] = {"text": "opacity", "type": "property", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-color-4/#propdef-opacity", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-values-4/#number-value'] = {"text": "<number>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-4/#number-value", "export": true, "normative": true, "for_": []};
+window.refsData['#stroke'] = {"text": "stroke", "type": "dfn", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#stroke", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-stroke-image'] = {"text": "stroke-image", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-image", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/SVG2/painting.html#PaintOrderProperty'] = {"text": "paint-order", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "snapshot", "url": "https://www.w3.org/TR/SVG2/painting.html#PaintOrderProperty", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-stroke-width'] = {"text": "stroke-width", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-width", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-stroke-dasharray'] = {"text": "stroke-dasharray", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-dasharray", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-values-4/#typedef-length-percentage'] = {"text": "<length-percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-4/#typedef-length-percentage", "export": true, "normative": true, "for_": []};
+window.refsData['#scaled-viewport-size'] = {"text": "scaled viewport size", "type": "dfn", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#scaled-viewport-size", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-stroke-align'] = {"text": "stroke-align", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-align", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-stroke-linejoin'] = {"text": "stroke-linejoin", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-linejoin", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-stroke-align-outset'] = {"text": "outset", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#valdef-stroke-align-outset", "export": true, "normative": true, "for_": ["stroke-align"]};
+window.refsData['#valdef-stroke-align-inset'] = {"text": "inset", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#valdef-stroke-align-inset", "export": true, "normative": true, "for_": ["stroke-align"]};
+window.refsData['#valdef-stroke-align-center'] = {"text": "center", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#valdef-stroke-align-center", "export": true, "normative": true, "for_": ["stroke-align"]};
+window.refsData['#valdef-fill-rule-nonzero'] = {"text": "nonzero", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#valdef-fill-rule-nonzero", "export": true, "normative": true, "for_": ["fill-rule"]};
+window.refsData['#valdef-fill-rule-evenodd'] = {"text": "evenodd", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#valdef-fill-rule-evenodd", "export": true, "normative": true, "for_": ["fill-rule"]};
+window.refsData['#propdef-stroke-linecap'] = {"text": "stroke-linecap", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-linecap", "export": true, "normative": true, "for_": []};
+window.refsData['#cap-shapes'] = {"text": "cap shapes", "type": "dfn", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#cap-shapes", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-values-4/#comb-any'] = {"text": "||", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-4/#comb-any", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-stroke-miterlimit'] = {"text": "stroke-miterlimit", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-miterlimit", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-stroke-linejoin-miter'] = {"text": "miter", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#valdef-stroke-linejoin-miter", "export": true, "normative": true, "for_": ["stroke-linejoin"]};
+window.refsData['#--corner-diagonal'] = {"text": "corner diagonal", "type": "dfn", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#--corner-diagonal", "export": true, "normative": true, "for_": ["/"]};
+window.refsData['#valdef-stroke-linejoin-bevel'] = {"text": "bevel", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#valdef-stroke-linejoin-bevel", "export": true, "normative": true, "for_": ["stroke-linejoin"]};
+window.refsData['#valdef-stroke-linejoin-fallback'] = {"text": "fallback", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#valdef-stroke-linejoin-fallback", "export": true, "normative": true, "for_": ["stroke-linejoin"]};
+window.refsData['#valdef-stroke-linejoin-crop'] = {"text": "crop", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#valdef-stroke-linejoin-crop", "export": true, "normative": true, "for_": ["stroke-linejoin"]};
+window.refsData['#valdef-stroke-linejoin-arcs'] = {"text": "arcs", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#valdef-stroke-linejoin-arcs", "export": true, "normative": true, "for_": ["stroke-linejoin"]};
+window.refsData['https://w3c.github.io/rdf-semantics/spec/#dfn-invalid'] = {"text": "invalid", "type": "dfn", "spec": "rdf12-semantics", "shortname": "rdf-semantics", "level": "1", "status": "current", "url": "https://w3c.github.io/rdf-semantics/spec/#dfn-invalid", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-values-4/#mult-one-plus'] = {"text": "+", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-4/#mult-one-plus", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-stroke-dasharray-none'] = {"text": "none", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#valdef-stroke-dasharray-none", "export": true, "normative": true, "for_": ["stroke-dasharray"]};
+window.refsData['#propdef-stroke-dashoffset'] = {"text": "stroke-dashoffset", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-dashoffset", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-stroke-dash-corner'] = {"text": "stroke-dash-corner", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-dash-corner", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-stroke-dash-justify'] = {"text": "stroke-dash-justify", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-dash-justify", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-values-4/#length-value'] = {"text": "<length>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-4/#length-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/SVG2/paths.html#TermEquivalentPath'] = {"text": "equivalent path", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "snapshot", "url": "https://www.w3.org/TR/SVG2/paths.html#TermEquivalentPath", "export": false, "normative": true, "for_": []};
+window.refsData['#valdef-stroke-dash-corner-none'] = {"text": "none", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#valdef-stroke-dash-corner-none", "export": true, "normative": true, "for_": ["stroke-dash-corner"]};
+window.refsData['#valdef-stroke-dash-justify-stretch'] = {"text": "stretch", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#valdef-stroke-dash-justify-stretch", "export": true, "normative": true, "for_": ["stroke-dash-justify"]};
+window.refsData['#valdef-stroke-dash-justify-compress'] = {"text": "compress", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#valdef-stroke-dash-justify-compress", "export": true, "normative": true, "for_": ["stroke-dash-justify"]};
+window.refsData['#valdef-stroke-dash-justify-dashes'] = {"text": "dashes", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#valdef-stroke-dash-justify-dashes", "export": true, "normative": true, "for_": ["stroke-dash-justify"]};
+window.refsData['#valdef-stroke-dash-justify-gaps'] = {"text": "gaps", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#valdef-stroke-dash-justify-gaps", "export": true, "normative": true, "for_": ["stroke-dash-justify"]};
+window.refsData['#propdef-stroke-origin'] = {"text": "stroke-origin", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-origin", "export": true, "normative": true, "for_": []};
+window.refsData['#stroke-positioning-area'] = {"text": "stroke positioning area", "type": "dfn", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#stroke-positioning-area", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-stroke-origin-content-box'] = {"text": "content-box", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#valdef-stroke-origin-content-box", "export": true, "normative": true, "for_": ["stroke-origin"]};
+window.refsData['#valdef-stroke-origin-padding-box'] = {"text": "padding-box", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#valdef-stroke-origin-padding-box", "export": true, "normative": true, "for_": ["stroke-origin"]};
+window.refsData['#valdef-stroke-origin-fill-box'] = {"text": "fill-box", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#valdef-stroke-origin-fill-box", "export": true, "normative": true, "for_": ["stroke-origin"]};
+window.refsData['#valdef-stroke-origin-border-box'] = {"text": "border-box", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#valdef-stroke-origin-border-box", "export": true, "normative": true, "for_": ["stroke-origin"]};
+window.refsData['#valdef-stroke-origin-stroke-box'] = {"text": "stroke-box", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#valdef-stroke-origin-stroke-box", "export": true, "normative": true, "for_": ["stroke-origin"]};
+window.refsData['#valdef-stroke-origin-match-parent'] = {"text": "match-parent", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#valdef-stroke-origin-match-parent", "export": true, "normative": true, "for_": ["stroke-origin"]};
+window.refsData['#propdef-stroke-position'] = {"text": "stroke-position", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-position", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-stroke-size'] = {"text": "stroke-size", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-size", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-stroke-repeat'] = {"text": "stroke-repeat", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-repeat", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-stroke-opacity'] = {"text": "stroke-opacity", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-opacity", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/SVG2/pservers.html#elementdef-pattern'] = {"text": "pattern", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "snapshot", "url": "https://www.w3.org/TR/SVG2/pservers.html#elementdef-pattern", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-stroke-linecap-butt'] = {"text": "butt", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#valdef-stroke-linecap-butt", "export": true, "normative": true, "for_": ["stroke-linecap"]};
+window.refsData['#valdef-stroke-linecap-round'] = {"text": "round", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#valdef-stroke-linecap-round", "export": true, "normative": true, "for_": ["stroke-linecap"]};
+window.refsData['#valdef-stroke-linecap-square'] = {"text": "square", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#valdef-stroke-linecap-square", "export": true, "normative": true, "for_": ["stroke-linecap"]};
+window.refsData['#dash-positions'] = {"text": "dash positions", "type": "dfn", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#dash-positions", "export": true, "normative": true, "for_": []};
+window.refsData['#line-join-shape'] = {"text": "line join shape", "type": "dfn", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#line-join-shape", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-stroke-linejoin-round'] = {"text": "round", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#valdef-stroke-linejoin-round", "export": true, "normative": true, "for_": ["stroke-linejoin"]};
+window.refsData['https://www.w3.org/TR/css-text-decor-4/#propdef-text-decoration'] = {"text": "text-decoration", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-text-decor-4/#propdef-text-decoration", "export": true, "normative": true, "for_": []};window.refsData['#propdef-fill'] = {"text": "fill", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-fill", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-fill-break'] = {"text": "fill-break", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-fill-break", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-fill-color'] = {"text": "fill-color", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-fill-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-fill-image'] = {"text": "fill-image", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-fill-image", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-fill-opacity'] = {"text": "fill-opacity", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-fill-opacity", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-fill-origin'] = {"text": "fill-origin", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-fill-origin", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-fill-position'] = {"text": "fill-position", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-fill-position", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-fill-repeat'] = {"text": "fill-repeat", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-fill-repeat", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-fill-rule'] = {"text": "fill-rule", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-fill-rule", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-fill-size'] = {"text": "fill-size", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-fill-size", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-stroke'] = {"text": "stroke", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-stroke-align'] = {"text": "stroke-align", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-align", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-stroke-break'] = {"text": "stroke-break", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-break", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-stroke-color'] = {"text": "stroke-color", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-stroke-dash-corner'] = {"text": "stroke-dash-corner", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-dash-corner", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-stroke-dash-justify'] = {"text": "stroke-dash-justify", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-dash-justify", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-stroke-dasharray'] = {"text": "stroke-dasharray", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-dasharray", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-stroke-dashoffset'] = {"text": "stroke-dashoffset", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-dashoffset", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-stroke-image'] = {"text": "stroke-image", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-image", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-stroke-linecap'] = {"text": "stroke-linecap", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-linecap", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-stroke-linejoin'] = {"text": "stroke-linejoin", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-linejoin", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-stroke-miterlimit'] = {"text": "stroke-miterlimit", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-miterlimit", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-stroke-opacity'] = {"text": "stroke-opacity", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-opacity", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-stroke-origin'] = {"text": "stroke-origin", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-origin", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-stroke-position'] = {"text": "stroke-position", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-position", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-stroke-repeat'] = {"text": "stroke-repeat", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-repeat", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-stroke-size'] = {"text": "stroke-size", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-size", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-stroke-width'] = {"text": "stroke-width", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "local", "url": "#propdef-stroke-width", "export": true, "normative": true, "for_": []};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

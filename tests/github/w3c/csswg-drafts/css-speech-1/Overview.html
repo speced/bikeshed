@@ -472,6 +472,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -3117,8 +3154,6 @@ offset (if any)
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -3366,7 +3401,6 @@ offset (if any)
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -3810,4 +3844,332 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#propdef-voice-balance'] = {"text": "voice-balance", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-voice-balance", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-voice-duration'] = {"text": "voice-duration", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-voice-duration", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-voice-pitch'] = {"text": "voice-pitch", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-voice-pitch", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-voice-range'] = {"text": "voice-range", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-voice-range", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-voice-stress'] = {"text": "voice-stress", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-voice-stress", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/mediaqueries-5/#valdef-media-aural'] = {"text": "aural", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-5/#valdef-media-aural", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['https://drafts.csswg.org/css2/#valdef-media-speech'] = {"text": "speech", "type": "value", "spec": "css22", "shortname": "css", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css2/#valdef-media-speech", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['https://drafts.csswg.org/css-break-4/#valdef-break-before-all'] = {"text": "all", "type": "value", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-break-4/#valdef-break-before-all", "export": true, "normative": true, "for_": ["break-before", "break-after"]};
+window.refsData['https://drafts.csswg.org/css2/#valdef-media-screen'] = {"text": "screen", "type": "value", "spec": "css22", "shortname": "css", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css2/#valdef-media-screen", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#css-wide-keywords'] = {"text": "css-wide keywords", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-span-element'] = {"text": "span", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-span-element", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-rest'] = {"text": "rest", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-rest", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-cue'] = {"text": "cue", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-cue", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-pause'] = {"text": "pause", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-pause", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#propdef-padding'] = {"text": "padding", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#propdef-padding", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border'] = {"text": "border", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#propdef-margin'] = {"text": "margin", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#propdef-margin", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-before'] = {"text": "::before", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-before", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-after'] = {"text": "::after", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-after", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-voice-volume'] = {"text": "voice-volume", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-voice-volume", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-any'] = {"text": "||", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-any", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-voice-volume-decibel'] = {"text": "<decibel>", "type": "type", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#typedef-voice-volume-decibel", "export": true, "normative": true, "for_": ["voice-volume"]};
+window.refsData['#valdef-voice-volume-silent'] = {"text": "silent", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-volume-silent", "export": true, "normative": true, "for_": ["voice-volume"]};
+window.refsData['#aural-box-model'] = {"text": "aural box model", "type": "dfn", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#aural-box-model", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-speak'] = {"text": "speak", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-speak", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-voice-volume-x-soft'] = {"text": "x-soft", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-volume-x-soft", "export": true, "normative": true, "for_": ["voice-volume"]};
+window.refsData['#valdef-voice-volume-x-loud'] = {"text": "x-loud", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-volume-x-loud", "export": true, "normative": true, "for_": ["voice-volume"]};
+window.refsData['#valdef-voice-volume-medium'] = {"text": "medium", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-volume-medium", "export": true, "normative": true, "for_": ["voice-volume"]};
+window.refsData['#valdef-voice-volume-soft'] = {"text": "soft", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-volume-soft", "export": true, "normative": true, "for_": ["voice-volume"]};
+window.refsData['#valdef-voice-volume-loud'] = {"text": "loud", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-volume-loud", "export": true, "normative": true, "for_": ["voice-volume"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#dimension'] = {"text": "dimension", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#dimension", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#number-value'] = {"text": "<number>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#number-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#number'] = {"text": "number", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#number", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-voice-balance-center'] = {"text": "center", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-balance-center", "export": true, "normative": true, "for_": ["voice-balance"]};
+window.refsData['https://drafts.csswg.org/css-position-3/#propdef-left'] = {"text": "left", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-left", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-position-3/#propdef-right'] = {"text": "right", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-right", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-speak-never'] = {"text": "never", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-speak-never", "export": true, "normative": true, "for_": ["speak"]};
+window.refsData['https://drafts.csswg.org/css-display-4/#propdef-display'] = {"text": "display", "type": "property", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#propdef-display", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#valdef-display-none'] = {"text": "none", "type": "value", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#valdef-display-none", "export": true, "normative": true, "for_": ["display", "<display-box>"]};
+window.refsData['#valdef-speak-auto'] = {"text": "auto", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-speak-auto", "export": true, "normative": true, "for_": ["speak"]};
+window.refsData['#valdef-speak-always'] = {"text": "always", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-speak-always", "export": true, "normative": true, "for_": ["speak"]};
+window.refsData['https://drafts.csswg.org/css-display-4/#propdef-visibility'] = {"text": "visibility", "type": "property", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#propdef-visibility", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#valdef-visibility-visible'] = {"text": "visible", "type": "value", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#valdef-visibility-visible", "export": true, "normative": true, "for_": ["visibility"]};
+window.refsData['#propdef-speak-as'] = {"text": "speak-as", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-speak-as", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-pause-before'] = {"text": "pause-before", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-pause-before", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-pause-after'] = {"text": "pause-after", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-pause-after", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-cue-before'] = {"text": "cue-before", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-cue-before", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-cue-after'] = {"text": "cue-after", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-cue-after", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#time-value'] = {"text": "<time>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#time-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-opt'] = {"text": "?", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-rest-after'] = {"text": "rest-after", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-rest-after", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-rest-before'] = {"text": "rest-before", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-rest-before", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css2/#value-def-uri'] = {"text": "<uri>", "type": "type", "spec": "css22", "shortname": "css", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css2/#value-def-uri", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-voice-family'] = {"text": "voice-family", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-voice-family", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-comma'] = {"text": ",", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-comma", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-zero-plus'] = {"text": "*", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-zero-plus", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font-family'] = {"text": "font-family", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-family", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-generic-voice'] = {"text": "<generic-voice>", "type": "type", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#typedef-generic-voice", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-voice-family-age'] = {"text": "<age>", "type": "type", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#typedef-voice-family-age", "export": true, "normative": true, "for_": ["voice-family"]};
+window.refsData['#typedef-voice-family-gender'] = {"text": "<gender>", "type": "type", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#typedef-voice-family-gender", "export": true, "normative": true, "for_": ["voice-family"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#integer-value'] = {"text": "<integer>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#integer-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#family-name-value'] = {"text": "<family-name>", "type": "type", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#family-name-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#string'] = {"text": "string", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#string", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#css-css-identifier'] = {"text": "identifier", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-css-identifier", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['#valdef-voice-family-male'] = {"text": "male", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-family-male", "export": true, "normative": true, "for_": ["voice-family"]};
+window.refsData['#valdef-voice-family-female'] = {"text": "female", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-family-female", "export": true, "normative": true, "for_": ["voice-family"]};
+window.refsData['#valdef-voice-family-neutral'] = {"text": "neutral", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-family-neutral", "export": true, "normative": true, "for_": ["voice-family"]};
+window.refsData['#valdef-voice-family-preserve'] = {"text": "preserve", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-family-preserve", "export": true, "normative": true, "for_": ["voice-family"]};
+window.refsData['#valdef-voice-family-child'] = {"text": "child", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-family-child", "export": true, "normative": true, "for_": ["voice-family"]};
+window.refsData['#valdef-voice-family-young'] = {"text": "young", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-family-young", "export": true, "normative": true, "for_": ["voice-family"]};
+window.refsData['#valdef-voice-family-old'] = {"text": "old", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-family-old", "export": true, "normative": true, "for_": ["voice-family"]};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#valdef-all-inherit'] = {"text": "inherit", "type": "value", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#valdef-all-inherit", "export": true, "normative": true, "for_": ["all"]};
+window.refsData['#propdef-voice-rate'] = {"text": "voice-rate", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-voice-rate", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#percentage-value'] = {"text": "<percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#percentage-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#percentage'] = {"text": "percentage", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#percentage", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#frequency-value'] = {"text": "<frequency>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#frequency-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-all'] = {"text": "&&", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-all", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-voice-pitch-semitones'] = {"text": "<semitones>", "type": "type", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#typedef-voice-pitch-semitones", "export": true, "normative": true, "for_": ["voice-pitch"]};
+window.refsData['#valdef-voice-pitch-absolute'] = {"text": "absolute", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-pitch-absolute", "export": true, "normative": true, "for_": ["voice-pitch"]};
+window.refsData['#voice-pitch-semitone'] = {"text": "semitone", "type": "dfn", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#voice-pitch-semitone", "export": true, "normative": true, "for_": ["voice-pitch"]};
+window.refsData['#valdef-voice-range-absolute'] = {"text": "absolute", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-range-absolute", "export": true, "normative": true, "for_": ["voice-range"]};
+window.refsData['#valdef-voice-stress-normal'] = {"text": "normal", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-stress-normal", "export": true, "normative": true, "for_": ["voice-stress"]};
+window.refsData['#valdef-voice-duration-auto'] = {"text": "auto", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-duration-auto", "export": true, "normative": true, "for_": ["voice-duration"]};
+window.refsData['https://drafts.csswg.org/css-lists-3/#propdef-list-style-type'] = {"text": "list-style-type", "type": "property", "spec": "css-lists-3", "shortname": "css-lists", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-lists-3/#propdef-list-style-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-content-3/#propdef-content'] = {"text": "content", "type": "property", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-content-3/#propdef-content", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-lists-3/#propdef-list-style-image'] = {"text": "list-style-image", "type": "property", "spec": "css-lists-3", "shortname": "css-lists", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-lists-3/#propdef-list-style-image", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-counter-styles-3/#decimal'] = {"text": "decimal", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-counter-styles-3/#decimal", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['https://drafts.csswg.org/css-counter-styles-3/#decimal-leading-zero'] = {"text": "decimal-leading-zero", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-counter-styles-3/#decimal-leading-zero", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['https://drafts.csswg.org/css-counter-styles-3/#lower-roman'] = {"text": "lower-roman", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-counter-styles-3/#lower-roman", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['https://drafts.csswg.org/css-counter-styles-3/#upper-roman'] = {"text": "upper-roman", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-counter-styles-3/#upper-roman", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['https://drafts.csswg.org/css-counter-styles-3/#georgian'] = {"text": "georgian", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-counter-styles-3/#georgian", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['https://drafts.csswg.org/css-counter-styles-3/#armenian'] = {"text": "armenian", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-counter-styles-3/#armenian", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['https://drafts.csswg.org/css-counter-styles-3/#lower-latin'] = {"text": "lower-latin", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-counter-styles-3/#lower-latin", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['https://drafts.csswg.org/css-counter-styles-3/#lower-alpha'] = {"text": "lower-alpha", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-counter-styles-3/#lower-alpha", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['https://drafts.csswg.org/css-counter-styles-3/#upper-latin'] = {"text": "upper-latin", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-counter-styles-3/#upper-latin", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['https://drafts.csswg.org/css-counter-styles-3/#upper-alpha'] = {"text": "upper-alpha", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-counter-styles-3/#upper-alpha", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['https://drafts.csswg.org/css-counter-styles-3/#lower-greek'] = {"text": "lower-greek", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-counter-styles-3/#lower-greek", "export": true, "normative": true, "for_": ["<counter-style-name>"]};window.refsData['#propdef-cue'] = {"text": "cue", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-cue", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-cue-after'] = {"text": "cue-after", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-cue-after", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-cue-before'] = {"text": "cue-before", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-cue-before", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-pause'] = {"text": "pause", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-pause", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-pause-after'] = {"text": "pause-after", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-pause-after", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-pause-before'] = {"text": "pause-before", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-pause-before", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-rest'] = {"text": "rest", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-rest", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-rest-after'] = {"text": "rest-after", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-rest-after", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-rest-before'] = {"text": "rest-before", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-rest-before", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-speak'] = {"text": "speak", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-speak", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-speak-as'] = {"text": "speak-as", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-speak-as", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-voice-balance'] = {"text": "voice-balance", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-voice-balance", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-voice-duration'] = {"text": "voice-duration", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-voice-duration", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-voice-family'] = {"text": "voice-family", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-voice-family", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-voice-pitch'] = {"text": "voice-pitch", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-voice-pitch", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-voice-range'] = {"text": "voice-range", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-voice-range", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-voice-rate'] = {"text": "voice-rate", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-voice-rate", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-voice-stress'] = {"text": "voice-stress", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-voice-stress", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-voice-volume'] = {"text": "voice-volume", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-voice-volume", "export": true, "normative": true, "for_": []};
 </script>

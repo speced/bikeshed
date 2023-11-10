@@ -689,6 +689,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -2547,8 +2584,6 @@ browsing context</a> or a <a data-link-type="dfn" href="#portal-browsing-context
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -2796,7 +2831,6 @@ browsing context</a> or a <a data-link-type="dfn" href="#portal-browsing-context
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -3348,6 +3382,380 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context'] = {"text": "top-level browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#browsing-context'] = {"text": "browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['#portal-state'] = {"text": "portal state", "type": "dfn", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#portal-state", "export": true, "normative": true, "for_": []};
+window.refsData['#elementdef-portal'] = {"text": "portal", "type": "element", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#elementdef-portal", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-htmlportalelement-activate'] = {"text": "activate()", "type": "method", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#dom-htmlportalelement-activate", "export": true, "normative": true, "for_": ["HTMLPortalElement"]};
+window.refsData['#adopt-the-predecessor-browsing-context'] = {"text": "adopt the predecessor browsing context", "type": "dfn", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#adopt-the-predecessor-browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['#activate-a-portal-browsing-context'] = {"text": "activate a portal browsing context", "type": "dfn", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#activate-a-portal-browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['#host-browsing-context'] = {"text": "host browsing context", "type": "dfn", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#host-browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/window-object.html#close-a-browsing-context'] = {"text": "close a browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/window-object.html#close-a-browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['#portal-browsing-context'] = {"text": "portal browsing context", "type": "dfn", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#portal-browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['#host-element'] = {"text": "host element", "type": "dfn", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#host-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#browsing-context-connected'] = {"text": "browsing-context connected", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#browsing-context-connected", "export": true, "normative": true, "for_": []};
+window.refsData['#eventdef-window-portalactivate'] = {"text": "portalactivate", "type": "event", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#eventdef-window-portalactivate", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['#dom-portalactivateevent-adoptpredecessor'] = {"text": "adoptPredecessor()", "type": "method", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#dom-portalactivateevent-adoptpredecessor", "export": true, "normative": true, "for_": ["PortalActivateEvent"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-node-document'] = {"text": "node document", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-node-document", "export": true, "normative": true, "for_": ["Node"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#task-source'] = {"text": "task source", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#task-source", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#concept-origin'] = {"text": "origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-origin", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel'] = {"text": "in parallel", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#assert'] = {"text": "assert", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#assert", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/history.html#session-history'] = {"text": "session history", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/history.html#session-history", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-global-task'] = {"text": "queue a global task", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-global-task", "export": true, "normative": true, "for_": []};
+window.refsData['#portal-task-source'] = {"text": "portal task source", "type": "dfn", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#portal-task-source", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#reject'] = {"text": "reject", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#reject", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#invalidstateerror'] = {"text": "InvalidStateError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invalidstateerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMException'] = {"text": "DOMException", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMException", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#windowproxy'] = {"text": "WindowProxy", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#windowproxy", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-global-object-realm'] = {"text": "realm", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-global-object-realm", "export": true, "normative": true, "for_": ["global object"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-document-origin'] = {"text": "origin", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-document-origin", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#same-origin'] = {"text": "same origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#same-origin", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/structured-data.html#structureddeserializewithtransfer'] = {"text": "StructuredDeserializeWithTransfer", "type": "abstract-op", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/structured-data.html#structureddeserializewithtransfer", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-event-create'] = {"text": "creating an event", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-event-create", "export": true, "normative": true, "for_": []};
+window.refsData['#portalactivateevent'] = {"text": "PortalActivateEvent", "type": "interface", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#portalactivateevent", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#dom-event-type'] = {"text": "type", "type": "attribute", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-event-type", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['#dom-portalactivateevent-data'] = {"text": "data", "type": "attribute", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#dom-portalactivateevent-data", "export": true, "normative": true, "for_": ["PortalActivateEvent"]};
+window.refsData['#portalactivateevent-predecessor-browsing-context'] = {"text": "predecessor browsing context", "type": "dfn", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#portalactivateevent-predecessor-browsing-context", "export": true, "normative": true, "for_": ["PortalActivateEvent"]};
+window.refsData['#portalactivateevent-successor-window'] = {"text": "successor window", "type": "dfn", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#portalactivateevent-successor-window", "export": true, "normative": true, "for_": ["PortalActivateEvent"]};
+window.refsData['#portalactivateevent-activation-promise'] = {"text": "activation promise", "type": "dfn", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#portalactivateevent-activation-promise", "export": true, "normative": true, "for_": ["PortalActivateEvent"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-event-dispatch'] = {"text": "dispatch", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-event-dispatch", "export": true, "normative": true, "for_": []};
+window.refsData['#portalactivateevent-adopted-predecessor-element'] = {"text": "adopted predecessor element", "type": "dfn", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#portalactivateevent-adopted-predecessor-element", "export": true, "normative": true, "for_": ["PortalActivateEvent"]};
+window.refsData['#htmlportalelement-just-adopted-flag'] = {"text": "just-adopted flag", "type": "dfn", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#htmlportalelement-just-adopted-flag", "export": true, "normative": true, "for_": ["HTMLPortalElement"]};
+window.refsData['#may-have-a-guest-browsing-context'] = {"text": "may have a guest browsing context", "type": "dfn", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#may-have-a-guest-browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['#htmlportalelement-guest-browsing-context'] = {"text": "guest browsing context", "type": "dfn", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#htmlportalelement-guest-browsing-context", "export": true, "normative": true, "for_": ["HTMLPortalElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/window-object.html#a-browsing-context-is-discarded'] = {"text": "discard a browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/window-object.html#a-browsing-context-is-discarded", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsing-the-web.html#unload-a-document'] = {"text": "unload", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsing-the-web.html#unload-a-document", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsing-the-web.html#prompt-to-unload-a-document'] = {"text": "prompt to unload", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsing-the-web.html#prompt-to-unload-a-document", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/indices.html#event-unload'] = {"text": "unload", "type": "event", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/indices.html#event-unload", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#concept-document-window'] = {"text": "associated document", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#concept-document-window", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-create-element'] = {"text": "creating an element", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-create-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#html-namespace'] = {"text": "html namespace", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#html-namespace", "export": true, "normative": true, "for_": []};
+window.refsData['#htmlportalelement'] = {"text": "HTMLPortalElement", "type": "interface", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#htmlportalelement", "export": true, "normative": true, "for_": []};
+window.refsData['#portalhost'] = {"text": "PortalHost", "type": "interface", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#portalhost", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#boolean'] = {"text": "boolean", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#boolean", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#concept-url'] = {"text": "url", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/urls-and-fetching.html#valid-non-empty-url-potentially-surrounded-by-spaces'] = {"text": "valid non-empty url potentially surrounded by spaces", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/urls-and-fetching.html#valid-non-empty-url-potentially-surrounded-by-spaces", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/urls-and-fetching.html#referrer-policy-attribute'] = {"text": "referrer policy attribute", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/urls-and-fetching.html#referrer-policy-attribute", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webappsec-referrer-policy/#referrer-policy'] = {"text": "referrer policy", "type": "dfn", "spec": "referrer-policy", "shortname": "referrer-policy", "level": "1", "status": "current", "url": "https://w3c.github.io/webappsec-referrer-policy/#referrer-policy", "export": true, "normative": true, "for_": []};
+window.refsData['#set-the-source-url-of-a-portal-element'] = {"text": "set the source url of a portal element", "type": "dfn", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#set-the-source-url-of-a-portal-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element'] = {"text": "iframe", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#browsing-context-group'] = {"text": "browsing context group", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#browsing-context-group", "export": true, "normative": true, "for_": []};
+window.refsData['http://tc39.github.io/ecma262/#sec-agents'] = {"text": "agent", "type": "dfn", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "http://tc39.github.io/ecma262/#sec-agents", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-agent-event-loop'] = {"text": "event loop", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-agent-event-loop", "export": true, "normative": true, "for_": ["agent"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#same-origin-domain'] = {"text": "same origin-domain", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#same-origin-domain", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/dom.html#htmlconstructor'] = {"text": "HTMLConstructor", "type": "extended-attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dom.html#htmlconstructor", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/dom.html#htmlelement'] = {"text": "HTMLElement", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dom.html#htmlelement", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/custom-elements.html#cereactions'] = {"text": "CEReactions", "type": "extended-attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/custom-elements.html#cereactions", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-USVString'] = {"text": "USVString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-USVString", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-htmlportalelement-src'] = {"text": "src", "type": "attribute", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#dom-htmlportalelement-src", "export": true, "normative": true, "for_": ["HTMLPortalElement"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-htmlportalelement-referrerpolicy'] = {"text": "referrerPolicy", "type": "attribute", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#dom-htmlportalelement-referrerpolicy", "export": true, "normative": true, "for_": ["HTMLPortalElement"]};
+window.refsData['https://webidl.spec.whatwg.org/#NewObject'] = {"text": "NewObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#NewObject", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-promise'] = {"text": "Promise", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-promise", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-portalactivateoptions'] = {"text": "PortalActivateOptions", "type": "dictionary", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#dictdef-portalactivateoptions", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-htmlportalelement-postmessage'] = {"text": "postMessage(message, options)", "type": "method", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#dom-htmlportalelement-postmessage", "export": true, "normative": true, "for_": ["HTMLPortalElement"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-any'] = {"text": "any", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-any", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler'] = {"text": "EventHandler", "type": "typedef", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/common-dom-interfaces.html#reflect'] = {"text": "reflect", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/common-dom-interfaces.html#reflect", "export": true, "normative": true, "for_": []};
+window.refsData['#element-attrdef-portal-src'] = {"text": "src", "type": "element-attr", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#element-attrdef-portal-src", "export": true, "normative": true, "for_": ["portal"]};
+window.refsData['#element-attrdef-portal-referrerpolicy'] = {"text": "referrerpolicy", "type": "element-attr", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#element-attrdef-portal-referrerpolicy", "export": true, "normative": true, "for_": ["portal"]};
+window.refsData['https://html.spec.whatwg.org/multipage/common-dom-interfaces.html#limited-to-only-known-values'] = {"text": "limited to only known values", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/common-dom-interfaces.html#limited-to-only-known-values", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#this'] = {"text": "this", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#this", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#concept-document-bc'] = {"text": "browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#concept-document-bc", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['https://html.spec.whatwg.org/multipage/structured-data.html#structuredserializewithtransfer'] = {"text": "StructuredSerializeWithTransfer", "type": "abstract-op", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/structured-data.html#structuredserializewithtransfer", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-portalactivateoptions-data'] = {"text": "data", "type": "dict-member", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#dom-portalactivateoptions-data", "export": true, "normative": true, "for_": ["PortalActivateOptions"]};
+window.refsData['http://tc39.github.io/ecma262/#sec-promise-objects'] = {"text": "promise", "type": "dfn", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "http://tc39.github.io/ecma262/#sec-promise-objects", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object'] = {"text": "relevant settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-origin'] = {"text": "origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-origin", "export": true, "normative": true, "for_": ["environment settings object"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#ascii-serialisation-of-an-origin'] = {"text": "serialization of an origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#ascii-serialisation-of-an-origin", "export": true, "normative": true, "for_": []};
+window.refsData['#portal-host-object'] = {"text": "portal host object", "type": "dfn", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#portal-host-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-event-fire'] = {"text": "fire an event", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-event-fire", "export": true, "normative": true, "for_": []};
+window.refsData['#eventdef-portalhost-messageerror'] = {"text": "messageerror", "type": "event", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#eventdef-portalhost-messageerror", "export": true, "normative": true, "for_": ["PortalHost"]};
+window.refsData['https://html.spec.whatwg.org/multipage/comms.html#messageevent'] = {"text": "MessageEvent", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/comms.html#messageevent", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/comms.html#dom-messageevent-origin'] = {"text": "origin", "type": "attribute", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/comms.html#dom-messageevent-origin", "export": true, "normative": true, "for_": ["MessageEvent"]};
+window.refsData['https://html.spec.whatwg.org/multipage/comms.html#dom-messageevent-source'] = {"text": "source", "type": "attribute", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/comms.html#dom-messageevent-source", "export": true, "normative": true, "for_": ["MessageEvent"]};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-frozen-array-type'] = {"text": "frozen array type", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-frozen-array-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/web-messaging.html#messageport'] = {"text": "MessagePort", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/web-messaging.html#messageport", "export": true, "normative": true, "for_": []};
+window.refsData['#eventdef-portalhost-message'] = {"text": "message", "type": "event", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#eventdef-portalhost-message", "export": true, "normative": true, "for_": ["PortalHost"]};
+window.refsData['https://html.spec.whatwg.org/multipage/comms.html#dom-messageevent-data'] = {"text": "data", "type": "attribute", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/comms.html#dom-messageevent-data", "export": true, "normative": true, "for_": ["MessageEvent"]};
+window.refsData['https://html.spec.whatwg.org/multipage/comms.html#dom-messageevent-ports'] = {"text": "ports", "type": "attribute", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/comms.html#dom-messageevent-ports", "export": true, "normative": true, "for_": ["MessageEvent"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-document-url'] = {"text": "url", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-document-url", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['https://url.spec.whatwg.org/#concept-url-scheme'] = {"text": "scheme", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-scheme", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['https://fetch.spec.whatwg.org/#http-scheme'] = {"text": "http(s) scheme", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#http-scheme", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#active-sandboxing-flag-set'] = {"text": "active sandboxing flag set", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#active-sandboxing-flag-set", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#auxiliary-browsing-context'] = {"text": "auxiliary browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#auxiliary-browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webappsec-csp/#sandbox'] = {"text": "sandbox", "type": "dfn", "spec": "csp3", "shortname": "csp", "level": "3", "status": "current", "url": "https://w3c.github.io/webappsec-csp/#sandbox", "export": true, "normative": true, "for_": []};
+window.refsData['#close-a-portal-element'] = {"text": "close a portal element", "type": "dfn", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#close-a-portal-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/urls-and-fetching.html#parse-a-url'] = {"text": "parse a url", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/urls-and-fetching.html#parse-a-url", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/urls-and-fetching.html#resulting-url-record'] = {"text": "resulting url record", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/urls-and-fetching.html#resulting-url-record", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#creating-a-new-top-level-browsing-context'] = {"text": "create a new top-level browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#creating-a-new-top-level-browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request'] = {"text": "request", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-url'] = {"text": "url", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-url", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-referrer-policy'] = {"text": "referrer policy", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-referrer-policy", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsing-the-web.html#navigate'] = {"text": "navigate", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsing-the-web.html#navigate", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#becomes-browsing-context-connected'] = {"text": "become browsing-context connected", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#becomes-browsing-context-connected", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#becomes-browsing-context-disconnected'] = {"text": "become browsing-context disconnected", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#becomes-browsing-context-disconnected", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-node-adopt-ext'] = {"text": "adopting steps", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-node-adopt-ext", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/parsing.html#completely-loaded'] = {"text": "completely loaded", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/parsing.html#completely-loaded", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/indices.html#event-load'] = {"text": "load", "type": "event", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/indices.html#event-load", "export": true, "normative": true, "for_": ["Window", "HTMLElement"]};
+window.refsData['https://dom.spec.whatwg.org/#eventtarget-activation-behavior'] = {"text": "activation behavior", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#eventtarget-activation-behavior", "export": true, "normative": true, "for_": ["EventTarget"]};
+window.refsData['#dom-htmlportalelement-onmessage'] = {"text": "onmessage", "type": "attribute", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#dom-htmlportalelement-onmessage", "export": true, "normative": true, "for_": ["HTMLPortalElement"]};
+window.refsData['#dom-htmlportalelement-onmessageerror'] = {"text": "onmessageerror", "type": "attribute", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#dom-htmlportalelement-onmessageerror", "export": true, "normative": true, "for_": ["HTMLPortalElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-content-attributes'] = {"text": "event handler content attribute", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-content-attributes", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#window'] = {"text": "Window", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-window-portalhost'] = {"text": "portalHost", "type": "attribute", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#dom-window-portalhost", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#window-bc'] = {"text": "browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window-bc", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['https://dom.spec.whatwg.org/#eventtarget'] = {"text": "EventTarget", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#eventtarget", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-portalhost-postmessage'] = {"text": "postMessage(message, options)", "type": "method", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#dom-portalhost-postmessage", "export": true, "normative": true, "for_": ["PortalHost"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-global'] = {"text": "relevant global object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-global", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-loop'] = {"text": "event loop", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-loop", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#queue-an-element-task'] = {"text": "queue an element task", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#queue-an-element-task", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object's-realm'] = {"text": "realm", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object's-realm", "export": true, "normative": true, "for_": ["environment settings object"]};
+window.refsData['#eventdef-htmlportalelement-messageerror'] = {"text": "messageerror", "type": "event", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#eventdef-htmlportalelement-messageerror", "export": true, "normative": true, "for_": ["HTMLPortalElement"]};
+window.refsData['#eventdef-htmlportalelement-message'] = {"text": "message", "type": "event", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#eventdef-htmlportalelement-message", "export": true, "normative": true, "for_": ["HTMLPortalElement"]};
+window.refsData['https://dom.spec.whatwg.org/#event'] = {"text": "Event", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#event", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-portalactivateeventinit'] = {"text": "PortalActivateEventInit", "type": "dictionary", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#dictdef-portalactivateeventinit", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#dictdef-eventinit'] = {"text": "EventInit", "type": "dictionary", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dictdef-eventinit", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-event-constructor-ext'] = {"text": "event constructing steps", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-event-constructor-ext", "export": true, "normative": true, "for_": []};
+window.refsData['#typedefdef-messageeventsource'] = {"text": "MessageEventSource", "type": "typedef", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#typedefdef-messageeventsource", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#serviceworker'] = {"text": "ServiceWorker", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#serviceworker", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-handlers'] = {"text": "event handler", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-handlers", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-idl-attributes'] = {"text": "event handler idl attribute", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-idl-attributes", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-event-type'] = {"text": "event handler event type", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-event-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#windoweventhandlers'] = {"text": "WindowEventHandlers", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#windoweventhandlers", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#script-closable'] = {"text": "script-closable", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#script-closable", "export": false, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsing-the-web.html#navigation-params-request'] = {"text": "request", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsing-the-web.html#navigation-params-request", "export": true, "normative": true, "for_": ["navigation params"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-current-url'] = {"text": "current url", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-current-url", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response-status'] = {"text": "status", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response-status", "export": true, "normative": true, "for_": ["response"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#environment-discarding-steps'] = {"text": "environment discarding steps", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#environment-discarding-steps", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsing-the-web.html#navigation-params-reserved-environment'] = {"text": "reserved environment", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsing-the-web.html#navigation-params-reserved-environment", "export": true, "normative": true, "for_": ["navigation params"]};
+window.refsData['https://html.spec.whatwg.org/multipage/links.html#allowed-to-download'] = {"text": "allowed to download", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/links.html#allowed-to-download", "export": false, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webappsec-csp/#grammardef-serialized-source-list'] = {"text": "serialized-source-list", "type": "grammar", "spec": "csp3", "shortname": "csp", "level": "3", "status": "current", "url": "https://w3c.github.io/webappsec-csp/#grammardef-serialized-source-list", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webappsec-csp/#header-content-security-policy'] = {"text": "content-security-policy", "type": "http-header", "spec": "csp3", "shortname": "csp", "level": "3", "status": "current", "url": "https://w3c.github.io/webappsec-csp/#header-content-security-policy", "export": true, "normative": true, "for_": []};
+window.refsData['#portal-src'] = {"text": "portal-src", "type": "dfn", "spec": "portals-1", "shortname": "portals", "level": "1", "status": "local", "url": "#portal-src", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webappsec-csp/#source-lists'] = {"text": "source lists", "type": "dfn", "spec": "csp3", "shortname": "csp", "level": "3", "status": "current", "url": "https://w3c.github.io/webappsec-csp/#source-lists", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webappsec-csp/#directive-pre-request-check'] = {"text": "pre-request check", "type": "dfn", "spec": "csp3", "shortname": "csp", "level": "3", "status": "current", "url": "https://w3c.github.io/webappsec-csp/#directive-pre-request-check", "export": true, "normative": true, "for_": ["directive"]};
+window.refsData['https://w3c.github.io/webappsec-csp/#directive-value'] = {"text": "value", "type": "dfn", "spec": "csp3", "shortname": "csp", "level": "3", "status": "current", "url": "https://w3c.github.io/webappsec-csp/#directive-value", "export": true, "normative": true, "for_": ["directive"]};
+window.refsData['https://w3c.github.io/webappsec-csp/#directive-post-request-check'] = {"text": "post-request check", "type": "dfn", "spec": "csp3", "shortname": "csp", "level": "3", "status": "current", "url": "https://w3c.github.io/webappsec-csp/#directive-post-request-check", "export": true, "normative": true, "for_": ["directive"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response'] = {"text": "response", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-reserved-client'] = {"text": "reserved client", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-reserved-client", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-environment-target-browsing-context'] = {"text": "target browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-environment-target-browsing-context", "export": true, "normative": true, "for_": ["environment"]};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

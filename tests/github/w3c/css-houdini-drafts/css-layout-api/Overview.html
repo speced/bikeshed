@@ -485,6 +485,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -3653,8 +3690,6 @@ resume the layout.</p>
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -3902,7 +3937,6 @@ resume the layout.</p>
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -4485,6 +4519,454 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://drafts.csswg.org/css-break-3/#fragment'] = {"text": "fragment", "type": "dfn", "spec": "css-break-3", "shortname": "css-break", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-break-3/#fragment", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#box-tree'] = {"text": "box tree", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#box-tree", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['https://drafts.csswg.org/css-display-3/#box'] = {"text": "box", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-display-3/#box", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['https://drafts.csswg.org/css-display-4/#typedef-display-inside'] = {"text": "<display-inside>", "type": "type", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#typedef-display-inside", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#typedef-ident'] = {"text": "<ident>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#typedef-ident", "export": true, "normative": true, "for_": []};
+window.refsData['#layout-api-container'] = {"text": "layout api container", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#layout-api-container", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#computed-value'] = {"text": "computed value", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#computed-value", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-display-layout'] = {"text": "layout()", "type": "value", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#valdef-display-layout", "export": true, "normative": true, "for_": ["display"]};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#propdef-overflow'] = {"text": "overflow", "type": "property", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#propdef-overflow", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#propdef-margin'] = {"text": "margin", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#propdef-margin", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-shapes-2/#valdef-shape-inside-display'] = {"text": "display", "type": "value", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-shapes-2/#valdef-shape-inside-display", "export": true, "normative": true, "for_": ["shape-inside"]};
+window.refsData['#dom-fragmentresultoptions-childfragments'] = {"text": "childFragments", "type": "dict-member", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-fragmentresultoptions-childfragments", "export": true, "normative": true, "for_": ["FragmentResultOptions"]};
+window.refsData['https://drafts.csswg.org/css2/#propdef-z-index'] = {"text": "z-index", "type": "property", "spec": "css22", "shortname": "css", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css2/#propdef-z-index", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css2/#valdef-z-index-auto'] = {"text": "auto", "type": "value", "spec": "css22", "shortname": "css", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css2/#valdef-z-index-auto", "export": true, "normative": true, "for_": ["z-index"]};
+window.refsData['https://drafts.csswg.org/css-position-3/#propdef-position'] = {"text": "position", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-position", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-position-3/#valdef-position-static'] = {"text": "static", "type": "value", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#valdef-position-static", "export": true, "normative": true, "for_": ["position"]};
+window.refsData['#document-layout-definition-layout-options'] = {"text": "layout options", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#document-layout-definition-layout-options", "export": true, "normative": true, "for_": ["document layout definition"]};
+window.refsData['#dom-layoutoptions-childdisplay'] = {"text": "childDisplay", "type": "dict-member", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutoptions-childdisplay", "export": true, "normative": true, "for_": ["LayoutOptions"]};
+window.refsData['https://drafts.csswg.org/css-display-4/#propdef-display'] = {"text": "display", "type": "property", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#propdef-display", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#blockify'] = {"text": "blockify", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#blockify", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-flexbox-1/#flex-container'] = {"text": "flex container", "type": "dfn", "spec": "css-flexbox-1", "shortname": "css-flexbox", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-flexbox-1/#flex-container", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-grid-2/#grid-container'] = {"text": "grid container", "type": "dfn", "spec": "css-grid-2", "shortname": "css-grid", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-grid-2/#grid-container", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#typedef-display-outside'] = {"text": "<display-outside>", "type": "type", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#typedef-display-outside", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-3/#valdef-display-inline'] = {"text": "inline", "type": "value", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-display-3/#valdef-display-inline", "export": true, "normative": true, "for_": ["display", "<display-outside>"]};
+window.refsData['https://drafts.csswg.org/css-inline-3/#root-inline-box'] = {"text": "root inline box", "type": "dfn", "spec": "css-inline-3", "shortname": "css-inline", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-inline-3/#root-inline-box", "export": true, "normative": true, "for_": []};
+window.refsData['#layoutfragment'] = {"text": "LayoutFragment", "type": "interface", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#layoutfragment", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-layoutchild-layoutnextfragment'] = {"text": "layoutNextFragment(constraints, breakToken)", "type": "method", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutchild-layoutnextfragment", "export": true, "normative": true, "for_": ["LayoutChild"]};
+window.refsData['#layoutchild'] = {"text": "LayoutChild", "type": "interface", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#layoutchild", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#block-level'] = {"text": "block-level", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#block-level", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#inline-level'] = {"text": "inline-level", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#inline-level", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#inlinify'] = {"text": "inlinify", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#inlinify", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-page-floats-3/#float'] = {"text": "float", "type": "dfn", "spec": "css-page-floats-3", "shortname": "css-page-floats", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-page-floats-3/#float", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#atomic-inline'] = {"text": "atomic inline", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#atomic-inline", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-css-layoutworklet'] = {"text": "layoutWorklet", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-css-layoutworklet", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['https://html.spec.whatwg.org/multipage/worklets.html#worklet'] = {"text": "Worklet", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/worklets.html#worklet", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/worklets.html#worklet-global-scope-type'] = {"text": "worklet global scope type", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/worklets.html#worklet-global-scope-type", "export": true, "normative": true, "for_": []};
+window.refsData['#layoutworkletglobalscope'] = {"text": "LayoutWorkletGlobalScope", "type": "interface", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#layoutworkletglobalscope", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-1/#namespacedef-css'] = {"text": "CSS", "type": "namespace", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#namespacedef-css", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#SameObject'] = {"text": "SameObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SameObject", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Global'] = {"text": "Global", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Global", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/worklets.html#workletglobalscope'] = {"text": "WorkletGlobalScope", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/worklets.html#workletglobalscope", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-layoutworkletglobalscope-registerlayout'] = {"text": "registerLayout(name, layoutCtor)", "type": "method", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutworkletglobalscope-registerlayout", "export": true, "normative": true, "for_": ["LayoutWorkletGlobalScope"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#VoidFunction'] = {"text": "VoidFunction", "type": "callback", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#VoidFunction", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#struct'] = {"text": "struct", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#struct", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-constructor'] = {"text": "constructor", "type": "dfn", "spec": "", "shortname": "css-layout-api", "level": "1", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-constructor", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-terms-and-definitions-function'] = {"text": "function", "type": "dfn", "spec": "", "shortname": "css-layout-api", "level": "1", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-terms-and-definitions-function", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list'] = {"text": "list", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-layoutoptions'] = {"text": "LayoutOptions", "type": "dictionary", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dictdef-layoutoptions", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-document'] = {"text": "document", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-document", "export": true, "normative": true, "for_": []};
+window.refsData['#enumdef-childdisplaytype'] = {"text": "ChildDisplayType", "type": "enum", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#enumdef-childdisplaytype", "export": true, "normative": true, "for_": []};
+window.refsData['#enumdef-layoutsizingmode'] = {"text": "LayoutSizingMode", "type": "enum", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#enumdef-layoutsizingmode", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ordered-map'] = {"text": "map", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ordered-map", "export": true, "normative": true, "for_": []};
+window.refsData['#determine-the-intrinsic-sizes'] = {"text": "determine the intrinsic sizes", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#determine-the-intrinsic-sizes", "export": true, "normative": true, "for_": []};
+window.refsData['#generate-a-fragment'] = {"text": "generate a fragment", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#generate-a-fragment", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.css-houdini.org/css-typed-om-1/#stylepropertymapreadonly'] = {"text": "StylePropertyMapReadOnly", "type": "interface", "spec": "css-typed-om-1", "shortname": "css-typed-om", "level": "1", "status": "current", "url": "https://drafts.css-houdini.org/css-typed-om-1/#stylepropertymapreadonly", "export": true, "normative": true, "for_": []};
+window.refsData['#stylemap'] = {"text": "stylemap", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#stylemap", "export": true, "normative": true, "for_": []};
+window.refsData['#document-layout-definition-input-properties'] = {"text": "input properties", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#document-layout-definition-input-properties", "export": true, "normative": true, "for_": ["document layout definition"]};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-throw'] = {"text": "throw", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-throw", "export": true, "normative": true, "for_": ["exception"]};
+window.refsData['https://tc39.github.io/ecma262/#sec-native-error-types-used-in-this-standard-typeerror'] = {"text": "typeerror", "type": "dfn", "spec": "", "shortname": "css-layout-api", "level": "1", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-native-error-types-used-in-this-standard-typeerror", "export": true, "normative": true, "for_": []};
+window.refsData['#layout-definitions'] = {"text": "layout definitions", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#layout-definitions", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#map-exists'] = {"text": "exist", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-exists", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['https://webidl.spec.whatwg.org/#invalidmodificationerror'] = {"text": "InvalidModificationError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invalidmodificationerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMException'] = {"text": "DOMException", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMException", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-get-o-p'] = {"text": "get", "type": "dfn", "spec": "", "shortname": "css-layout-api", "level": "1", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-get-o-p", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#javascript-string-convert'] = {"text": "convert", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#javascript-string-convert", "export": true, "normative": true, "for_": ["string", "JavaScript string"]};
+window.refsData['https://drafts.csswg.org/cssom-1/#supported-css-property'] = {"text": "supported css property", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#supported-css-property", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-variables-2/#custom-property'] = {"text": "custom property", "type": "dfn", "spec": "css-variables-2", "shortname": "css-variables", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-variables-2/#custom-property", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-ecmascript-data-types-and-values'] = {"text": "type", "type": "dfn", "spec": "", "shortname": "css-layout-api", "level": "1", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-ecmascript-data-types-and-values", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-callback-function'] = {"text": "callback function", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-callback-function", "export": true, "normative": true, "for_": []};
+window.refsData['#layout-definition'] = {"text": "layout definition", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#layout-definition", "export": true, "normative": true, "for_": []};
+window.refsData['#layout-definition-class-constructor'] = {"text": "class constructor", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#layout-definition-class-constructor", "export": true, "normative": true, "for_": ["layout definition"]};
+window.refsData['#layout-definition-layout-function'] = {"text": "layout function", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#layout-definition-layout-function", "export": true, "normative": true, "for_": ["layout definition"]};
+window.refsData['#layout-definition-intrinsic-sizes-function'] = {"text": "intrinsic sizes function", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#layout-definition-intrinsic-sizes-function", "export": true, "normative": true, "for_": ["layout definition"]};
+window.refsData['#layout-definition-constructor-valid-flag'] = {"text": "constructor valid flag", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#layout-definition-constructor-valid-flag", "export": true, "normative": true, "for_": ["layout definition"]};
+window.refsData['#layout-definition-child-input-properties'] = {"text": "child input properties", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#layout-definition-child-input-properties", "export": true, "normative": true, "for_": ["layout definition"]};
+window.refsData['#layout-definition-input-properties'] = {"text": "input properties", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#layout-definition-input-properties", "export": true, "normative": true, "for_": ["layout definition"]};
+window.refsData['#layout-definition-layout-options'] = {"text": "layout options", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#layout-definition-layout-options", "export": true, "normative": true, "for_": ["layout definition"]};
+window.refsData['https://infra.spec.whatwg.org/#map-set'] = {"text": "set", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-set", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task'] = {"text": "queue a task", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task", "export": true, "normative": true, "for_": []};
+window.refsData['#document-layout-definitions'] = {"text": "document layout definitions", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#document-layout-definitions", "export": true, "normative": true, "for_": []};
+window.refsData['#document-layout-definition'] = {"text": "document layout definition", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#document-layout-definition", "export": true, "normative": true, "for_": []};
+window.refsData['#document-layout-definition-child-input-properties'] = {"text": "child input properties", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#document-layout-definition-child-input-properties", "export": true, "normative": true, "for_": ["document layout definition"]};
+window.refsData['https://infra.spec.whatwg.org/#map-get'] = {"text": "get", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-get", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['#current-layout'] = {"text": "current layout", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#current-layout", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-3/#valdef-display-none'] = {"text": "none", "type": "value", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-display-3/#valdef-display-none", "export": true, "normative": true, "for_": ["display", "<display-box>"]};
+window.refsData['#dom-layoutchild-stylemap'] = {"text": "styleMap", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutchild-stylemap", "export": true, "normative": true, "for_": ["LayoutChild"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-promise'] = {"text": "Promise", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-promise", "export": true, "normative": true, "for_": []};
+window.refsData['#intrinsicsizes'] = {"text": "IntrinsicSizes", "type": "interface", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#intrinsicsizes", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-layoutchild-intrinsicsizes'] = {"text": "intrinsicSizes()", "type": "method", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutchild-intrinsicsizes", "export": true, "normative": true, "for_": ["LayoutChild"]};
+window.refsData['#dictdef-layoutconstraintsoptions'] = {"text": "LayoutConstraintsOptions", "type": "dictionary", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dictdef-layoutconstraintsoptions", "export": true, "normative": true, "for_": []};
+window.refsData['#childbreaktoken'] = {"text": "ChildBreakToken", "type": "interface", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#childbreaktoken", "export": true, "normative": true, "for_": []};
+window.refsData['#layout-api-context-unique-id'] = {"text": "unique id", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#layout-api-context-unique-id", "export": true, "normative": true, "for_": ["layout API context"]};
+window.refsData['#layout-api-context'] = {"text": "layout api context", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#layout-api-context", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-layoutchild-stylemap-slot'] = {"text": "[[styleMap]]", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutchild-stylemap-slot", "export": true, "normative": true, "for_": ["LayoutChild"]};
+window.refsData['#dom-layoutchild-box-slot'] = {"text": "[[box]]", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutchild-box-slot", "export": true, "normative": true, "for_": ["LayoutChild"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-element'] = {"text": "element", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-before'] = {"text": "::before", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-before", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-after'] = {"text": "::after", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-after", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-first-letter'] = {"text": "::first-letter", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-first-letter", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-first-line'] = {"text": "::first-line", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-first-line", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#anonymous'] = {"text": "anonymous box", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#anonymous", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['#get-a-layout-definition'] = {"text": "get a layout definition", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#get-a-layout-definition", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-layoutchild-unique-id-slot'] = {"text": "[[unique id]]", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutchild-unique-id-slot", "export": true, "normative": true, "for_": ["LayoutChild"]};
+window.refsData['https://webidl.spec.whatwg.org/#invalidstateerror'] = {"text": "InvalidStateError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invalidstateerror", "export": true, "normative": true, "for_": []};
+window.refsData['#layout-api-work-task'] = {"text": "layout api work task", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#layout-api-work-task", "export": true, "normative": true, "for_": []};
+window.refsData['#layout-api-work-task-layout-child'] = {"text": "layout child", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#layout-api-work-task-layout-child", "export": true, "normative": true, "for_": ["layout api work task"]};
+window.refsData['#layout-api-work-task-task-type'] = {"text": "task type", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#layout-api-work-task-task-type", "export": true, "normative": true, "for_": ["layout api work task"]};
+window.refsData['#layout-api-work-task-promise'] = {"text": "promise", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#layout-api-work-task-promise", "export": true, "normative": true, "for_": ["layout api work task"]};
+window.refsData['https://infra.spec.whatwg.org/#list-append'] = {"text": "append", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-append", "export": true, "normative": true, "for_": ["list"]};
+window.refsData['#layout-api-context-work-queue'] = {"text": "work queue", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#layout-api-context-work-queue", "export": true, "normative": true, "for_": ["layout API context"]};
+window.refsData['#layout-api-context-mode'] = {"text": "mode", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#layout-api-context-mode", "export": true, "normative": true, "for_": ["layout API context"]};
+window.refsData['https://webidl.spec.whatwg.org/#notsupportederror'] = {"text": "NotSupportedError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#notsupportederror", "export": true, "normative": true, "for_": []};
+window.refsData['#layout-api-work-task-layout-constraints'] = {"text": "layout constraints", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#layout-api-work-task-layout-constraints", "export": true, "normative": true, "for_": ["layout api work task"]};
+window.refsData['#layout-api-work-task-child-break-token'] = {"text": "child break token", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#layout-api-work-task-child-break-token", "export": true, "normative": true, "for_": ["layout api work task"]};
+window.refsData['#get-a-layout-child'] = {"text": "get a layout child", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#get-a-layout-child", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#containing-block'] = {"text": "containing block", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#containing-block", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-box-layoutchildmap-slot'] = {"text": "[[layoutChildMap]]", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-box-layoutchildmap-slot", "export": true, "normative": true, "for_": ["box"]};
+window.refsData['https://infra.spec.whatwg.org/#map-iterate'] = {"text": "for each", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-iterate", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['#update-a-layout-child-style'] = {"text": "update a layout child style", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#update-a-layout-child-style", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-double'] = {"text": "double", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-double", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-any'] = {"text": "any", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-any", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-layoutfragment-inlinesize'] = {"text": "inlineSize", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutfragment-inlinesize", "export": true, "normative": true, "for_": ["LayoutFragment"]};
+window.refsData['#dom-layoutfragment-blocksize'] = {"text": "blockSize", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutfragment-blocksize", "export": true, "normative": true, "for_": ["LayoutFragment"]};
+window.refsData['#dom-layoutfragment-inlineoffset'] = {"text": "inlineOffset", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutfragment-inlineoffset", "export": true, "normative": true, "for_": ["LayoutFragment"]};
+window.refsData['#dom-layoutfragment-blockoffset'] = {"text": "blockOffset", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutfragment-blockoffset", "export": true, "normative": true, "for_": ["LayoutFragment"]};
+window.refsData['https://drafts.csswg.org/css-position-3/#relative-position'] = {"text": "relatively position", "type": "dfn", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#relative-position", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-layoutfragment-data'] = {"text": "data", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutfragment-data", "export": true, "normative": true, "for_": ["LayoutFragment"]};
+window.refsData['#dom-fragmentresultoptions-data'] = {"text": "data", "type": "dict-member", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-fragmentresultoptions-data", "export": true, "normative": true, "for_": ["FragmentResultOptions"]};
+window.refsData['#dictdef-fragmentresultoptions'] = {"text": "FragmentResultOptions", "type": "dictionary", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dictdef-fragmentresultoptions", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-layoutfragment-breaktoken'] = {"text": "breakToken", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutfragment-breaktoken", "export": true, "normative": true, "for_": ["LayoutFragment"]};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#min-content'] = {"text": "min-content size", "type": "dfn", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#min-content", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#max-content'] = {"text": "max-content size", "type": "dfn", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#max-content", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-intrinsicsizes-mincontentsize'] = {"text": "minContentSize", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-intrinsicsizes-mincontentsize", "export": true, "normative": true, "for_": ["IntrinsicSizes"]};
+window.refsData['#dom-intrinsicsizes-maxcontentsize'] = {"text": "maxContentSize", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-intrinsicsizes-maxcontentsize", "export": true, "normative": true, "for_": ["IntrinsicSizes"]};
+window.refsData['#layoutconstraints'] = {"text": "LayoutConstraints", "type": "interface", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#layoutconstraints", "export": true, "normative": true, "for_": []};
+window.refsData['#enumdef-blockfragmentationtype'] = {"text": "BlockFragmentationType", "type": "enum", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#enumdef-blockfragmentationtype", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-layoutconstraints-availableinlinesize'] = {"text": "availableInlineSize", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutconstraints-availableinlinesize", "export": true, "normative": true, "for_": ["LayoutConstraints"]};
+window.refsData['#dom-layoutconstraints-availableblocksize'] = {"text": "availableBlockSize", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutconstraints-availableblocksize", "export": true, "normative": true, "for_": ["LayoutConstraints"]};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#available'] = {"text": "available space", "type": "dfn", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#available", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#replaced-element'] = {"text": "replaced element", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#replaced-element", "export": true, "normative": true, "for_": []};
+window.refsData['#parent-layout'] = {"text": "parent layout", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#parent-layout", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-layoutconstraints-fixedinlinesize'] = {"text": "fixedInlineSize", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutconstraints-fixedinlinesize", "export": true, "normative": true, "for_": ["LayoutConstraints"]};
+window.refsData['#dom-layoutconstraints-fixedblocksize'] = {"text": "fixedBlockSize", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutconstraints-fixedblocksize", "export": true, "normative": true, "for_": ["LayoutConstraints"]};
+window.refsData['#dom-layoutconstraints-percentageinlinesize'] = {"text": "percentageInlineSize", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutconstraints-percentageinlinesize", "export": true, "normative": true, "for_": ["LayoutConstraints"]};
+window.refsData['#dom-layoutconstraints-percentageblocksize'] = {"text": "percentageBlockSize", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutconstraints-percentageblocksize", "export": true, "normative": true, "for_": ["LayoutConstraints"]};
+window.refsData['#dom-layoutconstraints-blockfragmentationtype'] = {"text": "blockFragmentationType", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutconstraints-blockfragmentationtype", "export": true, "normative": true, "for_": ["LayoutConstraints"]};
+window.refsData['#dom-layoutconstraints-blockfragmentationoffset'] = {"text": "blockFragmentationOffset", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutconstraints-blockfragmentationoffset", "export": true, "normative": true, "for_": ["LayoutConstraints"]};
+window.refsData['https://drafts.csswg.org/css-break-3/#propdef-break-inside'] = {"text": "break-inside", "type": "property", "spec": "css-break-3", "shortname": "css-break", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-break-3/#propdef-break-inside", "export": true, "normative": true, "for_": []};
+window.refsData['#create-a-layout-constraints-object'] = {"text": "create a layout constraints object", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#create-a-layout-constraints-object", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-layoutoptions-sizing'] = {"text": "sizing", "type": "dict-member", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutoptions-sizing", "export": true, "normative": true, "for_": ["LayoutOptions"]};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#inline-size'] = {"text": "inline size", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#inline-size", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#block-size'] = {"text": "block size", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#block-size", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#valdef-width-auto'] = {"text": "auto", "type": "value", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#valdef-width-auto", "export": true, "normative": true, "for_": ["width", "height", "min-width", "min-height"]};
+window.refsData['#translate-a-layoutconstraintsoptions-to-internal-constraints'] = {"text": "translate a layoutconstraintsoptions to internal constraints", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#translate-a-layoutconstraintsoptions-to-internal-constraints", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-layoutconstraintsoptions-availableinlinesize'] = {"text": "availableInlineSize", "type": "dict-member", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutconstraintsoptions-availableinlinesize", "export": true, "normative": true, "for_": ["LayoutConstraintsOptions"]};
+window.refsData['#dom-layoutconstraintsoptions-availableblocksize'] = {"text": "availableBlockSize", "type": "dict-member", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutconstraintsoptions-availableblocksize", "export": true, "normative": true, "for_": ["LayoutConstraintsOptions"]};
+window.refsData['#dom-layoutconstraintsoptions-fixedinlinesize'] = {"text": "fixedInlineSize", "type": "dict-member", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutconstraintsoptions-fixedinlinesize", "export": true, "normative": true, "for_": ["LayoutConstraintsOptions"]};
+window.refsData['#dom-layoutconstraintsoptions-fixedblocksize'] = {"text": "fixedBlockSize", "type": "dict-member", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutconstraintsoptions-fixedblocksize", "export": true, "normative": true, "for_": ["LayoutConstraintsOptions"]};
+window.refsData['#dom-layoutconstraintsoptions-percentageinlinesize'] = {"text": "percentageInlineSize", "type": "dict-member", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutconstraintsoptions-percentageinlinesize", "export": true, "normative": true, "for_": ["LayoutConstraintsOptions"]};
+window.refsData['#dom-layoutconstraintsoptions-percentageblocksize'] = {"text": "percentageBlockSize", "type": "dict-member", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutconstraintsoptions-percentageblocksize", "export": true, "normative": true, "for_": ["LayoutConstraintsOptions"]};
+window.refsData['#child-layout'] = {"text": "child layout", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#child-layout", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-layoutconstraints-data'] = {"text": "data", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutconstraints-data", "export": true, "normative": true, "for_": ["LayoutConstraints"]};
+window.refsData['https://html.spec.whatwg.org/#structuredserializeforstorage'] = {"text": "structuredserializeforstorage", "type": "dfn", "spec": "", "shortname": "css-layout-api", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/#structuredserializeforstorage", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-layoutconstraintsoptions-data'] = {"text": "data", "type": "dict-member", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutconstraintsoptions-data", "export": true, "normative": true, "for_": ["LayoutConstraintsOptions"]};
+window.refsData['#enumdef-breaktype'] = {"text": "BreakType", "type": "enum", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#enumdef-breaktype", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-frozen-array'] = {"text": "FrozenArray", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-frozen-array", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['#layoutedges'] = {"text": "LayoutEdges", "type": "interface", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#layoutedges", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/CSS21/box.html#box-dimensions'] = {"text": "box model edges", "type": "dfn", "spec": "", "shortname": "css-layout-api", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/CSS21/box.html#box-dimensions", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#abstract-dimensions'] = {"text": "abstract dimensions", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#abstract-dimensions", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-layoutedges-inlinestart'] = {"text": "inlineStart", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutedges-inlinestart", "export": true, "normative": true, "for_": ["LayoutEdges"]};
+window.refsData['#dom-layoutedges-inlineend'] = {"text": "inlineEnd", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutedges-inlineend", "export": true, "normative": true, "for_": ["LayoutEdges"]};
+window.refsData['#dom-layoutedges-blockstart'] = {"text": "blockStart", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutedges-blockstart", "export": true, "normative": true, "for_": ["LayoutEdges"]};
+window.refsData['#dom-layoutedges-blockend'] = {"text": "blockEnd", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutedges-blockend", "export": true, "normative": true, "for_": ["LayoutEdges"]};
+window.refsData['#dom-layoutedges-inline'] = {"text": "inline", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutedges-inline", "export": true, "normative": true, "for_": ["LayoutEdges"]};
+window.refsData['#dom-layoutedges-block'] = {"text": "block", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutedges-block", "export": true, "normative": true, "for_": ["LayoutEdges"]};
+window.refsData['https://drafts.csswg.org/css-display-4/#block-formatting-context'] = {"text": "block formatting context", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#block-formatting-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#block-box'] = {"text": "block box", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#block-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#inline-formatting-context'] = {"text": "inline formatting context", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#inline-formatting-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#stretch-fit-inline-size'] = {"text": "stretch-fit inline size", "type": "dfn", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#stretch-fit-inline-size", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/CSS21/visudet.html#static-position'] = {"text": "static position", "type": "dfn", "spec": "", "shortname": "css-layout-api", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/CSS21/visudet.html#static-position", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#inline-start'] = {"text": "inline-start", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#inline-start", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#block-start'] = {"text": "block-start", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#block-start", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#scrollable-overflow'] = {"text": "scrollable overflow", "type": "dfn", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#scrollable-overflow", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-empty'] = {"text": "empty", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-empty", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['#dictdef-breaktokenoptions'] = {"text": "BreakTokenOptions", "type": "dictionary", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dictdef-breaktokenoptions", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-fragmentresult-fragmentresult'] = {"text": "FragmentResult(options)", "type": "constructor", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-fragmentresult-fragmentresult", "export": true, "normative": true, "for_": ["FragmentResult"]};
+window.refsData['#dom-fragmentresult-inlinesize'] = {"text": "inlineSize", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-fragmentresult-inlinesize", "export": true, "normative": true, "for_": ["FragmentResult"]};
+window.refsData['#dom-fragmentresult-blocksize'] = {"text": "blockSize", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-fragmentresult-blocksize", "export": true, "normative": true, "for_": ["FragmentResult"]};
+window.refsData['#fragmentresult'] = {"text": "FragmentResult", "type": "interface", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#fragmentresult", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#flow-layout'] = {"text": "flow layout", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#flow-layout", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-fragmentresult-inline-size-slot'] = {"text": "[[inline size]]", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-fragmentresult-inline-size-slot", "export": true, "normative": true, "for_": ["FragmentResult"]};
+window.refsData['#dom-fragmentresult-block-size-slot'] = {"text": "[[block size]]", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-fragmentresult-block-size-slot", "export": true, "normative": true, "for_": ["FragmentResult"]};
+window.refsData['#construct-a-fragment-result'] = {"text": "construct a fragment result", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#construct-a-fragment-result", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-fragmentresultoptions-breaktoken'] = {"text": "breakToken", "type": "dict-member", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-fragmentresultoptions-breaktoken", "export": true, "normative": true, "for_": ["FragmentResultOptions"]};
+window.refsData['https://infra.spec.whatwg.org/#list-iterate'] = {"text": "for each", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-iterate", "export": true, "normative": true, "for_": ["list", "set"]};
+window.refsData['#dom-layoutfragment-unique-id-slot'] = {"text": "[[unique id]]", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-layoutfragment-unique-id-slot", "export": true, "normative": true, "for_": ["LayoutFragment"]};
+window.refsData['#dom-breaktokenoptions-childbreaktokens'] = {"text": "childBreakTokens", "type": "dict-member", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-breaktokenoptions-childbreaktokens", "export": true, "normative": true, "for_": ["BreakTokenOptions"]};
+window.refsData['#dom-childbreaktoken-unique-id-slot'] = {"text": "[[unique id]]", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-childbreaktoken-unique-id-slot", "export": true, "normative": true, "for_": ["ChildBreakToken"]};
+window.refsData['#dom-fragmentresultoptions-autoblocksize'] = {"text": "autoBlockSize", "type": "dict-member", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-fragmentresultoptions-autoblocksize", "export": true, "normative": true, "for_": ["FragmentResultOptions"]};
+window.refsData['#dom-fragmentresultoptions-inlinesize'] = {"text": "inlineSize", "type": "dict-member", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-fragmentresultoptions-inlinesize", "export": true, "normative": true, "for_": ["FragmentResultOptions"]};
+window.refsData['#dom-fragmentresultoptions-blocksize'] = {"text": "blockSize", "type": "dict-member", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-fragmentresultoptions-blocksize", "export": true, "normative": true, "for_": ["FragmentResultOptions"]};
+window.refsData['#dom-breaktokenoptions-data'] = {"text": "data", "type": "dict-member", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-breaktokenoptions-data", "export": true, "normative": true, "for_": ["BreakTokenOptions"]};
+window.refsData['https://drafts.csswg.org/css-break-4/#fragmentation-break'] = {"text": "fragmentation break", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-break-4/#fragmentation-break", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-fragmentresult-box-slot'] = {"text": "[[box]]", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-fragmentresult-box-slot", "export": true, "normative": true, "for_": ["FragmentResult"]};
+window.refsData['#dom-fragmentresult-child-fragments-slot'] = {"text": "[[child fragments]]", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-fragmentresult-child-fragments-slot", "export": true, "normative": true, "for_": ["FragmentResult"]};
+window.refsData['#dom-fragmentresult-data-slot'] = {"text": "[[data]]", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-fragmentresult-data-slot", "export": true, "normative": true, "for_": ["FragmentResult"]};
+window.refsData['#dom-fragmentresult-internal-break-token-slot'] = {"text": "[[internal break token]]", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-fragmentresult-internal-break-token-slot", "export": true, "normative": true, "for_": ["FragmentResult"]};
+window.refsData['#dom-fragmentresult-unique-id-slot'] = {"text": "[[unique id]]", "type": "attribute", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-fragmentresult-unique-id-slot", "export": true, "normative": true, "for_": ["FragmentResult"]};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#intrinsic-size'] = {"text": "intrinsic size", "type": "dfn", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#intrinsic-size", "export": true, "normative": true, "for_": []};
+window.refsData['#layout-api-formatting-context'] = {"text": "layout api formatting context", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#layout-api-formatting-context", "export": true, "normative": true, "for_": []};
+window.refsData['#get-a-document-layout-definition'] = {"text": "get a document layout definition", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#get-a-document-layout-definition", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/worklets.html#concept-worklet-global-scopes'] = {"text": "global scopes", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/worklets.html#concept-worklet-global-scopes", "export": true, "normative": true, "for_": ["Worklet"]};
+window.refsData['https://html.spec.whatwg.org/multipage/worklets.html#create-a-worklet-global-scope'] = {"text": "create a worklet global scope", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/worklets.html#create-a-worklet-global-scope", "export": true, "normative": true, "for_": []};
+window.refsData['#invoke-an-intrinsic-sizes-callback'] = {"text": "invoke an intrinsic sizes callback", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#invoke-an-intrinsic-sizes-callback", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel'] = {"text": "in parallel", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel", "export": true, "normative": true, "for_": []};
+window.refsData['#get-a-layout-class-instance'] = {"text": "get a layout class instance", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#get-a-layout-class-instance", "export": true, "normative": true, "for_": []};
+window.refsData['#get-a-style-map'] = {"text": "get a style map", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#get-a-style-map", "export": true, "normative": true, "for_": []};
+window.refsData['#create-a-layout-api-context'] = {"text": "create a layout api context", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#create-a-layout-api-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#invoke-a-callback-function'] = {"text": "invoke", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invoke-a-callback-function", "export": true, "normative": true, "for_": []};
+window.refsData['#run-a-work-queue'] = {"text": "run a work queue", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#run-a-work-queue", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-intrinsicsizesresultoptions'] = {"text": "IntrinsicSizesResultOptions", "type": "dictionary", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dictdef-intrinsicsizesresultoptions", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-intrinsicsizesresultoptions-mincontentsize'] = {"text": "minContentSize", "type": "dict-member", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-intrinsicsizesresultoptions-mincontentsize", "export": true, "normative": true, "for_": ["IntrinsicSizesResultOptions"]};
+window.refsData['#dom-intrinsicsizesresultoptions-maxcontentsize'] = {"text": "maxContentSize", "type": "dict-member", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#dom-intrinsicsizesresultoptions-maxcontentsize", "export": true, "normative": true, "for_": ["IntrinsicSizesResultOptions"]};
+window.refsData['#invoke-a-layout-callback'] = {"text": "invoke a layout callback", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#invoke-a-layout-callback", "export": true, "normative": true, "for_": []};
+window.refsData['#breaktoken'] = {"text": "BreakToken", "type": "interface", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#breaktoken", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-platform-object'] = {"text": "platform object", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-platform-object", "export": true, "normative": true, "for_": []};
+window.refsData['#layout-class-instances'] = {"text": "layout class instances", "type": "dfn", "spec": "css-layout-api-1", "shortname": "css-layout-api", "level": "1", "status": "local", "url": "#layout-class-instances", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-construct'] = {"text": "construct", "type": "dfn", "spec": "", "shortname": "css-layout-api", "level": "1", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-construct", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#iteration-while'] = {"text": "while", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#iteration-while", "export": true, "normative": true, "for_": ["iteration"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-global-object-realm'] = {"text": "realm", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-global-object-realm", "export": true, "normative": true, "for_": ["global object"]};
+window.refsData['https://html.spec.whatwg.org/#structureddeserialize'] = {"text": "structureddeserialize", "type": "dfn", "spec": "", "shortname": "css-layout-api", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/#structureddeserialize", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#perform-a-microtask-checkpoint'] = {"text": "perform a microtask checkpoint", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#perform-a-microtask-checkpoint", "export": true, "normative": true, "for_": []};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

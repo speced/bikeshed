@@ -708,6 +708,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -17493,8 +17530,6 @@ u\+[0-9a-f?]{1,6}/- return UNICODE_RANGE;
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -17742,7 +17777,6 @@ u\+[0-9a-f?]{1,6}/- return UNICODE_RANGE;
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -18457,6 +18491,594 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#propdef-property-name'] = {"text": "property-name", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-property-name", "export": true, "normative": true, "for_": []};
+window.refsData['#value-def-length'] = {"text": "<length>", "type": "type", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-length", "export": true, "normative": true, "for_": []};
+window.refsData['#value-def-percentage'] = {"text": "<percentage>", "type": "type", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-percentage", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-width'] = {"text": "border-width", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-width", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-background-attachment'] = {"text": "background-attachment", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-background-attachment", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-all-inherit'] = {"text": "inherit", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-all-inherit", "export": true, "normative": true, "for_": ["all"]};
+window.refsData['#value-def-uri'] = {"text": "<uri>", "type": "type", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-uri", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-clear'] = {"text": "clear", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-clear", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font'] = {"text": "font", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-font", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-style'] = {"text": "font-style", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-font-style", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-variant'] = {"text": "font-variant", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-font-variant", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-weight'] = {"text": "font-weight", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-font-weight", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-size'] = {"text": "font-size", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-font-size", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-line-height'] = {"text": "line-height", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-line-height", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-family'] = {"text": "font-family", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-font-family", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-color'] = {"text": "color", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-color", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-color-red'] = {"text": "red", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-color-red", "export": true, "normative": true, "for_": ["<color>"]};
+window.refsData['#valdef-generic-family-sans-serif'] = {"text": "sans-serif", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-generic-family-sans-serif", "export": true, "normative": true, "for_": ["<generic-family>"]};
+window.refsData['#valdef-display-none'] = {"text": "none", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-display-none", "export": true, "normative": true, "for_": ["display"]};
+window.refsData['#propdef-display'] = {"text": "display", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-display", "export": true, "normative": true, "for_": []};
+window.refsData['#value-def-dotted'] = {"text": "dotted", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-dotted", "export": true, "normative": true, "for_": ["<border-style>", "border-bottom-style", "border-left-style", "border-right-style", "border-style", "border-top-style"]};
+window.refsData['#ignore①'] = {"text": "ignore", "type": "dfn", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#ignore\u2460", "export": true, "normative": true, "for_": []};
+window.refsData['#at-rules-dfn'] = {"text": "at-rules", "type": "dfn", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#at-rules-dfn", "export": true, "normative": true, "for_": []};
+window.refsData['#rule-sets-dfn'] = {"text": "rule set", "type": "dfn", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#rule-sets-dfn", "export": true, "normative": true, "for_": []};
+window.refsData['#at-ruledef-import'] = {"text": "@import", "type": "at-rule", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#at-ruledef-import", "export": true, "normative": true, "for_": []};
+window.refsData['#at-ruledef-page'] = {"text": "@page", "type": "at-rule", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#at-ruledef-page", "export": true, "normative": true, "for_": []};
+window.refsData['#at-ruledef-media'] = {"text": "@media", "type": "at-rule", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#at-ruledef-media", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-media-print'] = {"text": "print", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-media-print", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['https://drafts.csswg.org/css-display-4/#block'] = {"text": "block", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#block", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#string'] = {"text": "string", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#string", "export": true, "normative": true, "for_": []};
+window.refsData['#selector①'] = {"text": "selector", "type": "dfn", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#selector\u2460", "export": true, "normative": true, "for_": []};
+window.refsData['#property'] = {"text": "property", "type": "dfn", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#property", "export": true, "normative": true, "for_": []};
+window.refsData['#em-width'] = {"text": "em", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#em-width", "export": true, "normative": true, "for_": ["<length>"]};
+window.refsData['#ex'] = {"text": "ex", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#ex", "export": true, "normative": true, "for_": ["<length>"]};
+window.refsData['#propdef-text-indent'] = {"text": "text-indent", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-text-indent", "export": true, "normative": true, "for_": []};
+window.refsData['#value-def-number'] = {"text": "<number>", "type": "type", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-number", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-counter-increment'] = {"text": "counter-increment", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-counter-increment", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-counter-reset'] = {"text": "counter-reset", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-counter-reset", "export": true, "normative": true, "for_": []};
+window.refsData['#value-def-decimal'] = {"text": "decimal", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-decimal", "export": true, "normative": true, "for_": ["list-style-type"]};
+window.refsData['#propdef-content'] = {"text": "content", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-content", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-list-style-type'] = {"text": "list-style-type", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-list-style-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#newline'] = {"text": "newline", "type": "dfn", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#newline", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#valdef-display-run-in'] = {"text": "run-in", "type": "value", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#valdef-display-run-in", "export": true, "normative": true, "for_": ["display", "<display-outside>"]};
+window.refsData['#selectordef-first-child'] = {"text": ":first-child", "type": "selector", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#selectordef-first-child", "export": true, "normative": true, "for_": []};
+window.refsData['#selectordef-lang'] = {"text": ":lang()", "type": "selector", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#selectordef-lang", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-font-weight-bold'] = {"text": "bold", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-font-weight-bold", "export": true, "normative": true, "for_": ["font-weight"]};
+window.refsData['#selectordef-link'] = {"text": ":link", "type": "selector", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#selectordef-link", "export": true, "normative": true, "for_": []};
+window.refsData['#selectordef-visited'] = {"text": ":visited", "type": "selector", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#selectordef-visited", "export": true, "normative": true, "for_": []};
+window.refsData['#selectordef-active'] = {"text": ":active", "type": "selector", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#selectordef-active", "export": true, "normative": true, "for_": []};
+window.refsData['#selectordef-hover'] = {"text": ":hover", "type": "selector", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#selectordef-hover", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-quotes'] = {"text": "quotes", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-quotes", "export": true, "normative": true, "for_": []};
+window.refsData['#selectordef-first-line'] = {"text": ":first-line", "type": "selector", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#selectordef-first-line", "export": true, "normative": true, "for_": []};
+window.refsData['#selectordef-first-letter'] = {"text": ":first-letter", "type": "selector", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#selectordef-first-letter", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-word-spacing'] = {"text": "word-spacing", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-word-spacing", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-letter-spacing'] = {"text": "letter-spacing", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-letter-spacing", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-decoration'] = {"text": "text-decoration", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-text-decoration", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-transform'] = {"text": "text-transform", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-text-transform", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-float'] = {"text": "float", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-float", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-float-none'] = {"text": "none", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-float-none", "export": true, "normative": true, "for_": ["float"]};
+window.refsData['#propdef-vertical-align'] = {"text": "vertical-align", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-vertical-align", "export": true, "normative": true, "for_": []};
+window.refsData['#fictional-tag-sequence'] = {"text": "fictional tag sequence", "type": "dfn", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#fictional-tag-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['#selectordef-before'] = {"text": ":before", "type": "selector", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#selectordef-before", "export": true, "normative": true, "for_": []};
+window.refsData['#selectordef-after'] = {"text": ":after", "type": "selector", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#selectordef-after", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-color-blue'] = {"text": "blue", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-color-blue", "export": true, "normative": true, "for_": ["<color>"]};
+window.refsData['#doctree'] = {"text": "document tree", "type": "dfn", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#doctree", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-background'] = {"text": "background", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-background", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-media-all'] = {"text": "all", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-media-all", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#shorthand-properties'] = {"text": "shorthand properties", "type": "dfn", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#shorthand-properties", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-color-5/#valdef-color-b'] = {"text": "b", "type": "value", "spec": "css-color-5", "shortname": "css-color", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-color-5/#valdef-color-b", "export": true, "normative": true, "for_": ["color()"]};
+window.refsData['#propdef-page-break-before'] = {"text": "page-break-before", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-page-break-before", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/mediaqueries-5/#valdef-media-aural'] = {"text": "aural", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-5/#valdef-media-aural", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#valdef-media-screen'] = {"text": "screen", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-media-screen", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#valdef-media-tv'] = {"text": "tv", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-media-tv", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#propdef-width'] = {"text": "width", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-width", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-height'] = {"text": "height", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-height", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-padding'] = {"text": "padding", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-padding", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-style'] = {"text": "border-style", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-style", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-margin-top'] = {"text": "margin-top", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-margin-top", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-margin-right'] = {"text": "margin-right", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-margin-right", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-margin-bottom'] = {"text": "margin-bottom", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-margin-bottom", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-margin-left'] = {"text": "margin-left", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-margin-left", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-margin'] = {"text": "margin", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-margin", "export": true, "normative": true, "for_": []};
+window.refsData['#value-def-margin-width'] = {"text": "<margin-width>", "type": "type", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-margin-width", "export": true, "normative": true, "for_": []};
+window.refsData['#comb-one'] = {"text": "|", "type": "grammar", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#comb-one", "export": true, "normative": true, "for_": []};
+window.refsData['#mult-num-range'] = {"text": "{a,b}", "type": "grammar", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#mult-num-range", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-height-auto'] = {"text": "auto", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-height-auto", "export": true, "normative": true, "for_": ["height"]};
+window.refsData['#propdef-min-height'] = {"text": "min-height", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-min-height", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-overflow'] = {"text": "overflow", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-overflow", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-overflow-visible'] = {"text": "visible", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-overflow-visible", "export": true, "normative": true, "for_": ["overflow"]};
+window.refsData['#propdef-padding-top'] = {"text": "padding-top", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-padding-top", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-padding-right'] = {"text": "padding-right", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-padding-right", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-padding-bottom'] = {"text": "padding-bottom", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-padding-bottom", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-padding-left'] = {"text": "padding-left", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-padding-left", "export": true, "normative": true, "for_": []};
+window.refsData['#value-def-padding-width'] = {"text": "<padding-width>", "type": "type", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-padding-width", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-top-width'] = {"text": "border-top-width", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-top-width", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-right-width'] = {"text": "border-right-width", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-right-width", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-bottom-width'] = {"text": "border-bottom-width", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-bottom-width", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-left-width'] = {"text": "border-left-width", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-left-width", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-border-width-thin'] = {"text": "thin", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-border-width-thin", "export": true, "normative": true, "for_": ["<border-width>", "border-bottom-wight", "border-left-width", "border-right-width", "border-top-width", "border-width"]};
+window.refsData['#valdef-border-width-medium'] = {"text": "medium", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-border-width-medium", "export": true, "normative": true, "for_": ["<border-width>", "border-bottom-wight", "border-left-width", "border-right-width", "border-top-width", "border-width"]};
+window.refsData['#valdef-border-width-thick'] = {"text": "thick", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-border-width-thick", "export": true, "normative": true, "for_": ["<border-width>", "border-bottom-wight", "border-left-width", "border-right-width", "border-top-width", "border-width"]};
+window.refsData['#value-def-border-width'] = {"text": "<border-width>", "type": "type", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-border-width", "export": true, "normative": true, "for_": []};
+window.refsData['#value-def-bo-none'] = {"text": "none", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-bo-none", "export": true, "normative": true, "for_": ["<border-style>", "border-bottom-style", "border-left-style", "border-right-style", "border-style", "border-top-style"]};
+window.refsData['#value-def-hidden'] = {"text": "hidden", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-hidden", "export": true, "normative": true, "for_": ["<border-style>", "border-bottom-style", "border-left-style", "border-right-style", "border-style", "border-top-style"]};
+window.refsData['#propdef-border-top-color'] = {"text": "border-top-color", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-top-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-right-color'] = {"text": "border-right-color", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-right-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-bottom-color'] = {"text": "border-bottom-color", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-bottom-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-left-color'] = {"text": "border-left-color", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-left-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-color'] = {"text": "border-color", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-color", "export": true, "normative": true, "for_": []};
+window.refsData['#value-def-color'] = {"text": "<color>", "type": "type", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-top-style'] = {"text": "border-top-style", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-top-style", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-right-style'] = {"text": "border-right-style", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-right-style", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-bottom-style'] = {"text": "border-bottom-style", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-bottom-style", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-left-style'] = {"text": "border-left-style", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-left-style", "export": true, "normative": true, "for_": []};
+window.refsData['#value-def-groove'] = {"text": "groove", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-groove", "export": true, "normative": true, "for_": ["<border-style>", "border-bottom-style", "border-left-style", "border-right-style", "border-style", "border-top-style"]};
+window.refsData['#value-def-inset'] = {"text": "inset", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-inset", "export": true, "normative": true, "for_": ["<border-style>", "border-bottom-style", "border-left-style", "border-right-style", "border-style", "border-top-style"]};
+window.refsData['#value-def-ridge'] = {"text": "ridge", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-ridge", "export": true, "normative": true, "for_": ["<border-style>", "border-bottom-style", "border-left-style", "border-right-style", "border-style", "border-top-style"]};
+window.refsData['#value-def-outset'] = {"text": "outset", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-outset", "export": true, "normative": true, "for_": ["<border-style>", "border-bottom-style", "border-left-style", "border-right-style", "border-style", "border-top-style"]};
+window.refsData['#valdef-color-silver'] = {"text": "silver", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-color-silver", "export": true, "normative": true, "for_": ["<color>"]};
+window.refsData['#value-def-border-style'] = {"text": "<border-style>", "type": "type", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-border-style", "export": true, "normative": true, "for_": []};
+window.refsData['#value-def-solid'] = {"text": "solid", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-solid", "export": true, "normative": true, "for_": ["<border-style>", "border-bottom-style", "border-left-style", "border-right-style", "border-style", "border-top-style"]};
+window.refsData['#propdef-border-top'] = {"text": "border-top", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-top", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-right'] = {"text": "border-right", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-right", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-bottom'] = {"text": "border-bottom", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-bottom", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-left'] = {"text": "border-left", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-left", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border'] = {"text": "border", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border", "export": true, "normative": true, "for_": []};
+window.refsData['#comb-any'] = {"text": "||", "type": "grammar", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#comb-any", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-direction'] = {"text": "direction", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-direction", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-direction-ltr'] = {"text": "ltr", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-direction-ltr", "export": true, "normative": true, "for_": ["direction"]};
+window.refsData['#valdef-direction-rtl'] = {"text": "rtl", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-direction-rtl", "export": true, "normative": true, "for_": ["direction"]};
+window.refsData['#value-def-block'] = {"text": "block", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-block", "export": true, "normative": true, "for_": ["display"]};
+window.refsData['#value-def-list-item'] = {"text": "list-item", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-list-item", "export": true, "normative": true, "for_": ["display"]};
+window.refsData['#value-def-table'] = {"text": "table", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-table", "export": true, "normative": true, "for_": ["display"]};
+window.refsData['#value-def-inline'] = {"text": "inline", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-inline", "export": true, "normative": true, "for_": ["display"]};
+window.refsData['#value-def-inline-table'] = {"text": "inline-table", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-inline-table", "export": true, "normative": true, "for_": ["display"]};
+window.refsData['#value-def-inline-block'] = {"text": "inline-block", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-inline-block", "export": true, "normative": true, "for_": ["display"]};
+window.refsData['#propdef-white-space'] = {"text": "white-space", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-white-space", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-position'] = {"text": "position", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-position", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-top'] = {"text": "top", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-top", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-right'] = {"text": "right", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-right", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-bottom'] = {"text": "bottom", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-bottom", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-left'] = {"text": "left", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-left", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-position-absolute'] = {"text": "absolute", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-position-absolute", "export": true, "normative": true, "for_": ["position"]};
+window.refsData['#valdef-position-fixed'] = {"text": "fixed", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-position-fixed", "export": true, "normative": true, "for_": ["position"]};
+window.refsData['#valdef-position-static'] = {"text": "static", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-position-static", "export": true, "normative": true, "for_": ["position"]};
+window.refsData['#valdef-top-auto'] = {"text": "auto", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-top-auto", "export": true, "normative": true, "for_": ["bottom", "left", "right", "top"]};
+window.refsData['#propdef-text-align'] = {"text": "text-align", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-text-align", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-text-align-justify'] = {"text": "justify", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-text-align-justify", "export": true, "normative": true, "for_": ["text-align"]};
+window.refsData['#propdef-visibility'] = {"text": "visibility", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-visibility", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-clear-none'] = {"text": "none", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-clear-none", "export": true, "normative": true, "for_": ["clear"]};
+window.refsData['#valdef-clear-both'] = {"text": "both", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-clear-both", "export": true, "normative": true, "for_": ["clear"]};
+window.refsData['#valdef-position-relative'] = {"text": "relative", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-position-relative", "export": true, "normative": true, "for_": ["position"]};
+window.refsData['#propdef-z-index'] = {"text": "z-index", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-z-index", "export": true, "normative": true, "for_": []};
+window.refsData['#value-def-integer'] = {"text": "<integer>", "type": "type", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-integer", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-z-index-auto'] = {"text": "auto", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-z-index-auto", "export": true, "normative": true, "for_": ["z-index"]};
+window.refsData['#propdef-unicode-bidi'] = {"text": "unicode-bidi", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-unicode-bidi", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-unicode-bidi-embed'] = {"text": "embed", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-unicode-bidi-embed", "export": true, "normative": true, "for_": ["unicode-bidi"]};
+window.refsData['#valdef-unicode-bidi-normal'] = {"text": "normal", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-unicode-bidi-normal", "export": true, "normative": true, "for_": ["unicode-bidi"]};
+window.refsData['#valdef-width-auto'] = {"text": "auto", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-width-auto", "export": true, "normative": true, "for_": ["width"]};
+window.refsData['#propdef-min-width'] = {"text": "min-width", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-min-width", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-max-width'] = {"text": "max-width", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-max-width", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-max-width-none'] = {"text": "none", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-max-width-none", "export": true, "normative": true, "for_": ["max-width"]};
+window.refsData['#propdef-max-height'] = {"text": "max-height", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-max-height", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-max-height-none'] = {"text": "none", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-max-height-none", "export": true, "normative": true, "for_": ["max-height"]};
+window.refsData['#valdef-line-height-normal'] = {"text": "normal", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-line-height-normal", "export": true, "normative": true, "for_": ["line-height"]};
+window.refsData['#value-def-table-cell'] = {"text": "table-cell", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-table-cell", "export": true, "normative": true, "for_": ["display"]};
+window.refsData['#valdef-vertical-align-baseline'] = {"text": "baseline", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-vertical-align-baseline", "export": true, "normative": true, "for_": ["vertical-align"]};
+window.refsData['#valdef-overflow-auto'] = {"text": "auto", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-overflow-auto", "export": true, "normative": true, "for_": ["overflow"]};
+window.refsData['#valdef-overflow-hidden'] = {"text": "hidden", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-overflow-hidden", "export": true, "normative": true, "for_": ["overflow"]};
+window.refsData['#valdef-overflow-scroll'] = {"text": "scroll", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-overflow-scroll", "export": true, "normative": true, "for_": ["overflow"]};
+window.refsData['#propdef-clip'] = {"text": "clip", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-clip", "export": true, "normative": true, "for_": []};
+window.refsData['#value-def-shape'] = {"text": "<shape>", "type": "type", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-shape", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-clip-auto'] = {"text": "auto", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-clip-auto", "export": true, "normative": true, "for_": ["clip"]};
+window.refsData['#valdef-top-auto①'] = {"text": "auto", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-top-auto\u2460", "export": true, "normative": true, "for_": ["<bottom>", "<left>", "<right>", "<top>"]};
+window.refsData['#valdef-visibility-collapse'] = {"text": "collapse", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-visibility-collapse", "export": true, "normative": true, "for_": ["visibility"]};
+window.refsData['#valdef-visibility-hidden'] = {"text": "hidden", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-visibility-hidden", "export": true, "normative": true, "for_": ["visibility"]};
+window.refsData['#value-def-string'] = {"text": "<string>", "type": "type", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-string", "export": true, "normative": true, "for_": []};
+window.refsData['#value-def-counter'] = {"text": "<counter>", "type": "type", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-counter", "export": true, "normative": true, "for_": []};
+window.refsData['#value-def-identifier'] = {"text": "<identifier>", "type": "type", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-identifier", "export": true, "normative": true, "for_": []};
+window.refsData['#mult-one-plus'] = {"text": "+", "type": "grammar", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#mult-one-plus", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-content-normal'] = {"text": "normal", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-content-normal", "export": true, "normative": true, "for_": ["content"]};
+window.refsData['#valdef-content-none'] = {"text": "none", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-content-none", "export": true, "normative": true, "for_": ["content"]};
+window.refsData['#funcdef-counter'] = {"text": "counter()", "type": "function", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#funcdef-counter", "export": true, "normative": true, "for_": []};
+window.refsData['#funcdef-counters'] = {"text": "counters()", "type": "function", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#funcdef-counters", "export": true, "normative": true, "for_": []};
+window.refsData['#value-def-open-quote'] = {"text": "open-quote", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-open-quote", "export": true, "normative": true, "for_": ["content"]};
+window.refsData['#value-def-close-quote'] = {"text": "close-quote", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-close-quote", "export": true, "normative": true, "for_": ["content"]};
+window.refsData['#value-def-no-close-quote'] = {"text": "no-close-quote", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-no-close-quote", "export": true, "normative": true, "for_": ["content"]};
+window.refsData['#mult-opt'] = {"text": "?", "type": "grammar", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#mult-opt", "export": true, "normative": true, "for_": []};
+window.refsData['#value-def-disc'] = {"text": "disc", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-disc", "export": true, "normative": true, "for_": ["list-style-type"]};
+window.refsData['#value-def-circle'] = {"text": "circle", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-circle", "export": true, "normative": true, "for_": ["list-style-type"]};
+window.refsData['#value-def-square'] = {"text": "square", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-square", "export": true, "normative": true, "for_": ["list-style-type"]};
+window.refsData['#valdef-list-style-type-none'] = {"text": "none", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-list-style-type-none", "export": true, "normative": true, "for_": ["list-style-type"]};
+window.refsData['#propdef-list-style-image'] = {"text": "list-style-image", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-list-style-image", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-list-style-position-outside'] = {"text": "outside", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-list-style-position-outside", "export": true, "normative": true, "for_": ["list-style-position"]};
+window.refsData['#propdef-list-style-position'] = {"text": "list-style-position", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-list-style-position", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-list-style'] = {"text": "list-style", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-list-style", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-lists-3/#valdef-list-style-image-none'] = {"text": "none", "type": "value", "spec": "css-lists-3", "shortname": "css-lists", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-lists-3/#valdef-list-style-image-none", "export": true, "normative": true, "for_": ["list-style-image"]};
+window.refsData['#value-def-lower-latin'] = {"text": "lower-latin", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-lower-latin", "export": true, "normative": true, "for_": ["list-style-type"]};
+window.refsData['#velue-def-lower-alpha'] = {"text": "lower-alpha", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#velue-def-lower-alpha", "export": true, "normative": true, "for_": ["list-style-type"]};
+window.refsData['#selectordef-first'] = {"text": ":first", "type": "selector", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#selectordef-first", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-white-space-pre'] = {"text": "pre", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-white-space-pre", "export": true, "normative": true, "for_": ["white-space"]};
+window.refsData['#propdef-page-break-after'] = {"text": "page-break-after", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-page-break-after", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-page-break-inside'] = {"text": "page-break-inside", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-page-break-inside", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-page-break-always'] = {"text": "always", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-page-break-always", "export": true, "normative": true, "for_": ["page-break-after", "page-break-before", "page-break-inside"]};
+window.refsData['#valdef-page-break-auto'] = {"text": "auto", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-page-break-auto", "export": true, "normative": true, "for_": ["page-break-after", "page-break-before", "page-break-inside"]};
+window.refsData['#valdef-page-break-avoid'] = {"text": "avoid", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-page-break-avoid", "export": true, "normative": true, "for_": ["page-break-after", "page-break-before", "page-break-inside"]};
+window.refsData['#value-def-table-row'] = {"text": "table-row", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-table-row", "export": true, "normative": true, "for_": ["display"]};
+window.refsData['#propdef-orphans'] = {"text": "orphans", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-orphans", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-widows'] = {"text": "widows", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-widows", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-border-color-transparent'] = {"text": "transparent", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-border-color-transparent", "export": true, "normative": true, "for_": ["border-bottom-color", "border-color", "border-left-color", "border-right-color", "border-top-color"]};
+window.refsData['#propdef-background-color'] = {"text": "background-color", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-background-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-background-position'] = {"text": "background-position", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-background-position", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-background-image-none'] = {"text": "none", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-background-image-none", "export": true, "normative": true, "for_": ["background-image"]};
+window.refsData['#propdef-background-image'] = {"text": "background-image", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-background-image", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-background-repeat'] = {"text": "background-repeat", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-background-repeat", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-background-attachment-fixed'] = {"text": "fixed", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-background-attachment-fixed", "export": true, "normative": true, "for_": ["background-attachment"]};
+window.refsData['#valdef-background-attachment-scroll'] = {"text": "scroll", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-background-attachment-scroll", "export": true, "normative": true, "for_": ["background-attachment"]};
+window.refsData['#valdef-background-position-center'] = {"text": "center", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-background-position-center", "export": true, "normative": true, "for_": ["background-position"]};
+window.refsData['#valdef-font-style-italic'] = {"text": "italic", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-font-style-italic", "export": true, "normative": true, "for_": ["font-style"]};
+window.refsData['#valdef-font-style-oblique'] = {"text": "oblique", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-font-style-oblique", "export": true, "normative": true, "for_": ["font-style"]};
+window.refsData['#valdef-font-style-small-caps'] = {"text": "small-caps", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-font-style-small-caps", "export": true, "normative": true, "for_": ["font-style"]};
+window.refsData['#valdef-font-variant-normal'] = {"text": "normal", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-font-variant-normal", "export": true, "normative": true, "for_": ["font-variant"]};
+window.refsData['#value-def-family-name'] = {"text": "<family-name>", "type": "type", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-family-name", "export": true, "normative": true, "for_": []};
+window.refsData['#value-def-generic-family'] = {"text": "<generic-family>", "type": "type", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-generic-family", "export": true, "normative": true, "for_": []};
+window.refsData['#comb-comma'] = {"text": ",", "type": "grammar", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#comb-comma", "export": true, "normative": true, "for_": []};
+window.refsData['#mult-zero-plus'] = {"text": "*", "type": "grammar", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#mult-zero-plus", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-generic-family-serif'] = {"text": "serif", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-generic-family-serif", "export": true, "normative": true, "for_": ["<generic-family>"]};
+window.refsData['#valdef-generic-family-monospace'] = {"text": "monospace", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-generic-family-monospace", "export": true, "normative": true, "for_": ["<generic-family>"]};
+window.refsData['#valdef-generic-family-fantasy'] = {"text": "fantasy", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-generic-family-fantasy", "export": true, "normative": true, "for_": ["<generic-family>"]};
+window.refsData['#valdef-generic-family-cursive'] = {"text": "cursive", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-generic-family-cursive", "export": true, "normative": true, "for_": ["<generic-family>"]};
+window.refsData['#valdef-cursor-default'] = {"text": "default", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-cursor-default", "export": true, "normative": true, "for_": ["cursor"]};
+window.refsData['#valdef-font-style-normal'] = {"text": "normal", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-font-style-normal", "export": true, "normative": true, "for_": ["font-style"]};
+window.refsData['#valdef-font-weight-normal'] = {"text": "normal", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-font-weight-normal", "export": true, "normative": true, "for_": ["font-weight"]};
+window.refsData['#valdef-font-weight-bolder'] = {"text": "bolder", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-font-weight-bolder", "export": true, "normative": true, "for_": ["font-weight"]};
+window.refsData['#valdef-font-weight-lighter'] = {"text": "lighter", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-font-weight-lighter", "export": true, "normative": true, "for_": ["font-weight"]};
+window.refsData['#value-def-absolute-size'] = {"text": "<absolute-size>", "type": "type", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-absolute-size", "export": true, "normative": true, "for_": []};
+window.refsData['#value-def-relative-size'] = {"text": "<relative-size>", "type": "type", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-relative-size", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-font-size-medium'] = {"text": "medium", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-font-size-medium", "export": true, "normative": true, "for_": ["font-size"]};
+window.refsData['#valdef-font-size-large'] = {"text": "large", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-font-size-large", "export": true, "normative": true, "for_": ["font-size"]};
+window.refsData['#valdef-font-caption'] = {"text": "caption", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-font-caption", "export": true, "normative": true, "for_": ["font"]};
+window.refsData['#valdef-font-small-caption'] = {"text": "small-caption", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-font-small-caption", "export": true, "normative": true, "for_": ["font"]};
+window.refsData['#valdef-text-align-left'] = {"text": "left", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-text-align-left", "export": true, "normative": true, "for_": ["text-align"]};
+window.refsData['#valdef-text-align-right'] = {"text": "right", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-text-align-right", "export": true, "normative": true, "for_": ["text-align"]};
+window.refsData['#valdef-text-align-center'] = {"text": "center", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-text-align-center", "export": true, "normative": true, "for_": ["text-align"]};
+window.refsData['#valdef-white-space-pre-wrap'] = {"text": "pre-wrap", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-white-space-pre-wrap", "export": true, "normative": true, "for_": ["white-space"]};
+window.refsData['#valdef-letter-spacing-normal'] = {"text": "normal", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-letter-spacing-normal", "export": true, "normative": true, "for_": ["letter-spacing"]};
+window.refsData['#valdef-word-spacing-normal'] = {"text": "normal", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-word-spacing-normal", "export": true, "normative": true, "for_": ["word-spacing"]};
+window.refsData['#valdef-white-space-normal'] = {"text": "normal", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-white-space-normal", "export": true, "normative": true, "for_": ["white-space"]};
+window.refsData['#valdef-white-space-nowrap'] = {"text": "nowrap", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-white-space-nowrap", "export": true, "normative": true, "for_": ["white-space"]};
+window.refsData['#valdef-white-space-pre-line'] = {"text": "pre-line", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-white-space-pre-line", "export": true, "normative": true, "for_": ["white-space"]};
+window.refsData['#map-document-language-elements-to-table-elements'] = {"text": "map document language elements to table elements", "type": "dfn", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#map-document-language-elements-to-table-elements", "export": true, "normative": true, "for_": []};
+window.refsData['#value-def-table-row-group'] = {"text": "table-row-group", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-table-row-group", "export": true, "normative": true, "for_": ["display"]};
+window.refsData['#value-def-table-header-group'] = {"text": "table-header-group", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-table-header-group", "export": true, "normative": true, "for_": ["display"]};
+window.refsData['#value-def-table-footer-group'] = {"text": "table-footer-group", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-table-footer-group", "export": true, "normative": true, "for_": ["display"]};
+window.refsData['#value-def-table-column'] = {"text": "table-column", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-table-column", "export": true, "normative": true, "for_": ["display"]};
+window.refsData['#value-def-table-column-group'] = {"text": "table-column-group", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-table-column-group", "export": true, "normative": true, "for_": ["display"]};
+window.refsData['#value-def-table-caption'] = {"text": "table-caption", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-table-caption", "export": true, "normative": true, "for_": ["display"]};
+window.refsData['#propdef-border-collapse'] = {"text": "border-collapse", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-collapse", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-border-collapse-collapse'] = {"text": "collapse", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-border-collapse-collapse", "export": true, "normative": true, "for_": ["border-collapse"]};
+window.refsData['#propdef-caption-side'] = {"text": "caption-side", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-caption-side", "export": true, "normative": true, "for_": []};
+window.refsData['#separated-borders-model'] = {"text": "separated borders model", "type": "dfn", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#separated-borders-model", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-spacing'] = {"text": "border-spacing", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-spacing", "export": true, "normative": true, "for_": []};
+window.refsData['#rules-on-anonymous-table-objects'] = {"text": "rules on anonymous table objects", "type": "dfn", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#rules-on-anonymous-table-objects", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-border-collapse-separate'] = {"text": "separate", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-border-collapse-separate", "export": true, "normative": true, "for_": ["border-collapse"]};
+window.refsData['#propdef-empty-cells'] = {"text": "empty-cells", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-empty-cells", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-empty-cells-hide'] = {"text": "hide", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-empty-cells-hide", "export": true, "normative": true, "for_": ["empty-cells"]};
+window.refsData['#propdef-table-layout'] = {"text": "table-layout", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-table-layout", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-table-layout-auto'] = {"text": "auto", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-table-layout-auto", "export": true, "normative": true, "for_": ["table-layout"]};
+window.refsData['#value-def-double'] = {"text": "double", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-double", "export": true, "normative": true, "for_": ["<border-style>", "border-bottom-style", "border-left-style", "border-right-style", "border-style", "border-top-style"]};
+window.refsData['#value-def-dashed'] = {"text": "dashed", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-dashed", "export": true, "normative": true, "for_": ["<border-style>", "border-bottom-style", "border-left-style", "border-right-style", "border-style", "border-top-style"]};
+window.refsData['#propdef-cursor'] = {"text": "cursor", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-cursor", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-cursor-se-resize'] = {"text": "se-resize", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-cursor-se-resize", "export": true, "normative": true, "for_": ["cursor"]};
+window.refsData['#valdef-cursor-wait'] = {"text": "wait", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-cursor-wait", "export": true, "normative": true, "for_": ["cursor"]};
+window.refsData['#valdef-cursor-pointer'] = {"text": "pointer", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#valdef-cursor-pointer", "export": true, "normative": true, "for_": ["cursor"]};
+window.refsData['#propdef-outline'] = {"text": "outline", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-outline", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-outline-color'] = {"text": "outline-color", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-outline-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-outline-style'] = {"text": "outline-style", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-outline-style", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-outline-width'] = {"text": "outline-width", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-outline-width", "export": true, "normative": true, "for_": []};
+window.refsData['#value-def-invert'] = {"text": "invert", "type": "value", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#value-def-invert", "export": true, "normative": true, "for_": ["outline-color"]};
+window.refsData['#specified-value'] = {"text": "specified values", "type": "dfn", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#specified-value", "export": true, "normative": true, "for_": []};
+window.refsData['#computed-value'] = {"text": "computed values", "type": "dfn", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#computed-value", "export": true, "normative": true, "for_": []};window.refsData['#propdef-background'] = {"text": "background", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-background", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-background-attachment'] = {"text": "background-attachment", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-background-attachment", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-background-color'] = {"text": "background-color", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-background-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-background-image'] = {"text": "background-image", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-background-image", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-background-position'] = {"text": "background-position", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-background-position", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-background-repeat'] = {"text": "background-repeat", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-background-repeat", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border'] = {"text": "border", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-bottom'] = {"text": "border-bottom", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-bottom", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-bottom-color'] = {"text": "border-bottom-color", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-bottom-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-bottom-style'] = {"text": "border-bottom-style", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-bottom-style", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-bottom-width'] = {"text": "border-bottom-width", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-bottom-width", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-collapse'] = {"text": "border-collapse", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-collapse", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-color'] = {"text": "border-color", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-left'] = {"text": "border-left", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-left", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-left-color'] = {"text": "border-left-color", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-left-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-left-style'] = {"text": "border-left-style", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-left-style", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-left-width'] = {"text": "border-left-width", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-left-width", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-right'] = {"text": "border-right", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-right", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-right-color'] = {"text": "border-right-color", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-right-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-right-style'] = {"text": "border-right-style", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-right-style", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-right-width'] = {"text": "border-right-width", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-right-width", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-spacing'] = {"text": "border-spacing", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-spacing", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-style'] = {"text": "border-style", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-style", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-top'] = {"text": "border-top", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-top", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-top-color'] = {"text": "border-top-color", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-top-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-top-style'] = {"text": "border-top-style", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-top-style", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-top-width'] = {"text": "border-top-width", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-top-width", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-width'] = {"text": "border-width", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-border-width", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-bottom'] = {"text": "bottom", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-bottom", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-caption-side'] = {"text": "caption-side", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-caption-side", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-clear'] = {"text": "clear", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-clear", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-clip'] = {"text": "clip", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-clip", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-color'] = {"text": "color", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-content'] = {"text": "content", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-content", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-counter-increment'] = {"text": "counter-increment", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-counter-increment", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-counter-reset'] = {"text": "counter-reset", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-counter-reset", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-cursor'] = {"text": "cursor", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-cursor", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-direction'] = {"text": "direction", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-direction", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-display'] = {"text": "display", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-display", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-empty-cells'] = {"text": "empty-cells", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-empty-cells", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-float'] = {"text": "float", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-float", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font'] = {"text": "font", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-font", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-family'] = {"text": "font-family", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-font-family", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-size'] = {"text": "font-size", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-font-size", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-style'] = {"text": "font-style", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-font-style", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-variant'] = {"text": "font-variant", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-font-variant", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-weight'] = {"text": "font-weight", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-font-weight", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-height'] = {"text": "height", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-height", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-left'] = {"text": "left", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-left", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-letter-spacing'] = {"text": "letter-spacing", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-letter-spacing", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-line-height'] = {"text": "line-height", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-line-height", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-list-style'] = {"text": "list-style", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-list-style", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-list-style-image'] = {"text": "list-style-image", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-list-style-image", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-list-style-position'] = {"text": "list-style-position", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-list-style-position", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-list-style-type'] = {"text": "list-style-type", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-list-style-type", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-margin'] = {"text": "margin", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-margin", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-margin-bottom'] = {"text": "margin-bottom", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-margin-bottom", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-margin-left'] = {"text": "margin-left", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-margin-left", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-margin-right'] = {"text": "margin-right", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-margin-right", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-margin-top'] = {"text": "margin-top", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-margin-top", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-max-height'] = {"text": "max-height", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-max-height", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-max-width'] = {"text": "max-width", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-max-width", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-min-height'] = {"text": "min-height", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-min-height", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-min-width'] = {"text": "min-width", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-min-width", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-orphans'] = {"text": "orphans", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-orphans", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-outline'] = {"text": "outline", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-outline", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-outline-color'] = {"text": "outline-color", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-outline-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-outline-style'] = {"text": "outline-style", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-outline-style", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-outline-width'] = {"text": "outline-width", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-outline-width", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-overflow'] = {"text": "overflow", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-overflow", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-padding'] = {"text": "padding", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-padding", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-padding-bottom'] = {"text": "padding-bottom", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-padding-bottom", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-padding-left'] = {"text": "padding-left", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-padding-left", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-padding-right'] = {"text": "padding-right", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-padding-right", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-padding-top'] = {"text": "padding-top", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-padding-top", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-page-break-after'] = {"text": "page-break-after", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-page-break-after", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-page-break-before'] = {"text": "page-break-before", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-page-break-before", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-page-break-inside'] = {"text": "page-break-inside", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-page-break-inside", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-position'] = {"text": "position", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-position", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-property-name'] = {"text": "property-name", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-property-name", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-quotes'] = {"text": "quotes", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-quotes", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-right'] = {"text": "right", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-right", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-table-layout'] = {"text": "table-layout", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-table-layout", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-align'] = {"text": "text-align", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-text-align", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-decoration'] = {"text": "text-decoration", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-text-decoration", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-indent'] = {"text": "text-indent", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-text-indent", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-transform'] = {"text": "text-transform", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-text-transform", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-top'] = {"text": "top", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-top", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-unicode-bidi'] = {"text": "unicode-bidi", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-unicode-bidi", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-vertical-align'] = {"text": "vertical-align", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-vertical-align", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-visibility'] = {"text": "visibility", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-visibility", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-white-space'] = {"text": "white-space", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-white-space", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-widows'] = {"text": "widows", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-widows", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-width'] = {"text": "width", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-width", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-word-spacing'] = {"text": "word-spacing", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-word-spacing", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-z-index'] = {"text": "z-index", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "local", "url": "#propdef-z-index", "export": true, "normative": true, "for_": []};
 </script>
 <script>/* Boilerplate: script-wpt */
 let wptPath = "/css/CSS2/borders/";

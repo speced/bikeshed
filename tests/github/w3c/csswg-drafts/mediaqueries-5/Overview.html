@@ -708,6 +708,43 @@ a[href].issue-return {
         }
     }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -4783,8 +4820,6 @@ CSS.customMedia.set('--foo', 5);
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -5032,7 +5067,6 @@ CSS.customMedia.set('--foo', 5);
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -5547,4 +5581,378 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#media-query'] = {"text": "media query", "type": "dfn", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#media-query", "export": true, "normative": true, "for_": []};
+window.refsData['#descdef-media-update'] = {"text": "update", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-update", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#media-type'] = {"text": "media type", "type": "dfn", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#media-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-conditional-3/#at-ruledef-media'] = {"text": "@media", "type": "at-rule", "spec": "css-conditional-3", "shortname": "css-conditional", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-conditional-3/#at-ruledef-media", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#at-ruledef-import'] = {"text": "@import", "type": "at-rule", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#at-ruledef-import", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#integer-value'] = {"text": "<integer>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#integer-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#number-value'] = {"text": "<number>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#number-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#resolution-value'] = {"text": "<resolution>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#resolution-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#relative-length'] = {"text": "relative length", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#relative-length", "export": false, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#initial-value'] = {"text": "initial value", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#initial-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#em'] = {"text": "em", "type": "value", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#em", "export": true, "normative": true, "for_": ["<length>"]};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font-size'] = {"text": "font-size", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-size", "export": true, "normative": true, "for_": []};
+window.refsData['#media-query-modifier'] = {"text": "media query modifier", "type": "dfn", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#media-query-modifier", "export": true, "normative": true, "for_": []};
+window.refsData['#media-feature'] = {"text": "media feature", "type": "dfn", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#media-feature", "export": true, "normative": true, "for_": []};
+window.refsData['#media-condition'] = {"text": "media condition", "type": "dfn", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#media-condition", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-media-screen'] = {"text": "screen", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#valdef-media-screen", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#media-query-list'] = {"text": "media query list", "type": "dfn", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#media-query-list", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-media-projection'] = {"text": "projection", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#valdef-media-projection", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#valdef-media-not'] = {"text": "not", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#valdef-media-not", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#valdef-media-only'] = {"text": "only", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#valdef-media-only", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#valdef-media-handheld'] = {"text": "handheld", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#valdef-media-handheld", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#valdef-media-tty'] = {"text": "tty", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#valdef-media-tty", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#valdef-media-tv'] = {"text": "tv", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#valdef-media-tv", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-grid'] = {"text": "grid", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-grid", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#valdef-media-print'] = {"text": "print", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#valdef-media-print", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#boolean-context'] = {"text": "boolean context", "type": "dfn", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#boolean-context", "export": true, "normative": true, "for_": []};
+window.refsData['#descdef-media-color'] = {"text": "color", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-color", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#range-context'] = {"text": "range context", "type": "dfn", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#range-context", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-media-speech'] = {"text": "speech", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#valdef-media-speech", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-width'] = {"text": "width", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-width", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#typedef-dimension'] = {"text": "<dimension>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#typedef-dimension", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-media-update-none'] = {"text": "none", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#valdef-media-update-none", "export": true, "normative": true, "for_": ["@media/update", "update"]};
+window.refsData['#valdef-media-pointer-none'] = {"text": "none", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#valdef-media-pointer-none", "export": true, "normative": true, "for_": ["@media/pointer", "pointer"]};
+window.refsData['#descdef-media-resolution'] = {"text": "resolution", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-resolution", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#parse-a-comma-separated-list-of-component-values'] = {"text": "parse a comma-separated list of component values", "type": "dfn", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#parse-a-comma-separated-list-of-component-values", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-media-query'] = {"text": "<media-query>", "type": "type", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#typedef-media-query", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-media-query-list'] = {"text": "<media-query-list>", "type": "type", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#typedef-media-query-list", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ascii-case-insensitive'] = {"text": "ascii case-insensitive", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-case-insensitive", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-media-condition'] = {"text": "<media-condition>", "type": "type", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#typedef-media-condition", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-media-type'] = {"text": "<media-type>", "type": "type", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#typedef-media-type", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-media-condition-without-or'] = {"text": "<media-condition-without-or>", "type": "type", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#typedef-media-condition-without-or", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#typedef-ident'] = {"text": "<ident>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#typedef-ident", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-media-not'] = {"text": "<media-not>", "type": "type", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#typedef-media-not", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-media-in-parens'] = {"text": "<media-in-parens>", "type": "type", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#typedef-media-in-parens", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-media-and'] = {"text": "<media-and>", "type": "type", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#typedef-media-and", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-media-or'] = {"text": "<media-or>", "type": "type", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#typedef-media-or", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-media-feature'] = {"text": "<media-feature>", "type": "type", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#typedef-media-feature", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-general-enclosed'] = {"text": "<general-enclosed>", "type": "type", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#typedef-general-enclosed", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-mf-plain'] = {"text": "<mf-plain>", "type": "type", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#typedef-mf-plain", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-mf-boolean'] = {"text": "<mf-boolean>", "type": "type", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#typedef-mf-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-mf-range'] = {"text": "<mf-range>", "type": "type", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#typedef-mf-range", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-mf-name'] = {"text": "<mf-name>", "type": "type", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#typedef-mf-name", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-mf-value'] = {"text": "<mf-value>", "type": "type", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#typedef-mf-value", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-mf-comparison'] = {"text": "<mf-comparison>", "type": "type", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#typedef-mf-comparison", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-mf-lt'] = {"text": "<mf-lt>", "type": "type", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#typedef-mf-lt", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-mf-gt'] = {"text": "<mf-gt>", "type": "type", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#typedef-mf-gt", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#ratio-value'] = {"text": "<ratio>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#ratio-value", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-mf-eq'] = {"text": "<mf-eq>", "type": "type", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#typedef-mf-eq", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#typedef-function-token'] = {"text": "<function-token>", "type": "type", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#typedef-function-token", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#typedef-any-value'] = {"text": "<any-value>", "type": "type", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#typedef-any-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#typedef-delim-token'] = {"text": "<delim-token>", "type": "type", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#typedef-delim-token", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#length-value'] = {"text": "<length>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#length-value", "export": true, "normative": true, "for_": []};
+window.refsData['#continuous-media'] = {"text": "continuous media", "type": "dfn", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#continuous-media", "export": true, "normative": true, "for_": []};
+window.refsData['#paged-media'] = {"text": "paged media", "type": "dfn", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#paged-media", "export": true, "normative": true, "for_": []};
+window.refsData['#false-in-the-negative-range'] = {"text": "false in the negative range", "type": "dfn", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#false-in-the-negative-range", "export": true, "normative": true, "for_": []};
+window.refsData['#descdef-media-height'] = {"text": "height", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-height", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['https://drafts.csswg.org/css-sizing-4/#propdef-aspect-ratio'] = {"text": "aspect-ratio", "type": "property", "spec": "css-sizing-4", "shortname": "css-sizing", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-sizing-4/#propdef-aspect-ratio", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-media-orientation-portrait'] = {"text": "portrait", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#valdef-media-orientation-portrait", "export": true, "normative": true, "for_": ["@media/orientation", "orientation"]};
+window.refsData['#valdef-media-orientation-landscape'] = {"text": "landscape", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#valdef-media-orientation-landscape", "export": true, "normative": true, "for_": ["@media/orientation", "orientation"]};
+window.refsData['#descdef-media-overflow-block'] = {"text": "overflow-block", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-overflow-block", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['https://www.w3.org/TR/css-writing-modes-4/#block-axis'] = {"text": "block axis", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-writing-modes-4/#block-axis", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-media-overflow-block-none'] = {"text": "none", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#valdef-media-overflow-block-none", "export": true, "normative": true, "for_": ["@media/overflow-block", "overflow-block"]};
+window.refsData['#valdef-media-overflow-block-scroll'] = {"text": "scroll", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#valdef-media-overflow-block-scroll", "export": true, "normative": true, "for_": ["@media/overflow-block", "overflow-block"]};
+window.refsData['#valdef-media-overflow-block-paged'] = {"text": "paged", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#valdef-media-overflow-block-paged", "export": true, "normative": true, "for_": ["@media/overflow-block", "overflow-block"]};
+window.refsData['#descdef-media-overflow-inline'] = {"text": "overflow-inline", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-overflow-inline", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['https://www.w3.org/TR/css-writing-modes-4/#inline-axis'] = {"text": "inline axis", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-writing-modes-4/#inline-axis", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-view-1/#page-zoom'] = {"text": "page zoom", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-view-1/#page-zoom", "export": false, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/cssom-view-1/#pinch-zoom'] = {"text": "pinch zoom", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "snapshot", "url": "https://www.w3.org/TR/cssom-view-1/#pinch-zoom", "export": false, "normative": true, "for_": []};
+window.refsData['#valdef-media-resolution-infinite'] = {"text": "infinite", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#valdef-media-resolution-infinite", "export": true, "normative": true, "for_": ["@media/resolution", "resolution"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#px'] = {"text": "px", "type": "value", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#px", "export": true, "normative": true, "for_": ["<length>"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#in'] = {"text": "in", "type": "value", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#in", "export": true, "normative": true, "for_": ["<length>"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#cm'] = {"text": "cm", "type": "value", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#cm", "export": true, "normative": true, "for_": ["<length>"]};
+window.refsData['#descdef-media-scan'] = {"text": "scan", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-scan", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#typedef-mq-boolean'] = {"text": "<mq-boolean>", "type": "type", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#typedef-mq-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-media-environment-blending-subtractive'] = {"text": "subtractive", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#valdef-media-environment-blending-subtractive", "export": true, "normative": true, "for_": ["@media/environment-blending", "environment-blending"]};
+window.refsData['#descdef-media-color-gamut'] = {"text": "color-gamut", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-color-gamut", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-color-index'] = {"text": "color-index", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-color-index", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-monochrome'] = {"text": "monochrome", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-monochrome", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#valdef-media-color-gamut-p3'] = {"text": "p3", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#valdef-media-color-gamut-p3", "export": true, "normative": true, "for_": ["@media/color-gamut", "color-gamut"]};
+window.refsData['#valdef-media-color-gamut-srgb'] = {"text": "srgb", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#valdef-media-color-gamut-srgb", "export": true, "normative": true, "for_": ["@media/color-gamut", "color-gamut"]};
+window.refsData['#valdef-media-color-gamut-rec2020'] = {"text": "rec2020", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#valdef-media-color-gamut-rec2020", "export": true, "normative": true, "for_": ["@media/color-gamut", "color-gamut"]};
+window.refsData['#descdef-media-dynamic-range'] = {"text": "dynamic-range", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-dynamic-range", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#peak-brightness-high-peak-brightness'] = {"text": "high peak brightness", "type": "dfn", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#peak-brightness-high-peak-brightness", "export": true, "normative": true, "for_": ["peak brightness"]};
+window.refsData['#contrast-ratio-high-contrast-ratio'] = {"text": "high contrast ratio", "type": "dfn", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#contrast-ratio-high-contrast-ratio", "export": true, "normative": true, "for_": ["contrast ratio"]};
+window.refsData['#valdef-media-dynamic-range-high'] = {"text": "high", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#valdef-media-dynamic-range-high", "export": true, "normative": true, "for_": ["@media/dynamic-range", "dynamic-range"]};
+window.refsData['#peak-brightness'] = {"text": "peak brightness", "type": "dfn", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#peak-brightness", "export": true, "normative": true, "for_": []};
+window.refsData['#contrast-ratio'] = {"text": "contrast ratio", "type": "dfn", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#contrast-ratio", "export": true, "normative": true, "for_": []};
+window.refsData['#descdef-media-video-dynamic-range'] = {"text": "video-dynamic-range", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-video-dynamic-range", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#cascade-origin-ua'] = {"text": "ua style sheet", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#cascade-origin-ua", "export": true, "normative": true, "for_": []};
+window.refsData['#descdef-media-pointer'] = {"text": "pointer", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-pointer", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-hover'] = {"text": "hover", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-hover", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#valdef-media-pointer-coarse'] = {"text": "coarse", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#valdef-media-pointer-coarse", "export": true, "normative": true, "for_": ["@media/pointer", "pointer"]};
+window.refsData['#valdef-media-pointer-fine'] = {"text": "fine", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#valdef-media-pointer-fine", "export": true, "normative": true, "for_": ["@media/pointer", "pointer"]};
+window.refsData['#descdef-media-video-color-gamut'] = {"text": "video-color-gamut", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-video-color-gamut", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-video-width'] = {"text": "video-width", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-video-width", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-video-height'] = {"text": "video-height", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-video-height", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-video-resolution'] = {"text": "video-resolution", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-video-resolution", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#valdef-media-scripting-initial-only'] = {"text": "initial-only", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#valdef-media-scripting-initial-only", "export": true, "normative": true, "for_": ["@media/scripting", "scripting"]};
+window.refsData['#valdef-media-scripting-enabled'] = {"text": "enabled", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#valdef-media-scripting-enabled", "export": true, "normative": true, "for_": ["@media/scripting", "scripting"]};
+window.refsData['#valdef-media-scripting-none'] = {"text": "none", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#valdef-media-scripting-none", "export": true, "normative": true, "for_": ["@media/scripting", "scripting"]};
+window.refsData['#custom-media-query'] = {"text": "custom media query", "type": "dfn", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#custom-media-query", "export": true, "normative": true, "for_": []};
+window.refsData['#at-ruledef-custom-media'] = {"text": "@custom-media", "type": "at-rule", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#at-ruledef-custom-media", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-extensions-1/#typedef-extension-name'] = {"text": "<extension-name>", "type": "type", "spec": "css-extensions-1", "shortname": "css-extensions", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-extensions-1/#typedef-extension-name", "export": true, "normative": true, "for_": []};
+window.refsData['#descdef-media-prefers-contrast'] = {"text": "prefers-contrast", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-prefers-contrast", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#valdef-media-prefers-contrast-more'] = {"text": "more", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#valdef-media-prefers-contrast-more", "export": true, "normative": true, "for_": ["@media/prefers-contrast", "prefers-contrast"]};
+window.refsData['#valdef-media-prefers-contrast-less'] = {"text": "less", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#valdef-media-prefers-contrast-less", "export": true, "normative": true, "for_": ["@media/prefers-contrast", "prefers-contrast"]};
+window.refsData['https://drafts.csswg.org/css-color-adjust-1/#forced-colors-mode'] = {"text": "forced colors mode", "type": "dfn", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-color-adjust-1/#forced-colors-mode", "export": true, "normative": true, "for_": []};
+window.refsData['#descdef-media-forced-colors'] = {"text": "forced-colors", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-forced-colors", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#valdef-media-prefers-color-scheme-light'] = {"text": "light", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#valdef-media-prefers-color-scheme-light", "export": true, "normative": true, "for_": ["@media/prefers-color-scheme", "prefers-color-scheme"]};
+window.refsData['#valdef-media-prefers-color-scheme-dark'] = {"text": "dark", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#valdef-media-prefers-color-scheme-dark", "export": true, "normative": true, "for_": ["@media/prefers-color-scheme", "prefers-color-scheme"]};
+window.refsData['#descdef-media-prefers-reduced-data'] = {"text": "prefers-reduced-data", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-prefers-reduced-data", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#valdef-media-prefers-reduced-data-reduce'] = {"text": "reduce", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#valdef-media-prefers-reduced-data-reduce", "export": true, "normative": true, "for_": ["@media/prefers-reduced-data", "prefers-reduced-data"]};
+window.refsData['https://drafts.csswg.org/cssom-view-1/#web-exposed-screen-area'] = {"text": "web-exposed screen area", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-view-1/#web-exposed-screen-area", "export": true, "normative": true, "for_": []};
+window.refsData['#descdef-media-device-width'] = {"text": "device-width", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-device-width", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-device-height'] = {"text": "device-height", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-device-height", "export": true, "normative": true, "for_": ["@media"]};window.refsData['https://drafts.csswg.org/css-conditional-3/#at-ruledef-media'] = {"text": "@media", "type": "at-rule", "spec": "css-conditional-3", "shortname": "css-conditional", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-conditional-3/#at-ruledef-media", "export": true, "normative": true, "for_": []};
+window.refsData['#descdef-media-any-hover'] = {"text": "any-hover", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-any-hover", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-any-pointer'] = {"text": "any-pointer", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-any-pointer", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-aspect-ratio'] = {"text": "aspect-ratio", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-aspect-ratio", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-color'] = {"text": "color", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-color", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-color-gamut'] = {"text": "color-gamut", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-color-gamut", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-color-index'] = {"text": "color-index", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-color-index", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-device-aspect-ratio'] = {"text": "device-aspect-ratio", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-device-aspect-ratio", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-device-height'] = {"text": "device-height", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-device-height", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-device-width'] = {"text": "device-width", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-device-width", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-dynamic-range'] = {"text": "dynamic-range", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-dynamic-range", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-environment-blending'] = {"text": "environment-blending", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-environment-blending", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-forced-colors'] = {"text": "forced-colors", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-forced-colors", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-grid'] = {"text": "grid", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-grid", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-height'] = {"text": "height", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-height", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-hover'] = {"text": "hover", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-hover", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-inverted-colors'] = {"text": "inverted-colors", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-inverted-colors", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-monochrome'] = {"text": "monochrome", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-monochrome", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-orientation'] = {"text": "orientation", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-orientation", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-overflow-block'] = {"text": "overflow-block", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-overflow-block", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-overflow-inline'] = {"text": "overflow-inline", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-overflow-inline", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-pointer'] = {"text": "pointer", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-pointer", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-prefers-color-scheme'] = {"text": "prefers-color-scheme", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-prefers-color-scheme", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-prefers-contrast'] = {"text": "prefers-contrast", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-prefers-contrast", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-prefers-reduced-data'] = {"text": "prefers-reduced-data", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-prefers-reduced-data", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-prefers-reduced-motion'] = {"text": "prefers-reduced-motion", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-prefers-reduced-motion", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-prefers-reduced-transparency'] = {"text": "prefers-reduced-transparency", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-prefers-reduced-transparency", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-resolution'] = {"text": "resolution", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-resolution", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-scan'] = {"text": "scan", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-scan", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-scripting'] = {"text": "scripting", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-scripting", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-update'] = {"text": "update", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-update", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-video-color-gamut'] = {"text": "video-color-gamut", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-video-color-gamut", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-video-dynamic-range'] = {"text": "video-dynamic-range", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-video-dynamic-range", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-video-height'] = {"text": "video-height", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-video-height", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-video-resolution'] = {"text": "video-resolution", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-video-resolution", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-video-width'] = {"text": "video-width", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-video-width", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#descdef-media-width'] = {"text": "width", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "local", "url": "#descdef-media-width", "export": true, "normative": true, "for_": ["@media"]};
 </script>

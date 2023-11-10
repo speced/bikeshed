@@ -696,6 +696,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -2775,8 +2812,6 @@ particularly handling of layout-internal types.
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -3024,7 +3059,6 @@ particularly handling of layout-internal types.
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -3567,4 +3601,368 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#propdef-display'] = {"text": "display", "type": "property", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#propdef-display", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-first-letter'] = {"text": "::first-letter", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-first-letter", "export": true, "normative": true, "for_": []};
+window.refsData['#box-tree'] = {"text": "box tree", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#box-tree", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['#elements'] = {"text": "element", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#elements", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['https://drafts.csswg.org/selectors-4/#pseudo-element'] = {"text": "pseudo-element", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "current", "url": "https://drafts.csswg.org/selectors-4/#pseudo-element", "export": true, "normative": true, "for_": []};
+window.refsData['#text-nodes'] = {"text": "text node", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#text-nodes", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#computed-value'] = {"text": "computed value", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#computed-value", "export": true, "normative": true, "for_": []};
+window.refsData['#box'] = {"text": "box", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#box", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['#principal-box'] = {"text": "principal box", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#principal-box", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-display-none'] = {"text": "none", "type": "value", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#valdef-display-none", "export": true, "normative": true, "for_": ["<display-box>", "display"]};
+window.refsData['#valdef-display-contents'] = {"text": "contents", "type": "value", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#valdef-display-contents", "export": true, "normative": true, "for_": ["<display-box>", "display"]};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#inherited-property'] = {"text": "inherited property", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#inherited-property", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border'] = {"text": "border", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-tables-3/#table-grid-box'] = {"text": "table grid box", "type": "dfn", "spec": "css-tables-3", "shortname": "css-tables", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-tables-3/#table-grid-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-tables-3/#table-wrapper-box'] = {"text": "table wrapper box", "type": "dfn", "spec": "css-tables-3", "shortname": "css-tables", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-tables-3/#table-wrapper-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-1/#dom-window-getcomputedstyle'] = {"text": "getComputedStyle(elt)", "type": "method", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#dom-window-getcomputedstyle", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['#text-run'] = {"text": "text run", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#text-run", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['#valdef-display-run-in'] = {"text": "run-in", "type": "value", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#valdef-display-run-in", "export": true, "normative": true, "for_": ["<display-outside>", "display"]};
+window.refsData['#anonymous'] = {"text": "anonymous box", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#anonymous", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['#element-tree'] = {"text": "element tree", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#element-tree", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['https://drafts.csswg.org/css-break-3/#fragment'] = {"text": "fragment", "type": "dfn", "spec": "css-break-3", "shortname": "css-break", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-break-3/#fragment", "export": true, "normative": true, "for_": []};
+window.refsData['#inline-box'] = {"text": "inline box", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#inline-box", "export": true, "normative": true, "for_": []};
+window.refsData['#block-box'] = {"text": "block box", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#block-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-break-4/#fragmentation'] = {"text": "fragmentation", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-break-4/#fragmentation", "export": true, "normative": true, "for_": []};
+window.refsData['#display-type'] = {"text": "display type", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#display-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-break-4/#box-fragment'] = {"text": "box fragment", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-break-4/#box-fragment", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#css-wide-keywords'] = {"text": "css-wide keywords", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-display-outside'] = {"text": "<display-outside>", "type": "type", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#typedef-display-outside", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-any'] = {"text": "||", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-any", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-display-inside'] = {"text": "<display-inside>", "type": "type", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#typedef-display-inside", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-display-listitem'] = {"text": "<display-listitem>", "type": "type", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#typedef-display-listitem", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-display-internal'] = {"text": "<display-internal>", "type": "type", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#typedef-display-internal", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-display-box'] = {"text": "<display-box>", "type": "type", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#typedef-display-box", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-display-legacy'] = {"text": "<display-legacy>", "type": "type", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#typedef-display-legacy", "export": true, "normative": true, "for_": []};
+window.refsData['#replaced-element'] = {"text": "replaced element", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#replaced-element", "export": true, "normative": true, "for_": []};
+window.refsData['#formatting-context'] = {"text": "formatting context", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#formatting-context", "export": true, "normative": true, "for_": []};
+window.refsData['#flow-layout'] = {"text": "flow layout", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#flow-layout", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-display-list-item'] = {"text": "list-item", "type": "value", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#valdef-display-list-item", "export": true, "normative": true, "for_": ["<display-list-item>", "display"]};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-marker'] = {"text": "::marker", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-marker", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/selectors-4/#document-language'] = {"text": "document language", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "current", "url": "https://drafts.csswg.org/selectors-4/#document-language", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-opt'] = {"text": "?", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-all'] = {"text": "&&", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-all", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-display-block'] = {"text": "block", "type": "value", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#valdef-display-block", "export": true, "normative": true, "for_": ["<display-outside>", "display"]};
+window.refsData['#block-level'] = {"text": "block-level", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#block-level", "export": true, "normative": true, "for_": []};
+window.refsData['#block-container'] = {"text": "block container", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#block-container", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-display-flow-root'] = {"text": "flow-root", "type": "value", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#valdef-display-flow-root", "export": true, "normative": true, "for_": ["<display-inside>", "display"]};
+window.refsData['#block-formatting-context'] = {"text": "block formatting context", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#block-formatting-context", "export": true, "normative": true, "for_": []};
+window.refsData['#bfc'] = {"text": "bfc", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#bfc", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-display-inline'] = {"text": "inline", "type": "value", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#valdef-display-inline", "export": true, "normative": true, "for_": ["<display-outside>", "display"]};
+window.refsData['#valdef-display-inline-block'] = {"text": "inline-block", "type": "value", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#valdef-display-inline-block", "export": true, "normative": true, "for_": ["<display-legacy>", "display"]};
+window.refsData['#inline-level'] = {"text": "inline-level", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#inline-level", "export": true, "normative": true, "for_": []};
+window.refsData['#run-in'] = {"text": "run-in box", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#run-in", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-display-flex'] = {"text": "flex", "type": "value", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#valdef-display-flex", "export": true, "normative": true, "for_": ["<display-inside>", "display"]};
+window.refsData['https://drafts.csswg.org/css-flexbox-1/#flex-container'] = {"text": "flex container", "type": "dfn", "spec": "css-flexbox-1", "shortname": "css-flexbox", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-flexbox-1/#flex-container", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-display-inline-flex'] = {"text": "inline-flex", "type": "value", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#valdef-display-inline-flex", "export": true, "normative": true, "for_": ["<display-legacy>", "display"]};
+window.refsData['#valdef-display-grid'] = {"text": "grid", "type": "value", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#valdef-display-grid", "export": true, "normative": true, "for_": ["<display-inside>", "display"]};
+window.refsData['https://drafts.csswg.org/css-grid-2/#grid-container'] = {"text": "grid container", "type": "dfn", "spec": "css-grid-2", "shortname": "css-grid", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-grid-2/#grid-container", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-display-inline-grid'] = {"text": "inline-grid", "type": "value", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#valdef-display-inline-grid", "export": true, "normative": true, "for_": ["<display-legacy>", "display"]};
+window.refsData['#valdef-display-ruby'] = {"text": "ruby", "type": "value", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#valdef-display-ruby", "export": true, "normative": true, "for_": ["<display-inside>", "display"]};
+window.refsData['https://drafts.csswg.org/css-ruby-1/#ruby-container'] = {"text": "ruby container", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-ruby-1/#ruby-container", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-display-table'] = {"text": "table", "type": "value", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#valdef-display-table", "export": true, "normative": true, "for_": ["<display-inside>", "display"]};
+window.refsData['#valdef-display-inline-table'] = {"text": "inline-table", "type": "value", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#valdef-display-inline-table", "export": true, "normative": true, "for_": ["<display-legacy>", "display"]};
+window.refsData['#outer-display-type'] = {"text": "outer display type", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#outer-display-type", "export": true, "normative": true, "for_": []};
+window.refsData['#inline-level-box'] = {"text": "inline-level box", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#inline-level-box", "export": true, "normative": true, "for_": []};
+window.refsData['#inner-display-type'] = {"text": "inner display type", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#inner-display-type", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-display-flow'] = {"text": "flow", "type": "value", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#valdef-display-flow", "export": true, "normative": true, "for_": ["<display-inside>", "display"]};
+window.refsData['#inline-formatting-context'] = {"text": "inline formatting context", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#inline-formatting-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-position-3/#propdef-position'] = {"text": "position", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-position", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css2/#propdef-float'] = {"text": "float", "type": "property", "spec": "css22", "shortname": "css", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css2/#propdef-float", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-flexbox-1/#flex-formatting-context'] = {"text": "flex formatting context", "type": "dfn", "spec": "css-flexbox-1", "shortname": "css-flexbox", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-flexbox-1/#flex-formatting-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-grid-2/#grid-formatting-context'] = {"text": "grid formatting context", "type": "dfn", "spec": "css-grid-2", "shortname": "css-grid", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-grid-2/#grid-formatting-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-grid-2/#valdef-grid-template-rows-subgrid'] = {"text": "subgrid", "type": "value", "spec": "css-grid-2", "shortname": "css-grid", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-grid-2/#valdef-grid-template-rows-subgrid", "export": true, "normative": true, "for_": ["grid-template-rows", "grid-template-columns"]};
+window.refsData['https://drafts.csswg.org/css-ruby-1/#ruby-formatting-context'] = {"text": "ruby formatting context", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-ruby-1/#ruby-formatting-context", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-display-table-cell'] = {"text": "table-cell", "type": "value", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#valdef-display-table-cell", "export": true, "normative": true, "for_": ["<display-internal>", "display"]};
+window.refsData['#valdef-display-table-caption'] = {"text": "table-caption", "type": "value", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#valdef-display-table-caption", "export": true, "normative": true, "for_": ["<display-internal>", "display"]};
+window.refsData['#valdef-display-ruby-base'] = {"text": "ruby-base", "type": "value", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#valdef-display-ruby-base", "export": true, "normative": true, "for_": ["<display-internal>", "display"]};
+window.refsData['#valdef-display-ruby-text'] = {"text": "ruby-text", "type": "value", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#valdef-display-ruby-text", "export": true, "normative": true, "for_": ["<display-internal>", "display"]};
+window.refsData['#valdef-display-table-row'] = {"text": "table-row", "type": "value", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#valdef-display-table-row", "export": true, "normative": true, "for_": ["<display-internal>", "display"]};
+window.refsData['#internal-table-element'] = {"text": "internal table element", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#internal-table-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-before'] = {"text": "::before", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-before", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-after'] = {"text": "::after", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-after", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#css-inheritance'] = {"text": "inheritance", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#css-inheritance", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['https://html.spec.whatwg.org/multipage/interactive-elements.html#the-summary-element'] = {"text": "summary", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/interactive-elements.html#the-summary-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/form-elements.html#the-legend-element'] = {"text": "legend", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/form-elements.html#the-legend-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/form-elements.html#the-fieldset-element'] = {"text": "fieldset", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/form-elements.html#the-fieldset-element", "export": true, "normative": true, "for_": []};
+window.refsData['#inlinify'] = {"text": "inlinify", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#inlinify", "export": true, "normative": true, "for_": []};
+window.refsData['#inline-block'] = {"text": "inline block box", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#inline-block", "export": true, "normative": true, "for_": []};
+window.refsData['#blockify'] = {"text": "blockify", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#blockify", "export": true, "normative": true, "for_": []};
+window.refsData['#layout-internal'] = {"text": "layout-internal", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#layout-internal", "export": true, "normative": true, "for_": []};
+window.refsData['#run-in-sequence'] = {"text": "run-in sequence", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#run-in-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-4/#white-space'] = {"text": "white space", "type": "dfn", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#white-space", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#first-formatted-line'] = {"text": "first formatted line", "type": "dfn", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#first-formatted-line", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-inline-3/#root-inline-box'] = {"text": "root inline box", "type": "dfn", "spec": "css-inline-3", "shortname": "css-inline", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-inline-3/#root-inline-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-align-3/#propdef-align-content'] = {"text": "align-content", "type": "property", "spec": "css-align-3", "shortname": "css-align", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-align-3/#propdef-align-content", "export": true, "normative": true, "for_": []};
+window.refsData['#block-level-box'] = {"text": "block-level box", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#block-level-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element'] = {"text": "img", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#attr-img-src'] = {"text": "src", "type": "element-attr", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#attr-img-src", "export": true, "normative": true, "for_": ["img"]};
+window.refsData['https://drafts.csswg.org/css-images-3/#natural-dimensions'] = {"text": "natural dimension", "type": "dfn", "spec": "css-images-3", "shortname": "css-images", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-images-3/#natural-dimensions", "export": true, "normative": true, "for_": []};
+window.refsData['#containing-block'] = {"text": "containing block", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#containing-block", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#overflow'] = {"text": "overflow", "type": "dfn", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#overflow", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#box-box-edge'] = {"text": "box edge", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#box-box-edge", "export": true, "normative": true, "for_": ["box"]};
+window.refsData['#initial-containing-block'] = {"text": "initial containing block", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#initial-containing-block", "export": true, "normative": true, "for_": []};
+window.refsData['#block'] = {"text": "block", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#block", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-position-3/#absolute-position'] = {"text": "absolutely position", "type": "dfn", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#absolute-position", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/mediaqueries-5/#continuous-media'] = {"text": "continuous media", "type": "dfn", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-5/#continuous-media", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/mediaqueries-5/#paged-media'] = {"text": "paged media", "type": "dfn", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-5/#paged-media", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-flexbox-1/#flex-layout'] = {"text": "flex layout", "type": "dfn", "spec": "css-flexbox-1", "shortname": "css-flexbox", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-flexbox-1/#flex-layout", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-ruby-1/#ruby-base-container-box'] = {"text": "ruby base container", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-ruby-1/#ruby-base-container-box", "export": true, "normative": true, "for_": []};
+window.refsData['#independent-formatting-context'] = {"text": "independent formatting context", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#independent-formatting-context", "export": true, "normative": true, "for_": []};
+window.refsData['#out-of-flow'] = {"text": "out-of-flow", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#out-of-flow", "export": true, "normative": true, "for_": []};
+window.refsData['#establish-an-independent-formatting-context'] = {"text": "establish an independent formatting context", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#establish-an-independent-formatting-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-contain-2/#propdef-contain'] = {"text": "contain", "type": "property", "spec": "css-contain-2", "shortname": "css-contain", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-contain-2/#propdef-contain", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#scroll-container'] = {"text": "scroll container", "type": "dfn", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#scroll-container", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-grid-2/#subgrid'] = {"text": "subgrid", "type": "dfn", "spec": "css-grid-2", "shortname": "css-grid", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-grid-2/#subgrid", "export": true, "normative": true, "for_": []};
+window.refsData['#block-formatting-context-root'] = {"text": "block formatting context root", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#block-formatting-context-root", "export": true, "normative": true, "for_": []};
+window.refsData['#in-flow'] = {"text": "in-flow", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#in-flow", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/input.html#the-input-element'] = {"text": "input", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/input.html#the-input-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-br-element'] = {"text": "br", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-br-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-wbr-element'] = {"text": "wbr", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-wbr-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/form-elements.html#the-meter-element'] = {"text": "meter", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/form-elements.html#the-meter-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/form-elements.html#the-progress-element'] = {"text": "progress", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/form-elements.html#the-progress-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/canvas.html#canvas'] = {"text": "canvas", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/canvas.html#canvas", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-embed-element'] = {"text": "embed", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-embed-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-object-element'] = {"text": "object", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-object-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#audio'] = {"text": "audio", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#audio", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element'] = {"text": "iframe", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#video'] = {"text": "video", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#video", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/obsolete.html#frame'] = {"text": "frame", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/obsolete.html#frame", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/obsolete.html#frameset'] = {"text": "frameset", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/obsolete.html#frameset", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/form-elements.html#the-textarea-element'] = {"text": "textarea", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/form-elements.html#the-textarea-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/form-elements.html#the-select-element'] = {"text": "select", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/form-elements.html#the-select-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/rendering.html#rendered-legend'] = {"text": "rendered legend", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/rendering.html#rendered-legend", "export": false, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/form-elements.html#the-button-element'] = {"text": "button", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/form-elements.html#the-button-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/interactive-elements.html#the-details-element'] = {"text": "details", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/interactive-elements.html#the-details-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/struct.html#elementdef-svg'] = {"text": "svg", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-svg", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/struct.html#container-element'] = {"text": "container element", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/struct.html#container-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/render.html#TermRenderableElement'] = {"text": "renderable element", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/render.html#TermRenderableElement", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/text.html#TermTextContentChildElement'] = {"text": "text content child element", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/text.html#TermTextContentChildElement", "export": false, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/struct.html#elementdef-use'] = {"text": "use", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-use", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/text.html#elementdef-text'] = {"text": "text", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/text.html#elementdef-text", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/text.html#elementdef-tspan'] = {"text": "tspan", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/text.html#elementdef-tspan", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/text.html#elementdef-textPath'] = {"text": "textpath", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/text.html#elementdef-textPath", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/render.html#TermNonRenderedElement'] = {"text": "non-rendered element", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/render.html#TermNonRenderedElement", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/pservers.html#elementdef-pattern'] = {"text": "pattern", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/pservers.html#elementdef-pattern", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/struct.html#elementdef-symbol'] = {"text": "symbol", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-symbol", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/render.html#TermRenderedElement'] = {"text": "rendered element", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/render.html#TermRenderedElement", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/styling.html#TermPresentationAttribute'] = {"text": "presentation attributes", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/styling.html#TermPresentationAttribute", "export": true, "normative": true, "for_": []};
+window.refsData['#css-parent-box'] = {"text": "parent box", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#css-parent-box", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['https://html.spec.whatwg.org/multipage/sections.html#the-body-element'] = {"text": "body", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/sections.html#the-body-element", "export": true, "normative": true, "for_": []};
+window.refsData['#document-order'] = {"text": "document order", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#document-order", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-first-line'] = {"text": "::first-line", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-first-line", "export": true, "normative": true, "for_": []};window.refsData['#propdef-display'] = {"text": "display", "type": "property", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "local", "url": "#propdef-display", "export": true, "normative": true, "for_": []};
 </script>

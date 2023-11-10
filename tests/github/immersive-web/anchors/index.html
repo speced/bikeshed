@@ -523,6 +523,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -1199,8 +1236,6 @@ var.selected6 { background-color: #FFBCF2; box-shadow: 0 0 0 2px #FFBCF2; }
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -1448,7 +1483,6 @@ var.selected6 { background-color: #FFBCF2; box-shadow: 0 0 0 2px #FFBCF2; }
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -1848,6 +1882,272 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://www.w3.org/TR/webxr/#feature-descriptor'] = {"text": "feature descriptor", "type": "dfn", "spec": "webxr device api - level 1", "shortname": "webxr device api - level 1", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/webxr/#feature-descriptor", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/webxr/#capable-of-supporting'] = {"text": "capable of supporting", "type": "dfn", "spec": "webxr device api - level 1", "shortname": "webxr device api - level 1", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/webxr/#capable-of-supporting", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/webxr/#inline-xr-device'] = {"text": "inline xr device", "type": "dfn", "spec": "webxr device api - level 1", "shortname": "webxr device api - level 1", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/webxr/#inline-xr-device", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/webxr/#xrsession-mode'] = {"text": "mode", "type": "dfn", "spec": "webxr device api - level 1", "shortname": "webxr device api - level 1", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/webxr/#xrsession-mode", "export": true, "normative": true, "for_": ["XRSession"]};
+window.refsData['https://immersive-web.github.io/webxr-ar-module/#dom-xrsessionmode-immersive-ar'] = {"text": "\"immersive-ar\"", "type": "enum-value", "spec": "webxr-ar-module-1", "shortname": "webxr-ar-module", "level": "1", "status": "current", "url": "https://immersive-web.github.io/webxr-ar-module/#dom-xrsessionmode-immersive-ar", "export": true, "normative": true, "for_": ["XRSessionMode"]};
+window.refsData['https://webidl.spec.whatwg.org/#SecureContext'] = {"text": "SecureContext", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SecureContext", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://immersive-web.github.io/webxr/#xrspace'] = {"text": "XRSpace", "type": "interface", "spec": "webxr", "shortname": "webxr", "level": "1", "status": "current", "url": "https://immersive-web.github.io/webxr/#xrspace", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
+window.refsData['#xranchor'] = {"text": "XRAnchor", "type": "interface", "spec": "webxr-anchors-1", "shortname": "webxr-anchors", "level": "1", "status": "local", "url": "#xranchor", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-xranchor-anchorspace'] = {"text": "anchorSpace", "type": "attribute", "spec": "webxr-anchors-1", "shortname": "webxr-anchors", "level": "1", "status": "local", "url": "#dom-xranchor-anchorspace", "export": true, "normative": true, "for_": ["XRAnchor"]};
+window.refsData['#xranchor-deleted'] = {"text": "deleted", "type": "dfn", "spec": "webxr-anchors-1", "shortname": "webxr-anchors", "level": "1", "status": "local", "url": "#xranchor-deleted", "export": true, "normative": true, "for_": ["XRAnchor"]};
+window.refsData['https://webidl.spec.whatwg.org/#invalidstateerror'] = {"text": "InvalidStateError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invalidstateerror", "export": true, "normative": true, "for_": []};
+window.refsData['#xranchor-native-origin'] = {"text": "native origin", "type": "dfn", "spec": "webxr-anchors-1", "shortname": "webxr-anchors", "level": "1", "status": "local", "url": "#xranchor-native-origin", "export": true, "normative": true, "for_": ["XRAnchor"]};
+window.refsData['#xranchor-session'] = {"text": "session", "type": "dfn", "spec": "webxr-anchors-1", "shortname": "webxr-anchors", "level": "1", "status": "local", "url": "#xranchor-session", "export": true, "normative": true, "for_": ["XRAnchor"]};
+window.refsData['https://www.w3.org/TR/webxr/#xrspace-session'] = {"text": "session", "type": "dfn", "spec": "webxr device api - level 1", "shortname": "webxr device api - level 1", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/webxr/#xrspace-session", "export": true, "normative": true, "for_": ["XRSpace"]};
+window.refsData['https://www.w3.org/TR/webxr/#xrspace-native-origin'] = {"text": "native origin", "type": "dfn", "spec": "webxr device api - level 1", "shortname": "webxr device api - level 1", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/webxr/#xrspace-native-origin", "export": true, "normative": true, "for_": ["XRSpace"]};
+window.refsData['https://immersive-web.github.io/webxr/#xrsession'] = {"text": "XRSession", "type": "interface", "spec": "webxr", "shortname": "webxr", "level": "1", "status": "current", "url": "https://immersive-web.github.io/webxr/#xrsession", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-promise'] = {"text": "Promise", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-promise", "export": true, "normative": true, "for_": []};
+window.refsData['https://immersive-web.github.io/webxr/#xrframe'] = {"text": "XRFrame", "type": "interface", "spec": "webxr", "shortname": "webxr", "level": "1", "status": "current", "url": "https://immersive-web.github.io/webxr/#xrframe", "export": true, "normative": true, "for_": []};
+window.refsData['https://immersive-web.github.io/webxr/#xrrigidtransform'] = {"text": "XRRigidTransform", "type": "interface", "spec": "webxr", "shortname": "webxr", "level": "1", "status": "current", "url": "https://immersive-web.github.io/webxr/#xrrigidtransform", "export": true, "normative": true, "for_": []};
+window.refsData['https://immersive-web.github.io/hit-test/#xrhittestresult'] = {"text": "XRHitTestResult", "type": "interface", "spec": "webxr hit test module", "shortname": "webxr hit test module", "level": "", "status": "anchor-block", "url": "https://immersive-web.github.io/hit-test/#xrhittestresult", "export": true, "normative": true, "for_": []};
+window.refsData['#xrhittestresult-native-entity'] = {"text": "native entity", "type": "dfn", "spec": "webxr-anchors-1", "shortname": "webxr-anchors", "level": "1", "status": "local", "url": "#xrhittestresult-native-entity", "export": true, "normative": true, "for_": ["XRHitTestResult"]};
+window.refsData['#create-an-anchor-from-frame'] = {"text": "create an anchor from frame", "type": "dfn", "spec": "webxr-anchors-1", "shortname": "webxr-anchors", "level": "1", "status": "local", "url": "#create-an-anchor-from-frame", "export": true, "normative": true, "for_": []};
+window.refsData['#create-an-anchor-from-hit-test-result'] = {"text": "create an anchor from hit test result", "type": "dfn", "spec": "webxr-anchors-1", "shortname": "webxr-anchors", "level": "1", "status": "local", "url": "#create-an-anchor-from-hit-test-result", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/webxr/#xr-device'] = {"text": "xr device", "type": "dfn", "spec": "webxr device api - level 1", "shortname": "webxr device api - level 1", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/webxr/#xr-device", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-xrframe-createanchor'] = {"text": "createAnchor(pose, space)", "type": "method", "spec": "webxr-anchors-1", "shortname": "webxr-anchors", "level": "1", "status": "local", "url": "#dom-xrframe-createanchor", "export": true, "normative": true, "for_": ["XRFrame"]};
+window.refsData['https://webidl.spec.whatwg.org/#a-new-promise'] = {"text": "a new promise", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#a-new-promise", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/webxr/#xrframe-active'] = {"text": "active", "type": "dfn", "spec": "webxr device api - level 1", "shortname": "webxr device api - level 1", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/webxr/#xrframe-active", "export": true, "normative": true, "for_": ["XRFrame"]};
+window.refsData['https://webidl.spec.whatwg.org/#reject'] = {"text": "reject", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#reject", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/webxr/#dom-xrframe-session'] = {"text": "session", "type": "dfn", "spec": "webxr device api - level 1", "shortname": "webxr device api - level 1", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/webxr/#dom-xrframe-session", "export": true, "normative": true, "for_": ["XRFrame"]};
+window.refsData['#update-anchors'] = {"text": "update anchors", "type": "dfn", "spec": "webxr-anchors-1", "shortname": "webxr-anchors", "level": "1", "status": "local", "url": "#update-anchors", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/webxr/#xrsession-list-of-frame-updates'] = {"text": "list of frame updates", "type": "dfn", "spec": "webxr device api - level 1", "shortname": "webxr device api - level 1", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/webxr/#xrsession-list-of-frame-updates", "export": true, "normative": true, "for_": ["XRSession"]};
+window.refsData['https://www.w3.org/TR/webxr/#xrsession-xr-device'] = {"text": "xr device", "type": "dfn", "spec": "webxr device api - level 1", "shortname": "webxr device api - level 1", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/webxr/#xrsession-xr-device", "export": true, "normative": true, "for_": ["XRSession"]};
+window.refsData['https://www.w3.org/TR/webxr/#xrspace-effective-origin'] = {"text": "effective origin", "type": "dfn", "spec": "webxr device api - level 1", "shortname": "webxr device api - level 1", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/webxr/#xrspace-effective-origin", "export": true, "normative": true, "for_": ["XRSpace"]};
+window.refsData['https://www.w3.org/TR/webxr/#xrframe-time'] = {"text": "time", "type": "dfn", "spec": "webxr device api - level 1", "shortname": "webxr device api - level 1", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/webxr/#xrframe-time", "export": true, "normative": true, "for_": ["XRFrame"]};
+window.refsData['#create-new-anchor-object'] = {"text": "create new anchor object", "type": "dfn", "spec": "webxr-anchors-1", "shortname": "webxr-anchors", "level": "1", "status": "local", "url": "#create-new-anchor-object", "export": true, "normative": true, "for_": []};
+window.refsData['#xrsession-set-of-tracked-anchors'] = {"text": "set of tracked anchors", "type": "dfn", "spec": "webxr-anchors-1", "shortname": "webxr-anchors", "level": "1", "status": "local", "url": "#xrsession-set-of-tracked-anchors", "export": true, "normative": true, "for_": ["XRSession"]};
+window.refsData['#xrsession-map-of-new-anchors'] = {"text": "map of new anchors", "type": "dfn", "spec": "webxr-anchors-1", "shortname": "webxr-anchors", "level": "1", "status": "local", "url": "#xrsession-map-of-new-anchors", "export": true, "normative": true, "for_": ["XRSession"]};
+window.refsData['#dom-xrhittestresult-createanchor'] = {"text": "createAnchor()", "type": "method", "spec": "webxr-anchors-1", "shortname": "webxr-anchors", "level": "1", "status": "local", "url": "#dom-xrhittestresult-createanchor", "export": true, "normative": true, "for_": ["XRHitTestResult"]};
+window.refsData['https://immersive-web.github.io/hit-test/#xrhittestresult-frame'] = {"text": "frame", "type": "dfn", "spec": "webxr hit test module", "shortname": "webxr hit test module", "level": "", "status": "anchor-block", "url": "https://immersive-web.github.io/hit-test/#xrhittestresult-frame", "export": true, "normative": true, "for_": ["XRHitTestResult"]};
+window.refsData['https://immersive-web.github.io/hit-test/#xrhittestresult-native-origin'] = {"text": "native origin", "type": "dfn", "spec": "webxr hit test module", "shortname": "webxr hit test module", "level": "", "status": "anchor-block", "url": "https://immersive-web.github.io/hit-test/#xrhittestresult-native-origin", "export": true, "normative": true, "for_": ["XRHitTestResult"]};
+window.refsData['#attached'] = {"text": "attached", "type": "dfn", "spec": "webxr-anchors-1", "shortname": "webxr-anchors", "level": "1", "status": "local", "url": "#attached", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#SameObject'] = {"text": "SameObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SameObject", "export": true, "normative": true, "for_": []};
+window.refsData['#xranchorset'] = {"text": "XRAnchorSet", "type": "interface", "spec": "webxr-anchors-1", "shortname": "webxr-anchors", "level": "1", "status": "local", "url": "#xranchorset", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-xrframe-trackedanchors'] = {"text": "trackedAnchors", "type": "attribute", "spec": "webxr-anchors-1", "shortname": "webxr-anchors", "level": "1", "status": "local", "url": "#dom-xrframe-trackedanchors", "export": true, "normative": true, "for_": ["XRFrame"]};
+window.refsData['#tracked'] = {"text": "tracked", "type": "dfn", "spec": "webxr-anchors-1", "shortname": "webxr-anchors", "level": "1", "status": "local", "url": "#tracked", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#resolve'] = {"text": "resolve", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#resolve", "export": true, "normative": true, "for_": []};
+window.refsData['#delete-an-anchor'] = {"text": "delete an anchor", "type": "dfn", "spec": "webxr-anchors-1", "shortname": "webxr-anchors", "level": "1", "status": "local", "url": "#delete-an-anchor", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-xranchor-delete'] = {"text": "delete()", "type": "method", "spec": "webxr-anchors-1", "shortname": "webxr-anchors", "level": "1", "status": "local", "url": "#dom-xranchor-delete", "export": true, "normative": true, "for_": ["XRAnchor"]};
+window.refsData['#anchors'] = {"text": "anchors", "type": "dfn", "spec": "webxr-anchors-1", "shortname": "webxr-anchors", "level": "1", "status": "local", "url": "#anchors", "export": true, "normative": true, "for_": []};
+window.refsData['#emulated-native-anchors'] = {"text": "emulated native anchors", "type": "dfn", "spec": "webxr-anchors-1", "shortname": "webxr-anchors", "level": "1", "status": "local", "url": "#emulated-native-anchors", "export": true, "normative": true, "for_": []};
+window.refsData['https://immersive-web.github.io/webxr/#dom-xrsessionmode-immersive-vr'] = {"text": "\"immersive-vr\"", "type": "enum-value", "spec": "webxr", "shortname": "webxr", "level": "1", "status": "current", "url": "https://immersive-web.github.io/webxr/#dom-xrsessionmode-immersive-vr", "export": true, "normative": true, "for_": ["XRSessionMode"]};
+window.refsData['https://immersive-web.github.io/hit-test/#hit-test'] = {"text": "hit-test", "type": "dfn", "spec": "webxr hit test module", "shortname": "webxr hit test module", "level": "", "status": "anchor-block", "url": "https://immersive-web.github.io/hit-test/#hit-test", "export": true, "normative": true, "for_": []};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

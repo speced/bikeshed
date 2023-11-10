@@ -1952,6 +1952,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -2674,8 +2711,6 @@ set <var>sheet</var>’s <a data-link-type="dfn" href="https://drafts.csswg.org/
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -2923,7 +2958,6 @@ set <var>sheet</var>’s <a data-link-type="dfn" href="https://drafts.csswg.org/
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -3325,4 +3359,272 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://drafts.csswg.org/cssom-1/#cssstylesheet'] = {"text": "CSSStyleSheet", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#cssstylesheet", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#documentorshadowroot'] = {"text": "DocumentOrShadowRoot", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#documentorshadowroot", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cssstylesheet-cssstylesheet'] = {"text": "CSSStyleSheet(options)", "type": "constructor", "spec": "construct-stylesheets-1", "shortname": "construct-stylesheets", "level": "1", "status": "local", "url": "#dom-cssstylesheet-cssstylesheet", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['#dictdef-cssstylesheetinit'] = {"text": "CSSStyleSheetInit", "type": "dictionary", "spec": "construct-stylesheets-1", "shortname": "construct-stylesheets", "level": "1", "status": "local", "url": "#dictdef-cssstylesheetinit", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-promise'] = {"text": "Promise", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-promise", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cssstylesheet-replace'] = {"text": "replace(text)", "type": "method", "spec": "construct-stylesheets-1", "shortname": "construct-stylesheets", "level": "1", "status": "local", "url": "#dom-cssstylesheet-replace", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-USVString'] = {"text": "USVString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-USVString", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cssstylesheet-replacesync'] = {"text": "replaceSync(text)", "type": "method", "spec": "construct-stylesheets-1", "shortname": "construct-stylesheets", "level": "1", "status": "local", "url": "#dom-cssstylesheet-replacesync", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['https://drafts.csswg.org/cssom-1/#medialist'] = {"text": "MediaList", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#medialist", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-location'] = {"text": "location", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-location", "export": false, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['https://html.spec.whatwg.org/multipage/semantics.html#link-options-base-url'] = {"text": "base url", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/semantics.html#link-options-base-url", "export": false, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#concept-document-window'] = {"text": "associated document", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#concept-document-window", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#current-global-object'] = {"text": "current global object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#current-global-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-parent-css-style-sheet'] = {"text": "parent css style sheet", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-parent-css-style-sheet", "export": false, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-owner-node'] = {"text": "owner node", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-owner-node", "export": false, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-owner-css-rule'] = {"text": "owner css rule", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-owner-css-rule", "export": false, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-title'] = {"text": "title", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-title", "export": false, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['#dom-cssstylesheetinit-title'] = {"text": "title", "type": "dict-member", "spec": "construct-stylesheets-1", "shortname": "construct-stylesheets", "level": "1", "status": "local", "url": "#dom-cssstylesheetinit-title", "export": true, "normative": true, "for_": ["CSSStyleSheetInit"]};
+window.refsData['https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-alternate-flag'] = {"text": "alternate flag", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-alternate-flag", "export": false, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['#dom-cssstylesheetinit-alternate'] = {"text": "alternate", "type": "dict-member", "spec": "construct-stylesheets-1", "shortname": "construct-stylesheets", "level": "1", "status": "local", "url": "#dom-cssstylesheetinit-alternate", "export": true, "normative": true, "for_": ["CSSStyleSheetInit"]};
+window.refsData['https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-origin-clean-flag'] = {"text": "origin-clean flag", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-origin-clean-flag", "export": false, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['#cssstylesheet-constructed-flag'] = {"text": "constructed flag", "type": "dfn", "spec": "construct-stylesheets-1", "shortname": "construct-stylesheets", "level": "1", "status": "local", "url": "#cssstylesheet-constructed-flag", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['#cssstylesheet-constructor-document'] = {"text": "constructor document", "type": "dfn", "spec": "construct-stylesheets-1", "shortname": "construct-stylesheets", "level": "1", "status": "local", "url": "#cssstylesheet-constructor-document", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['#dom-cssstylesheetinit-media'] = {"text": "media", "type": "dict-member", "spec": "construct-stylesheets-1", "shortname": "construct-stylesheets", "level": "1", "status": "local", "url": "#dom-cssstylesheetinit-media", "export": true, "normative": true, "for_": ["CSSStyleSheetInit"]};
+window.refsData['https://drafts.csswg.org/cssom-1/#create-a-medialist-object'] = {"text": "create a medialist object", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#create-a-medialist-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-media'] = {"text": "media", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-media", "export": false, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['https://drafts.csswg.org/cssom-1/#serialize-a-media-query-list'] = {"text": "serialize a media query list", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#serialize-a-media-query-list", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cssstylesheetinit-disabled'] = {"text": "disabled", "type": "dict-member", "spec": "construct-stylesheets-1", "shortname": "construct-stylesheets", "level": "1", "status": "local", "url": "#dom-cssstylesheetinit-disabled", "export": true, "normative": true, "for_": ["CSSStyleSheetInit"]};
+window.refsData['https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-disabled-flag'] = {"text": "disabled flag", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-disabled-flag", "export": false, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cssstylesheet-insertrule'] = {"text": "insertRule(rule, index)", "type": "method", "spec": "construct-stylesheets-1", "shortname": "construct-stylesheets", "level": "1", "status": "local", "url": "#dom-cssstylesheet-insertrule", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['#dom-cssstylesheet-deleterule'] = {"text": "deleteRule(index)", "type": "method", "spec": "construct-stylesheets-1", "shortname": "construct-stylesheets", "level": "1", "status": "local", "url": "#dom-cssstylesheet-deleterule", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['#cssstylesheet-disallow-modification-flag'] = {"text": "disallow modification flag", "type": "dfn", "spec": "construct-stylesheets-1", "shortname": "construct-stylesheets", "level": "1", "status": "local", "url": "#cssstylesheet-disallow-modification-flag", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['https://webidl.spec.whatwg.org/#notallowederror'] = {"text": "NotAllowedError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#notallowederror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMException'] = {"text": "DOMException", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMException", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#parse-a-rule'] = {"text": "parse a rule", "type": "dfn", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#parse-a-rule", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#at-ruledef-import'] = {"text": "@import", "type": "at-rule", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#at-ruledef-import", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel'] = {"text": "in parallel", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#parse-a-list-of-rules'] = {"text": "parse a list of rules", "type": "dfn", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#parse-a-list-of-rules", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task'] = {"text": "queue a task", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#networking-task-source'] = {"text": "networking task source", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#networking-task-source", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#networkerror'] = {"text": "NetworkError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#networkerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-1/#css-rule'] = {"text": "css rule", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#css-rule", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-fetch-group'] = {"text": "fetch group", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-fetch-group", "export": true, "normative": true, "for_": ["fetch"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object'] = {"text": "relevant settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-frozen-array'] = {"text": "FrozenArray", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-frozen-array", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-documentorshadowroot-adoptedstylesheets'] = {"text": "adoptedStyleSheets", "type": "attribute", "spec": "construct-stylesheets-1", "shortname": "construct-stylesheets", "level": "1", "status": "local", "url": "#dom-documentorshadowroot-adoptedstylesheets", "export": true, "normative": true, "for_": ["DocumentOrShadowRoot"]};
+window.refsData['#adopted-stylesheets'] = {"text": "adopted stylesheets", "type": "dfn", "spec": "construct-stylesheets-1", "shortname": "construct-stylesheets", "level": "1", "status": "local", "url": "#adopted-stylesheets", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-node-document'] = {"text": "node document", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-node-document", "export": true, "normative": true, "for_": ["Node"]};
+window.refsData['https://drafts.csswg.org/cssom-1/#documentorshadowroot-document-or-shadow-root-css-style-sheets'] = {"text": "document or shadow root css style sheets", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#documentorshadowroot-document-or-shadow-root-css-style-sheets", "export": true, "normative": true, "for_": ["DocumentOrShadowRoot"]};
+window.refsData['https://drafts.csswg.org/cssom-1/#dom-documentorshadowroot-stylesheets'] = {"text": "styleSheets", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#dom-documentorshadowroot-stylesheets", "export": true, "normative": true, "for_": ["DocumentOrShadowRoot"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-node-adopt-ext'] = {"text": "adopting steps", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-node-adopt-ext", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#shadowroot'] = {"text": "ShadowRoot", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#shadowroot", "export": true, "normative": true, "for_": []};
 </script>

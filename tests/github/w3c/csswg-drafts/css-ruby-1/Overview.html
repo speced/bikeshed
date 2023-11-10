@@ -702,6 +702,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -3277,8 +3314,6 @@ rt::after  <c- p>{</c-> <c- k>content</c-><c- p>:</c-> <c- s>"）"</c-><c- p>;</
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -3526,7 +3561,6 @@ rt::after  <c- p>{</c-> <c- k>content</c-><c- p>:</c-> <c- s>"）"</c-><c- p>;</
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -4032,4 +4066,335 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#merged-annotation'] = {"text": "merged annotation", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#merged-annotation", "export": true, "normative": true, "for_": []};
+window.refsData['#pairing'] = {"text": "pairing", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#pairing", "export": true, "normative": true, "for_": []};
+window.refsData['#ruby'] = {"text": "ruby", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#ruby", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-first-line'] = {"text": "::first-line", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-first-line", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-first-letter'] = {"text": "::first-letter", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-first-letter", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-ruby-position'] = {"text": "ruby-position", "type": "property", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#propdef-ruby-position", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#css-wide-keywords'] = {"text": "css-wide keywords", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "export": true, "normative": true, "for_": []};
+window.refsData['#ruby-base-box'] = {"text": "ruby base", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#ruby-base-box", "export": true, "normative": true, "for_": []};
+window.refsData['#ruby-annotation-box'] = {"text": "ruby annotation", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#ruby-annotation-box", "export": true, "normative": true, "for_": []};
+window.refsData['#base-level'] = {"text": "base text level", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#base-level", "export": true, "normative": true, "for_": []};
+window.refsData['#annotation-level'] = {"text": "annotation level", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#annotation-level", "export": true, "normative": true, "for_": []};
+window.refsData['#ruby-columns'] = {"text": "column", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#ruby-columns", "export": true, "normative": true, "for_": []};
+window.refsData['#ruby-segments'] = {"text": "ruby segments", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#ruby-segments", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#propdef-display'] = {"text": "display", "type": "property", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#propdef-display", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
+window.refsData['#ruby-container'] = {"text": "ruby container", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#ruby-container", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#inline-level'] = {"text": "inline-level", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#inline-level", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#inline-box'] = {"text": "inline box", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#inline-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#containing-block'] = {"text": "containing block", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#containing-block", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#block-container'] = {"text": "block container", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#block-container", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#inline-formatting-context'] = {"text": "inline formatting context", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#inline-formatting-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#formatting-context'] = {"text": "formatting context", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#formatting-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#independent-formatting-context'] = {"text": "independent formatting context", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#independent-formatting-context", "export": true, "normative": true, "for_": []};
+window.refsData['#ruby-base-container-box'] = {"text": "ruby base container", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#ruby-base-container-box", "export": true, "normative": true, "for_": []};
+window.refsData['#ruby-annotation-container-box'] = {"text": "ruby annotation container", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#ruby-annotation-container-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#internal-table-element'] = {"text": "internal table element", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#internal-table-element", "export": true, "normative": true, "for_": []};
+window.refsData['#ruby-formatting-context'] = {"text": "ruby formatting context", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#ruby-formatting-context", "export": true, "normative": true, "for_": []};
+window.refsData['#internal-ruby-boxes'] = {"text": "internal ruby boxes", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#internal-ruby-boxes", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#inner-display-type'] = {"text": "inner display type", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#inner-display-type", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-display-ruby'] = {"text": "ruby", "type": "value", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#valdef-display-ruby", "export": true, "normative": true, "for_": ["display"]};
+window.refsData['https://drafts.csswg.org/css-display-4/#outer-display-type'] = {"text": "outer display type", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#outer-display-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#valdef-display-inline'] = {"text": "inline", "type": "value", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#valdef-display-inline", "export": true, "normative": true, "for_": ["display", "<display-outside>"]};
+window.refsData['https://drafts.csswg.org/css-display-4/#valdef-display-block'] = {"text": "block", "type": "value", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#valdef-display-block", "export": true, "normative": true, "for_": ["display", "<display-outside>"]};
+window.refsData['https://drafts.csswg.org/css-display-4/#inlinify'] = {"text": "inlinify", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#inlinify", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#valdef-display-inline-block'] = {"text": "inline-block", "type": "value", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#valdef-display-inline-block", "export": true, "normative": true, "for_": ["display", "<display-legacy>"]};
+window.refsData['https://drafts.csswg.org/css-text-4/#white-space'] = {"text": "white space", "type": "dfn", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#white-space", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-tables-3/#table-wrapper-box'] = {"text": "table wrapper box", "type": "dfn", "spec": "css-tables-3", "shortname": "css-tables", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-tables-3/#table-wrapper-box", "export": true, "normative": true, "for_": []};
+window.refsData['#intra-ruby-white-space'] = {"text": "intra-ruby white space", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#intra-ruby-white-space", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#in-flow'] = {"text": "in-flow", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#in-flow", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-4/#propdef-white-space'] = {"text": "white-space", "type": "property", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#propdef-white-space", "export": true, "normative": true, "for_": []};
+window.refsData['#inter-base-white-space'] = {"text": "inter-base white space", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#inter-base-white-space", "export": true, "normative": true, "for_": []};
+window.refsData['#inter-segment-white-space'] = {"text": "inter-segment white space", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#inter-segment-white-space", "export": true, "normative": true, "for_": []};
+window.refsData['#inter-annotation-white-space'] = {"text": "inter-annotation white space", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#inter-annotation-white-space", "export": true, "normative": true, "for_": []};
+window.refsData['#intra-level-white-space'] = {"text": "intra-level white space", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#intra-level-white-space", "export": true, "normative": true, "for_": []};
+window.refsData['#span'] = {"text": "span", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#span", "export": true, "normative": true, "for_": []};
+window.refsData['#interlinear-annotations'] = {"text": "interlinear", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#interlinear-annotations", "export": true, "normative": true, "for_": []};
+window.refsData['#spanning-annotation'] = {"text": "spanning annotation", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#spanning-annotation", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#propdef-visibility'] = {"text": "visibility", "type": "property", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#propdef-visibility", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#valdef-visibility-collapse'] = {"text": "collapse", "type": "value", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#valdef-visibility-collapse", "export": true, "normative": true, "for_": ["visibility"]};
+window.refsData['#hidden-annotation'] = {"text": "hidden", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#hidden-annotation", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#computed-value'] = {"text": "computed value", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#computed-value", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-ruby-merge'] = {"text": "ruby-merge", "type": "property", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#propdef-ruby-merge", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-ruby-merge-merge'] = {"text": "merge", "type": "value", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#valdef-ruby-merge-merge", "export": true, "normative": true, "for_": ["ruby-merge"]};
+window.refsData['#valdef-ruby-merge-auto'] = {"text": "auto", "type": "value", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#valdef-ruby-merge-auto", "export": true, "normative": true, "for_": ["ruby-merge"]};
+window.refsData['#valdef-ruby-merge-separate'] = {"text": "separate", "type": "value", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#valdef-ruby-merge-separate", "export": true, "normative": true, "for_": ["ruby-merge"]};
+window.refsData['#auto-hidden'] = {"text": "auto-hide", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#auto-hidden", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-4/#propdef-text-transform'] = {"text": "text-transform", "type": "property", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#propdef-text-transform", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-4/#collapsible-white-space'] = {"text": "collapsible white space", "type": "dfn", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#collapsible-white-space", "export": true, "normative": true, "for_": []};
+window.refsData['#ruby-position-inter-character-annotation'] = {"text": "inter-character annotation", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#ruby-position-inter-character-annotation", "export": true, "normative": true, "for_": ["ruby-position"]};
+window.refsData['https://drafts.csswg.org/css-display-4/#atomic-inline'] = {"text": "atomic inline", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#atomic-inline", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-4/#segment-break'] = {"text": "segment break", "type": "dfn", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#segment-break", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-inline-3/#line-box'] = {"text": "line box", "type": "dfn", "spec": "css-inline-3", "shortname": "css-inline", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-inline-3/#line-box", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-ruby-align'] = {"text": "ruby-align", "type": "property", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#propdef-ruby-align", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-inline-3/#propdef-vertical-align'] = {"text": "vertical-align", "type": "property", "spec": "css-inline-3", "shortname": "css-inline", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-inline-3/#propdef-vertical-align", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#inline-block'] = {"text": "inline block", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#inline-block", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-ruby-position-inter-character'] = {"text": "inter-character", "type": "value", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#valdef-ruby-position-inter-character", "export": true, "normative": true, "for_": ["ruby-position"]};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#valdef-writing-mode-vertical-rl'] = {"text": "vertical-rl", "type": "value", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#valdef-writing-mode-vertical-rl", "export": true, "normative": true, "for_": ["writing-mode"]};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#propdef-writing-mode'] = {"text": "writing-mode", "type": "property", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#propdef-writing-mode", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#horizontal-writing-mode'] = {"text": "horizontal writing mode", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#horizontal-writing-mode", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#margin-box'] = {"text": "margin box", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#margin-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#automatic-size'] = {"text": "automatic size", "type": "dfn", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#automatic-size", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#content-area'] = {"text": "content area", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#content-area", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#content-box'] = {"text": "content box", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#content-box", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-ruby-align-start'] = {"text": "start", "type": "value", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#valdef-ruby-align-start", "export": true, "normative": true, "for_": ["ruby-align"]};
+window.refsData['https://drafts.csswg.org/css-inline-3/#line-relative-shift-values'] = {"text": "line-relative shift values", "type": "dfn", "spec": "css-inline-3", "shortname": "css-inline", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-inline-3/#line-relative-shift-values", "export": false, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-inline-3/#valdef-baseline-shift-top'] = {"text": "top", "type": "value", "spec": "css-inline-3", "shortname": "css-inline", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-inline-3/#valdef-baseline-shift-top", "export": true, "normative": true, "for_": ["baseline-shift", "vertical-align"]};
+window.refsData['https://drafts.csswg.org/css-inline-3/#valdef-baseline-shift-bottom'] = {"text": "bottom", "type": "value", "spec": "css-inline-3", "shortname": "css-inline", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-inline-3/#valdef-baseline-shift-bottom", "export": true, "normative": true, "for_": ["baseline-shift", "vertical-align"]};
+window.refsData['https://drafts.csswg.org/css2/#propdef-line-height'] = {"text": "line-height", "type": "property", "spec": "css22", "shortname": "css", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css2/#propdef-line-height", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#margin'] = {"text": "margin", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#margin", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#padding'] = {"text": "padding", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#padding", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#border'] = {"text": "border", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#border", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-4/#propdef-word-break'] = {"text": "word-break", "type": "property", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#propdef-word-break", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-4/#valdef-word-break-keep-all'] = {"text": "keep-all", "type": "value", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#valdef-word-break-keep-all", "export": true, "normative": true, "for_": ["word-break"]};
+window.refsData['https://drafts.csswg.org/css-text-4/#soft-wrap-opportunity'] = {"text": "soft wrap opportunity", "type": "dfn", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#soft-wrap-opportunity", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#valdef-unicode-bidi-normal'] = {"text": "normal", "type": "value", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#valdef-unicode-bidi-normal", "export": true, "normative": true, "for_": ["unicode-bidi"]};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#valdef-unicode-bidi-embed'] = {"text": "embed", "type": "value", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#valdef-unicode-bidi-embed", "export": true, "normative": true, "for_": ["unicode-bidi"]};
+window.refsData['https://drafts.csswg.org/css-writing-modes-3/#propdef-unicode-bidi'] = {"text": "unicode-bidi", "type": "property", "spec": "css-writing-modes-3", "shortname": "css-writing-modes", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-3/#propdef-unicode-bidi", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#valdef-unicode-bidi-isolate'] = {"text": "isolate", "type": "value", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#valdef-unicode-bidi-isolate", "export": true, "normative": true, "for_": ["unicode-bidi"]};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#valdef-unicode-bidi-bidi-override'] = {"text": "bidi-override", "type": "value", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#valdef-unicode-bidi-bidi-override", "export": true, "normative": true, "for_": ["unicode-bidi"]};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#valdef-unicode-bidi-isolate-override'] = {"text": "isolate-override", "type": "value", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#valdef-unicode-bidi-isolate-override", "export": true, "normative": true, "for_": ["unicode-bidi"]};
+window.refsData['https://drafts.csswg.org/css-writing-modes-3/#propdef-direction'] = {"text": "direction", "type": "property", "spec": "css-writing-modes-3", "shortname": "css-writing-modes", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-3/#propdef-direction", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#inline-base-direction'] = {"text": "inline base direction", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#inline-base-direction", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#propdef-padding'] = {"text": "padding", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#propdef-padding", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-any'] = {"text": "||", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-any", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-ruby-position-over'] = {"text": "over", "type": "value", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#valdef-ruby-position-over", "export": true, "normative": true, "for_": ["ruby-position"]};
+window.refsData['#valdef-ruby-position-under'] = {"text": "under", "type": "value", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#valdef-ruby-position-under", "export": true, "normative": true, "for_": ["ruby-position"]};
+window.refsData['#valdef-ruby-position-alternate'] = {"text": "alternate", "type": "value", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#valdef-ruby-position-alternate", "export": true, "normative": true, "for_": ["ruby-position"]};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#line-over'] = {"text": "line-over", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#line-over", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#line-under'] = {"text": "line-under", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#line-under", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#writing-mode'] = {"text": "writing mode", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#writing-mode", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#vertical-writing-mode'] = {"text": "vertical writing mode", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#vertical-writing-mode", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#bidi-isolate'] = {"text": "bidi isolation", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#bidi-isolate", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-ruby-align-center'] = {"text": "center", "type": "value", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#valdef-ruby-align-center", "export": true, "normative": true, "for_": ["ruby-align"]};
+window.refsData['https://drafts.csswg.org/css-text-4/#propdef-text-justify'] = {"text": "text-justify", "type": "property", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#propdef-text-justify", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-4/#justification-opportunity'] = {"text": "justification opportunity", "type": "dfn", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#justification-opportunity", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-ruby-align-space-between'] = {"text": "space-between", "type": "value", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#valdef-ruby-align-space-between", "export": true, "normative": true, "for_": ["ruby-align"]};
+window.refsData['#valdef-ruby-align-space-around'] = {"text": "space-around", "type": "value", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#valdef-ruby-align-space-around", "export": true, "normative": true, "for_": ["ruby-align"]};
+window.refsData['https://drafts.csswg.org/css-text-3/#character'] = {"text": "character", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-text-3/#character", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-ruby-overhang'] = {"text": "ruby-overhang", "type": "property", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#propdef-ruby-overhang", "export": true, "normative": true, "for_": []};
+window.refsData['#bopomofo-tone-marks'] = {"text": "bopomofo tone marks", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#bopomofo-tone-marks", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#initial-value'] = {"text": "initial value", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#initial-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-grid-2/#valdef-grid-template-columns-max-content'] = {"text": "max-content", "type": "value", "spec": "css-grid-2", "shortname": "css-grid", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-grid-2/#valdef-grid-template-columns-max-content", "export": true, "normative": true, "for_": ["grid-template-columns", "grid-template-rows"]};
+window.refsData['https://html.spec.whatwg.org/multipage/obsolete.html#rtc'] = {"text": "rtc", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/obsolete.html#rtc", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-rp-element'] = {"text": "rp", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-rp-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-ruby-element'] = {"text": "ruby", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-ruby-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-decor-4/#propdef-text-emphasis-position'] = {"text": "text-emphasis-position", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-decor-4/#propdef-text-emphasis-position", "export": true, "normative": true, "for_": []};window.refsData['#propdef-ruby-align'] = {"text": "ruby-align", "type": "property", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#propdef-ruby-align", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-ruby-merge'] = {"text": "ruby-merge", "type": "property", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#propdef-ruby-merge", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-ruby-overhang'] = {"text": "ruby-overhang", "type": "property", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#propdef-ruby-overhang", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-ruby-position'] = {"text": "ruby-position", "type": "property", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "local", "url": "#propdef-ruby-position", "export": true, "normative": true, "for_": []};
 </script>

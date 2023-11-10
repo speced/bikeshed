@@ -730,6 +730,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -8742,8 +8779,6 @@ specification.</p>
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -8991,7 +9026,6 @@ specification.</p>
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -9784,6 +9818,620 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#dom-idbindexparameters-unique'] = {"text": "unique", "type": "dict-member", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbindexparameters-unique", "export": true, "normative": true, "for_": ["IDBIndexParameters"]};
+window.refsData['#eventdef-request-upgradeneeded'] = {"text": "upgradeneeded", "type": "event", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#eventdef-request-upgradeneeded", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['#eventdef-request-success'] = {"text": "success", "type": "event", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#eventdef-request-success", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['#eventdef-connection-versionchange'] = {"text": "versionchange", "type": "event", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#eventdef-connection-versionchange", "export": true, "normative": true, "for_": ["connection"]};
+window.refsData['#connection'] = {"text": "connection", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#connection", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-idbdatabase-close'] = {"text": "close()", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbdatabase-close", "export": true, "normative": true, "for_": ["IDBDatabase"]};
+window.refsData['#eventdef-request-blocked'] = {"text": "blocked", "type": "event", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#eventdef-request-blocked", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://tc39.github.io/ecma262/#sec-terms-and-definitions-string-type'] = {"text": "string", "type": "dfn", "spec": "ecma262", "shortname": "ecma262", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-terms-and-definitions-string-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['#name'] = {"text": "name", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#name", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-array.prototype.sort'] = {"text": "array.prototype.sort", "type": "dfn", "spec": "ecma262", "shortname": "ecma262", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-array.prototype.sort", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-array-objects'] = {"text": "array", "type": "dfn", "spec": "ecma262", "shortname": "ecma262", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-array-objects", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#concept-origin'] = {"text": "origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-origin", "export": true, "normative": true, "for_": []};
+window.refsData['#database'] = {"text": "database", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#database", "export": true, "normative": true, "for_": []};
+window.refsData['#object-store'] = {"text": "object store", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#object-store", "export": true, "normative": true, "for_": []};
+window.refsData['#database-version'] = {"text": "version", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#database-version", "export": true, "normative": true, "for_": ["database"]};
+window.refsData['#upgrade-transaction'] = {"text": "upgrade transaction", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#upgrade-transaction", "export": true, "normative": true, "for_": []};
+window.refsData['#transaction-concept'] = {"text": "transaction", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#transaction-concept", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/dom.html#document'] = {"text": "Document", "type": "interface", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/dom.html#document", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#dom-document-domain'] = {"text": "domain", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#dom-document-domain", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['#abort-an-upgrade-transaction'] = {"text": "abort an upgrade transaction", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#abort-an-upgrade-transaction", "export": true, "normative": true, "for_": []};
+window.refsData['#connection-version'] = {"text": "version", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#connection-version", "export": true, "normative": true, "for_": ["connection"]};
+window.refsData['#close-a-database-connection'] = {"text": "close a database connection", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#close-a-database-connection", "export": true, "normative": true, "for_": []};
+window.refsData['#connection-close-pending-flag'] = {"text": "close pending flag", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#connection-close-pending-flag", "export": true, "normative": true, "for_": ["connection"]};
+window.refsData['https://dom.spec.whatwg.org/#get-the-parent'] = {"text": "get the parent", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#get-the-parent", "export": true, "normative": true, "for_": []};
+window.refsData['#key'] = {"text": "key", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#key", "export": true, "normative": true, "for_": []};
+window.refsData['#value'] = {"text": "value", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#value", "export": true, "normative": true, "for_": []};
+window.refsData['#greater-than'] = {"text": "ascending", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#greater-than", "export": true, "normative": true, "for_": []};
+window.refsData['#key-generator'] = {"text": "key generator", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#key-generator", "export": true, "normative": true, "for_": []};
+window.refsData['#object-store-record'] = {"text": "record", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#object-store-record", "export": true, "normative": true, "for_": ["object-store"]};
+window.refsData['#object-store-key-path'] = {"text": "key path", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#object-store-key-path", "export": true, "normative": true, "for_": ["object-store"]};
+window.refsData['#object-store-handle'] = {"text": "object store handle", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#object-store-handle", "export": true, "normative": true, "for_": []};
+window.refsData['#index-concept'] = {"text": "index", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#index-concept", "export": true, "normative": true, "for_": []};
+window.refsData['#object-store-handle-object-store'] = {"text": "object store", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#object-store-handle-object-store", "export": true, "normative": true, "for_": ["object-store-handle"]};
+window.refsData['#object-store-name'] = {"text": "name", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#object-store-name", "export": true, "normative": true, "for_": ["object-store"]};
+window.refsData['https://html.spec.whatwg.org/multipage/structured-data.html#serializable-objects'] = {"text": "serializable object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/structured-data.html#serializable-objects", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-date-objects'] = {"text": "date", "type": "dfn", "spec": "ecma262", "shortname": "ecma262", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-date-objects", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-object-objects'] = {"text": "object", "type": "dfn", "spec": "ecma262", "shortname": "ecma262", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-object-objects", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/FileAPI/#dfn-file'] = {"text": "File", "type": "interface", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#dfn-file", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/FileAPI/#dfn-Blob'] = {"text": "Blob", "type": "interface", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#dfn-Blob", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/canvas.html#imagedata'] = {"text": "ImageData", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/canvas.html#imagedata", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-list-and-record-specification-type'] = {"text": "record", "type": "dfn", "spec": "ecma262", "shortname": "ecma262", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-list-and-record-specification-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/structured-data.html#structuredserializeforstorage'] = {"text": "StructuredSerializeForStorage", "type": "abstract-op", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/structured-data.html#structuredserializeforstorage", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unrestricted-double'] = {"text": "unrestricted double", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unrestricted-double", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#byte-sequence'] = {"text": "byte sequence", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#byte-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list'] = {"text": "list", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list", "export": true, "normative": true, "for_": []};
+window.refsData['#convert-a-value-to-a-key'] = {"text": "convert a value to a key", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#convert-a-value-to-a-key", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-terms-and-definitions-number-type'] = {"text": "number", "type": "dfn", "spec": "ecma262", "shortname": "ecma262", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-terms-and-definitions-number-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-arraybuffer-objects'] = {"text": "arraybuffer", "type": "dfn", "spec": "ecma262", "shortname": "ecma262", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-arraybuffer-objects", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-typedarray-objects'] = {"text": "uint8array", "type": "dfn", "spec": "ecma262", "shortname": "ecma262", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-typedarray-objects", "export": true, "normative": true, "for_": []};
+window.refsData['#key-type'] = {"text": "type", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#key-type", "export": true, "normative": true, "for_": ["key"]};
+window.refsData['#array-key'] = {"text": "array key", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#array-key", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-item'] = {"text": "item", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-item", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['#key-value'] = {"text": "value", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#key-value", "export": true, "normative": true, "for_": ["key"]};
+window.refsData['https://infra.spec.whatwg.org/#assert'] = {"text": "assert", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#assert", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#code-unit-less-than'] = {"text": "code unit less than", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#code-unit-less-than", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#byte-less-than'] = {"text": "byte less than", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#byte-less-than", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-size'] = {"text": "size", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-size", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['#compare-two-keys'] = {"text": "compare two keys", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#compare-two-keys", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#byte'] = {"text": "byte", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#byte", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-byte'] = {"text": "byte", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-byte", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#prod-IdentifierName'] = {"text": "identifiername", "type": "dfn", "spec": "ecma262", "shortname": "ecma262", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#prod-IdentifierName", "export": true, "normative": true, "for_": []};
+window.refsData['#identifier'] = {"text": "identifier", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#identifier", "export": true, "normative": true, "for_": []};
+window.refsData['#key-path'] = {"text": "key path", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#key-path", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/FileAPI/#dfn-size'] = {"text": "size", "type": "attribute", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#dfn-size", "export": true, "normative": true, "for_": ["Blob"]};
+window.refsData['https://w3c.github.io/FileAPI/#dfn-type'] = {"text": "type", "type": "attribute", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#dfn-type", "export": true, "normative": true, "for_": ["Blob"]};
+window.refsData['https://w3c.github.io/FileAPI/#dfn-name'] = {"text": "name", "type": "attribute", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#dfn-name", "export": true, "normative": true, "for_": ["File"]};
+window.refsData['https://w3c.github.io/FileAPI/#dfn-lastModified'] = {"text": "lastModified", "type": "attribute", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#dfn-lastModified", "export": true, "normative": true, "for_": ["File"]};
+window.refsData['#index-referenced'] = {"text": "referenced", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#index-referenced", "export": true, "normative": true, "for_": ["index"]};
+window.refsData['#index-records'] = {"text": "records", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#index-records", "export": true, "normative": true, "for_": ["index"]};
+window.refsData['#extract-a-key-from-a-value-using-a-key-path'] = {"text": "extract a key from a value using a key path", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#extract-a-key-from-a-value-using-a-key-path", "export": true, "normative": true, "for_": []};
+window.refsData['#index-key-path'] = {"text": "key path", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#index-key-path", "export": true, "normative": true, "for_": ["index"]};
+window.refsData['#index-keys'] = {"text": "keys", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#index-keys", "export": true, "normative": true, "for_": ["index"]};
+window.refsData['#index-referenced-value'] = {"text": "referenced value", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#index-referenced-value", "export": true, "normative": true, "for_": ["index"]};
+window.refsData['#index-multientry-flag'] = {"text": "multientry flag", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#index-multientry-flag", "export": true, "normative": true, "for_": ["index"]};
+window.refsData['#subkeys'] = {"text": "subkeys", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#subkeys", "export": true, "normative": true, "for_": []};
+window.refsData['#index-handle'] = {"text": "index handle", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#index-handle", "export": true, "normative": true, "for_": []};
+window.refsData['#object-store-handle-transaction'] = {"text": "transaction", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#object-store-handle-transaction", "export": true, "normative": true, "for_": ["object-store-handle"]};
+window.refsData['#index-name'] = {"text": "name", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#index-name", "export": true, "normative": true, "for_": ["index"]};
+window.refsData['#index-handle-index'] = {"text": "index", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#index-handle-index", "export": true, "normative": true, "for_": ["index-handle"]};
+window.refsData['https://infra.spec.whatwg.org/#ordered-set'] = {"text": "set", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ordered-set", "export": true, "normative": true, "for_": []};
+window.refsData['#transaction-scope'] = {"text": "scope", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#transaction-scope", "export": true, "normative": true, "for_": ["transaction"]};
+window.refsData['#transaction-mode'] = {"text": "mode", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#transaction-mode", "export": true, "normative": true, "for_": ["transaction"]};
+window.refsData['#dom-idbtransactionmode-readonly'] = {"text": "\"readonly\"", "type": "enum-value", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbtransactionmode-readonly", "export": true, "normative": true, "for_": ["IDBTransactionMode"]};
+window.refsData['#transaction-read-only-transaction'] = {"text": "read-only transaction", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#transaction-read-only-transaction", "export": true, "normative": true, "for_": ["transaction"]};
+window.refsData['#transaction-overlap'] = {"text": "overlap", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#transaction-overlap", "export": true, "normative": true, "for_": ["transaction"]};
+window.refsData['#dom-idbtransactionmode-readwrite'] = {"text": "\"readwrite\"", "type": "enum-value", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbtransactionmode-readwrite", "export": true, "normative": true, "for_": ["IDBTransactionMode"]};
+window.refsData['#dom-idbtransactionmode-versionchange'] = {"text": "\"versionchange\"", "type": "enum-value", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbtransactionmode-versionchange", "export": true, "normative": true, "for_": ["IDBTransactionMode"]};
+window.refsData['#transaction-durability-hint'] = {"text": "durability hint", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#transaction-durability-hint", "export": true, "normative": true, "for_": ["transaction"]};
+window.refsData['#dom-idbtransactiondurability-strict'] = {"text": "\"strict\"", "type": "enum-value", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbtransactiondurability-strict", "export": true, "normative": true, "for_": ["IDBTransactionDurability"]};
+window.refsData['#transaction-commit'] = {"text": "committed", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#transaction-commit", "export": true, "normative": true, "for_": ["transaction"]};
+window.refsData['#dom-idbtransactiondurability-relaxed'] = {"text": "\"relaxed\"", "type": "enum-value", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbtransactiondurability-relaxed", "export": true, "normative": true, "for_": ["IDBTransactionDurability"]};
+window.refsData['#dom-idbtransactiondurability-default'] = {"text": "\"default\"", "type": "enum-value", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbtransactiondurability-default", "export": true, "normative": true, "for_": ["IDBTransactionDurability"]};
+window.refsData['https://storage.spec.whatwg.org/#storage-bucket'] = {"text": "storage bucket", "type": "dfn", "spec": "storage", "shortname": "storage", "level": "", "status": "anchor-block", "url": "https://storage.spec.whatwg.org/#storage-bucket", "export": true, "normative": true, "for_": []};
+window.refsData['#eventdef-transaction-complete'] = {"text": "complete", "type": "event", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#eventdef-transaction-complete", "export": true, "normative": true, "for_": ["transaction"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-loop'] = {"text": "event loop", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-loop", "export": true, "normative": true, "for_": []};
+window.refsData['#request'] = {"text": "request", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#request", "export": true, "normative": true, "for_": []};
+window.refsData['#transaction-abort'] = {"text": "aborted", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#transaction-abort", "export": true, "normative": true, "for_": ["transaction"]};
+window.refsData['#transaction-connection'] = {"text": "connection", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#transaction-connection", "export": true, "normative": true, "for_": ["transaction"]};
+window.refsData['#transaction-created'] = {"text": "created", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#transaction-created", "export": true, "normative": true, "for_": ["transaction"]};
+window.refsData['#transaction-state'] = {"text": "state", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#transaction-state", "export": true, "normative": true, "for_": ["transaction"]};
+window.refsData['#transaction-active'] = {"text": "active", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#transaction-active", "export": true, "normative": true, "for_": ["transaction"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task'] = {"text": "queue a task", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task", "export": true, "normative": true, "for_": []};
+window.refsData['#transaction-start'] = {"text": "started", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#transaction-start", "export": true, "normative": true, "for_": ["transaction"]};
+window.refsData['#request-processed'] = {"text": "processed", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#request-processed", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['#eventdef-request-error'] = {"text": "error", "type": "event", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#eventdef-request-error", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-event'] = {"text": "event", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-event", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-event-dispatch'] = {"text": "dispatch", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-event-dispatch", "export": true, "normative": true, "for_": []};
+window.refsData['#transaction-inactive'] = {"text": "inactive", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#transaction-inactive", "export": true, "normative": true, "for_": ["transaction"]};
+window.refsData['#transaction-finished'] = {"text": "finished", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#transaction-finished", "export": true, "normative": true, "for_": ["transaction"]};
+window.refsData['#dom-idbtransaction-abort'] = {"text": "abort()", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbtransaction-abort", "export": true, "normative": true, "for_": ["IDBTransaction"]};
+window.refsData['#dom-idbtransaction-commit'] = {"text": "commit()", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbtransaction-commit", "export": true, "normative": true, "for_": ["IDBTransaction"]};
+window.refsData['#transaction-committing'] = {"text": "committing", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#transaction-committing", "export": true, "normative": true, "for_": ["transaction"]};
+window.refsData['#abort-a-transaction'] = {"text": "abort a transaction", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#abort-a-transaction", "export": true, "normative": true, "for_": []};
+window.refsData['#request-placed'] = {"text": "placed", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#request-placed", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['#transaction-cleanup-event-loop'] = {"text": "cleanup event loop", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#transaction-cleanup-event-loop", "export": true, "normative": true, "for_": ["transaction"]};
+window.refsData['#dom-idbdatabase-transaction'] = {"text": "transaction(storeNames)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbdatabase-transaction", "export": true, "normative": true, "for_": ["IDBDatabase"]};
+window.refsData['#transaction-read-write-transaction'] = {"text": "read/write transaction", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#transaction-read-write-transaction", "export": true, "normative": true, "for_": ["transaction"]};
+window.refsData['#run-an-upgrade-transaction'] = {"text": "run an upgrade transaction", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#run-an-upgrade-transaction", "export": true, "normative": true, "for_": []};
+window.refsData['#open-a-database'] = {"text": "open a database", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#open-a-database", "export": true, "normative": true, "for_": []};
+window.refsData['#request-processed-flag'] = {"text": "processed flag", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#request-processed-flag", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['#request-done-flag'] = {"text": "done flag", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#request-done-flag", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['#asynchronously-execute-a-request'] = {"text": "asynchronously execute a request", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#asynchronously-execute-a-request", "export": true, "normative": true, "for_": []};
+window.refsData['#request-result'] = {"text": "result", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#request-result", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['#request-error'] = {"text": "error", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#request-error", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['#request-transaction'] = {"text": "transaction", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#request-transaction", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['#cursor'] = {"text": "cursor", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#cursor", "export": true, "normative": true, "for_": []};
+window.refsData['#request-open-request'] = {"text": "open request", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#request-open-request", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['#request-source'] = {"text": "source", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#request-source", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['#database-name'] = {"text": "name", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#database-name", "export": true, "normative": true, "for_": ["database"]};
+window.refsData['#request-connection-queue'] = {"text": "connection queue", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#request-connection-queue", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['#connection-closed'] = {"text": "closed", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#connection-closed", "export": true, "normative": true, "for_": ["connection"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#task-queue'] = {"text": "task queues", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#task-queue", "export": false, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#browsing-context'] = {"text": "browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['#key-range'] = {"text": "key range", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#key-range", "export": true, "normative": true, "for_": []};
+window.refsData['#key-range-lower-bound'] = {"text": "lower bound", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#key-range-lower-bound", "export": true, "normative": true, "for_": ["key range"]};
+window.refsData['#equal-to'] = {"text": "equal to", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#equal-to", "export": true, "normative": true, "for_": []};
+window.refsData['#key-range-upper-bound'] = {"text": "upper bound", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#key-range-upper-bound", "export": true, "normative": true, "for_": ["key range"]};
+window.refsData['#less-than'] = {"text": "less than", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#less-than", "export": true, "normative": true, "for_": []};
+window.refsData['#key-range-lower-open-flag'] = {"text": "lower open flag", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#key-range-lower-open-flag", "export": true, "normative": true, "for_": ["key range"]};
+window.refsData['#key-range-upper-open-flag'] = {"text": "upper open flag", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#key-range-upper-open-flag", "export": true, "normative": true, "for_": ["key range"]};
+window.refsData['#in'] = {"text": "in", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#in", "export": true, "normative": true, "for_": []};
+window.refsData['#unbounded-key-range'] = {"text": "unbounded key range", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#unbounded-key-range", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-throw'] = {"text": "throw", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-throw", "export": true, "normative": true, "for_": ["exception"]};
+window.refsData['https://webidl.spec.whatwg.org/#dataerror'] = {"text": "DataError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dataerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMException'] = {"text": "DOMException", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMException", "export": true, "normative": true, "for_": []};
+window.refsData['#containing-only'] = {"text": "containing only", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#containing-only", "export": true, "normative": true, "for_": []};
+window.refsData['#cursor-source'] = {"text": "source", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#cursor-source", "export": true, "normative": true, "for_": ["cursor"]};
+window.refsData['#cursor-direction'] = {"text": "direction", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#cursor-direction", "export": true, "normative": true, "for_": ["cursor"]};
+window.refsData['#dom-idbcursordirection-next'] = {"text": "\"next\"", "type": "enum-value", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbcursordirection-next", "export": true, "normative": true, "for_": ["IDBCursorDirection"]};
+window.refsData['#dom-idbcursordirection-nextunique'] = {"text": "\"nextunique\"", "type": "enum-value", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbcursordirection-nextunique", "export": true, "normative": true, "for_": ["IDBCursorDirection"]};
+window.refsData['#index-unique-flag'] = {"text": "unique flag", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#index-unique-flag", "export": true, "normative": true, "for_": ["index"]};
+window.refsData['#dom-idbcursordirection-prev'] = {"text": "\"prev\"", "type": "enum-value", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbcursordirection-prev", "export": true, "normative": true, "for_": ["IDBCursorDirection"]};
+window.refsData['#dom-idbcursordirection-prevunique'] = {"text": "\"prevunique\"", "type": "enum-value", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbcursordirection-prevunique", "export": true, "normative": true, "for_": ["IDBCursorDirection"]};
+window.refsData['#cursor-range'] = {"text": "range", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#cursor-range", "export": true, "normative": true, "for_": ["cursor"]};
+window.refsData['#cursor-position'] = {"text": "position", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#cursor-position", "export": true, "normative": true, "for_": ["cursor"]};
+window.refsData['#cursor-object-store-position'] = {"text": "object store position", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#cursor-object-store-position", "export": true, "normative": true, "for_": ["cursor"]};
+window.refsData['#cursor-effective-object-store'] = {"text": "effective object store", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#cursor-effective-object-store", "export": true, "normative": true, "for_": ["cursor"]};
+window.refsData['#cursor-effective-key'] = {"text": "effective key", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#cursor-effective-key", "export": true, "normative": true, "for_": ["cursor"]};
+window.refsData['#cursor-value'] = {"text": "value", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#cursor-value", "export": true, "normative": true, "for_": ["cursor"]};
+window.refsData['#key-generator-current-number'] = {"text": "current number", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#key-generator-current-number", "export": true, "normative": true, "for_": ["key generator"]};
+window.refsData['#dom-idbobjectstore-clear'] = {"text": "clear()", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbobjectstore-clear", "export": true, "normative": true, "for_": ["IDBObjectStore"]};
+window.refsData['#object-store-in-line-keys'] = {"text": "in-line keys", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#object-store-in-line-keys", "export": true, "normative": true, "for_": ["object-store"]};
+window.refsData['#object-store-out-of-line-keys'] = {"text": "out-of-line keys", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#object-store-out-of-line-keys", "export": true, "normative": true, "for_": ["object-store"]};
+window.refsData['https://webidl.spec.whatwg.org/#constrainterror'] = {"text": "ConstraintError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#constrainterror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#aborterror'] = {"text": "AbortError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#aborterror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#datacloneerror'] = {"text": "DataCloneError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#datacloneerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#invalidaccesserror'] = {"text": "InvalidAccessError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invalidaccesserror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#invalidstateerror'] = {"text": "InvalidStateError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invalidstateerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#notfounderror'] = {"text": "NotFoundError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#notfounderror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#quotaexceedederror'] = {"text": "QuotaExceededError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#quotaexceedederror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#syntaxerror'] = {"text": "SyntaxError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#syntaxerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#readonlyerror'] = {"text": "ReadOnlyError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#readonlyerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#transactioninactiveerror'] = {"text": "TransactionInactiveError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#transactioninactiveerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#unknownerror'] = {"text": "UnknownError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#unknownerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#versionerror'] = {"text": "VersionError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#versionerror", "export": true, "normative": true, "for_": []};
+window.refsData['#idbrequest'] = {"text": "IDBRequest", "type": "interface", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#idbrequest", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-idl-attributes'] = {"text": "event handler idl attribute", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-idl-attributes", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#eventtarget'] = {"text": "EventTarget", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#eventtarget", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-any'] = {"text": "any", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-any", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-idbrequest-result'] = {"text": "result", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbrequest-result", "export": true, "normative": true, "for_": ["IDBRequest"]};
+window.refsData['#dom-idbrequest-error'] = {"text": "error", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbrequest-error", "export": true, "normative": true, "for_": ["IDBRequest"]};
+window.refsData['#idbobjectstore'] = {"text": "IDBObjectStore", "type": "interface", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#idbobjectstore", "export": true, "normative": true, "for_": []};
+window.refsData['#idbindex'] = {"text": "IDBIndex", "type": "interface", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#idbindex", "export": true, "normative": true, "for_": []};
+window.refsData['#idbcursor'] = {"text": "IDBCursor", "type": "interface", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#idbcursor", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-idbrequest-source'] = {"text": "source", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbrequest-source", "export": true, "normative": true, "for_": ["IDBRequest"]};
+window.refsData['#idbtransaction'] = {"text": "IDBTransaction", "type": "interface", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#idbtransaction", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-idbrequest-transaction'] = {"text": "transaction", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbrequest-transaction", "export": true, "normative": true, "for_": ["IDBRequest"]};
+window.refsData['#enumdef-idbrequestreadystate'] = {"text": "IDBRequestReadyState", "type": "enum", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#enumdef-idbrequestreadystate", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-idbrequest-readystate'] = {"text": "readyState", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbrequest-readystate", "export": true, "normative": true, "for_": ["IDBRequest"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler'] = {"text": "EventHandler", "type": "typedef", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-idbrequest-onsuccess'] = {"text": "onsuccess", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbrequest-onsuccess", "export": true, "normative": true, "for_": ["IDBRequest"]};
+window.refsData['#dom-idbrequest-onerror'] = {"text": "onerror", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbrequest-onerror", "export": true, "normative": true, "for_": ["IDBRequest"]};
+window.refsData['#dom-idbrequestreadystate-pending'] = {"text": "\"pending\"", "type": "enum-value", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbrequestreadystate-pending", "export": true, "normative": true, "for_": ["IDBRequestReadyState"]};
+window.refsData['#dom-idbrequestreadystate-done'] = {"text": "\"done\"", "type": "enum-value", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbrequestreadystate-done", "export": true, "normative": true, "for_": ["IDBRequestReadyState"]};
+window.refsData['https://webidl.spec.whatwg.org/#this'] = {"text": "this", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#this", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-idbfactory-open'] = {"text": "open(name)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbfactory-open", "export": true, "normative": true, "for_": ["IDBFactory"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-event-type'] = {"text": "event handler event type", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-event-type", "export": true, "normative": true, "for_": []};
+window.refsData['#idbdatabase'] = {"text": "IDBDatabase", "type": "interface", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#idbdatabase", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-idbopendbrequest-onblocked'] = {"text": "onblocked", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbopendbrequest-onblocked", "export": true, "normative": true, "for_": ["IDBOpenDBRequest"]};
+window.refsData['#dom-idbopendbrequest-onupgradeneeded'] = {"text": "onupgradeneeded", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbopendbrequest-onupgradeneeded", "export": true, "normative": true, "for_": ["IDBOpenDBRequest"]};
+window.refsData['https://dom.spec.whatwg.org/#event'] = {"text": "Event", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#event", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-idbversionchangeeventinit'] = {"text": "IDBVersionChangeEventInit", "type": "dictionary", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dictdef-idbversionchangeeventinit", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-long-long'] = {"text": "unsigned long long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-long-long", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-idbversionchangeevent-oldversion'] = {"text": "oldVersion", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbversionchangeevent-oldversion", "export": true, "normative": true, "for_": ["IDBVersionChangeEvent"]};
+window.refsData['#dom-idbversionchangeevent-newversion'] = {"text": "newVersion", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbversionchangeevent-newversion", "export": true, "normative": true, "for_": ["IDBVersionChangeEvent"]};
+window.refsData['https://dom.spec.whatwg.org/#dictdef-eventinit'] = {"text": "EventInit", "type": "dictionary", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dictdef-eventinit", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-event-create'] = {"text": "creating an event", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-event-create", "export": true, "normative": true, "for_": []};
+window.refsData['#idbversionchangeevent'] = {"text": "IDBVersionChangeEvent", "type": "interface", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#idbversionchangeevent", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#dom-event-type'] = {"text": "type", "type": "attribute", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-event-type", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['https://dom.spec.whatwg.org/#dom-event-bubbles'] = {"text": "bubbles", "type": "attribute", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-event-bubbles", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['https://dom.spec.whatwg.org/#dom-event-cancelable'] = {"text": "cancelable", "type": "attribute", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-event-cancelable", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['#idbfactory'] = {"text": "IDBFactory", "type": "interface", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#idbfactory", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#windoworworkerglobalscope'] = {"text": "WindowOrWorkerGlobalScope", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#windoworworkerglobalscope", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#SameObject'] = {"text": "SameObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SameObject", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-windoworworkerglobalscope-indexeddb'] = {"text": "indexedDB", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-windoworworkerglobalscope-indexeddb", "export": true, "normative": true, "for_": ["WindowOrWorkerGlobalScope"]};
+window.refsData['https://webidl.spec.whatwg.org/#NewObject'] = {"text": "NewObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#NewObject", "export": true, "normative": true, "for_": []};
+window.refsData['#idbopendbrequest'] = {"text": "IDBOpenDBRequest", "type": "interface", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#idbopendbrequest", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#EnforceRange'] = {"text": "EnforceRange", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#EnforceRange", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-idbfactory-deletedatabase'] = {"text": "deleteDatabase(name)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbfactory-deletedatabase", "export": true, "normative": true, "for_": ["IDBFactory"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-promise'] = {"text": "Promise", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-promise", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-idbdatabaseinfo'] = {"text": "IDBDatabaseInfo", "type": "dictionary", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dictdef-idbdatabaseinfo", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-idbfactory-databases'] = {"text": "databases()", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbfactory-databases", "export": true, "normative": true, "for_": ["IDBFactory"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-short'] = {"text": "short", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-short", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-idbfactory-cmp'] = {"text": "cmp(first, second)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbfactory-cmp", "export": true, "normative": true, "for_": ["IDBFactory"]};
+window.refsData['https://tc39.github.io/ecma262/#sec-native-error-types-used-in-this-standard-typeerror'] = {"text": "typeerror", "type": "dfn", "spec": "ecma262", "shortname": "ecma262", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-native-error-types-used-in-this-standard-typeerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object'] = {"text": "relevant settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-origin'] = {"text": "origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-origin", "export": true, "normative": true, "for_": ["environment settings object"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#concept-origin-opaque'] = {"text": "opaque origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-origin-opaque", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#securityerror'] = {"text": "SecurityError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#securityerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel'] = {"text": "in parallel", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-event-fire'] = {"text": "fire an event", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-event-fire", "export": true, "normative": true, "for_": []};
+window.refsData['#fire-a-success-event'] = {"text": "fire a success event", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#fire-a-success-event", "export": true, "normative": true, "for_": []};
+window.refsData['#fire-an-error-event'] = {"text": "fire an error event", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#fire-an-error-event", "export": true, "normative": true, "for_": []};
+window.refsData['#delete-a-database'] = {"text": "delete a database", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#delete-a-database", "export": true, "normative": true, "for_": []};
+window.refsData['#fire-a-version-change-event'] = {"text": "fire a version change event", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#fire-a-version-change-event", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#a-promise-rejected-with'] = {"text": "a promise rejected with", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#a-promise-rejected-with", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#a-new-promise'] = {"text": "a new promise", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#a-new-promise", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#reject'] = {"text": "reject", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#reject", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-iterate'] = {"text": "for each", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-iterate", "export": true, "normative": true, "for_": ["list", "set"]};
+window.refsData['#dom-idbdatabaseinfo-name'] = {"text": "name", "type": "dict-member", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbdatabaseinfo-name", "export": true, "normative": true, "for_": ["IDBDatabaseInfo"]};
+window.refsData['#dom-idbdatabaseinfo-version'] = {"text": "version", "type": "dict-member", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbdatabaseinfo-version", "export": true, "normative": true, "for_": ["IDBDatabaseInfo"]};
+window.refsData['https://infra.spec.whatwg.org/#list-append'] = {"text": "append", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-append", "export": true, "normative": true, "for_": ["list"]};
+window.refsData['https://webidl.spec.whatwg.org/#resolve'] = {"text": "resolve", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#resolve", "export": true, "normative": true, "for_": []};
+window.refsData['#eventdef-transaction-abort'] = {"text": "abort", "type": "event", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#eventdef-transaction-abort", "export": true, "normative": true, "for_": ["transaction"]};
+window.refsData['#dom-idbdatabase-name'] = {"text": "name", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbdatabase-name", "export": true, "normative": true, "for_": ["IDBDatabase"]};
+window.refsData['#dom-idbdatabase-version'] = {"text": "version", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbdatabase-version", "export": true, "normative": true, "for_": ["IDBDatabase"]};
+window.refsData['https://html.spec.whatwg.org/multipage/common-dom-interfaces.html#domstringlist'] = {"text": "DOMStringList", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/common-dom-interfaces.html#domstringlist", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-idbdatabase-objectstorenames'] = {"text": "objectStoreNames", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbdatabase-objectstorenames", "export": true, "normative": true, "for_": ["IDBDatabase"]};
+window.refsData['#enumdef-idbtransactionmode'] = {"text": "IDBTransactionMode", "type": "enum", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#enumdef-idbtransactionmode", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-idbtransactionoptions'] = {"text": "IDBTransactionOptions", "type": "dictionary", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dictdef-idbtransactionoptions", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-idbdatabase-createobjectstore'] = {"text": "createObjectStore(name, options)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbdatabase-createobjectstore", "export": true, "normative": true, "for_": ["IDBDatabase"]};
+window.refsData['#dictdef-idbobjectstoreparameters'] = {"text": "IDBObjectStoreParameters", "type": "dictionary", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dictdef-idbobjectstoreparameters", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-idbdatabase-deleteobjectstore'] = {"text": "deleteObjectStore(name)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbdatabase-deleteobjectstore", "export": true, "normative": true, "for_": ["IDBDatabase"]};
+window.refsData['#dom-idbdatabase-onabort'] = {"text": "onabort", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbdatabase-onabort", "export": true, "normative": true, "for_": ["IDBDatabase"]};
+window.refsData['#dom-idbdatabase-onclose'] = {"text": "onclose", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbdatabase-onclose", "export": true, "normative": true, "for_": ["IDBDatabase"]};
+window.refsData['#dom-idbdatabase-onerror'] = {"text": "onerror", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbdatabase-onerror", "export": true, "normative": true, "for_": ["IDBDatabase"]};
+window.refsData['#dom-idbdatabase-onversionchange'] = {"text": "onversionchange", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbdatabase-onversionchange", "export": true, "normative": true, "for_": ["IDBDatabase"]};
+window.refsData['#enumdef-idbtransactiondurability'] = {"text": "IDBTransactionDurability", "type": "enum", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#enumdef-idbtransactiondurability", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['#sorted-name-list'] = {"text": "sorted name list", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#sorted-name-list", "export": true, "normative": true, "for_": []};
+window.refsData['#connection-object-store-set'] = {"text": "object store set", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#connection-object-store-set", "export": true, "normative": true, "for_": ["connection"]};
+window.refsData['#database-upgrade-transaction'] = {"text": "upgrade transaction", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#database-upgrade-transaction", "export": true, "normative": true, "for_": ["database"]};
+window.refsData['#dom-idbobjectstoreparameters-keypath'] = {"text": "keyPath", "type": "dict-member", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbobjectstoreparameters-keypath", "export": true, "normative": true, "for_": ["IDBObjectStoreParameters"]};
+window.refsData['#valid-key-path'] = {"text": "valid key path", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#valid-key-path", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-idbobjectstoreparameters-autoincrement'] = {"text": "autoIncrement", "type": "dict-member", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbobjectstoreparameters-autoincrement", "export": true, "normative": true, "for_": ["IDBObjectStoreParameters"]};
+window.refsData['#object-store-handle-index-set'] = {"text": "index set", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#object-store-handle-index-set", "export": true, "normative": true, "for_": ["object-store-handle"]};
+window.refsData['#dom-idbtransactionoptions-durability'] = {"text": "durability", "type": "dict-member", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbtransactionoptions-durability", "export": true, "normative": true, "for_": ["IDBTransactionOptions"]};
+window.refsData['#transaction-lifetime'] = {"text": "lifetime", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#transaction-lifetime", "export": true, "normative": true, "for_": ["transaction"]};
+window.refsData['https://html.spec.whatwg.org/multipage/indices.html#event-close'] = {"text": "close", "type": "event", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/indices.html#event-close", "export": true, "normative": true, "for_": ["HTMLElement"]};
+window.refsData['#dom-idbobjectstore-name'] = {"text": "name", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbobjectstore-name", "export": true, "normative": true, "for_": ["IDBObjectStore"]};
+window.refsData['#dom-idbobjectstore-keypath'] = {"text": "keyPath", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbobjectstore-keypath", "export": true, "normative": true, "for_": ["IDBObjectStore"]};
+window.refsData['#dom-idbobjectstore-indexnames'] = {"text": "indexNames", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbobjectstore-indexnames", "export": true, "normative": true, "for_": ["IDBObjectStore"]};
+window.refsData['#dom-idbobjectstore-transaction'] = {"text": "transaction", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbobjectstore-transaction", "export": true, "normative": true, "for_": ["IDBObjectStore"]};
+window.refsData['#dom-idbobjectstore-autoincrement'] = {"text": "autoIncrement", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbobjectstore-autoincrement", "export": true, "normative": true, "for_": ["IDBObjectStore"]};
+window.refsData['#dom-idbobjectstore-put'] = {"text": "put(value, key)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbobjectstore-put", "export": true, "normative": true, "for_": ["IDBObjectStore"]};
+window.refsData['#dom-idbobjectstore-add'] = {"text": "add(value, key)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbobjectstore-add", "export": true, "normative": true, "for_": ["IDBObjectStore"]};
+window.refsData['#dom-idbobjectstore-delete'] = {"text": "delete(query)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbobjectstore-delete", "export": true, "normative": true, "for_": ["IDBObjectStore"]};
+window.refsData['#dom-idbobjectstore-get'] = {"text": "get(query)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbobjectstore-get", "export": true, "normative": true, "for_": ["IDBObjectStore"]};
+window.refsData['#dom-idbobjectstore-getkey'] = {"text": "getKey(query)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbobjectstore-getkey", "export": true, "normative": true, "for_": ["IDBObjectStore"]};
+window.refsData['#dom-idbobjectstore-getall'] = {"text": "getAll(query, count)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbobjectstore-getall", "export": true, "normative": true, "for_": ["IDBObjectStore"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-long'] = {"text": "unsigned long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-long", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-idbobjectstore-getallkeys'] = {"text": "getAllKeys(query, count)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbobjectstore-getallkeys", "export": true, "normative": true, "for_": ["IDBObjectStore"]};
+window.refsData['#dom-idbobjectstore-count'] = {"text": "count(query)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbobjectstore-count", "export": true, "normative": true, "for_": ["IDBObjectStore"]};
+window.refsData['#dom-idbobjectstore-opencursor'] = {"text": "openCursor(query, direction)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbobjectstore-opencursor", "export": true, "normative": true, "for_": ["IDBObjectStore"]};
+window.refsData['#enumdef-idbcursordirection'] = {"text": "IDBCursorDirection", "type": "enum", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#enumdef-idbcursordirection", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-idbobjectstore-openkeycursor'] = {"text": "openKeyCursor(query, direction)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbobjectstore-openkeycursor", "export": true, "normative": true, "for_": ["IDBObjectStore"]};
+window.refsData['#dom-idbobjectstore-index'] = {"text": "index(name)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbobjectstore-index", "export": true, "normative": true, "for_": ["IDBObjectStore"]};
+window.refsData['#dom-idbobjectstore-createindex'] = {"text": "createIndex(name, keyPath, options)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbobjectstore-createindex", "export": true, "normative": true, "for_": ["IDBObjectStore"]};
+window.refsData['#dictdef-idbindexparameters'] = {"text": "IDBIndexParameters", "type": "dictionary", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dictdef-idbindexparameters", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-idbobjectstore-deleteindex'] = {"text": "deleteIndex(name)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbobjectstore-deleteindex", "export": true, "normative": true, "for_": ["IDBObjectStore"]};
+window.refsData['https://webidl.spec.whatwg.org/#the-given-value'] = {"text": "the given value", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#the-given-value", "export": true, "normative": true, "for_": []};
+window.refsData['#object-store-handle-name'] = {"text": "name", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#object-store-handle-name", "export": true, "normative": true, "for_": ["object-store-handle"]};
+window.refsData['#add-or-put'] = {"text": "add or put", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#add-or-put", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#realm'] = {"text": "realm", "type": "dfn", "spec": "ecma262", "shortname": "ecma262", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#realm", "export": true, "normative": true, "for_": []};
+window.refsData['#clone'] = {"text": "clone", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#clone", "export": true, "normative": true, "for_": []};
+window.refsData['#check-that-a-key-could-be-injected-into-a-value'] = {"text": "check that a key could be injected into a value", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#check-that-a-key-could-be-injected-into-a-value", "export": true, "normative": true, "for_": []};
+window.refsData['#store-a-record-into-an-object-store'] = {"text": "store a record into an object store", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#store-a-record-into-an-object-store", "export": true, "normative": true, "for_": []};
+window.refsData['#convert-a-value-to-a-key-range'] = {"text": "convert a value to a key range", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#convert-a-value-to-a-key-range", "export": true, "normative": true, "for_": []};
+window.refsData['#delete-records-from-an-object-store'] = {"text": "delete records from an object store", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#delete-records-from-an-object-store", "export": true, "normative": true, "for_": []};
+window.refsData['#idbkeyrange'] = {"text": "IDBKeyRange", "type": "interface", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#idbkeyrange", "export": true, "normative": true, "for_": []};
+window.refsData['#clear-an-object-store'] = {"text": "clear an object store", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#clear-an-object-store", "export": true, "normative": true, "for_": []};
+window.refsData['#retrieve-a-value-from-an-object-store'] = {"text": "retrieve a value from an object store", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#retrieve-a-value-from-an-object-store", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#current-realm'] = {"text": "current realm", "type": "dfn", "spec": "ecma262", "shortname": "ecma262", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#current-realm", "export": true, "normative": true, "for_": []};
+window.refsData['#retrieve-a-key-from-an-object-store'] = {"text": "retrieve a key from an object store", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#retrieve-a-key-from-an-object-store", "export": true, "normative": true, "for_": []};
+window.refsData['#retrieve-multiple-values-from-an-object-store'] = {"text": "retrieve multiple values from an object store", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#retrieve-multiple-values-from-an-object-store", "export": true, "normative": true, "for_": []};
+window.refsData['#retrieve-multiple-keys-from-an-object-store'] = {"text": "retrieve multiple keys from an object store", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#retrieve-multiple-keys-from-an-object-store", "export": true, "normative": true, "for_": []};
+window.refsData['#count-the-records-in-a-range'] = {"text": "count the records in a range", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#count-the-records-in-a-range", "export": true, "normative": true, "for_": []};
+window.refsData['#idbcursorwithvalue'] = {"text": "IDBCursorWithValue", "type": "interface", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#idbcursorwithvalue", "export": true, "normative": true, "for_": []};
+window.refsData['#cursor-key-only-flag'] = {"text": "key only flag", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#cursor-key-only-flag", "export": true, "normative": true, "for_": ["cursor"]};
+window.refsData['#cursor-transaction'] = {"text": "transaction", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#cursor-transaction", "export": true, "normative": true, "for_": ["cursor"]};
+window.refsData['#cursor-got-value-flag'] = {"text": "got value flag", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#cursor-got-value-flag", "export": true, "normative": true, "for_": ["cursor"]};
+window.refsData['#cursor-key'] = {"text": "key", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#cursor-key", "export": true, "normative": true, "for_": ["cursor"]};
+window.refsData['#iterate-a-cursor'] = {"text": "iterate a cursor", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#iterate-a-cursor", "export": true, "normative": true, "for_": []};
+window.refsData['#cursor-request'] = {"text": "request", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#cursor-request", "export": true, "normative": true, "for_": ["cursor"]};
+window.refsData['#dom-idbindexparameters-multientry'] = {"text": "multiEntry", "type": "dict-member", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbindexparameters-multientry", "export": true, "normative": true, "for_": ["IDBIndexParameters"]};
+window.refsData['#dom-idbindex-name'] = {"text": "name", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbindex-name", "export": true, "normative": true, "for_": ["IDBIndex"]};
+window.refsData['#dom-idbindex-objectstore'] = {"text": "objectStore", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbindex-objectstore", "export": true, "normative": true, "for_": ["IDBIndex"]};
+window.refsData['#dom-idbindex-keypath'] = {"text": "keyPath", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbindex-keypath", "export": true, "normative": true, "for_": ["IDBIndex"]};
+window.refsData['#dom-idbindex-multientry'] = {"text": "multiEntry", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbindex-multientry", "export": true, "normative": true, "for_": ["IDBIndex"]};
+window.refsData['#dom-idbindex-unique'] = {"text": "unique", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbindex-unique", "export": true, "normative": true, "for_": ["IDBIndex"]};
+window.refsData['#dom-idbindex-get'] = {"text": "get(query)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbindex-get", "export": true, "normative": true, "for_": ["IDBIndex"]};
+window.refsData['#dom-idbindex-getkey'] = {"text": "getKey(query)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbindex-getkey", "export": true, "normative": true, "for_": ["IDBIndex"]};
+window.refsData['#dom-idbindex-getall'] = {"text": "getAll(query, count)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbindex-getall", "export": true, "normative": true, "for_": ["IDBIndex"]};
+window.refsData['#dom-idbindex-getallkeys'] = {"text": "getAllKeys(query, count)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbindex-getallkeys", "export": true, "normative": true, "for_": ["IDBIndex"]};
+window.refsData['#dom-idbindex-count'] = {"text": "count(query)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbindex-count", "export": true, "normative": true, "for_": ["IDBIndex"]};
+window.refsData['#dom-idbindex-opencursor'] = {"text": "openCursor(query, direction)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbindex-opencursor", "export": true, "normative": true, "for_": ["IDBIndex"]};
+window.refsData['#dom-idbindex-openkeycursor'] = {"text": "openKeyCursor(query, direction)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbindex-openkeycursor", "export": true, "normative": true, "for_": ["IDBIndex"]};
+window.refsData['#index-handle-transaction'] = {"text": "transaction", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#index-handle-transaction", "export": true, "normative": true, "for_": ["index-handle"]};
+window.refsData['#index-handle-name'] = {"text": "name", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#index-handle-name", "export": true, "normative": true, "for_": ["index-handle"]};
+window.refsData['#index-handle-object-store-handle'] = {"text": "object store handle", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#index-handle-object-store-handle", "export": true, "normative": true, "for_": ["index-handle"]};
+window.refsData['#retrieve-a-referenced-value-from-an-index'] = {"text": "retrieve a referenced value from an index", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#retrieve-a-referenced-value-from-an-index", "export": true, "normative": true, "for_": []};
+window.refsData['#retrieve-a-value-from-an-index'] = {"text": "retrieve a value from an index", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#retrieve-a-value-from-an-index", "export": true, "normative": true, "for_": []};
+window.refsData['#retrieve-multiple-referenced-values-from-an-index'] = {"text": "retrieve multiple referenced values from an index", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#retrieve-multiple-referenced-values-from-an-index", "export": true, "normative": true, "for_": []};
+window.refsData['#retrieve-multiple-values-from-an-index'] = {"text": "retrieve multiple values from an index", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#retrieve-multiple-values-from-an-index", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-idbkeyrange-lower'] = {"text": "lower", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbkeyrange-lower", "export": true, "normative": true, "for_": ["IDBKeyRange"]};
+window.refsData['#dom-idbkeyrange-upper'] = {"text": "upper", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbkeyrange-upper", "export": true, "normative": true, "for_": ["IDBKeyRange"]};
+window.refsData['#dom-idbkeyrange-loweropen'] = {"text": "lowerOpen", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbkeyrange-loweropen", "export": true, "normative": true, "for_": ["IDBKeyRange"]};
+window.refsData['#dom-idbkeyrange-upperopen'] = {"text": "upperOpen", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbkeyrange-upperopen", "export": true, "normative": true, "for_": ["IDBKeyRange"]};
+window.refsData['#dom-idbkeyrange-only'] = {"text": "only(value)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbkeyrange-only", "export": true, "normative": true, "for_": ["IDBKeyRange"]};
+window.refsData['#dom-idbkeyrange-lowerbound'] = {"text": "lowerBound(lower, open)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbkeyrange-lowerbound", "export": true, "normative": true, "for_": ["IDBKeyRange"]};
+window.refsData['#dom-idbkeyrange-upperbound'] = {"text": "upperBound(upper, open)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbkeyrange-upperbound", "export": true, "normative": true, "for_": ["IDBKeyRange"]};
+window.refsData['#dom-idbkeyrange-bound'] = {"text": "bound(lower, upper, lowerOpen, upperOpen)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbkeyrange-bound", "export": true, "normative": true, "for_": ["IDBKeyRange"]};
+window.refsData['#dom-idbkeyrange-includes'] = {"text": "includes(key)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbkeyrange-includes", "export": true, "normative": true, "for_": ["IDBKeyRange"]};
+window.refsData['#convert-a-key-to-a-value'] = {"text": "convert a key to a value", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#convert-a-key-to-a-value", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-idbcursor-source'] = {"text": "source", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbcursor-source", "export": true, "normative": true, "for_": ["IDBCursor"]};
+window.refsData['#dom-idbcursor-direction'] = {"text": "direction", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbcursor-direction", "export": true, "normative": true, "for_": ["IDBCursor"]};
+window.refsData['#dom-idbcursor-key'] = {"text": "key", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbcursor-key", "export": true, "normative": true, "for_": ["IDBCursor"]};
+window.refsData['#dom-idbcursor-primarykey'] = {"text": "primaryKey", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbcursor-primarykey", "export": true, "normative": true, "for_": ["IDBCursor"]};
+window.refsData['#dom-idbcursor-request'] = {"text": "request", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbcursor-request", "export": true, "normative": true, "for_": ["IDBCursor"]};
+window.refsData['#dom-idbcursor-advance'] = {"text": "advance(count)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbcursor-advance", "export": true, "normative": true, "for_": ["IDBCursor"]};
+window.refsData['#dom-idbcursor-continue'] = {"text": "continue(key)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbcursor-continue", "export": true, "normative": true, "for_": ["IDBCursor"]};
+window.refsData['#dom-idbcursor-continueprimarykey'] = {"text": "continuePrimaryKey(key, primaryKey)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbcursor-continueprimarykey", "export": true, "normative": true, "for_": ["IDBCursor"]};
+window.refsData['#dom-idbcursor-update'] = {"text": "update(value)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbcursor-update", "export": true, "normative": true, "for_": ["IDBCursor"]};
+window.refsData['#dom-idbcursor-delete'] = {"text": "delete()", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbcursor-delete", "export": true, "normative": true, "for_": ["IDBCursor"]};
+window.refsData['#dom-idbcursorwithvalue-value'] = {"text": "value", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbcursorwithvalue-value", "export": true, "normative": true, "for_": ["IDBCursorWithValue"]};
+window.refsData['#dom-idbtransaction-objectstorenames'] = {"text": "objectStoreNames", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbtransaction-objectstorenames", "export": true, "normative": true, "for_": ["IDBTransaction"]};
+window.refsData['#dom-idbtransaction-mode'] = {"text": "mode", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbtransaction-mode", "export": true, "normative": true, "for_": ["IDBTransaction"]};
+window.refsData['#dom-idbtransaction-durability'] = {"text": "durability", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbtransaction-durability", "export": true, "normative": true, "for_": ["IDBTransaction"]};
+window.refsData['#dom-idbtransaction-db'] = {"text": "db", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbtransaction-db", "export": true, "normative": true, "for_": ["IDBTransaction"]};
+window.refsData['#dom-idbtransaction-error'] = {"text": "error", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbtransaction-error", "export": true, "normative": true, "for_": ["IDBTransaction"]};
+window.refsData['#dom-idbtransaction-objectstore'] = {"text": "objectStore(name)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbtransaction-objectstore", "export": true, "normative": true, "for_": ["IDBTransaction"]};
+window.refsData['#dom-idbtransaction-onabort'] = {"text": "onabort", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbtransaction-onabort", "export": true, "normative": true, "for_": ["IDBTransaction"]};
+window.refsData['#dom-idbtransaction-oncomplete'] = {"text": "oncomplete", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbtransaction-oncomplete", "export": true, "normative": true, "for_": ["IDBTransaction"]};
+window.refsData['#dom-idbtransaction-onerror'] = {"text": "onerror", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#dom-idbtransaction-onerror", "export": true, "normative": true, "for_": ["IDBTransaction"]};
+window.refsData['#transaction-error'] = {"text": "error", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#transaction-error", "export": true, "normative": true, "for_": ["transaction"]};
+window.refsData['#commit-a-transaction'] = {"text": "commit a transaction", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#commit-a-transaction", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-create-exception'] = {"text": "created", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-create-exception", "export": true, "normative": true, "for_": ["exception"]};
+window.refsData['#transaction-request-list'] = {"text": "request list", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#transaction-request-list", "export": true, "normative": true, "for_": ["transaction"]};
+window.refsData['https://dom.spec.whatwg.org/#canceled-flag'] = {"text": "canceled flag", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#canceled-flag", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['https://dom.spec.whatwg.org/#dom-event-preventdefault'] = {"text": "preventDefault()", "type": "method", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-event-preventdefault", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['https://tc39.github.io/ecma262/#sec-algorithm-conventions'] = {"text": "?", "type": "dfn", "spec": "ecma262", "shortname": "ecma262", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-algorithm-conventions", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/structured-data.html#structureddeserialize'] = {"text": "StructuredDeserialize", "type": "abstract-op", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/structured-data.html#structureddeserialize", "export": true, "normative": true, "for_": []};
+window.refsData['#generate-a-key'] = {"text": "generate a key", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#generate-a-key", "export": true, "normative": true, "for_": []};
+window.refsData['#inject-a-key-into-a-value-using-a-key-path'] = {"text": "inject a key into a value using a key path", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#inject-a-key-into-a-value-using-a-key-path", "export": true, "normative": true, "for_": []};
+window.refsData['#possibly-update-the-key-generator'] = {"text": "possibly update the key generator", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#possibly-update-the-key-generator", "export": true, "normative": true, "for_": []};
+window.refsData['#object-store-list-of-records'] = {"text": "list of records", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#object-store-list-of-records", "export": true, "normative": true, "for_": ["object-store"]};
+window.refsData['#index-list-of-records'] = {"text": "list of records", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#index-list-of-records", "export": true, "normative": true, "for_": ["index"]};
+window.refsData['https://w3c.github.io/screen-orientation/#dom-orientationlocktype-any'] = {"text": "any", "type": "enum-value", "spec": "screen-orientation", "shortname": "screen-orientation", "level": "1", "status": "current", "url": "https://w3c.github.io/screen-orientation/#dom-orientationlocktype-any", "export": true, "normative": true, "for_": ["OrientationLockType"]};
+window.refsData['#index-values'] = {"text": "values", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#index-values", "export": true, "normative": true, "for_": ["index"]};
+window.refsData['#evaluate-a-key-path-on-a-value'] = {"text": "evaluate a key path on a value", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#evaluate-a-key-path-on-a-value", "export": true, "normative": true, "for_": []};
+window.refsData['#convert-a-value-to-a-multientry-key'] = {"text": "convert a value to a multientry key", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#convert-a-value-to-a-multientry-key", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-completion-record-specification-type'] = {"text": "abrupt completion", "type": "dfn", "spec": "ecma262", "shortname": "ecma262", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-completion-record-specification-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-tostring'] = {"text": "tostring", "type": "dfn", "spec": "ecma262", "shortname": "ecma262", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-tostring", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-createdataproperty'] = {"text": "createdataproperty", "type": "dfn", "spec": "ecma262", "shortname": "ecma262", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-createdataproperty", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#strictly-split'] = {"text": "strictly split a string", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#strictly-split", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-ecmascript-data-types-and-values'] = {"text": "type", "type": "dfn", "spec": "ecma262", "shortname": "ecma262", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-ecmascript-data-types-and-values", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-tolength'] = {"text": "tolength", "type": "dfn", "spec": "ecma262", "shortname": "ecma262", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-tolength", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-get-o-p'] = {"text": "get", "type": "dfn", "spec": "ecma262", "shortname": "ecma262", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-get-o-p", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-hasownproperty'] = {"text": "hasownproperty", "type": "dfn", "spec": "ecma262", "shortname": "ecma262", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-hasownproperty", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#byte-sequence-length'] = {"text": "length", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#byte-sequence-length", "export": true, "normative": true, "for_": ["byte sequence"]};
+window.refsData['https://infra.spec.whatwg.org/#list-contain'] = {"text": "contain", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-contain", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-buffer-source-type'] = {"text": "buffer source types", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-buffer-source-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-get-buffer-source-copy'] = {"text": "get a copy of the buffer source", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-get-buffer-source-copy", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#array-exotic-objects'] = {"text": "array exotic object", "type": "dfn", "spec": "ecma262", "shortname": "ecma262", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#array-exotic-objects", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#set-append'] = {"text": "append", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#set-append", "export": true, "normative": true, "for_": ["set"]};
+window.refsData['https://tc39.github.io/ecma262/#sec-returnifabrupt'] = {"text": "returnifabrupt", "type": "dfn", "spec": "ecma262", "shortname": "ecma262", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-returnifabrupt", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-regexp-regular-expression-objects'] = {"text": "regexp", "type": "dfn", "spec": "ecma262", "shortname": "ecma262", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-regexp-regular-expression-objects", "export": true, "normative": true, "for_": []};
+window.refsData['#cleanup-indexed-database-transactions'] = {"text": "cleanup indexed database transactions", "type": "dfn", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "local", "url": "#cleanup-indexed-database-transactions", "export": true, "normative": true, "for_": ["transaction"]};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

@@ -527,6 +527,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -1128,8 +1165,6 @@ not be obvious to end users and user agents SHOULD clarify this.</p>
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -1377,7 +1412,6 @@ not be obvious to end users and user agents SHOULD clarify this.</p>
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -1762,4 +1796,255 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#additive-light'] = {"text": "additive light", "type": "dfn", "spec": "webxr-ar-module-1", "shortname": "webxr-ar-module", "level": "1", "status": "local", "url": "#additive-light", "export": true, "normative": true, "for_": []};
+window.refsData['#pass-through'] = {"text": "pass-through", "type": "dfn", "spec": "webxr-ar-module-1", "shortname": "webxr-ar-module", "level": "1", "status": "local", "url": "#pass-through", "export": true, "normative": true, "for_": []};
+window.refsData['#opaque'] = {"text": "opaque", "type": "dfn", "spec": "webxr-ar-module-1", "shortname": "webxr-ar-module", "level": "1", "status": "local", "url": "#opaque", "export": true, "normative": true, "for_": []};
+window.refsData['#display-technology'] = {"text": "display technology", "type": "dfn", "spec": "webxr-ar-module-1", "shortname": "webxr-ar-module", "level": "1", "status": "local", "url": "#display-technology", "export": true, "normative": true, "for_": []};
+window.refsData['#real-world-environment'] = {"text": "real-world environment", "type": "dfn", "spec": "webxr-ar-module-1", "shortname": "webxr-ar-module", "level": "1", "status": "local", "url": "#real-world-environment", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-xrsessionmode-immersive-ar'] = {"text": "\"immersive-ar\"", "type": "enum-value", "spec": "webxr-ar-module-1", "shortname": "webxr-ar-module", "level": "1", "status": "local", "url": "#dom-xrsessionmode-immersive-ar", "export": true, "normative": true, "for_": ["XRSessionMode"]};
+window.refsData['https://immersive-web.github.io/webxr/#xrsession'] = {"text": "XRSession", "type": "interface", "spec": "webxr", "shortname": "webxr", "level": "1", "status": "current", "url": "https://immersive-web.github.io/webxr/#xrsession", "export": true, "normative": true, "for_": []};
+window.refsData['#blend-technique'] = {"text": "blend technique", "type": "dfn", "spec": "webxr-ar-module-1", "shortname": "webxr-ar-module", "level": "1", "status": "local", "url": "#blend-technique", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-xrenvironmentblendmode-opaque'] = {"text": "\"opaque\"", "type": "enum-value", "spec": "webxr-ar-module-1", "shortname": "webxr-ar-module", "level": "1", "status": "local", "url": "#dom-xrenvironmentblendmode-opaque", "export": true, "normative": true, "for_": ["XREnvironmentBlendMode"]};
+window.refsData['#dom-xrenvironmentblendmode-alpha-blend'] = {"text": "\"alpha-blend\"", "type": "enum-value", "spec": "webxr-ar-module-1", "shortname": "webxr-ar-module", "level": "1", "status": "local", "url": "#dom-xrenvironmentblendmode-alpha-blend", "export": true, "normative": true, "for_": ["XREnvironmentBlendMode"]};
+window.refsData['#dom-xrenvironmentblendmode-additive'] = {"text": "\"additive\"", "type": "enum-value", "spec": "webxr-ar-module-1", "shortname": "webxr-ar-module", "level": "1", "status": "local", "url": "#dom-xrenvironmentblendmode-additive", "export": true, "normative": true, "for_": ["XREnvironmentBlendMode"]};
+window.refsData['#enumdef-xrenvironmentblendmode'] = {"text": "XREnvironmentBlendMode", "type": "enum", "spec": "webxr-ar-module-1", "shortname": "webxr-ar-module", "level": "1", "status": "local", "url": "#enumdef-xrenvironmentblendmode", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-xrsession-environmentblendmode'] = {"text": "environmentBlendMode", "type": "attribute", "spec": "webxr-ar-module-1", "shortname": "webxr-ar-module", "level": "1", "status": "local", "url": "#dom-xrsession-environmentblendmode", "export": true, "normative": true, "for_": ["XRSession"]};
+window.refsData['#opaque-environment-blending'] = {"text": "opaque environment blending", "type": "dfn", "spec": "webxr-ar-module-1", "shortname": "webxr-ar-module", "level": "1", "status": "local", "url": "#opaque-environment-blending", "export": true, "normative": true, "for_": []};
+window.refsData['#alpha-blend-environment-blending'] = {"text": "alpha-blend environment blending", "type": "dfn", "spec": "webxr-ar-module-1", "shortname": "webxr-ar-module", "level": "1", "status": "local", "url": "#alpha-blend-environment-blending", "export": true, "normative": true, "for_": []};
+window.refsData['#additive-environment-blending'] = {"text": "additive environment blending", "type": "dfn", "spec": "webxr-ar-module-1", "shortname": "webxr-ar-module", "level": "1", "status": "local", "url": "#additive-environment-blending", "export": true, "normative": true, "for_": []};
+window.refsData['#enumdef-xrinteractionmode'] = {"text": "XRInteractionMode", "type": "enum", "spec": "webxr-ar-module-1", "shortname": "webxr-ar-module", "level": "1", "status": "local", "url": "#enumdef-xrinteractionmode", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-xrsession-interactionmode'] = {"text": "interactionMode", "type": "attribute", "spec": "webxr-ar-module-1", "shortname": "webxr-ar-module", "level": "1", "status": "local", "url": "#dom-xrsession-interactionmode", "export": true, "normative": true, "for_": ["XRSession"]};
+window.refsData['#dom-xrinteractionmode-screen-space'] = {"text": "\"screen-space\"", "type": "enum-value", "spec": "webxr-ar-module-1", "shortname": "webxr-ar-module", "level": "1", "status": "local", "url": "#dom-xrinteractionmode-screen-space", "export": true, "normative": true, "for_": ["XRInteractionMode"]};
+window.refsData['https://html.spec.whatwg.org/multipage/indices.html#event-select'] = {"text": "select", "type": "event", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/indices.html#event-select", "export": true, "normative": true, "for_": ["HTMLElement"]};
+window.refsData['https://immersive-web.github.io/webxr/#dom-xrinputsourceevent-inputsource'] = {"text": "inputSource", "type": "attribute", "spec": "webxr", "shortname": "webxr", "level": "1", "status": "current", "url": "https://immersive-web.github.io/webxr/#dom-xrinputsourceevent-inputsource", "export": true, "normative": true, "for_": ["XRInputSourceEvent"]};
+window.refsData['https://immersive-web.github.io/webxr/#dom-xrinputsource-targetraymode'] = {"text": "targetRayMode", "type": "attribute", "spec": "webxr", "shortname": "webxr", "level": "1", "status": "current", "url": "https://immersive-web.github.io/webxr/#dom-xrinputsource-targetraymode", "export": true, "normative": true, "for_": ["XRInputSource"]};
+window.refsData['https://immersive-web.github.io/webxr/#dom-xrtargetraymode-screen'] = {"text": "\"screen\"", "type": "enum-value", "spec": "webxr", "shortname": "webxr", "level": "1", "status": "current", "url": "https://immersive-web.github.io/webxr/#dom-xrtargetraymode-screen", "export": true, "normative": true, "for_": ["XRTargetRayMode"]};
+window.refsData['#dom-xrinteractionmode-world-space'] = {"text": "\"world-space\"", "type": "enum-value", "spec": "webxr-ar-module-1", "shortname": "webxr-ar-module", "level": "1", "status": "local", "url": "#dom-xrinteractionmode-world-space", "export": true, "normative": true, "for_": ["XRInteractionMode"]};
+window.refsData['https://immersive-web.github.io/webxr/#dom-xrtargetraymode-tracked-pointer'] = {"text": "\"tracked-pointer\"", "type": "enum-value", "spec": "webxr", "shortname": "webxr", "level": "1", "status": "current", "url": "https://immersive-web.github.io/webxr/#dom-xrtargetraymode-tracked-pointer", "export": true, "normative": true, "for_": ["XRTargetRayMode"]};
+window.refsData['https://immersive-web.github.io/webxr/#dom-xrtargetraymode-gaze'] = {"text": "\"gaze\"", "type": "enum-value", "spec": "webxr", "shortname": "webxr", "level": "1", "status": "current", "url": "https://immersive-web.github.io/webxr/#dom-xrtargetraymode-gaze", "export": true, "normative": true, "for_": ["XRTargetRayMode"]};
+window.refsData['https://www.w3.org/TR/compositing-1#porterduffcompositingoperators_srcover'] = {"text": "source-over", "type": "dfn", "spec": "compositing-1", "shortname": "compositing", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/compositing-1#porterduffcompositingoperators_srcover", "export": true, "normative": true, "for_": []};
+window.refsData['https://immersive-web.github.io/webxr/#xrframe'] = {"text": "XRFrame", "type": "interface", "spec": "webxr", "shortname": "webxr", "level": "1", "status": "current", "url": "https://immersive-web.github.io/webxr/#xrframe", "export": true, "normative": true, "for_": []};
+window.refsData['https://immersive-web.github.io/webxr/#dom-xrview-transform'] = {"text": "transform", "type": "attribute", "spec": "webxr", "shortname": "webxr", "level": "1", "status": "current", "url": "https://immersive-web.github.io/webxr/#dom-xrview-transform", "export": true, "normative": true, "for_": ["XRView"]};
+window.refsData['https://immersive-web.github.io/webxr/#dom-xrviewerpose-views'] = {"text": "views", "type": "attribute", "spec": "webxr", "shortname": "webxr", "level": "1", "status": "current", "url": "https://immersive-web.github.io/webxr/#dom-xrviewerpose-views", "export": true, "normative": true, "for_": ["XRViewerPose"]};
+window.refsData['https://www.w3.org/TR/compositing-1#porterduffcompositingoperators_plus'] = {"text": "lighter", "type": "dfn", "spec": "compositing-1", "shortname": "compositing", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/compositing-1#porterduffcompositingoperators_plus", "export": true, "normative": true, "for_": []};
+window.refsData['https://immersive-web.github.io/webxr/#dom-xrrenderstate-baselayer'] = {"text": "baseLayer", "type": "attribute", "spec": "webxr", "shortname": "webxr", "level": "1", "status": "current", "url": "https://immersive-web.github.io/webxr/#dom-xrrenderstate-baselayer", "export": true, "normative": true, "for_": ["XRRenderState"]};
+window.refsData['https://immersive-web.github.io/webxr/#xrrigidtransform'] = {"text": "XRRigidTransform", "type": "interface", "spec": "webxr", "shortname": "webxr", "level": "1", "status": "current", "url": "https://immersive-web.github.io/webxr/#xrrigidtransform", "export": true, "normative": true, "for_": []};
+window.refsData['https://immersive-web.github.io/webxr/#dom-xreye-none'] = {"text": "\"none\"", "type": "enum-value", "spec": "webxr", "shortname": "webxr", "level": "1", "status": "current", "url": "https://immersive-web.github.io/webxr/#dom-xreye-none", "export": true, "normative": true, "for_": ["XREye"]};
+window.refsData['#first-person-observer-view'] = {"text": "first-person observer view", "type": "dfn", "spec": "webxr-ar-module-1", "shortname": "webxr-ar-module", "level": "1", "status": "local", "url": "#first-person-observer-view", "export": true, "normative": true, "for_": []};
+window.refsData['https://immersive-web.github.io/webxr/#xrview'] = {"text": "XRView", "type": "interface", "spec": "webxr", "shortname": "webxr", "level": "1", "status": "current", "url": "https://immersive-web.github.io/webxr/#xrview", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-xrview-isfirstpersonobserver'] = {"text": "isFirstPersonObserver", "type": "attribute", "spec": "webxr-ar-module-1", "shortname": "webxr-ar-module", "level": "1", "status": "local", "url": "#dom-xrview-isfirstpersonobserver", "export": true, "normative": true, "for_": ["XRView"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['https://immersive-web.github.io/webxr/#dom-xrsystem-requestsession'] = {"text": "requestSession(mode)", "type": "method", "spec": "webxr", "shortname": "webxr", "level": "1", "status": "current", "url": "https://immersive-web.github.io/webxr/#dom-xrsystem-requestsession", "export": true, "normative": true, "for_": ["XRSystem"]};
 </script>

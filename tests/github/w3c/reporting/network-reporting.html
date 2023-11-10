@@ -471,6 +471,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -1490,8 +1527,6 @@ Content-Type: application/reports+json
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -1739,7 +1774,6 @@ Content-Type: application/reports+json
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -2138,6 +2172,271 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://w3c.github.io/reporting/#endpoint'] = {"text": "endpoint", "type": "dfn", "spec": "reporting-1", "shortname": "reporting", "level": "1", "status": "current", "url": "https://w3c.github.io/reporting/#endpoint", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc2782#'] = {"text": "srv record", "type": "dfn", "spec": "rfc2782", "shortname": "rfc2782", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc2782#", "export": true, "normative": true, "for_": ["SRV"]};
+window.refsData['#network_reporting_endpoints'] = {"text": "network_reporting_endpoints", "type": "dfn", "spec": "network-reporting-1", "shortname": "network-reporting", "level": "1", "status": "local", "url": "#network_reporting_endpoints", "export": true, "normative": true, "for_": []};
+window.refsData['#network_reporting_endpoints-group'] = {"text": "group", "type": "dfn", "spec": "network-reporting-1", "shortname": "network-reporting", "level": "1", "status": "local", "url": "#network_reporting_endpoints-group", "export": true, "normative": true, "for_": ["network_reporting_endpoints"]};
+window.refsData['#network_reporting_endpoints-max_age'] = {"text": "max_age", "type": "dfn", "spec": "network-reporting-1", "shortname": "network-reporting", "level": "1", "status": "local", "url": "#network_reporting_endpoints-max_age", "export": true, "normative": true, "for_": ["network_reporting_endpoints"]};
+window.refsData['#network_reporting_endpoints-endpoints'] = {"text": "endpoints", "type": "dfn", "spec": "network-reporting-1", "shortname": "network-reporting", "level": "1", "status": "local", "url": "#network_reporting_endpoints-endpoints", "export": true, "normative": true, "for_": ["network_reporting_endpoints"]};
+window.refsData['#network_reporting_endpoints-url'] = {"text": "url", "type": "dfn", "spec": "network-reporting-1", "shortname": "network-reporting", "level": "1", "status": "local", "url": "#network_reporting_endpoints-url", "export": true, "normative": true, "for_": ["network_reporting_endpoints"]};
+window.refsData['#network_reporting_endpoints-priority'] = {"text": "priority", "type": "dfn", "spec": "network-reporting-1", "shortname": "network-reporting", "level": "1", "status": "local", "url": "#network_reporting_endpoints-priority", "export": true, "normative": true, "for_": ["network_reporting_endpoints"]};
+window.refsData['https://w3c.github.io/webappsec-csp/#directives-reporting'] = {"text": "reports directive", "type": "dfn", "spec": "csp", "shortname": "csp", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webappsec-csp/#directives-reporting", "export": true, "normative": true, "for_": []};
+window.refsData['#network-reporting-endpoint'] = {"text": "network reporting endpoint", "type": "dfn", "spec": "network-reporting-1", "shortname": "network-reporting", "level": "1", "status": "local", "url": "#network-reporting-endpoint", "export": true, "normative": true, "for_": []};
+window.refsData['#endpoint-group'] = {"text": "endpoint group", "type": "dfn", "spec": "network-reporting-1", "shortname": "network-reporting", "level": "1", "status": "local", "url": "#endpoint-group", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#origin'] = {"text": "origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#origin", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-endpoint-group-creation'] = {"text": "creation", "type": "attribute", "spec": "network-reporting-1", "shortname": "network-reporting", "level": "1", "status": "local", "url": "#dom-endpoint-group-creation", "export": true, "normative": true, "for_": ["endpoint group"]};
+window.refsData['#dom-endpoint-group-ttl'] = {"text": "ttl", "type": "attribute", "spec": "network-reporting-1", "shortname": "network-reporting", "level": "1", "status": "local", "url": "#dom-endpoint-group-ttl", "export": true, "normative": true, "for_": ["endpoint group"]};
+window.refsData['#dom-network-reporting-endpoint-retry_after'] = {"text": "retry_after", "type": "attribute", "spec": "network-reporting-1", "shortname": "network-reporting", "level": "1", "status": "local", "url": "#dom-network-reporting-endpoint-retry_after", "export": true, "normative": true, "for_": ["network reporting endpoint"]};
+window.refsData['#client'] = {"text": "client", "type": "dfn", "spec": "network-reporting-1", "shortname": "network-reporting", "level": "1", "status": "local", "url": "#client", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-endpoint-group-name'] = {"text": "name", "type": "attribute", "spec": "network-reporting-1", "shortname": "network-reporting", "level": "1", "status": "local", "url": "#dom-endpoint-group-name", "export": true, "normative": true, "for_": ["endpoint group"]};
+window.refsData['#dom-network-reporting-endpoint-priority'] = {"text": "priority", "type": "attribute", "spec": "network-reporting-1", "shortname": "network-reporting", "level": "1", "status": "local", "url": "#dom-network-reporting-endpoint-priority", "export": true, "normative": true, "for_": ["network reporting endpoint"]};
+window.refsData['#failover-class'] = {"text": "failover class", "type": "dfn", "spec": "network-reporting-1", "shortname": "network-reporting", "level": "1", "status": "local", "url": "#failover-class", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-network-reporting-endpoint-weight'] = {"text": "weight", "type": "attribute", "spec": "network-reporting-1", "shortname": "network-reporting", "level": "1", "status": "local", "url": "#dom-network-reporting-endpoint-weight", "export": true, "normative": true, "for_": ["network reporting endpoint"]};
+window.refsData['https://w3c.github.io/reporting/#windoworworkerglobalscope-reports'] = {"text": "reports", "type": "dfn", "spec": "reporting-1", "shortname": "reporting", "level": "1", "status": "current", "url": "https://w3c.github.io/reporting/#windoworworkerglobalscope-reports", "export": true, "normative": true, "for_": ["WindowOrWorkerGlobalScope"]};
+window.refsData['https://w3c.github.io/reporting/#report'] = {"text": "report", "type": "dfn", "spec": "reporting-1", "shortname": "reporting", "level": "1", "status": "current", "url": "https://w3c.github.io/reporting/#report", "export": true, "normative": true, "for_": []};
+window.refsData['https://wicg.github.io/origin-policy/#origin-policy-manifest'] = {"text": "origin policy manifest", "type": "dfn", "spec": "origin-policy", "shortname": "origin-policy", "level": "", "status": "anchor-block", "url": "https://wicg.github.io/origin-policy/#origin-policy-manifest", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#concept-origin-host'] = {"text": "host", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-origin-host", "export": true, "normative": true, "for_": ["origin"]};
+window.refsData['#reporting-cache'] = {"text": "reporting cache", "type": "dfn", "spec": "network-reporting-1", "shortname": "network-reporting", "level": "1", "status": "local", "url": "#reporting-cache", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webappsec-secure-contexts/#is-origin-trustworthy'] = {"text": "potentially trustworthy", "type": "dfn", "spec": "secure-contexts", "shortname": "secure-contexts", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webappsec-secure-contexts/#is-origin-trustworthy", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ordered-map'] = {"text": "map", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ordered-map", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#absolute-url-string'] = {"text": "absolute-url string", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#absolute-url-string", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#path-absolute-url-string'] = {"text": "path-absolute-url string", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#path-absolute-url-string", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#concept-url-parser'] = {"text": "url parser", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "anchor-block", "url": "https://url.spec.whatwg.org/#concept-url-parser", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#concept-base-url'] = {"text": "base url", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-base-url", "export": false, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response-url'] = {"text": "url", "type": "attribute", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-response-url", "export": true, "normative": true, "for_": ["response"]};
+window.refsData['#network_reporting_endpoints-weight'] = {"text": "weight", "type": "dfn", "spec": "network-reporting-1", "shortname": "network-reporting", "level": "1", "status": "local", "url": "#network_reporting_endpoints-weight", "export": true, "normative": true, "for_": ["network_reporting_endpoints"]};
+window.refsData['https://w3c.github.io/reporting/#dom-endpoint-name'] = {"text": "name", "type": "attribute", "spec": "reporting-1", "shortname": "reporting", "level": "1", "status": "current", "url": "https://w3c.github.io/reporting/#dom-endpoint-name", "export": true, "normative": true, "for_": ["endpoint"]};
+window.refsData['https://w3c.github.io/reporting/#dom-endpoint-url'] = {"text": "url", "type": "attribute", "spec": "reporting-1", "shortname": "reporting", "level": "1", "status": "current", "url": "https://w3c.github.io/reporting/#dom-endpoint-url", "export": true, "normative": true, "for_": ["endpoint"]};
+window.refsData['https://w3c.github.io/reporting/#dom-endpoint-failures'] = {"text": "failures", "type": "attribute", "spec": "reporting-1", "shortname": "reporting", "level": "1", "status": "current", "url": "https://w3c.github.io/reporting/#dom-endpoint-failures", "export": true, "normative": true, "for_": ["endpoint"]};
+window.refsData['#dom-endpoint-group-subdomains'] = {"text": "subdomains", "type": "attribute", "spec": "network-reporting-1", "shortname": "network-reporting", "level": "1", "status": "local", "url": "#dom-endpoint-group-subdomains", "export": true, "normative": true, "for_": ["endpoint group"]};
+window.refsData['#network_reporting_endpoints-include_subdomains'] = {"text": "include_subdomains", "type": "dfn", "spec": "network-reporting-1", "shortname": "network-reporting", "level": "1", "status": "local", "url": "#network_reporting_endpoints-include_subdomains", "export": true, "normative": true, "for_": ["network_reporting_endpoints"]};
+window.refsData['#dom-endpoint-group-endpoints'] = {"text": "endpoints", "type": "attribute", "spec": "network-reporting-1", "shortname": "network-reporting", "level": "1", "status": "local", "url": "#dom-endpoint-group-endpoints", "export": true, "normative": true, "for_": ["endpoint group"]};
+window.refsData['#dom-client-origin'] = {"text": "origin", "type": "attribute", "spec": "network-reporting-1", "shortname": "network-reporting", "level": "1", "status": "local", "url": "#dom-client-origin", "export": true, "normative": true, "for_": ["client"]};
+window.refsData['#dom-client-endpoint-groups'] = {"text": "endpoint-groups", "type": "attribute", "spec": "network-reporting-1", "shortname": "network-reporting", "level": "1", "status": "local", "url": "#dom-client-endpoint-groups", "export": true, "normative": true, "for_": ["client"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-document'] = {"text": "document", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-document", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object'] = {"text": "environment settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc2782#page-4'] = {"text": "target selection algorithm", "type": "dfn", "spec": "rfc2782", "shortname": "rfc2782", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc2782#page-4", "export": true, "normative": true, "for_": ["SRV"]};
+window.refsData['#network-reporting-endpoint-pending'] = {"text": "pending", "type": "dfn", "spec": "network-reporting-1", "shortname": "network-reporting", "level": "1", "status": "local", "url": "#network-reporting-endpoint-pending", "export": true, "normative": true, "for_": ["network reporting endpoint"]};
+window.refsData['https://w3c.github.io/reporting/#report-url'] = {"text": "url", "type": "dfn", "spec": "reporting-1", "shortname": "reporting", "level": "1", "status": "current", "url": "https://w3c.github.io/reporting/#report-url", "export": true, "normative": true, "for_": ["report"]};
+window.refsData['https://w3c.github.io/reporting/#report-destination'] = {"text": "destination", "type": "dfn", "spec": "reporting-1", "shortname": "reporting", "level": "1", "status": "current", "url": "https://w3c.github.io/reporting/#report-destination", "export": true, "normative": true, "for_": ["report"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#concept-origin-tuple'] = {"text": "tuple origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-origin-tuple", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#concept-domain'] = {"text": "domain", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "anchor-block", "url": "https://url.spec.whatwg.org/#concept-domain", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc6797#section-8.2'] = {"text": "superdomain match", "type": "dfn", "spec": "rfc6797", "shortname": "rfc6797", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc6797#section-8.2", "export": true, "normative": true, "for_": []};
+window.refsData['#endpoint-group-expired'] = {"text": "expired", "type": "dfn", "spec": "network-reporting-1", "shortname": "network-reporting", "level": "1", "status": "local", "url": "#endpoint-group-expired", "export": true, "normative": true, "for_": ["endpoint group"]};
+window.refsData['https://w3c.github.io/reporting/#report-attempts'] = {"text": "attempts", "type": "dfn", "spec": "reporting-1", "shortname": "reporting", "level": "1", "status": "current", "url": "https://w3c.github.io/reporting/#report-attempts", "export": true, "normative": true, "for_": ["report"]};
+window.refsData['https://w3c.github.io/reporting/#report-body'] = {"text": "body", "type": "dfn", "spec": "reporting-1", "shortname": "reporting", "level": "1", "status": "current", "url": "https://w3c.github.io/reporting/#report-body", "export": true, "normative": true, "for_": ["report"]};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

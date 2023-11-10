@@ -531,6 +531,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -1851,8 +1888,6 @@ A human-readable <a href="http://www.w3.org/community/about/agreements/cla-deed/
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -2100,7 +2135,6 @@ A human-readable <a href="http://www.w3.org/community/about/agreements/cla-deed/
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -2621,6 +2655,393 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#apphistory'] = {"text": "AppHistory", "type": "interface", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#apphistory", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#window'] = {"text": "Window", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-window-apphistory'] = {"text": "appHistory", "type": "attribute", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#dom-window-apphistory", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['https://webidl.spec.whatwg.org/#this'] = {"text": "this", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#this", "export": true, "normative": true, "for_": []};
+window.refsData['#window-app-history'] = {"text": "app history", "type": "dfn", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#window-app-history", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#eventtarget'] = {"text": "EventTarget", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#eventtarget", "export": true, "normative": true, "for_": []};
+window.refsData['#apphistoryentry'] = {"text": "AppHistoryEntry", "type": "interface", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#apphistoryentry", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-apphistory-current'] = {"text": "current", "type": "attribute", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#dom-apphistory-current", "export": true, "normative": true, "for_": ["AppHistory"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-apphistory-entries'] = {"text": "entries()", "type": "method", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#dom-apphistory-entries", "export": true, "normative": true, "for_": ["AppHistory"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-apphistory-cangoback'] = {"text": "canGoBack", "type": "attribute", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#dom-apphistory-cangoback", "export": true, "normative": true, "for_": ["AppHistory"]};
+window.refsData['#dom-apphistory-cangoforward'] = {"text": "canGoForward", "type": "attribute", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#dom-apphistory-cangoforward", "export": true, "normative": true, "for_": ["AppHistory"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler'] = {"text": "EventHandler", "type": "typedef", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-apphistory-onnavigate'] = {"text": "onnavigate", "type": "attribute", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#dom-apphistory-onnavigate", "export": true, "normative": true, "for_": ["AppHistory"]};
+window.refsData['#dom-apphistory-onnavigatesuccess'] = {"text": "onnavigatesuccess", "type": "attribute", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#dom-apphistory-onnavigatesuccess", "export": true, "normative": true, "for_": ["AppHistory"]};
+window.refsData['#dom-apphistory-onnavigateerror'] = {"text": "onnavigateerror", "type": "attribute", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#dom-apphistory-onnavigateerror", "export": true, "normative": true, "for_": ["AppHistory"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#same-origin'] = {"text": "same origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#same-origin", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list'] = {"text": "list", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-global'] = {"text": "relevant global object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-global", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#concept-document-window'] = {"text": "associated document", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#concept-document-window", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#fully-active'] = {"text": "fully active", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#fully-active", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['#apphistory-current-index'] = {"text": "current index", "type": "dfn", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#apphistory-current-index", "export": true, "normative": true, "for_": ["AppHistory"]};
+window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
+window.refsData['#apphistory-update-the-entries'] = {"text": "update the entries", "type": "dfn", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#apphistory-update-the-entries", "export": true, "normative": true, "for_": ["AppHistory"]};
+window.refsData['#apphistory-entry-list'] = {"text": "entry list", "type": "dfn", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#apphistory-entry-list", "export": true, "normative": true, "for_": ["AppHistory"]};
+window.refsData['https://infra.spec.whatwg.org/#list-size'] = {"text": "size", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-size", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-handlers'] = {"text": "event handler", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-handlers", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-event-type'] = {"text": "event handler event type", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-event-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-idl-attributes'] = {"text": "event handler idl attribute", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-idl-attributes", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#concept-document-bc'] = {"text": "browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#concept-document-bc", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['https://infra.spec.whatwg.org/#assert'] = {"text": "assert", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#assert", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/history.html#session-history'] = {"text": "session history", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/history.html#session-history", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-is-empty'] = {"text": "is empty", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-is-empty", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsing-the-web.html#url-and-history-update-steps'] = {"text": "url and history update steps", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsing-the-web.html#url-and-history-update-steps", "export": false, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/multipage/dynamic-markup-insertion.html#dom-document-open'] = {"text": "open(unused1, unused2)", "type": "method", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/multipage/dynamic-markup-insertion.html#dom-document-open", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['https://html.spec.whatwg.org/multipage/history.html#current-entry'] = {"text": "current entry", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/history.html#current-entry", "export": true, "normative": true, "for_": ["session history"]};
+window.refsData['#session-history-entry-origin'] = {"text": "origin", "type": "dfn", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#session-history-entry-origin", "export": true, "normative": true, "for_": ["session history entry"]};
+window.refsData['https://infra.spec.whatwg.org/#list-prepend'] = {"text": "prepend", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-prepend", "export": true, "normative": true, "for_": ["list"]};
+window.refsData['https://infra.spec.whatwg.org/#iteration-break'] = {"text": "break", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#iteration-break", "export": true, "normative": true, "for_": ["iteration"]};
+window.refsData['https://infra.spec.whatwg.org/#list-append'] = {"text": "append", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-append", "export": true, "normative": true, "for_": ["list"]};
+window.refsData['https://infra.spec.whatwg.org/#list-iterate'] = {"text": "for each", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-iterate", "export": true, "normative": true, "for_": ["list", "set"]};
+window.refsData['#apphistoryentry-index'] = {"text": "index", "type": "dfn", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#apphistoryentry-index", "export": true, "normative": true, "for_": ["AppHistoryEntry"]};
+window.refsData['https://infra.spec.whatwg.org/#list-contain'] = {"text": "contain", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-contain", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['#apphistoryentry-session-history-entry'] = {"text": "session history entry", "type": "dfn", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#apphistoryentry-session-history-entry", "export": true, "normative": true, "for_": ["AppHistoryEntry"]};
+window.refsData['https://webidl.spec.whatwg.org/#new'] = {"text": "new", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#new", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-realm'] = {"text": "relevant realm", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-realm", "export": true, "normative": true, "for_": []};
+window.refsData['#eventdef-apphistory-navigate'] = {"text": "navigate", "type": "event", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#eventdef-apphistory-navigate", "export": true, "normative": true, "for_": ["AppHistory"]};
+window.refsData['https://dom.spec.whatwg.org/#event'] = {"text": "Event", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#event", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-apphistorynavigateeventinit'] = {"text": "AppHistoryNavigateEventInit", "type": "dictionary", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#dictdef-apphistorynavigateeventinit", "export": true, "normative": true, "for_": []};
+window.refsData['#enumdef-apphistorynavigationtype'] = {"text": "AppHistoryNavigationType", "type": "enum", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#enumdef-apphistorynavigationtype", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-apphistorynavigateevent-navigationtype'] = {"text": "navigationType", "type": "attribute", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#dom-apphistorynavigateevent-navigationtype", "export": true, "normative": true, "for_": ["AppHistoryNavigateEvent"]};
+window.refsData['#dom-apphistorynavigateevent-canrespond'] = {"text": "canRespond", "type": "attribute", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#dom-apphistorynavigateevent-canrespond", "export": true, "normative": true, "for_": ["AppHistoryNavigateEvent"]};
+window.refsData['#dom-apphistorynavigateevent-userinitiated'] = {"text": "userInitiated", "type": "attribute", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#dom-apphistorynavigateevent-userinitiated", "export": true, "normative": true, "for_": ["AppHistoryNavigateEvent"]};
+window.refsData['#dom-apphistorynavigateevent-hashchange'] = {"text": "hashChange", "type": "attribute", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#dom-apphistorynavigateevent-hashchange", "export": true, "normative": true, "for_": ["AppHistoryNavigateEvent"]};
+window.refsData['https://xhr.spec.whatwg.org/#formdata'] = {"text": "FormData", "type": "interface", "spec": "xhr", "shortname": "xhr", "level": "1", "status": "current", "url": "https://xhr.spec.whatwg.org/#formdata", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-apphistorynavigateevent-formdata'] = {"text": "formData", "type": "attribute", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#dom-apphistorynavigateevent-formdata", "export": true, "normative": true, "for_": ["AppHistoryNavigateEvent"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-any'] = {"text": "any", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-any", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-apphistorynavigateevent-info'] = {"text": "info", "type": "attribute", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#dom-apphistorynavigateevent-info", "export": true, "normative": true, "for_": ["AppHistoryNavigateEvent"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-apphistorynavigateevent-respondwith'] = {"text": "respondWith(newNavigationAction)", "type": "method", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#dom-apphistorynavigateevent-respondwith", "export": true, "normative": true, "for_": ["AppHistoryNavigateEvent"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-promise'] = {"text": "Promise", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-promise", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#dictdef-eventinit'] = {"text": "EventInit", "type": "dictionary", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dictdef-eventinit", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-apphistorynavigationtype-push'] = {"text": "\"push\"", "type": "enum-value", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#dom-apphistorynavigationtype-push", "export": true, "normative": true, "for_": ["AppHistoryNavigationType"]};
+window.refsData['#dom-apphistorynavigationtype-replace'] = {"text": "\"replace\"", "type": "enum-value", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#dom-apphistorynavigationtype-replace", "export": true, "normative": true, "for_": ["AppHistoryNavigationType"]};
+window.refsData['#dom-apphistorynavigationtype-traverse'] = {"text": "\"traverse\"", "type": "enum-value", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#dom-apphistorynavigationtype-traverse", "export": true, "normative": true, "for_": ["AppHistoryNavigationType"]};
+window.refsData['#rewritable'] = {"text": "rewritable", "type": "dfn", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#rewritable", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-a-element'] = {"text": "a", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-a-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/forms.html#the-form-element'] = {"text": "form", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/forms.html#the-form-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsing-the-web.html#navigate-fragid'] = {"text": "navigate to a fragment", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsing-the-web.html#navigate-fragid", "export": false, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#concept-form-submit'] = {"text": "submitted", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#concept-form-submit", "export": false, "normative": true, "for_": []};
+window.refsData['#eventdef-apphistory-navigatesuccess'] = {"text": "navigatesuccess", "type": "event", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#eventdef-apphistory-navigatesuccess", "export": true, "normative": true, "for_": ["AppHistory"]};
+window.refsData['#eventdef-apphistory-navigateerror'] = {"text": "navigateerror", "type": "event", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#eventdef-apphistory-navigateerror", "export": true, "normative": true, "for_": ["AppHistory"]};
+window.refsData['https://webidl.spec.whatwg.org/#securityerror'] = {"text": "SecurityError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#securityerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMException'] = {"text": "DOMException", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMException", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#dom-event-istrusted'] = {"text": "isTrusted", "type": "attribute", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-event-istrusted", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['https://webidl.spec.whatwg.org/#invalidstateerror'] = {"text": "InvalidStateError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invalidstateerror", "export": true, "normative": true, "for_": []};
+window.refsData['#apphistorynavigateevent'] = {"text": "AppHistoryNavigateEvent", "type": "interface", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#apphistorynavigateevent", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#concept-url'] = {"text": "url", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/history.html#serialized-state'] = {"text": "serialized state", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/history.html#serialized-state", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/history.html#session-history-entry'] = {"text": "session history entry", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/history.html#session-history-entry", "export": true, "normative": true, "for_": []};
+window.refsData['#fire-a-navigate-event'] = {"text": "fire a navigate event", "type": "dfn", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#fire-a-navigate-event", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#window-bc'] = {"text": "browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window-bc", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['https://dom.spec.whatwg.org/#dispatch-flag'] = {"text": "dispatch flag", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dispatch-flag", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['https://dom.spec.whatwg.org/#canceled-flag'] = {"text": "canceled flag", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#canceled-flag", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['#apphistorynavigateevent-navigation-action-promise'] = {"text": "navigation action promise", "type": "dfn", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#apphistorynavigateevent-navigation-action-promise", "export": true, "normative": true, "for_": ["AppHistoryNavigateEvent"]};
+window.refsData['#apphistorynavigateevent-destination-url'] = {"text": "destination url", "type": "dfn", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#apphistorynavigateevent-destination-url", "export": true, "normative": true, "for_": ["AppHistoryNavigateEvent"]};
+window.refsData['https://html.spec.whatwg.org/multipage/history.html#uhus-serializeddata'] = {"text": "serializeddata", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/history.html#uhus-serializeddata", "export": true, "normative": true, "for_": ["URL and history update steps"]};
+window.refsData['#apphistorynavigateevent-classic-history-api-serialized-data'] = {"text": "classic history api serialized data", "type": "dfn", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#apphistorynavigateevent-classic-history-api-serialized-data", "export": true, "normative": true, "for_": ["AppHistoryNavigateEvent"]};
+window.refsData['https://html.spec.whatwg.org/multipage/history.html#uhus-ispush'] = {"text": "ispush", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/history.html#uhus-ispush", "export": true, "normative": true, "for_": ["URL and history update steps"]};
+window.refsData['#apphistorynavigateevent-destination-entry'] = {"text": "destination entry", "type": "dfn", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#apphistorynavigateevent-destination-entry", "export": true, "normative": true, "for_": ["AppHistoryNavigateEvent"]};
+window.refsData['#user-navigation-involvement'] = {"text": "user navigation involvement", "type": "dfn", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#user-navigation-involvement", "export": true, "normative": true, "for_": []};
+window.refsData['#user-navigation-involvement-none'] = {"text": "none", "type": "dfn", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#user-navigation-involvement-none", "export": true, "normative": true, "for_": ["user navigation involvement"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-event-create'] = {"text": "creating an event", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-event-create", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#dom-event-type'] = {"text": "type", "type": "attribute", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-event-type", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-document-url'] = {"text": "url", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-document-url", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['https://url.spec.whatwg.org/#concept-url-equals'] = {"text": "equal", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-equals", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['https://url.spec.whatwg.org/#url-equals-exclude-fragments'] = {"text": "exclude fragments", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#url-equals-exclude-fragments", "export": true, "normative": true, "for_": ["url/equals"]};
+window.refsData['https://url.spec.whatwg.org/#concept-url-fragment'] = {"text": "fragment", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-fragment", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['https://infra.spec.whatwg.org/#string-is'] = {"text": "is", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#string-is", "export": true, "normative": true, "for_": ["string"]};
+window.refsData['#user-navigation-involvement-browser-ui'] = {"text": "browser ui", "type": "dfn", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#user-navigation-involvement-browser-ui", "export": true, "normative": true, "for_": ["user navigation involvement"]};
+window.refsData['https://dom.spec.whatwg.org/#dom-event-cancelable'] = {"text": "cancelable", "type": "attribute", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-event-cancelable", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-event-dispatch'] = {"text": "dispatch", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-event-dispatch", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element'] = {"text": "iframe", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#a-promise-resolved-with'] = {"text": "a promise resolved with", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#a-promise-resolved-with", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-perform-steps-once-promise-is-settled'] = {"text": "react", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-perform-steps-once-promise-is-settled", "export": true, "normative": true, "for_": ["promise"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-event-fire'] = {"text": "fire an event", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-event-fire", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#errorevent'] = {"text": "ErrorEvent", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#errorevent", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#dom-errorevent-error'] = {"text": "error", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#dom-errorevent-error", "export": true, "normative": true, "for_": ["ErrorEvent"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#dom-errorevent-message'] = {"text": "message", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#dom-errorevent-message", "export": true, "normative": true, "for_": ["ErrorEvent"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#dom-errorevent-filename'] = {"text": "filename", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#dom-errorevent-filename", "export": true, "normative": true, "for_": ["ErrorEvent"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#dom-errorevent-lineno'] = {"text": "lineno", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#dom-errorevent-lineno", "export": true, "normative": true, "for_": ["ErrorEvent"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#dom-errorevent-colno'] = {"text": "colno", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#dom-errorevent-colno", "export": true, "normative": true, "for_": ["ErrorEvent"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#report-the-exception'] = {"text": "report an exception", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#report-the-exception", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#concept-url-path'] = {"text": "path", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-path", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['https://url.spec.whatwg.org/#concept-url-query'] = {"text": "query", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-query", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['https://url.spec.whatwg.org/#concept-url-origin'] = {"text": "origin", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-origin", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['#dom-apphistoryentry-key'] = {"text": "key", "type": "attribute", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#dom-apphistoryentry-key", "export": true, "normative": true, "for_": ["AppHistoryEntry"]};
+window.refsData['#dom-apphistoryentry-id'] = {"text": "id", "type": "attribute", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#dom-apphistoryentry-id", "export": true, "normative": true, "for_": ["AppHistoryEntry"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-USVString'] = {"text": "USVString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-USVString", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-apphistoryentry-url'] = {"text": "url", "type": "attribute", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#dom-apphistoryentry-url", "export": true, "normative": true, "for_": ["AppHistoryEntry"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-long-long'] = {"text": "long long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-long-long", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-apphistoryentry-index'] = {"text": "index", "type": "attribute", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#dom-apphistoryentry-index", "export": true, "normative": true, "for_": ["AppHistoryEntry"]};
+window.refsData['#dom-apphistoryentry-samedocument'] = {"text": "sameDocument", "type": "attribute", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#dom-apphistoryentry-samedocument", "export": true, "normative": true, "for_": ["AppHistoryEntry"]};
+window.refsData['#dom-apphistoryentry-getstate'] = {"text": "getState()", "type": "method", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#dom-apphistoryentry-getstate", "export": true, "normative": true, "for_": ["AppHistoryEntry"]};
+window.refsData['https://infra.spec.whatwg.org/#user-agent'] = {"text": "user agent", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#user-agent", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-document-2'] = {"text": "document", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-document-2", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-history-state'] = {"text": "state", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-history-state", "export": true, "normative": true, "for_": ["History"]};
+window.refsData['#session-history-entry-app-history-key'] = {"text": "app history key", "type": "dfn", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#session-history-entry-app-history-key", "export": true, "normative": true, "for_": ["session history entry"]};
+window.refsData['#session-history-entry-app-history-id'] = {"text": "app history id", "type": "dfn", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#session-history-entry-app-history-id", "export": true, "normative": true, "for_": ["session history entry"]};
+window.refsData['https://html.spec.whatwg.org/multipage/history.html#she-url'] = {"text": "url", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/history.html#she-url", "export": true, "normative": true, "for_": ["session history entry"]};
+window.refsData['https://url.spec.whatwg.org/#concept-url-serializer'] = {"text": "url serializer", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-serializer", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/history.html#she-document'] = {"text": "document", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/history.html#she-document", "export": true, "normative": true, "for_": ["session history entry"]};
+window.refsData['#session-history-entry-app-history-state'] = {"text": "app history state", "type": "dfn", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#session-history-entry-app-history-state", "export": true, "normative": true, "for_": ["session history entry"]};
+window.refsData['https://html.spec.whatwg.org/multipage/structured-data.html#structureddeserialize'] = {"text": "StructuredDeserialize", "type": "abstract-op", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/structured-data.html#structureddeserialize", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-ArrayBuffer'] = {"text": "ArrayBuffer", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-ArrayBuffer", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsing-the-web.html#navigate'] = {"text": "navigate", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsing-the-web.html#navigate", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel'] = {"text": "in parallel", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#plan-to-navigate'] = {"text": "plan to navigate", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#plan-to-navigate", "export": false, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsing-the-web.html#navigation-hh'] = {"text": "historyhandling", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsing-the-web.html#navigation-hh", "export": true, "normative": true, "for_": ["navigate"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsing-the-web.html#navigation-navigationtype'] = {"text": "navigationtype", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsing-the-web.html#navigation-navigationtype", "export": true, "normative": true, "for_": ["navigate"]};
+window.refsData['#navigate-entrylist'] = {"text": "entrylist", "type": "dfn", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#navigate-entrylist", "export": true, "normative": true, "for_": ["navigate"]};
+window.refsData['https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#submit-body'] = {"text": "submit as entity body", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#submit-body", "export": false, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/image-maps.html#the-area-element'] = {"text": "area", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/image-maps.html#the-area-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#eventtarget-activation-behavior'] = {"text": "activation behavior", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#eventtarget-activation-behavior", "export": true, "normative": true, "for_": ["EventTarget"]};
+window.refsData['#user-navigation-involvement-activation'] = {"text": "activation", "type": "dfn", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#user-navigation-involvement-activation", "export": true, "normative": true, "for_": ["user navigation involvement"]};
+window.refsData['#navigate-userinvolvement'] = {"text": "userinvolvement", "type": "dfn", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#navigate-userinvolvement", "export": true, "normative": true, "for_": ["navigate"]};
+window.refsData['https://w3c.github.io/webappsec-fetch-metadata/#http-headerdef-sec-fetch-site'] = {"text": "sec-fetch-site", "type": "http-header", "spec": "fetch-metadata", "shortname": "fetch-metadata", "level": "1", "status": "current", "url": "https://w3c.github.io/webappsec-fetch-metadata/#http-headerdef-sec-fetch-site", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsing-the-web.html#traverse-the-history-by-a-delta'] = {"text": "traverse the history by a delta", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsing-the-web.html#traverse-the-history-by-a-delta", "export": false, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#browsing-context'] = {"text": "browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['#traverse-the-history-by-a-delta-userinvolvement'] = {"text": "userinvolvement", "type": "dfn", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#traverse-the-history-by-a-delta-userinvolvement", "export": true, "normative": true, "for_": ["traverse the history by a delta"]};
+window.refsData['https://html.spec.whatwg.org/multipage/links.html#following-hyperlinks-2'] = {"text": "follow the hyperlink", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/links.html#following-hyperlinks-2", "export": false, "normative": true, "for_": []};
+window.refsData['#event-user-navigation-involvement'] = {"text": "user navigation involvement", "type": "dfn", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#event-user-navigation-involvement", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['https://html.spec.whatwg.org/multipage/input.html#the-input-element'] = {"text": "input", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/input.html#the-input-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/input.html#input-activation-behavior'] = {"text": "input activation behavior", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/input.html#input-activation-behavior", "export": false, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/form-elements.html#the-button-element'] = {"text": "button", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/form-elements.html#the-button-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/form-elements.html#attr-button-type-submit-state'] = {"text": "submit button", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/form-elements.html#attr-button-type-submit-state", "export": false, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#shared-history-push/replace-state-steps'] = {"text": "shared history push/replace state steps", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#shared-history-push/replace-state-steps", "export": false, "normative": true, "for_": []};
+window.refsData['#fire-a-navigate-event-navigationtype'] = {"text": "navigationtype", "type": "dfn", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#fire-a-navigate-event-navigationtype", "export": true, "normative": true, "for_": ["fire a navigate event"]};
+window.refsData['#fire-a-navigate-event-issamedocument'] = {"text": "issamedocument", "type": "dfn", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#fire-a-navigate-event-issamedocument", "export": true, "normative": true, "for_": ["fire a navigate event"]};
+window.refsData['#fire-a-navigate-event-destinationurl'] = {"text": "destinationurl", "type": "dfn", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#fire-a-navigate-event-destinationurl", "export": true, "normative": true, "for_": ["fire a navigate event"]};
+window.refsData['#fire-a-navigate-event-classichistoryapiserializeddata'] = {"text": "classichistoryapiserializeddata", "type": "dfn", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#fire-a-navigate-event-classichistoryapiserializeddata", "export": true, "normative": true, "for_": ["fire a navigate event"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsing-the-web.html#hh-default'] = {"text": "default", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsing-the-web.html#hh-default", "export": true, "normative": true, "for_": ["history handling behavior"]};
+window.refsData['#fire-a-navigate-event-userinvolvement'] = {"text": "userinvolvement", "type": "dfn", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#fire-a-navigate-event-userinvolvement", "export": true, "normative": true, "for_": ["fire a navigate event"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsing-the-web.html#hh-entry-update'] = {"text": "entry update", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsing-the-web.html#hh-entry-update", "export": true, "normative": true, "for_": ["history handling behavior"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-document-origin'] = {"text": "origin", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-document-origin", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#same-origin-domain'] = {"text": "same origin-domain", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#same-origin-domain", "export": true, "normative": true, "for_": []};
+window.refsData['#fire-a-navigate-event-formdataentrylist'] = {"text": "formdataentrylist", "type": "dfn", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#fire-a-navigate-event-formdataentrylist", "export": true, "normative": true, "for_": ["fire a navigate event"]};
+window.refsData['#fire-a-navigate-event-destinationentry'] = {"text": "destinationentry", "type": "dfn", "spec": "app-history-1", "shortname": "app-history", "level": "1", "status": "local", "url": "#fire-a-navigate-event-destinationentry", "export": true, "normative": true, "for_": ["fire a navigate event"]};
+window.refsData['https://infra.spec.whatwg.org/#struct-item'] = {"text": "item", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#struct-item", "export": true, "normative": true, "for_": ["struct", "tuple"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#concept-origin'] = {"text": "origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-origin", "export": true, "normative": true, "for_": []};
+window.refsData['https://wicg.github.io/uuid/#dfn-generate-a-random-uuid'] = {"text": "generate a random uuid", "type": "dfn", "spec": "uuid", "shortname": "uuid", "level": "", "status": "anchor-block", "url": "https://wicg.github.io/uuid/#dfn-generate-a-random-uuid", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsing-the-web.html#hh-replace'] = {"text": "replace", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsing-the-web.html#hh-replace", "export": true, "normative": true, "for_": ["history handling behavior"]};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

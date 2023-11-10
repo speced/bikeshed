@@ -696,6 +696,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -3970,8 +4007,6 @@ the prose restrictions on negative values.</p>
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -4219,7 +4254,6 @@ the prose restrictions on negative values.</p>
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -4741,4 +4775,358 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#at-ruledef-counter-style'] = {"text": "@counter-style", "type": "at-rule", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#at-ruledef-counter-style", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-images-3/#typedef-image'] = {"text": "<image>", "type": "type", "spec": "css-images-3", "shortname": "css-images", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-images-3/#typedef-image", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-symbol'] = {"text": "<symbol>", "type": "type", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#typedef-symbol", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-lists-3/#propdef-list-style-type'] = {"text": "list-style-type", "type": "property", "spec": "css-lists-3", "shortname": "css-lists", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-lists-3/#propdef-list-style-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-lists-3/#funcdef-counter'] = {"text": "counter()", "type": "function", "spec": "css-lists-3", "shortname": "css-lists", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-lists-3/#funcdef-counter", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-lists-3/#funcdef-counters'] = {"text": "counters()", "type": "function", "spec": "css-lists-3", "shortname": "css-lists", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-lists-3/#funcdef-counters", "export": true, "normative": true, "for_": []};
+window.refsData['#generate-a-counter'] = {"text": "generate a counter representation", "type": "dfn", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#generate-a-counter", "export": true, "normative": true, "for_": []};
+window.refsData['#decimal'] = {"text": "decimal", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#decimal", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#use-a-negative-sign'] = {"text": "uses a negative sign", "type": "dfn", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#use-a-negative-sign", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-content-3/#propdef-content'] = {"text": "content", "type": "property", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-content-3/#propdef-content", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-marker'] = {"text": "::marker", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-marker", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-system-symbolic'] = {"text": "symbolic", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-system-symbolic", "export": true, "normative": true, "for_": ["system"]};
+window.refsData['#valdef-counter-style-system-additive'] = {"text": "additive", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-system-additive", "export": true, "normative": true, "for_": ["@counter-style/system", "system"]};
+window.refsData['#counter-style'] = {"text": "counter style", "type": "dfn", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#counter-style", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-decor-4/#valdef-text-emphasis-skip-symbols'] = {"text": "symbols", "type": "value", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-decor-4/#valdef-text-emphasis-skip-symbols", "export": true, "normative": true, "for_": ["text-emphasis-skip"]};
+window.refsData['#typedef-counter-style-name'] = {"text": "<counter-style-name>", "type": "type", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#typedef-counter-style-name", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#typedef-declaration-list'] = {"text": "<declaration-list>", "type": "type", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#typedef-declaration-list", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#identifier-value'] = {"text": "<custom-ident>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#identifier-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ascii-case-insensitive'] = {"text": "ascii case-insensitive", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-case-insensitive", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#css-wide-keywords'] = {"text": "css-wide keywords", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-lists-3/#valdef-list-style-position-inside'] = {"text": "inside", "type": "value", "spec": "css-lists-3", "shortname": "css-lists", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-lists-3/#valdef-list-style-position-inside", "export": true, "normative": true, "for_": ["list-style-position"]};
+window.refsData['https://drafts.csswg.org/css-lists-3/#propdef-list-style'] = {"text": "list-style", "type": "property", "spec": "css-lists-3", "shortname": "css-lists", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-lists-3/#propdef-list-style", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#integer-value'] = {"text": "<integer>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#integer-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-opt'] = {"text": "?", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-counter-style-system-cyclic'] = {"text": "cyclic", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-system-cyclic", "export": true, "normative": true, "for_": ["@counter-style/system", "system"]};
+window.refsData['#valdef-counter-style-system-numeric'] = {"text": "numeric", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-system-numeric", "export": true, "normative": true, "for_": ["@counter-style/system", "system"]};
+window.refsData['#counter-symbol'] = {"text": "counter symbol", "type": "dfn", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#counter-symbol", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-counter-style-system-fixed'] = {"text": "fixed", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-system-fixed", "export": true, "normative": true, "for_": ["@counter-style/system", "system"]};
+window.refsData['#first-symbol-value'] = {"text": "first symbol value", "type": "dfn", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#first-symbol-value", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-counter-style-system-alphabetic'] = {"text": "alphabetic", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-system-alphabetic", "export": true, "normative": true, "for_": ["@counter-style/system", "system"]};
+window.refsData['#upper-alpha'] = {"text": "upper-alpha", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#upper-alpha", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#lower-alpha'] = {"text": "lower-alpha", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#lower-alpha", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#additive-tuple'] = {"text": "additive tuple", "type": "dfn", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#additive-tuple", "export": true, "normative": true, "for_": []};
+window.refsData['#current-tuple'] = {"text": "current tuple", "type": "dfn", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#current-tuple", "export": true, "normative": true, "for_": []};
+window.refsData['#descdef-counter-style-additive-symbols'] = {"text": "additive-symbols", "type": "descriptor", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#descdef-counter-style-additive-symbols", "export": true, "normative": true, "for_": ["@counter-style"]};
+window.refsData['#valdef-counter-style-system-extends'] = {"text": "extends", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-system-extends", "export": true, "normative": true, "for_": ["@counter-style/system", "system"]};
+window.refsData['#descdef-counter-style-negative'] = {"text": "negative", "type": "descriptor", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#descdef-counter-style-negative", "export": true, "normative": true, "for_": ["@counter-style"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-num'] = {"text": "{a}", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-num", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-comma'] = {"text": "#", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-comma", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-counter-style-range-auto'] = {"text": "auto", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-range-auto", "export": true, "normative": true, "for_": ["@counter-style/range", "range"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-all'] = {"text": "&&", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-all", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-3/#grapheme-cluster'] = {"text": "grapheme cluster", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-text-3/#grapheme-cluster", "export": false, "normative": true, "for_": []};
+window.refsData['#initial-representation-for-the-counter-value'] = {"text": "initial representation for the counter value", "type": "dfn", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#initial-representation-for-the-counter-value", "export": true, "normative": true, "for_": []};
+window.refsData['#descdef-counter-style-pad'] = {"text": "pad", "type": "descriptor", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#descdef-counter-style-pad", "export": true, "normative": true, "for_": ["@counter-style"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-one-plus'] = {"text": "+", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-one-plus", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#string-value'] = {"text": "<string>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#string-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#at-rule'] = {"text": "at-rule", "type": "dfn", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#at-rule", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-images-3/#default-object-size'] = {"text": "default object size", "type": "dfn", "spec": "css-images-3", "shortname": "css-images", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-images-3/#default-object-size", "export": true, "normative": true, "for_": []};
+window.refsData['#descdef-counter-style-symbols'] = {"text": "symbols", "type": "descriptor", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#descdef-counter-style-symbols", "export": true, "normative": true, "for_": ["@counter-style"]};
+window.refsData['#descdef-counter-style-speak-as'] = {"text": "speak-as", "type": "descriptor", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#descdef-counter-style-speak-as", "export": true, "normative": true, "for_": ["@counter-style"]};
+window.refsData['#valdef-counter-style-speak-as-spell-out'] = {"text": "spell-out", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-speak-as-spell-out", "export": true, "normative": true, "for_": ["@counter-style/speak-as", "speak-as"]};
+window.refsData['#valdef-counter-style-speak-as-bullets'] = {"text": "bullets", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-speak-as-bullets", "export": true, "normative": true, "for_": ["@counter-style/speak-as", "speak-as"]};
+window.refsData['#valdef-counter-style-speak-as-auto'] = {"text": "auto", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-speak-as-auto", "export": true, "normative": true, "for_": ["@counter-style/speak-as", "speak-as"]};
+window.refsData['#valdef-counter-style-speak-as-numbers'] = {"text": "numbers", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-speak-as-numbers", "export": true, "normative": true, "for_": ["@counter-style/speak-as", "speak-as"]};
+window.refsData['https://drafts.csswg.org/css-text-4/#content-language'] = {"text": "content language", "type": "dfn", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#content-language", "export": true, "normative": true, "for_": []};
+window.refsData['#lower-greek'] = {"text": "lower-greek", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#lower-greek", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#upper-latin'] = {"text": "upper-latin", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#upper-latin", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#lower-latin'] = {"text": "lower-latin", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#lower-latin", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#funcdef-symbols'] = {"text": "symbols()", "type": "function", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#funcdef-symbols", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-symbols-type'] = {"text": "<symbols-type>", "type": "type", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#typedef-symbols-type", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-counter-style'] = {"text": "<counter-style>", "type": "type", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#typedef-counter-style", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#computed-value'] = {"text": "computed value", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#computed-value", "export": true, "normative": true, "for_": []};
+window.refsData['#decimal-leading-zero'] = {"text": "decimal-leading-zero", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#decimal-leading-zero", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#valdef-counter-style-name-arabic-indic'] = {"text": "arabic-indic", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-name-arabic-indic", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#armenian'] = {"text": "armenian", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#armenian", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#valdef-counter-style-name-upper-armenian'] = {"text": "upper-armenian", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-name-upper-armenian", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#valdef-counter-style-name-lower-armenian'] = {"text": "lower-armenian", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-name-lower-armenian", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#valdef-counter-style-name-bengali'] = {"text": "bengali", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-name-bengali", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#valdef-counter-style-name-cambodian'] = {"text": "cambodian", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-name-cambodian", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#valdef-counter-style-name-khmer'] = {"text": "khmer", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-name-khmer", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#cjk-decimal'] = {"text": "cjk-decimal", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#cjk-decimal", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#valdef-counter-style-name-devanagari'] = {"text": "devanagari", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-name-devanagari", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#georgian'] = {"text": "georgian", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#georgian", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#valdef-counter-style-name-gujarati'] = {"text": "gujarati", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-name-gujarati", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#valdef-counter-style-name-gurmukhi'] = {"text": "gurmukhi", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-name-gurmukhi", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#hebrew'] = {"text": "hebrew", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#hebrew", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#valdef-counter-style-name-kannada'] = {"text": "kannada", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-name-kannada", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#valdef-counter-style-name-lao'] = {"text": "lao", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-name-lao", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#valdef-counter-style-name-malayalam'] = {"text": "malayalam", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-name-malayalam", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#valdef-counter-style-name-mongolian'] = {"text": "mongolian", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-name-mongolian", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#valdef-counter-style-name-myanmar'] = {"text": "myanmar", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-name-myanmar", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#valdef-counter-style-name-oriya'] = {"text": "oriya", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-name-oriya", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#valdef-counter-style-name-persian'] = {"text": "persian", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-name-persian", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#lower-roman'] = {"text": "lower-roman", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#lower-roman", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#upper-roman'] = {"text": "upper-roman", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#upper-roman", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#valdef-counter-style-name-tamil'] = {"text": "tamil", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-name-tamil", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#valdef-counter-style-name-telugu'] = {"text": "telugu", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-name-telugu", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#valdef-counter-style-name-thai'] = {"text": "thai", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-name-thai", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#valdef-counter-style-name-tibetan'] = {"text": "tibetan", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-name-tibetan", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#hiragana'] = {"text": "hiragana", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#hiragana", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#hiragana-iroha'] = {"text": "hiragana-iroha", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#hiragana-iroha", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#katakana'] = {"text": "katakana", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#katakana", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#katakana-iroha'] = {"text": "katakana-iroha", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#katakana-iroha", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#disc'] = {"text": "disc", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#disc", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#circle'] = {"text": "circle", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#circle", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#square'] = {"text": "square", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#square", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#disclosure-open'] = {"text": "disclosure-open", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#disclosure-open", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#disclosure-closed'] = {"text": "disclosure-closed", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#disclosure-closed", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['https://html.spec.whatwg.org/multipage/interactive-elements.html#the-details-element'] = {"text": "details", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/interactive-elements.html#the-details-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#writing-mode'] = {"text": "writing mode", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#writing-mode", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-counter-style-name-cjk-earthly-branch'] = {"text": "cjk-earthly-branch", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-name-cjk-earthly-branch", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#valdef-counter-style-name-cjk-heavenly-stem'] = {"text": "cjk-heavenly-stem", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-name-cjk-heavenly-stem", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#japanese-informal'] = {"text": "japanese-informal", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#japanese-informal", "export": true, "normative": true, "for_": ["<counter-style>"]};
+window.refsData['#japanese-formal'] = {"text": "japanese-formal", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#japanese-formal", "export": true, "normative": true, "for_": ["<counter-style>"]};
+window.refsData['#korean-hangul-formal'] = {"text": "korean-hangul-formal", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#korean-hangul-formal", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#korean-hanja-informal'] = {"text": "korean-hanja-informal", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#korean-hanja-informal", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#korean-hanja-formal'] = {"text": "korean-hanja-formal", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#korean-hanja-formal", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['#simp-chinese-informal'] = {"text": "simp-chinese-informal", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#simp-chinese-informal", "export": true, "normative": true, "for_": ["<counter-style>"]};
+window.refsData['#simp-chinese-formal'] = {"text": "simp-chinese-formal", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#simp-chinese-formal", "export": true, "normative": true, "for_": ["<counter-style>"]};
+window.refsData['#trad-chinese-informal'] = {"text": "trad-chinese-informal", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#trad-chinese-informal", "export": true, "normative": true, "for_": ["<counter-style>"]};
+window.refsData['#trad-chinese-formal'] = {"text": "trad-chinese-formal", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#trad-chinese-formal", "export": true, "normative": true, "for_": ["<counter-style>"]};
+window.refsData['#valdef-counter-style-name-ethiopic-numeric'] = {"text": "ethiopic-numeric", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#valdef-counter-style-name-ethiopic-numeric", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
+window.refsData['https://drafts.csswg.org/cssom-1/#cssrule'] = {"text": "CSSRule", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#cssrule", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-short'] = {"text": "unsigned short", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-short", "export": true, "normative": true, "for_": []};
+window.refsData['#csscounterstylerule'] = {"text": "CSSCounterStyleRule", "type": "interface", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#csscounterstylerule", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-1/#cssomstring'] = {"text": "CSSOMString", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#cssomstring", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-csscounterstylerule-name'] = {"text": "name", "type": "attribute", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#dom-csscounterstylerule-name", "export": true, "normative": true, "for_": ["CSSCounterStyleRule"]};
+window.refsData['#dom-csscounterstylerule-system'] = {"text": "system", "type": "attribute", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#dom-csscounterstylerule-system", "export": true, "normative": true, "for_": ["CSSCounterStyleRule"]};
+window.refsData['#dom-csscounterstylerule-symbols'] = {"text": "symbols", "type": "attribute", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#dom-csscounterstylerule-symbols", "export": true, "normative": true, "for_": ["CSSCounterStyleRule"]};
+window.refsData['#dom-csscounterstylerule-additivesymbols'] = {"text": "additiveSymbols", "type": "attribute", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#dom-csscounterstylerule-additivesymbols", "export": true, "normative": true, "for_": ["CSSCounterStyleRule"]};
+window.refsData['#dom-csscounterstylerule-negative'] = {"text": "negative", "type": "attribute", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#dom-csscounterstylerule-negative", "export": true, "normative": true, "for_": ["CSSCounterStyleRule"]};
+window.refsData['#dom-csscounterstylerule-prefix'] = {"text": "prefix", "type": "attribute", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#dom-csscounterstylerule-prefix", "export": true, "normative": true, "for_": ["CSSCounterStyleRule"]};
+window.refsData['#dom-csscounterstylerule-suffix'] = {"text": "suffix", "type": "attribute", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#dom-csscounterstylerule-suffix", "export": true, "normative": true, "for_": ["CSSCounterStyleRule"]};
+window.refsData['#dom-csscounterstylerule-range'] = {"text": "range", "type": "attribute", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#dom-csscounterstylerule-range", "export": true, "normative": true, "for_": ["CSSCounterStyleRule"]};
+window.refsData['#dom-csscounterstylerule-pad'] = {"text": "pad", "type": "attribute", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#dom-csscounterstylerule-pad", "export": true, "normative": true, "for_": ["CSSCounterStyleRule"]};
+window.refsData['#dom-csscounterstylerule-speakas'] = {"text": "speakAs", "type": "attribute", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#dom-csscounterstylerule-speakas", "export": true, "normative": true, "for_": ["CSSCounterStyleRule"]};
+window.refsData['#dom-csscounterstylerule-fallback'] = {"text": "fallback", "type": "attribute", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#dom-csscounterstylerule-fallback", "export": true, "normative": true, "for_": ["CSSCounterStyleRule"]};
+window.refsData['https://drafts.csswg.org/css-values-3/#css-css-identifier'] = {"text": "identifier", "type": "dfn", "spec": "css-values-3", "shortname": "css-values", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-values-3/#css-css-identifier", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#parse-a-list-of-component-values'] = {"text": "parse a list of component values", "type": "dfn", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#parse-a-list-of-component-values", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#css-parse-something-according-to-a-css-grammar'] = {"text": "parse", "type": "dfn", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#css-parse-something-according-to-a-css-grammar", "export": true, "normative": true, "for_": ["CSS"]};window.refsData['#at-ruledef-counter-style'] = {"text": "@counter-style", "type": "at-rule", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#at-ruledef-counter-style", "export": true, "normative": true, "for_": []};
+window.refsData['#descdef-counter-style-additive-symbols'] = {"text": "additive-symbols", "type": "descriptor", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#descdef-counter-style-additive-symbols", "export": true, "normative": true, "for_": ["@counter-style"]};
+window.refsData['#descdef-counter-style-fallback'] = {"text": "fallback", "type": "descriptor", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#descdef-counter-style-fallback", "export": true, "normative": true, "for_": ["@counter-style"]};
+window.refsData['#descdef-counter-style-negative'] = {"text": "negative", "type": "descriptor", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#descdef-counter-style-negative", "export": true, "normative": true, "for_": ["@counter-style"]};
+window.refsData['#descdef-counter-style-pad'] = {"text": "pad", "type": "descriptor", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#descdef-counter-style-pad", "export": true, "normative": true, "for_": ["@counter-style"]};
+window.refsData['#descdef-counter-style-prefix'] = {"text": "prefix", "type": "descriptor", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#descdef-counter-style-prefix", "export": true, "normative": true, "for_": ["@counter-style"]};
+window.refsData['#descdef-counter-style-range'] = {"text": "range", "type": "descriptor", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#descdef-counter-style-range", "export": true, "normative": true, "for_": ["@counter-style"]};
+window.refsData['#descdef-counter-style-speak-as'] = {"text": "speak-as", "type": "descriptor", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#descdef-counter-style-speak-as", "export": true, "normative": true, "for_": ["@counter-style"]};
+window.refsData['#descdef-counter-style-suffix'] = {"text": "suffix", "type": "descriptor", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#descdef-counter-style-suffix", "export": true, "normative": true, "for_": ["@counter-style"]};
+window.refsData['#descdef-counter-style-symbols'] = {"text": "symbols", "type": "descriptor", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#descdef-counter-style-symbols", "export": true, "normative": true, "for_": ["@counter-style"]};
+window.refsData['#descdef-counter-style-system'] = {"text": "system", "type": "descriptor", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "local", "url": "#descdef-counter-style-system", "export": true, "normative": true, "for_": ["@counter-style"]};
 </script>

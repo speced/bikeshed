@@ -746,6 +746,43 @@ a[href].issue-return {
         }
     }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -3411,8 +3448,6 @@ complete-length = ( 1*DIGIT / "*" )</pre>
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -3660,7 +3695,6 @@ complete-length = ( 1*DIGIT / "*" )</pre>
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -4278,6 +4312,446 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://w3c.github.io/ServiceWorker/#dfn-service-worker'] = {"text": "service worker", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#dfn-service-worker", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#dom-extendableevent-waituntil'] = {"text": "waitUntil(f)", "type": "method", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#dom-extendableevent-waituntil", "export": true, "normative": true, "for_": ["ExtendableEvent"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-realm'] = {"text": "relevant realm", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-realm", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#task-source'] = {"text": "task source", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#task-source", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-agent-event-loop'] = {"text": "event loop", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-agent-event-loop", "export": true, "normative": true, "for_": ["agent"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object'] = {"text": "relevant settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#responsible-event-loop'] = {"text": "responsible event loop", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#responsible-event-loop", "export": true, "normative": true, "for_": ["environment settings object"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task'] = {"text": "queue a task", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task", "export": true, "normative": true, "for_": []};
+window.refsData['#background-fetch-task-source'] = {"text": "background fetch task source", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#background-fetch-task-source", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#dfn-service-worker-registration'] = {"text": "service worker registration", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#dfn-service-worker-registration", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ordered-map'] = {"text": "map", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ordered-map", "export": true, "normative": true, "for_": []};
+window.refsData['#background-fetch'] = {"text": "background fetch", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#background-fetch", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#parallel-queue'] = {"text": "parallel queue", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#parallel-queue", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#starting-a-new-parallel-queue'] = {"text": "starting a new parallel queue", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#starting-a-new-parallel-queue", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list'] = {"text": "list", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list", "export": true, "normative": true, "for_": []};
+window.refsData['#background-fetch-record'] = {"text": "background fetch record", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#background-fetch-record", "export": true, "normative": true, "for_": []};
+window.refsData['#enumdef-backgroundfetchresult'] = {"text": "BackgroundFetchResult", "type": "enum", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#enumdef-backgroundfetchresult", "export": true, "normative": true, "for_": []};
+window.refsData['#enumdef-backgroundfetchfailurereason'] = {"text": "BackgroundFetchFailureReason", "type": "enum", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#enumdef-backgroundfetchfailurereason", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/image-resource/#dom-imageresource'] = {"text": "ImageResource", "type": "dictionary", "spec": "image-resource", "shortname": "image-resource", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/image-resource/#dom-imageresource", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-iterate'] = {"text": "for each", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-iterate", "export": true, "normative": true, "for_": ["list", "set"]};
+window.refsData['#background-fetch-records'] = {"text": "records", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#background-fetch-records", "export": true, "normative": true, "for_": ["background fetch"]};
+window.refsData['https://infra.spec.whatwg.org/#byte-sequence-length'] = {"text": "length", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#byte-sequence-length", "export": true, "normative": true, "for_": ["byte sequence"]};
+window.refsData['#background-fetch-record-response-data'] = {"text": "response data", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#background-fetch-record-response-data", "export": true, "normative": true, "for_": ["background fetch record"]};
+window.refsData['#background-fetch-response-bytes'] = {"text": "bytes", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#background-fetch-response-bytes", "export": true, "normative": true, "for_": ["background fetch response"]};
+window.refsData['#background-fetch-display'] = {"text": "display", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#background-fetch-display", "export": true, "normative": true, "for_": ["background fetch"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object'] = {"text": "environment settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['#background-fetch-service-worker-registration'] = {"text": "service worker registration", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#background-fetch-service-worker-registration", "export": true, "normative": true, "for_": ["background fetch"]};
+window.refsData['https://w3c.github.io/ServiceWorker/#dfn-scope-url'] = {"text": "scope url", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#dfn-scope-url", "export": true, "normative": true, "for_": ["service worker registration"]};
+window.refsData['https://url.spec.whatwg.org/#concept-url-origin'] = {"text": "origin", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-origin", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['#background-fetch-paused-flag'] = {"text": "paused flag", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#background-fetch-paused-flag", "export": true, "normative": true, "for_": ["background fetch"]};
+window.refsData['#background-fetch-result'] = {"text": "result", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#background-fetch-result", "export": true, "normative": true, "for_": ["background fetch"]};
+window.refsData['#background-fetch-title'] = {"text": "title", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#background-fetch-title", "export": true, "normative": true, "for_": ["background fetch"]};
+window.refsData['https://w3c.github.io/image-resource/#image-resource'] = {"text": "image resource", "type": "dfn", "spec": "image-resource", "shortname": "image-resource", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/image-resource/#image-resource", "export": true, "normative": true, "for_": []};
+window.refsData['#background-fetch-icons'] = {"text": "icons", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#background-fetch-icons", "export": true, "normative": true, "for_": ["background fetch"]};
+window.refsData['https://w3c.github.io/image-resource/#processing-an-imageresource-from-an-api'] = {"text": "processing", "type": "dfn", "spec": "image-resource", "shortname": "image-resource", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/image-resource/#processing-an-imageresource-from-an-api", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-fetch'] = {"text": "fetch", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-fetch", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request'] = {"text": "request", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-url'] = {"text": "url", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-url", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://w3c.github.io/image-resource/#dfn-src'] = {"text": "src", "type": "dfn", "spec": "image-resource", "shortname": "image-resource", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/image-resource/#dfn-src", "export": true, "normative": true, "for_": ["image resource"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-client'] = {"text": "client", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-client", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://fetch.spec.whatwg.org/#request-service-workers-mode'] = {"text": "service-workers mode", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#request-service-workers-mode", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-destination'] = {"text": "destination", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-destination", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-mode'] = {"text": "mode", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-mode", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-credentials-mode'] = {"text": "credentials mode", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-credentials-mode", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['#background-fetch-download-total'] = {"text": "download total", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#background-fetch-download-total", "export": true, "normative": true, "for_": ["background fetch"]};
+window.refsData['#background-fetch-upload-total'] = {"text": "upload total", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#background-fetch-upload-total", "export": true, "normative": true, "for_": ["background fetch"]};
+window.refsData['#background-fetch-stored-body-bytes-total'] = {"text": "stored body bytes total", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#background-fetch-stored-body-bytes-total", "export": true, "normative": true, "for_": ["background fetch"]};
+window.refsData['#background-fetch-uploaded'] = {"text": "uploaded", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#background-fetch-uploaded", "export": true, "normative": true, "for_": ["background fetch"]};
+window.refsData['#background-fetch-abort-all-flag'] = {"text": "abort all flag", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#background-fetch-abort-all-flag", "export": true, "normative": true, "for_": ["background fetch"]};
+window.refsData['#background-fetch-record-request'] = {"text": "request", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#background-fetch-record-request", "export": true, "normative": true, "for_": ["background fetch record"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-method'] = {"text": "method", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-method", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['#fire-a-background-fetch-click-event'] = {"text": "fire a background fetch click event", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#fire-a-background-fetch-click-event", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dfn-permission-state'] = {"text": "permission state", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-permission-state", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dom-permissiondescriptor'] = {"text": "PermissionDescriptor", "type": "dictionary", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dom-permissiondescriptor", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dom-permissiondescriptor-name'] = {"text": "name", "type": "dict-member", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dom-permissiondescriptor-name", "export": true, "normative": true, "for_": ["PermissionDescriptor"]};
+window.refsData['https://w3c.github.io/permissions/#dfn-new-information-about-the-user-s-intent'] = {"text": "new information about the user's intent", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-new-information-about-the-user-s-intent", "export": true, "normative": true, "for_": []};
+window.refsData['#background-fetch-response'] = {"text": "background fetch response", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#background-fetch-response", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response'] = {"text": "response", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#byte-sequence'] = {"text": "byte sequence", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#byte-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['#background-fetch-response-response'] = {"text": "response", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#background-fetch-response-response", "export": true, "normative": true, "for_": ["background fetch response"]};
+window.refsData['#background-fetch-response-result'] = {"text": "result", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#background-fetch-response-result", "export": true, "normative": true, "for_": ["background fetch response"]};
+window.refsData['#perform-a-background-fetch'] = {"text": "perform a background fetch", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#perform-a-background-fetch", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel'] = {"text": "in parallel", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel", "export": true, "normative": true, "for_": []};
+window.refsData['#complete-a-record'] = {"text": "complete a record", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#complete-a-record", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-size'] = {"text": "size", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-size", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#enqueue-the-following-steps'] = {"text": "enqueue the following steps", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#enqueue-the-following-steps", "export": true, "normative": true, "for_": ["parallel queue"]};
+window.refsData['#service-worker-registration-active-background-fetches-edit-queue'] = {"text": "active background fetches edit queue", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#service-worker-registration-active-background-fetches-edit-queue", "export": true, "normative": true, "for_": ["service worker registration"]};
+window.refsData['#service-worker-registration-active-background-fetches'] = {"text": "active background fetches", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#service-worker-registration-active-background-fetches", "export": true, "normative": true, "for_": ["service worker registration"]};
+window.refsData['#background-fetch-id'] = {"text": "id", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#background-fetch-id", "export": true, "normative": true, "for_": ["background fetch"]};
+window.refsData['#contains-background-fetch'] = {"text": "contains background fetch", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#contains-background-fetch", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-backgroundfetchregistration-abort'] = {"text": "abort()", "type": "method", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#dom-backgroundfetchregistration-abort", "export": true, "normative": true, "for_": ["BackgroundFetchRegistration"]};
+window.refsData['#background-fetch-failure-reason'] = {"text": "failure reason", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#background-fetch-failure-reason", "export": true, "normative": true, "for_": ["background fetch"]};
+window.refsData['#update-background-fetch-instances'] = {"text": "update background fetch instances", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#update-background-fetch-instances", "export": true, "normative": true, "for_": []};
+window.refsData['#backgroundfetchevent'] = {"text": "BackgroundFetchEvent", "type": "interface", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#backgroundfetchevent", "export": true, "normative": true, "for_": []};
+window.refsData['#backgroundfetchupdateuievent'] = {"text": "BackgroundFetchUpdateUIEvent", "type": "interface", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#backgroundfetchupdateuievent", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#fire-functional-event'] = {"text": "fire a functional event", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#fire-functional-event", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-backgroundfetchevent-registration'] = {"text": "registration", "type": "attribute", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#dom-backgroundfetchevent-registration", "export": true, "normative": true, "for_": ["BackgroundFetchEvent"]};
+window.refsData['#get-a-backgroundfetchregistration-instance'] = {"text": "getting a backgroundfetchregistration instance", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#get-a-backgroundfetchregistration-instance", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#extendableevent-active'] = {"text": "active", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#extendableevent-active", "export": true, "normative": true, "for_": ["ExtendableEvent"]};
+window.refsData['#background-fetch-records-available-flag'] = {"text": "records available flag", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#background-fetch-records-available-flag", "export": true, "normative": true, "for_": ["background fetch"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-add-range-header'] = {"text": "add a range header", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-add-range-header", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-body'] = {"text": "body", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-body", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-network-error'] = {"text": "network error", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-network-error", "export": true, "normative": true, "for_": []};
+window.refsData['#temporarily-unavailable'] = {"text": "temporarily unavailable", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#temporarily-unavailable", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-aborted-network-error'] = {"text": "aborted network error", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-aborted-network-error", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response-status'] = {"text": "status", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response-status", "export": true, "normative": true, "for_": ["response"]};
+window.refsData['#validate-a-partial-response'] = {"text": "validate a partial response", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#validate-a-partial-response", "export": true, "normative": true, "for_": []};
+window.refsData['#create-record-objects'] = {"text": "create record objects", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#create-record-objects", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response-body'] = {"text": "body", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response-body", "export": true, "normative": true, "for_": ["response"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-body-stream'] = {"text": "stream", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-body-stream", "export": true, "normative": true, "for_": ["body"]};
+window.refsData['https://streams.spec.whatwg.org/#readablestream-cancel'] = {"text": "cancel", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#readablestream-cancel", "export": true, "normative": true, "for_": ["ReadableStream"]};
+window.refsData['#extract-content-range-values'] = {"text": "extracting content-range values", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#extract-content-range-values", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#ok-status'] = {"text": "ok status", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#ok-status", "export": true, "normative": true, "for_": []};
+window.refsData['https://streams.spec.whatwg.org/#readablestream-errored'] = {"text": "errored", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#readablestream-errored", "export": true, "normative": true, "for_": ["ReadableStream"]};
+window.refsData['https://infra.spec.whatwg.org/#abort-when'] = {"text": "abort when", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#abort-when", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#if-aborted'] = {"text": "if aborted", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#if-aborted", "export": true, "normative": true, "for_": []};
+window.refsData['#background-fetch-update-handling-queue'] = {"text": "update handling queue", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#background-fetch-update-handling-queue", "export": true, "normative": true, "for_": ["background fetch"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-origin'] = {"text": "origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-origin", "export": true, "normative": true, "for_": ["environment settings object"]};
+window.refsData['#queue-a-bgfetch-task'] = {"text": "queue a bgfetch task", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#queue-a-bgfetch-task", "export": true, "normative": true, "for_": []};
+window.refsData['#backgroundfetchregistration'] = {"text": "BackgroundFetchRegistration", "type": "interface", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#backgroundfetchregistration", "export": true, "normative": true, "for_": []};
+window.refsData['#backgroundfetchregistration-background-fetch'] = {"text": "background fetch", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#backgroundfetchregistration-background-fetch", "export": true, "normative": true, "for_": ["BackgroundFetchRegistration"]};
+window.refsData['#backgroundfetchregistration-records-available-flag'] = {"text": "records available flag", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#backgroundfetchregistration-records-available-flag", "export": true, "normative": true, "for_": ["BackgroundFetchRegistration"]};
+window.refsData['#backgroundfetchregistration-result'] = {"text": "result", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#backgroundfetchregistration-result", "export": true, "normative": true, "for_": ["BackgroundFetchRegistration"]};
+window.refsData['#backgroundfetchregistration-downloaded'] = {"text": "downloaded", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#backgroundfetchregistration-downloaded", "export": true, "normative": true, "for_": ["BackgroundFetchRegistration"]};
+window.refsData['#backgroundfetchregistration-uploaded'] = {"text": "uploaded", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#backgroundfetchregistration-uploaded", "export": true, "normative": true, "for_": ["BackgroundFetchRegistration"]};
+window.refsData['#backgroundfetchregistration-failure-reason'] = {"text": "failure reason", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#backgroundfetchregistration-failure-reason", "export": true, "normative": true, "for_": ["BackgroundFetchRegistration"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-event-fire'] = {"text": "fire an event", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-event-fire", "export": true, "normative": true, "for_": []};
+window.refsData['#backgroundfetchmanager'] = {"text": "BackgroundFetchManager", "type": "interface", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#backgroundfetchmanager", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#realm'] = {"text": "realm", "type": "dfn", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#realm", "export": true, "normative": true, "for_": []};
+window.refsData['#backgroundfetchmanager-backgroundfetchregistration-instances'] = {"text": "backgroundfetchregistration instances", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#backgroundfetchmanager-backgroundfetchregistration-instances", "export": true, "normative": true, "for_": ["BackgroundFetchManager"]};
+window.refsData['https://infra.spec.whatwg.org/#map-exists'] = {"text": "exist", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-exists", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response-header-list'] = {"text": "header list", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response-header-list", "export": true, "normative": true, "for_": ["response"]};
+window.refsData['https://fetch.spec.whatwg.org/#header-list-contains'] = {"text": "contains", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#header-list-contains", "export": true, "normative": true, "for_": ["header list"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-header-list-combine'] = {"text": "combine", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-header-list-combine", "export": true, "normative": true, "for_": ["header list"]};
+window.refsData['#single-byte-content-range'] = {"text": "single byte content-range", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#single-byte-content-range", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-header-value'] = {"text": "value", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-header-value", "export": true, "normative": true, "for_": ["header"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-header'] = {"text": "header", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-header", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-header-name'] = {"text": "name", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-header-name", "export": true, "normative": true, "for_": ["header"]};
+window.refsData['https://infra.spec.whatwg.org/#byte-case-insensitive'] = {"text": "byte-case-insensitive", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#byte-case-insensitive", "export": true, "normative": true, "for_": []};
+window.refsData['#backgroundfetchrecord'] = {"text": "BackgroundFetchRecord", "type": "interface", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#backgroundfetchrecord", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-backgroundfetchrecord-responseready'] = {"text": "responseReady", "type": "attribute", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#dom-backgroundfetchrecord-responseready", "export": true, "normative": true, "for_": ["BackgroundFetchRecord"]};
+window.refsData['https://webidl.spec.whatwg.org/#a-new-promise'] = {"text": "a new promise", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#a-new-promise", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#request'] = {"text": "Request", "type": "interface", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#request", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-request'] = {"text": "request", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-request", "export": true, "normative": true, "for_": ["Request"]};
+window.refsData['https://fetch.spec.whatwg.org/#request-headers'] = {"text": "headers", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#request-headers", "export": true, "normative": true, "for_": ["Request"]};
+window.refsData['https://fetch.spec.whatwg.org/#headers'] = {"text": "Headers", "type": "interface", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#headers", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-header-list'] = {"text": "header list", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-header-list", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['#dom-backgroundfetchrecord-request'] = {"text": "request", "type": "attribute", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#dom-backgroundfetchrecord-request", "export": true, "normative": true, "for_": ["BackgroundFetchRecord"]};
+window.refsData['#background-fetch-response-exposed'] = {"text": "exposed", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#background-fetch-response-exposed", "export": true, "normative": true, "for_": ["background fetch response"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#networking-task-source'] = {"text": "networking task source", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#networking-task-source", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-Uint8Array'] = {"text": "Uint8Array", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-Uint8Array", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-ArrayBuffer'] = {"text": "ArrayBuffer", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-ArrayBuffer", "export": true, "normative": true, "for_": []};
+window.refsData['https://streams.spec.whatwg.org/#readablestream-enqueue'] = {"text": "enqueue", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#readablestream-enqueue", "export": true, "normative": true, "for_": ["ReadableStream"]};
+window.refsData['https://streams.spec.whatwg.org/#readablestream-close'] = {"text": "close", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#readablestream-close", "export": true, "normative": true, "for_": ["ReadableStream"]};
+window.refsData['https://streams.spec.whatwg.org/#readablestream-error'] = {"text": "error", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#readablestream-error", "export": true, "normative": true, "for_": ["ReadableStream"]};
+window.refsData['https://webidl.spec.whatwg.org/#aborterror'] = {"text": "AbortError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#aborterror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMException'] = {"text": "DOMException", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMException", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#exceptiondef-typeerror'] = {"text": "TypeError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#exceptiondef-typeerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#resolve'] = {"text": "resolve", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#resolve", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-header-list-delete'] = {"text": "delete", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-header-list-delete", "export": true, "normative": true, "for_": ["header list"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-body'] = {"text": "body", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-body", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#response'] = {"text": "Response", "type": "interface", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#response", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response-response'] = {"text": "response", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response-response", "export": true, "normative": true, "for_": ["Response"]};
+window.refsData['https://fetch.spec.whatwg.org/#response-headers'] = {"text": "headers", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#response-headers", "export": true, "normative": true, "for_": ["Response"]};
+window.refsData['https://webidl.spec.whatwg.org/#reject'] = {"text": "reject", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#reject", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-append'] = {"text": "append", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-append", "export": true, "normative": true, "for_": ["list"]};
+window.refsData['https://tools.ietf.org/html/rfc7230#section-7'] = {"text": "http abnf", "type": "dfn", "spec": "", "shortname": "background-fetch", "level": "1", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc7230#section-7", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#serviceworkerglobalscope'] = {"text": "ServiceWorkerGlobalScope", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#serviceworkerglobalscope", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler'] = {"text": "EventHandler", "type": "typedef", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-handlers'] = {"text": "event handler", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-handlers", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-event-type'] = {"text": "event handler event type", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-event-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-idl-attributes'] = {"text": "event handler idl attribute", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-idl-attributes", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#serviceworker'] = {"text": "ServiceWorker", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#serviceworker", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-serviceworkerglobalscope-onbackgroundfetchsuccess'] = {"text": "onbackgroundfetchsuccess", "type": "attribute", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#dom-serviceworkerglobalscope-onbackgroundfetchsuccess", "export": true, "normative": true, "for_": ["ServiceWorkerGlobalScope"]};
+window.refsData['#dom-serviceworkerglobalscope-onbackgroundfetchfail'] = {"text": "onbackgroundfetchfail", "type": "attribute", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#dom-serviceworkerglobalscope-onbackgroundfetchfail", "export": true, "normative": true, "for_": ["ServiceWorkerGlobalScope"]};
+window.refsData['#dom-serviceworkerglobalscope-onbackgroundfetchabort'] = {"text": "onbackgroundfetchabort", "type": "attribute", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#dom-serviceworkerglobalscope-onbackgroundfetchabort", "export": true, "normative": true, "for_": ["ServiceWorkerGlobalScope"]};
+window.refsData['#dom-serviceworkerglobalscope-onbackgroundfetchclick'] = {"text": "onbackgroundfetchclick", "type": "attribute", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#dom-serviceworkerglobalscope-onbackgroundfetchclick", "export": true, "normative": true, "for_": ["ServiceWorkerGlobalScope"]};
+window.refsData['https://w3c.github.io/ServiceWorker/#serviceworkerregistration'] = {"text": "ServiceWorkerRegistration", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#serviceworkerregistration", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-serviceworkerregistration-backgroundfetch'] = {"text": "backgroundFetch", "type": "attribute", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#dom-serviceworkerregistration-backgroundfetch", "export": true, "normative": true, "for_": ["ServiceWorkerRegistration"]};
+window.refsData['#backgroundfetchmanager-service-worker-registration'] = {"text": "service worker registration", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#backgroundfetchmanager-service-worker-registration", "export": true, "normative": true, "for_": ["BackgroundFetchManager"]};
+window.refsData['#serviceworkerregistration-background-fetch-manager'] = {"text": "background fetch manager", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#serviceworkerregistration-background-fetch-manager", "export": true, "normative": true, "for_": ["ServiceWorkerRegistration"]};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-promise'] = {"text": "Promise", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-promise", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-backgroundfetchmanager-fetch'] = {"text": "fetch(id, requests, options)", "type": "method", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#dom-backgroundfetchmanager-fetch", "export": true, "normative": true, "for_": ["BackgroundFetchManager"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#requestinfo'] = {"text": "RequestInfo", "type": "typedef", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#requestinfo", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-backgroundfetchoptions'] = {"text": "BackgroundFetchOptions", "type": "dictionary", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#dictdef-backgroundfetchoptions", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-backgroundfetchmanager-get'] = {"text": "get(id)", "type": "method", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#dom-backgroundfetchmanager-get", "export": true, "normative": true, "for_": ["BackgroundFetchManager"]};
+window.refsData['#dom-backgroundfetchmanager-getids'] = {"text": "getIds()", "type": "method", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#dom-backgroundfetchmanager-getids", "export": true, "normative": true, "for_": ["BackgroundFetchManager"]};
+window.refsData['#dictdef-backgroundfetchuioptions'] = {"text": "BackgroundFetchUIOptions", "type": "dictionary", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#dictdef-backgroundfetchuioptions", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-long-long'] = {"text": "unsigned long long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-long-long", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-empty'] = {"text": "empty", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-empty", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['https://webidl.spec.whatwg.org/#a-promise-rejected-with'] = {"text": "a promise rejected with", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#a-promise-rejected-with", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#notallowederror'] = {"text": "NotAllowedError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#notallowederror", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#dfn-active-worker'] = {"text": "active worker", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#dfn-active-worker", "export": true, "normative": true, "for_": ["service worker registration"]};
+window.refsData['https://infra.spec.whatwg.org/#iteration-continue'] = {"text": "continue", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#iteration-continue", "export": true, "normative": true, "for_": ["iteration"]};
+window.refsData['https://streams.spec.whatwg.org/#readablestream-readable'] = {"text": "readable", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#readablestream-readable", "export": true, "normative": true, "for_": ["ReadableStream"]};
+window.refsData['https://webidl.spec.whatwg.org/#quotaexceedederror'] = {"text": "QuotaExceededError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#quotaexceedederror", "export": true, "normative": true, "for_": []};
+window.refsData['#eventdef-backgroundfetchregistration-progress'] = {"text": "progress", "type": "event", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#eventdef-backgroundfetchregistration-progress", "export": true, "normative": true, "for_": ["BackgroundFetchRegistration"]};
+window.refsData['https://infra.spec.whatwg.org/#map-getting-the-keys'] = {"text": "getting the keys", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-getting-the-keys", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['https://dom.spec.whatwg.org/#eventtarget'] = {"text": "EventTarget", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#eventtarget", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-backgroundfetchregistration-id'] = {"text": "id", "type": "attribute", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#dom-backgroundfetchregistration-id", "export": true, "normative": true, "for_": ["BackgroundFetchRegistration"]};
+window.refsData['#dom-backgroundfetchregistration-uploadtotal'] = {"text": "uploadTotal", "type": "attribute", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#dom-backgroundfetchregistration-uploadtotal", "export": true, "normative": true, "for_": ["BackgroundFetchRegistration"]};
+window.refsData['#dom-backgroundfetchregistration-uploaded'] = {"text": "uploaded", "type": "attribute", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#dom-backgroundfetchregistration-uploaded", "export": true, "normative": true, "for_": ["BackgroundFetchRegistration"]};
+window.refsData['#dom-backgroundfetchregistration-downloadtotal'] = {"text": "downloadTotal", "type": "attribute", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#dom-backgroundfetchregistration-downloadtotal", "export": true, "normative": true, "for_": ["BackgroundFetchRegistration"]};
+window.refsData['#dom-backgroundfetchregistration-downloaded'] = {"text": "downloaded", "type": "attribute", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#dom-backgroundfetchregistration-downloaded", "export": true, "normative": true, "for_": ["BackgroundFetchRegistration"]};
+window.refsData['#dom-backgroundfetchregistration-result'] = {"text": "result", "type": "attribute", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#dom-backgroundfetchregistration-result", "export": true, "normative": true, "for_": ["BackgroundFetchRegistration"]};
+window.refsData['#dom-backgroundfetchregistration-failurereason'] = {"text": "failureReason", "type": "attribute", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#dom-backgroundfetchregistration-failurereason", "export": true, "normative": true, "for_": ["BackgroundFetchRegistration"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-backgroundfetchregistration-recordsavailable'] = {"text": "recordsAvailable", "type": "attribute", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#dom-backgroundfetchregistration-recordsavailable", "export": true, "normative": true, "for_": ["BackgroundFetchRegistration"]};
+window.refsData['#dom-backgroundfetchregistration-onprogress'] = {"text": "onprogress", "type": "attribute", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#dom-backgroundfetchregistration-onprogress", "export": true, "normative": true, "for_": ["BackgroundFetchRegistration"]};
+window.refsData['#dom-backgroundfetchregistration-match'] = {"text": "match(request, options)", "type": "method", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#dom-backgroundfetchregistration-match", "export": true, "normative": true, "for_": ["BackgroundFetchRegistration"]};
+window.refsData['https://w3c.github.io/ServiceWorker/#dictdef-cachequeryoptions'] = {"text": "CacheQueryOptions", "type": "dictionary", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#dictdef-cachequeryoptions", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-backgroundfetchregistration-matchall'] = {"text": "matchAll(request, options)", "type": "method", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#dom-backgroundfetchregistration-matchall", "export": true, "normative": true, "for_": ["BackgroundFetchRegistration"]};
+window.refsData['#backgroundfetchregistration-id'] = {"text": "id", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#backgroundfetchregistration-id", "export": true, "normative": true, "for_": ["BackgroundFetchRegistration"]};
+window.refsData['#backgroundfetchregistration-upload-total'] = {"text": "upload total", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#backgroundfetchregistration-upload-total", "export": true, "normative": true, "for_": ["BackgroundFetchRegistration"]};
+window.refsData['#backgroundfetchregistration-download-total'] = {"text": "download total", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#backgroundfetchregistration-download-total", "export": true, "normative": true, "for_": ["BackgroundFetchRegistration"]};
+window.refsData['https://dom.spec.whatwg.org/#event'] = {"text": "Event", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#event", "export": true, "normative": true, "for_": []};
+window.refsData['#does-not-contain-background-fetch'] = {"text": "does not contain background fetch", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#does-not-contain-background-fetch", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-perform-steps-once-promise-is-settled'] = {"text": "reacting", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-perform-steps-once-promise-is-settled", "export": true, "normative": true, "for_": ["promise"]};
+window.refsData['https://webidl.spec.whatwg.org/#invalidstateerror'] = {"text": "InvalidStateError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invalidstateerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#request-matches-cached-item'] = {"text": "request matches cached item", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#request-matches-cached-item", "export": true, "normative": true, "for_": []};
+window.refsData['#backgroundfetchrecord-request'] = {"text": "request", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#backgroundfetchrecord-request", "export": true, "normative": true, "for_": ["BackgroundFetchRecord"]};
+window.refsData['#backgroundfetchrecord-response-promise'] = {"text": "response promise", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#backgroundfetchrecord-response-promise", "export": true, "normative": true, "for_": ["BackgroundFetchRecord"]};
+window.refsData['https://w3c.github.io/ServiceWorker/#extendableevent'] = {"text": "ExtendableEvent", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#extendableevent", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-backgroundfetcheventinit'] = {"text": "BackgroundFetchEventInit", "type": "dictionary", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#dictdef-backgroundfetcheventinit", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#dictdef-extendableeventinit'] = {"text": "ExtendableEventInit", "type": "dictionary", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#dictdef-extendableeventinit", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-backgroundfetchupdateuievent-updateui'] = {"text": "updateUI(options)", "type": "method", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#dom-backgroundfetchupdateuievent-updateui", "export": true, "normative": true, "for_": ["BackgroundFetchUpdateUIEvent"]};
+window.refsData['https://dom.spec.whatwg.org/#dom-event-istrusted'] = {"text": "isTrusted", "type": "attribute", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-event-istrusted", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['#backgroundfetchupdateuievent-ui-updated-flag'] = {"text": "ui updated flag", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#backgroundfetchupdateuievent-ui-updated-flag", "export": true, "normative": true, "for_": ["BackgroundFetchUpdateUIEvent"]};
+window.refsData['#backgroundfetchevent-background-fetch'] = {"text": "background fetch", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#backgroundfetchevent-background-fetch", "export": true, "normative": true, "for_": ["BackgroundFetchEvent"]};
+window.refsData['#dom-backgroundfetchuioptions-icons'] = {"text": "icons", "type": "dict-member", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#dom-backgroundfetchuioptions-icons", "export": true, "normative": true, "for_": ["BackgroundFetchUIOptions"]};
+window.refsData['#dom-backgroundfetchuioptions-title'] = {"text": "title", "type": "dict-member", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#dom-backgroundfetchuioptions-title", "export": true, "normative": true, "for_": ["BackgroundFetchUIOptions"]};
+window.refsData['https://w3c.github.io/webdriver/#dfn-extension-command'] = {"text": "extension command", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-extension-command", "export": true, "normative": true, "for_": []};
+window.refsData['#background-fetch-click'] = {"text": "background fetch click", "type": "dfn", "spec": "background-fetch-1", "shortname": "background-fetch", "level": "1", "status": "local", "url": "#background-fetch-click", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/#dfn-extension-command-uri-template'] = {"text": "extension command uri template", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-extension-command-uri-template", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/#dfn-remote-end-steps'] = {"text": "remote end steps", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-remote-end-steps", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/#dfn-current-top-level-browsing-context'] = {"text": "current top-level browsing context", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-current-top-level-browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/#dfn-no-longer-open'] = {"text": "no longer open", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-no-longer-open", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/#dfn-errors'] = {"text": "webdriver error", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-errors", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/#dfn-error-code'] = {"text": "webdriver error code", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-error-code", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/#dfn-no-such-window'] = {"text": "no such window", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-no-such-window", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#nav-document'] = {"text": "active document", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#nav-document", "export": true, "normative": true, "for_": ["navigable"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-document-url'] = {"text": "url", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-document-url", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['https://w3c.github.io/ServiceWorker/#match-service-worker-registration'] = {"text": "match service worker registration", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#match-service-worker-registration", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/#dfn-url-variables'] = {"text": "url variable", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-url-variables", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/#dfn-success'] = {"text": "webdriver success", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-success", "export": true, "normative": true, "for_": []};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

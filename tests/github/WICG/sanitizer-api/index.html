@@ -469,6 +469,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -1486,8 +1523,6 @@ describes, as is Internet Explorer’s <code class="idl"><a data-link-type="idl"
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -1735,7 +1770,6 @@ describes, as is Internet Explorer’s <code class="idl"><a data-link-type="idl"
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -2144,6 +2178,281 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://dom.spec.whatwg.org/#element'] = {"text": "Element", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#element", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/DOM-Parsing/#widl-Element-innerHTML'] = {"text": "innerHTML", "type": "attribute", "spec": "dom-parsing", "shortname": "dom-parsing", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/DOM-Parsing/#widl-Element-innerHTML", "export": true, "normative": true, "for_": ["Element"]};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#SecureContext'] = {"text": "SecureContext", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SecureContext", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-sanitizer-sanitizer'] = {"text": "Sanitizer(config)", "type": "constructor", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#dom-sanitizer-sanitizer", "export": true, "normative": true, "for_": ["Sanitizer"]};
+window.refsData['#dictdef-sanitizerconfig'] = {"text": "SanitizerConfig", "type": "dictionary", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#dictdef-sanitizerconfig", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#documentfragment'] = {"text": "DocumentFragment", "type": "interface", "spec": "", "shortname": "sanitizer-api", "level": "1", "status": "anchor-block", "url": "https://dom.spec.whatwg.org/#documentfragment", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-sanitizer-sanitize'] = {"text": "sanitize(input)", "type": "method", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#dom-sanitizer-sanitize", "export": true, "normative": true, "for_": ["Sanitizer"]};
+window.refsData['#typedefdef-sanitizerinput'] = {"text": "SanitizerInput", "type": "typedef", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#typedefdef-sanitizerinput", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-sanitizer-sanitizetostring'] = {"text": "sanitizeToString(input)", "type": "method", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#dom-sanitizer-sanitizetostring", "export": true, "normative": true, "for_": ["Sanitizer"]};
+window.refsData['#configuration-object'] = {"text": "configuration object", "type": "dfn", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#configuration-object", "export": true, "normative": true, "for_": []};
+window.refsData['#sanitize'] = {"text": "sanitize", "type": "dfn", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#sanitize", "export": true, "normative": true, "for_": []};
+window.refsData['#sanitizetostring'] = {"text": "sanitizetostring", "type": "dfn", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#sanitizetostring", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#interface-Document'] = {"text": "Document", "type": "interface", "spec": "", "shortname": "sanitizer-api", "level": "1", "status": "anchor-block", "url": "https://dom.spec.whatwg.org/#interface-Document", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/parsing.html#html-parser'] = {"text": "html parser", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/parsing.html#html-parser", "export": true, "normative": true, "for_": []};
+window.refsData['#default-configuration'] = {"text": "default configuration", "type": "dfn", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#default-configuration", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['#typedefdef-attributematchlist'] = {"text": "AttributeMatchList", "type": "typedef", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#typedefdef-attributematchlist", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['#attribute-match-list'] = {"text": "attribute match list", "type": "dfn", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#attribute-match-list", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/custom-elements.html#custom-element'] = {"text": "custom element", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/custom-elements.html#custom-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-record'] = {"text": "record", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-record", "export": true, "normative": true, "for_": []};
+window.refsData['#create-a-document-fragment'] = {"text": "create a document fragment", "type": "dfn", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#create-a-document-fragment", "export": true, "normative": true, "for_": []};
+window.refsData['#sanitize-a-document-fragment'] = {"text": "sanitize a document fragment", "type": "dfn", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#sanitize-a-document-fragment", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/parsing.html#html-fragment-serialisation-algorithm'] = {"text": "html fragment serialization algorithm", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/parsing.html#html-fragment-serialisation-algorithm", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/DOM-Parsing/#widl-DOMParser-parseFromString-Document-DOMString-str-SupportedType-type'] = {"text": "parseFromString", "type": "method", "spec": "dom-parsing", "shortname": "dom-parsing", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/DOM-Parsing/#widl-DOMParser-parseFromString-Document-DOMString-str-SupportedType-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-node-clone'] = {"text": "clone a node", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-node-clone", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#dom-document-createdocumentfragment'] = {"text": "createDocumentFragment", "type": "method", "spec": "", "shortname": "sanitizer-api", "level": "1", "status": "anchor-block", "url": "https://dom.spec.whatwg.org/#dom-document-createdocumentfragment", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-node-append'] = {"text": "append", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-node-append", "export": true, "normative": true, "for_": []};
+window.refsData['#sanitize-action'] = {"text": "sanitize action", "type": "dfn", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#sanitize-action", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-tree-inclusive-descendant'] = {"text": "inclusive descendant", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-tree-inclusive-descendant", "export": true, "normative": true, "for_": ["tree"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-tree-order'] = {"text": "tree order", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-tree-order", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-iterate'] = {"text": "iterate", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-iterate", "export": true, "normative": true, "for_": ["list", "set"]};
+window.refsData['#sanitize-a-node'] = {"text": "sanitize a node", "type": "dfn", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#sanitize-a-node", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-element-attribute'] = {"text": "attribute list", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-element-attribute", "export": true, "normative": true, "for_": ["Element"]};
+window.refsData['#effective-attribute-configuration'] = {"text": "effective attribute configuration", "type": "dfn", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#effective-attribute-configuration", "export": true, "normative": true, "for_": []};
+window.refsData['#handle-funky-elements'] = {"text": "handle funky elements", "type": "dfn", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#handle-funky-elements", "export": true, "normative": true, "for_": []};
+window.refsData['#effective-element-configuration'] = {"text": "effective element configuration", "type": "dfn", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#effective-element-configuration", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-element-interface'] = {"text": "element interface", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-element-interface", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/scripting.html#htmltemplateelement'] = {"text": "HTMLTemplateElement", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/scripting.html#htmltemplateelement", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/links.html#htmlhyperlinkelementutils'] = {"text": "HTMLHyperlinkElementUtils", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/links.html#htmlhyperlinkelementutils", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/forms.html#htmlformelement'] = {"text": "HTMLFormElement", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/forms.html#htmlformelement", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/input.html#htmlinputelement'] = {"text": "HTMLInputElement", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/input.html#htmlinputelement", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/form-elements.html#htmlbuttonelement'] = {"text": "HTMLButtonElement", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/form-elements.html#htmlbuttonelement", "export": true, "normative": true, "for_": []};
+window.refsData['#determine-the-baseline-configuration-for-an-element'] = {"text": "determine the baseline configuration for an element", "type": "dfn", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#determine-the-baseline-configuration-for-an-element", "export": true, "normative": true, "for_": []};
+window.refsData['#determine-the-effective-configuration-for-an-element'] = {"text": "determine the effective configuration for an element", "type": "dfn", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#determine-the-effective-configuration-for-an-element", "export": true, "normative": true, "for_": []};
+window.refsData['#stricter-action'] = {"text": "stricter action", "type": "dfn", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#stricter-action", "export": true, "normative": true, "for_": []};
+window.refsData['#determine-the-baseline-configuration-for-an-attribute'] = {"text": "determine the baseline configuration for an attribute", "type": "dfn", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#determine-the-baseline-configuration-for-an-attribute", "export": true, "normative": true, "for_": []};
+window.refsData['#determine-the-effective-configuration-for-an-attribute'] = {"text": "determine the effective configuration for an attribute", "type": "dfn", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#determine-the-effective-configuration-for-an-attribute", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/custom-elements.html#valid-custom-element-name'] = {"text": "valid custom element name", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/custom-elements.html#valid-custom-element-name", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/dom.html#htmlunknownelement'] = {"text": "HTMLUnknownElement", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dom.html#htmlunknownelement", "export": true, "normative": true, "for_": []};
+window.refsData['#element-kind'] = {"text": "element kind", "type": "dfn", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#element-kind", "export": true, "normative": true, "for_": []};
+window.refsData['#allow-custom-elements-option'] = {"text": "allow custom elements option", "type": "dfn", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#allow-custom-elements-option", "export": true, "normative": true, "for_": []};
+window.refsData['#element-drop-list'] = {"text": "element drop list", "type": "dfn", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#element-drop-list", "export": true, "normative": true, "for_": []};
+window.refsData['#element-block-list'] = {"text": "element block list", "type": "dfn", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#element-block-list", "export": true, "normative": true, "for_": []};
+window.refsData['#element-allow-list'] = {"text": "element allow list", "type": "dfn", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#element-allow-list", "export": true, "normative": true, "for_": []};
+window.refsData['#attribute-drop-list'] = {"text": "attribute drop list", "type": "dfn", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#attribute-drop-list", "export": true, "normative": true, "for_": []};
+window.refsData['#attribute-allow-list'] = {"text": "attribute allow list", "type": "dfn", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#attribute-allow-list", "export": true, "normative": true, "for_": []};
+window.refsData['#baseline-element-allow-list①'] = {"text": "baseline element allow list", "type": "dfn", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#baseline-element-allow-list\u2460", "export": true, "normative": true, "for_": []};
+window.refsData['#attribute-kind'] = {"text": "attribute kind", "type": "dfn", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#attribute-kind", "export": true, "normative": true, "for_": []};
+window.refsData['#baseline-attribute-allow-list①'] = {"text": "baseline attribute allow list", "type": "dfn", "spec": "sanitizer-api-1", "shortname": "sanitizer-api", "level": "1", "status": "local", "url": "#baseline-attribute-allow-list\u2460", "export": true, "normative": true, "for_": []};
+window.refsData['https://msdn.microsoft.com/en-us/library/cc848922(v=vs.85).aspx'] = {"text": "window.toStaticHTML()", "type": "method", "spec": "", "shortname": "sanitizer-api", "level": "1", "status": "anchor-block", "url": "https://msdn.microsoft.com/en-us/library/cc848922(v=vs.85).aspx", "export": true, "normative": true, "for_": []};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

@@ -491,6 +491,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -1464,8 +1501,6 @@ Jake Archibald</p>
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -1713,7 +1748,6 @@ Jake Archibald</p>
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -2123,6 +2157,282 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#dom-queryoptions-select'] = {"text": "select", "type": "dict-member", "spec": "localfonts-1", "shortname": "localfonts", "level": "1", "status": "local", "url": "#dom-queryoptions-select", "export": true, "normative": true, "for_": ["QueryOptions"]};
+window.refsData['#font-representation'] = {"text": "font representation", "type": "dfn", "spec": "localfonts-1", "shortname": "localfonts", "level": "1", "status": "local", "url": "#font-representation", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#byte-sequence'] = {"text": "byte sequence", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#byte-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list'] = {"text": "list", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list", "export": true, "normative": true, "for_": []};
+window.refsData['#font-table'] = {"text": "font table", "type": "dfn", "spec": "localfonts-1", "shortname": "localfonts", "level": "1", "status": "local", "url": "#font-table", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-ByteString'] = {"text": "ByteString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-ByteString", "export": true, "normative": true, "for_": []};
+window.refsData['#font-representation-table-list'] = {"text": "table list", "type": "dfn", "spec": "localfonts-1", "shortname": "localfonts", "level": "1", "status": "local", "url": "#font-representation-table-list", "export": true, "normative": true, "for_": ["font representation"]};
+window.refsData['#font-table-tag'] = {"text": "tag", "type": "dfn", "spec": "localfonts-1", "shortname": "localfonts", "level": "1", "status": "local", "url": "#font-table-tag", "export": true, "normative": true, "for_": ["font table"]};
+window.refsData['#font-representation-name-table'] = {"text": "name table", "type": "dfn", "spec": "localfonts-1", "shortname": "localfonts", "level": "1", "status": "local", "url": "#font-representation-name-table", "export": true, "normative": true, "for_": ["font representation"]};
+window.refsData['https://infra.spec.whatwg.org/#ordered-map'] = {"text": "map", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ordered-map", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-short'] = {"text": "unsigned short", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-short", "export": true, "normative": true, "for_": []};
+window.refsData['#localized-string-table'] = {"text": "localized string table", "type": "dfn", "spec": "localfonts-1", "shortname": "localfonts", "level": "1", "status": "local", "url": "#localized-string-table", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-USVString'] = {"text": "USVString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-USVString", "export": true, "normative": true, "for_": []};
+window.refsData['#name-table-names'] = {"text": "names", "type": "dfn", "spec": "localfonts-1", "shortname": "localfonts", "level": "1", "status": "local", "url": "#name-table-names", "export": true, "normative": true, "for_": ["name table"]};
+window.refsData['https://html.spec.whatwg.org/multipage/system-state.html#navigatorlanguage'] = {"text": "NavigatorLanguage", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/system-state.html#navigatorlanguage", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/system-state.html#dom-navigator-language'] = {"text": "language", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/system-state.html#dom-navigator-language", "export": true, "normative": true, "for_": ["NavigatorLanguage"]};
+window.refsData['https://w3c.github.io/permissions/#dfn-powerful-feature'] = {"text": "powerful feature", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-powerful-feature", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-fontmanager-query'] = {"text": "query(options)", "type": "method", "spec": "localfonts-1", "shortname": "localfonts", "level": "1", "status": "local", "url": "#dom-fontmanager-query", "export": true, "normative": true, "for_": ["FontManager"]};
+window.refsData['#fontmetadata'] = {"text": "FontMetadata", "type": "interface", "spec": "localfonts-1", "shortname": "localfonts", "level": "1", "status": "local", "url": "#fontmetadata", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#SecureContext'] = {"text": "SecureContext", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SecureContext", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#SameObject'] = {"text": "SameObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SameObject", "export": true, "normative": true, "for_": []};
+window.refsData['#fontmanager'] = {"text": "FontManager", "type": "interface", "spec": "localfonts-1", "shortname": "localfonts", "level": "1", "status": "local", "url": "#fontmanager", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-navigatorfonts-fonts'] = {"text": "fonts", "type": "attribute", "spec": "localfonts-1", "shortname": "localfonts", "level": "1", "status": "local", "url": "#dom-navigatorfonts-fonts", "export": true, "normative": true, "for_": ["NavigatorFonts"]};
+window.refsData['https://html.spec.whatwg.org/multipage/system-state.html#navigator'] = {"text": "Navigator", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/system-state.html#navigator", "export": true, "normative": true, "for_": []};
+window.refsData['#navigatorfonts'] = {"text": "NavigatorFonts", "type": "interface", "spec": "localfonts-1", "shortname": "localfonts", "level": "1", "status": "local", "url": "#navigatorfonts", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#workernavigator'] = {"text": "WorkerNavigator", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/workers.html#workernavigator", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object'] = {"text": "environment settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#this'] = {"text": "this", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#this", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object'] = {"text": "relevant settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-promise'] = {"text": "Promise", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-promise", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-queryoptions'] = {"text": "QueryOptions", "type": "dictionary", "spec": "localfonts-1", "shortname": "localfonts", "level": "1", "status": "local", "url": "#dictdef-queryoptions", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#a-new-promise'] = {"text": "a new promise", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#a-new-promise", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#concept-origin'] = {"text": "origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-origin", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#concept-origin-opaque'] = {"text": "opaque origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-origin-opaque", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#reject'] = {"text": "reject", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#reject", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#exceptiondef-typeerror'] = {"text": "TypeError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#exceptiondef-typeerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel'] = {"text": "in parallel", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-queryoptions-persistentaccess'] = {"text": "persistentAccess", "type": "dict-member", "spec": "localfonts-1", "shortname": "localfonts", "level": "1", "status": "local", "url": "#dom-queryoptions-persistentaccess", "export": true, "normative": true, "for_": ["QueryOptions"]};
+window.refsData['https://w3c.github.io/permissions/#dfn-request-permission-to-use'] = {"text": "requesting permission to use", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-request-permission-to-use", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-permissionname-font-access'] = {"text": "\"font-access\"", "type": "enum-value", "spec": "localfonts-1", "shortname": "localfonts", "level": "1", "status": "local", "url": "#dom-permissionname-font-access", "export": true, "normative": true, "for_": ["PermissionName"]};
+window.refsData['https://w3c.github.io/permissions/#dom-permissionstate-granted'] = {"text": "granted", "type": "enum-value", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dom-permissionstate-granted", "export": true, "normative": true, "for_": ["PermissionState"]};
+window.refsData['https://webidl.spec.whatwg.org/#notallowederror'] = {"text": "NotAllowedError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#notallowederror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMException'] = {"text": "DOMException", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMException", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-iterate'] = {"text": "for each", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-iterate", "export": true, "normative": true, "for_": ["list", "set"]};
+window.refsData['#font-representation-name-string'] = {"text": "name string", "type": "dfn", "spec": "localfonts-1", "shortname": "localfonts", "level": "1", "status": "local", "url": "#font-representation-name-string", "export": true, "normative": true, "for_": ["font representation"]};
+window.refsData['https://infra.spec.whatwg.org/#list-contain'] = {"text": "contain", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-contain", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['https://infra.spec.whatwg.org/#list-append'] = {"text": "append", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-append", "export": true, "normative": true, "for_": ["list"]};
+window.refsData['https://infra.spec.whatwg.org/#list-sort-in-ascending-order'] = {"text": "sort in ascending order", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-sort-in-ascending-order", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['#dom-fontmetadata-postscriptname'] = {"text": "postscriptName", "type": "attribute", "spec": "localfonts-1", "shortname": "localfonts", "level": "1", "status": "local", "url": "#dom-fontmetadata-postscriptname", "export": true, "normative": true, "for_": ["FontMetadata"]};
+window.refsData['https://webidl.spec.whatwg.org/#resolve'] = {"text": "resolve", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#resolve", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-fontmetadata-fullname'] = {"text": "fullName", "type": "attribute", "spec": "localfonts-1", "shortname": "localfonts", "level": "1", "status": "local", "url": "#dom-fontmetadata-fullname", "export": true, "normative": true, "for_": ["FontMetadata"]};
+window.refsData['#dom-fontmetadata-family'] = {"text": "family", "type": "attribute", "spec": "localfonts-1", "shortname": "localfonts", "level": "1", "status": "local", "url": "#dom-fontmetadata-family", "export": true, "normative": true, "for_": ["FontMetadata"]};
+window.refsData['#dom-fontmetadata-style'] = {"text": "style", "type": "attribute", "spec": "localfonts-1", "shortname": "localfonts", "level": "1", "status": "local", "url": "#dom-fontmetadata-style", "export": true, "normative": true, "for_": ["FontMetadata"]};
+window.refsData['https://w3c.github.io/FileAPI/#dfn-Blob'] = {"text": "Blob", "type": "interface", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#dfn-Blob", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-fontmetadata-blob'] = {"text": "blob()", "type": "method", "spec": "localfonts-1", "shortname": "localfonts", "level": "1", "status": "local", "url": "#dom-fontmetadata-blob", "export": true, "normative": true, "for_": ["FontMetadata"]};
+window.refsData['#current-language'] = {"text": "current language", "type": "dfn", "spec": "localfonts-1", "shortname": "localfonts", "level": "1", "status": "local", "url": "#current-language", "export": true, "normative": true, "for_": []};
+window.refsData['#font-representation-data-bytes'] = {"text": "data bytes", "type": "dfn", "spec": "localfonts-1", "shortname": "localfonts", "level": "1", "status": "local", "url": "#font-representation-data-bytes", "export": true, "normative": true, "for_": ["font representation"]};
+window.refsData['https://w3c.github.io/FileAPI/#dfn-type'] = {"text": "type", "type": "attribute", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#dfn-type", "export": true, "normative": true, "for_": ["Blob"]};
+window.refsData['https://drafts.csswg.org/css-font-loading-3/#fontface'] = {"text": "FontFace", "type": "interface", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-font-loading-3/#fontface", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-font-loading-3/#dom-fontface-family'] = {"text": "family", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-font-loading-3/#dom-fontface-family", "export": true, "normative": true, "for_": ["FontFace"]};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

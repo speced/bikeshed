@@ -692,6 +692,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -2150,8 +2187,6 @@ and all the rest of the <a href="http://lists.w3.org/Archives/Public/www-style/"
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -2399,7 +2434,6 @@ and all the rest of the <a href="http://lists.w3.org/Archives/Public/www-style/"
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -2837,6 +2871,266 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#at-ruledef-media'] = {"text": "@media", "type": "at-rule", "spec": "css-conditional-3", "shortname": "css-conditional", "level": "3", "status": "local", "url": "#at-ruledef-media", "export": true, "normative": true, "for_": []};
+window.refsData['#at-ruledef-supports'] = {"text": "@supports", "type": "at-rule", "spec": "css-conditional-3", "shortname": "css-conditional", "level": "3", "status": "local", "url": "#at-ruledef-supports", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#at-ruledef-import'] = {"text": "@import", "type": "at-rule", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#at-ruledef-import", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/semantics.html#the-link-element'] = {"text": "link", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/semantics.html#the-link-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#at-rule'] = {"text": "at-rule", "type": "dfn", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#at-rule", "export": true, "normative": true, "for_": []};
+window.refsData['#conditional-group-rule'] = {"text": "conditional group rule", "type": "dfn", "spec": "css-conditional-3", "shortname": "css-conditional", "level": "3", "status": "local", "url": "#conditional-group-rule", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#typedef-stylesheet'] = {"text": "<stylesheet>", "type": "type", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#typedef-stylesheet", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-namespaces-3/#css-qualified-name'] = {"text": "css qualified name", "type": "dfn", "spec": "css-namespaces-3", "shortname": "css-namespaces", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-namespaces-3/#css-qualified-name", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-namespaces-3/#namespace-prefix'] = {"text": "namespace prefix", "type": "dfn", "spec": "css-namespaces-3", "shortname": "css-namespaces", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-namespaces-3/#namespace-prefix", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#style-rule'] = {"text": "style rule", "type": "dfn", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#style-rule", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#at-ruledef-charset'] = {"text": "@charset", "type": "at-rule", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#at-ruledef-charset", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#css-invalid'] = {"text": "invalid", "type": "dfn", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#css-invalid", "export": true, "normative": true, "for_": ["css"]};
+window.refsData['https://drafts.csswg.org/mediaqueries-5/#typedef-media-query-list'] = {"text": "<media-query-list>", "type": "type", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-5/#typedef-media-query-list", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/mediaqueries-5/#typedef-media-condition'] = {"text": "<media-condition>", "type": "type", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-5/#typedef-media-condition", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-supports-condition'] = {"text": "<supports-condition>", "type": "type", "spec": "css-conditional-3", "shortname": "css-conditional", "level": "3", "status": "local", "url": "#typedef-supports-condition", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-supports-in-parens'] = {"text": "<supports-in-parens>", "type": "type", "spec": "css-conditional-3", "shortname": "css-conditional", "level": "3", "status": "local", "url": "#typedef-supports-in-parens", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-zero-plus'] = {"text": "*", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-zero-plus", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-supports-feature'] = {"text": "<supports-feature>", "type": "type", "spec": "css-conditional-3", "shortname": "css-conditional", "level": "3", "status": "local", "url": "#typedef-supports-feature", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/mediaqueries-5/#typedef-general-enclosed'] = {"text": "<general-enclosed>", "type": "type", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-5/#typedef-general-enclosed", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-supports-decl'] = {"text": "<supports-decl>", "type": "type", "spec": "css-conditional-3", "shortname": "css-conditional", "level": "3", "status": "local", "url": "#typedef-supports-decl", "export": true, "normative": true, "for_": []};
+window.refsData['#dfn-support'] = {"text": "support", "type": "dfn", "spec": "css-conditional-3", "shortname": "css-conditional", "level": "3", "status": "local", "url": "#dfn-support", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['https://drafts.csswg.org/css-display-4/#propdef-display'] = {"text": "display", "type": "property", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#propdef-display", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#propdef-width'] = {"text": "width", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-width", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-box-shadow'] = {"text": "box-shadow", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-box-shadow", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border'] = {"text": "border", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-color-4/#propdef-color'] = {"text": "color", "type": "property", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-color-4/#propdef-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-1/#cssrule'] = {"text": "CSSRule", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#cssrule", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-short'] = {"text": "unsigned short", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-short", "export": true, "normative": true, "for_": []};
+window.refsData['#cssconditionrule'] = {"text": "CSSConditionRule", "type": "interface", "spec": "css-conditional-3", "shortname": "css-conditional", "level": "3", "status": "local", "url": "#cssconditionrule", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-1/#cssgroupingrule'] = {"text": "CSSGroupingRule", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#cssgroupingrule", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-1/#cssomstring'] = {"text": "CSSOMString", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#cssomstring", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#css-parse-something-according-to-a-css-grammar'] = {"text": "parse", "type": "dfn", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#css-parse-something-according-to-a-css-grammar", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['#cssmediarule'] = {"text": "CSSMediaRule", "type": "interface", "spec": "css-conditional-3", "shortname": "css-conditional", "level": "3", "status": "local", "url": "#cssmediarule", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#SameObject'] = {"text": "SameObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SameObject", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#PutForwards'] = {"text": "PutForwards", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#PutForwards", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-1/#dom-medialist-mediatext'] = {"text": "mediaText", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#dom-medialist-mediatext", "export": true, "normative": true, "for_": ["MediaList"]};
+window.refsData['https://drafts.csswg.org/cssom-1/#medialist'] = {"text": "MediaList", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#medialist", "export": true, "normative": true, "for_": []};
+window.refsData['#csssupportsrule'] = {"text": "CSSSupportsRule", "type": "interface", "spec": "css-conditional-3", "shortname": "css-conditional", "level": "3", "status": "local", "url": "#csssupportsrule", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-1/#namespacedef-css'] = {"text": "CSS", "type": "namespace", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#namespacedef-css", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-css-supports'] = {"text": "supports(property, value)", "type": "method", "spec": "css-conditional-3", "shortname": "css-conditional", "level": "3", "status": "local", "url": "#dom-css-supports", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['https://infra.spec.whatwg.org/#ascii-case-insensitive'] = {"text": "ascii case-insensitive", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-case-insensitive", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.css-houdini.org/css-typed-om-1/#custom-property-name-string'] = {"text": "custom property name string", "type": "dfn", "spec": "css-typed-om-1", "shortname": "css-typed-om", "level": "1", "status": "current", "url": "https://drafts.css-houdini.org/css-typed-om-1/#custom-property-name-string", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-css-supports-conditiontext'] = {"text": "supports(conditionText)", "type": "method", "spec": "css-conditional-3", "shortname": "css-conditional", "level": "3", "status": "local", "url": "#dom-css-supports-conditiontext", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['https://drafts.csswg.org/mediaqueries-5/#valdef-media-not'] = {"text": "not", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-5/#valdef-media-not", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['https://drafts.csswg.org/css-conditional-5/#funcdef-supports'] = {"text": "supports()", "type": "function", "spec": "css-conditional-5", "shortname": "css-conditional", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-conditional-5/#funcdef-supports", "export": true, "normative": true, "for_": []};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

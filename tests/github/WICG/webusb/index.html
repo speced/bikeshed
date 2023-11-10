@@ -706,6 +706,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -4084,8 +4121,6 @@ parameters in addition to a larger data payload that can be either IN or OUT.</p
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -4333,7 +4368,6 @@ parameters in addition to a larger data payload that can be either IN or OUT.</p
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -4927,4 +4961,420 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#landing-page'] = {"text": "landing page", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#landing-page", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-usb-requestdevice'] = {"text": "requestDevice(options)", "type": "method", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usb-requestdevice", "export": true, "normative": true, "for_": ["USB"]};
+window.refsData['#dom-usbdevice-claiminterface'] = {"text": "claimInterface(interfaceNumber)", "type": "method", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevice-claiminterface", "export": true, "normative": true, "for_": ["USBDevice"]};
+window.refsData['#platform-descriptor'] = {"text": "platform descriptor", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#platform-descriptor", "export": true, "normative": true, "for_": []};
+window.refsData['#binary-object-store'] = {"text": "binary object store", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#binary-object-store", "export": true, "normative": true, "for_": []};
+window.refsData['#control-transfer'] = {"text": "control transfer", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#control-transfer", "export": true, "normative": true, "for_": []};
+window.refsData['#webusb-platform-capability-descriptor'] = {"text": "webusb platform capability descriptor", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#webusb-platform-capability-descriptor", "export": true, "normative": true, "for_": []};
+window.refsData['#url-descriptor'] = {"text": "url descriptor", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#url-descriptor", "export": true, "normative": true, "for_": []};
+window.refsData['#get-url'] = {"text": "get url", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#get-url", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-short'] = {"text": "unsigned short", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-short", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-octet'] = {"text": "octet", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-octet", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-usbdevicefilter'] = {"text": "USBDeviceFilter", "type": "dictionary", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dictdef-usbdevicefilter", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#SecureContext'] = {"text": "SecureContext", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SecureContext", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#eventtarget'] = {"text": "EventTarget", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#eventtarget", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler'] = {"text": "EventHandler", "type": "typedef", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-promise'] = {"text": "Promise", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-promise", "export": true, "normative": true, "for_": []};
+window.refsData['#usbdevice'] = {"text": "USBDevice", "type": "interface", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#usbdevice", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-usbdevicerequestoptions'] = {"text": "USBDeviceRequestOptions", "type": "dictionary", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dictdef-usbdevicerequestoptions", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/system-state.html#navigator'] = {"text": "Navigator", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/system-state.html#navigator", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#SameObject'] = {"text": "SameObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SameObject", "export": true, "normative": true, "for_": []};
+window.refsData['#usb'] = {"text": "USB", "type": "interface", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#usb", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#workernavigator'] = {"text": "WorkerNavigator", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/workers.html#workernavigator", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-usb-getdevices'] = {"text": "getDevices()", "type": "method", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usb-getdevices", "export": true, "normative": true, "for_": ["USB"]};
+window.refsData['#connect'] = {"text": "connect", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#connect", "export": true, "normative": true, "for_": []};
+window.refsData['#disconnect'] = {"text": "disconnect", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#disconnect", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-global'] = {"text": "relevant global object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-global", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#transient-activation'] = {"text": "transient activation", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/interaction.html#transient-activation", "export": true, "normative": true, "for_": []};
+window.refsData['#device-descriptor'] = {"text": "device descriptor", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#device-descriptor", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-usbdevicefilter-vendorid'] = {"text": "vendorId", "type": "dict-member", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevicefilter-vendorid", "export": true, "normative": true, "for_": ["USBDeviceFilter"]};
+window.refsData['#dom-usbdevicefilter-productid'] = {"text": "productId", "type": "dict-member", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevicefilter-productid", "export": true, "normative": true, "for_": ["USBDeviceFilter"]};
+window.refsData['#dom-usbdevicefilter-serialnumber'] = {"text": "serialNumber", "type": "dict-member", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevicefilter-serialnumber", "export": true, "normative": true, "for_": ["USBDeviceFilter"]};
+window.refsData['#string-descriptor'] = {"text": "string descriptor", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#string-descriptor", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-usbdevicefilter-classcode'] = {"text": "classCode", "type": "dict-member", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevicefilter-classcode", "export": true, "normative": true, "for_": ["USBDeviceFilter"]};
+window.refsData['#matches-the-interface-filter'] = {"text": "matches the interface filter", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#matches-the-interface-filter", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-usbdevicefilter-subclasscode'] = {"text": "subclassCode", "type": "dict-member", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevicefilter-subclasscode", "export": true, "normative": true, "for_": ["USBDeviceFilter"]};
+window.refsData['#dom-usbdevicefilter-protocolcode'] = {"text": "protocolCode", "type": "dict-member", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevicefilter-protocolcode", "export": true, "normative": true, "for_": ["USBDeviceFilter"]};
+window.refsData['#interface-descriptor'] = {"text": "interface descriptor", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#interface-descriptor", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-usb-onconnect'] = {"text": "onconnect", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usb-onconnect", "export": true, "normative": true, "for_": ["USB"]};
+window.refsData['#dom-usb-ondisconnect'] = {"text": "ondisconnect", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usb-ondisconnect", "export": true, "normative": true, "for_": ["USB"]};
+window.refsData['https://tc39.github.io/ecma262/#sec-promise-objects'] = {"text": "Promise", "type": "interface", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-promise-objects", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel'] = {"text": "in parallel", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel", "export": true, "normative": true, "for_": []};
+window.refsData['#enumerate-all-devices-attached-to-the-system'] = {"text": "enumerate all devices attached to the system", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#enumerate-all-devices-attached-to-the-system", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-array-objects'] = {"text": "Array", "type": "interface", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-array-objects", "export": true, "normative": true, "for_": []};
+window.refsData['#check-permissions-for-device'] = {"text": "check permissions for device", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#check-permissions-for-device", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-usbpermissionstorage-alloweddevices'] = {"text": "allowedDevices", "type": "dict-member", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbpermissionstorage-alloweddevices", "export": true, "normative": true, "for_": ["USBPermissionStorage"]};
+window.refsData['#dom-allowedusbdevice-devices-slot'] = {"text": "[[devices]]", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-allowedusbdevice-devices-slot", "export": true, "normative": true, "for_": ["AllowedUSBDevice"]};
+window.refsData['https://webidl.spec.whatwg.org/#resolve'] = {"text": "resolve", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#resolve", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dfn-request-permission-to-use'] = {"text": "request permission to use", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-request-permission-to-use", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-usbdevicerequestoptions-filters'] = {"text": "filters", "type": "dict-member", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevicerequestoptions-filters", "export": true, "normative": true, "for_": ["USBDeviceRequestOptions"]};
+window.refsData['https://webidl.spec.whatwg.org/#upon-fulfillment'] = {"text": "upon fulfillment", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#upon-fulfillment", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-usbpermissionresult-devices'] = {"text": "devices", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbpermissionresult-devices", "export": true, "normative": true, "for_": ["USBPermissionResult"]};
+window.refsData['https://webidl.spec.whatwg.org/#notfounderror'] = {"text": "NotFoundError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#notfounderror", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-usbpermissionstorage'] = {"text": "USBPermissionStorage", "type": "dictionary", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dictdef-usbpermissionstorage", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-usbpermissiondescriptor'] = {"text": "USBPermissionDescriptor", "type": "dictionary", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dictdef-usbpermissiondescriptor", "export": true, "normative": true, "for_": []};
+window.refsData['#usbpermissionresult'] = {"text": "USBPermissionResult", "type": "interface", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#usbpermissionresult", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-usbpermissiondescriptor-filters'] = {"text": "filters", "type": "dict-member", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbpermissiondescriptor-filters", "export": true, "normative": true, "for_": ["USBPermissionDescriptor"]};
+window.refsData['#is-not-a-valid-filter'] = {"text": "is not a valid filter", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#is-not-a-valid-filter", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#reject'] = {"text": "reject", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#reject", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-native-error-types-used-in-this-standard-typeerror'] = {"text": "TypeError", "type": "interface", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-native-error-types-used-in-this-standard-typeerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#securityerror'] = {"text": "SecurityError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#securityerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dom-permissionstatus-state'] = {"text": "state", "type": "attribute", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dom-permissionstatus-state", "export": true, "normative": true, "for_": ["PermissionStatus"]};
+window.refsData['#match-a-device-filter'] = {"text": "match a device filter", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#match-a-device-filter", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-frozen-array'] = {"text": "FrozenArray", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-frozen-array", "export": true, "normative": true, "for_": []};
+window.refsData['#add-device-to-storage'] = {"text": "add device to storage", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#add-device-to-storage", "export": true, "normative": true, "for_": []};
+window.refsData['#usb-device'] = {"text": "usb device", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#usb-device", "export": true, "normative": true, "for_": []};
+window.refsData['#vendor-id'] = {"text": "vendor id", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#vendor-id", "export": true, "normative": true, "for_": []};
+window.refsData['#product-id'] = {"text": "product id", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#product-id", "export": true, "normative": true, "for_": []};
+window.refsData['#serial-number'] = {"text": "serial number", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#serial-number", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-allowedusbdevice-vendorid'] = {"text": "vendorId", "type": "dict-member", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-allowedusbdevice-vendorid", "export": true, "normative": true, "for_": ["AllowedUSBDevice"]};
+window.refsData['#dom-allowedusbdevice-productid'] = {"text": "productId", "type": "dict-member", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-allowedusbdevice-productid", "export": true, "normative": true, "for_": ["AllowedUSBDevice"]};
+window.refsData['#dom-allowedusbdevice-serialnumber'] = {"text": "serialNumber", "type": "dict-member", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-allowedusbdevice-serialnumber", "export": true, "normative": true, "for_": ["AllowedUSBDevice"]};
+window.refsData['https://dom.spec.whatwg.org/#dictdef-eventinit'] = {"text": "EventInit", "type": "dictionary", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dictdef-eventinit", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#event'] = {"text": "Event", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#event", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-usbconnectioneventinit'] = {"text": "USBConnectionEventInit", "type": "dictionary", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dictdef-usbconnectioneventinit", "export": true, "normative": true, "for_": []};
+window.refsData['#usbconnectionevent'] = {"text": "USBConnectionEvent", "type": "interface", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#usbconnectionevent", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-navigator-usb'] = {"text": "usb", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-navigator-usb", "export": true, "normative": true, "for_": ["Navigator"]};
+window.refsData['#usbconfiguration'] = {"text": "USBConfiguration", "type": "interface", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#usbconfiguration", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
+window.refsData['#usbintransferresult'] = {"text": "USBInTransferResult", "type": "interface", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#usbintransferresult", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-usbcontroltransferparameters'] = {"text": "USBControlTransferParameters", "type": "dictionary", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dictdef-usbcontroltransferparameters", "export": true, "normative": true, "for_": []};
+window.refsData['#usbouttransferresult'] = {"text": "USBOutTransferResult", "type": "interface", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#usbouttransferresult", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#BufferSource'] = {"text": "BufferSource", "type": "typedef", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#BufferSource", "export": true, "normative": true, "for_": []};
+window.refsData['#enumdef-usbdirection'] = {"text": "USBDirection", "type": "enum", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#enumdef-usbdirection", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-long'] = {"text": "unsigned long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-long", "export": true, "normative": true, "for_": []};
+window.refsData['#usbisochronousintransferresult'] = {"text": "USBIsochronousInTransferResult", "type": "interface", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#usbisochronousintransferresult", "export": true, "normative": true, "for_": []};
+window.refsData['#usbisochronousouttransferresult'] = {"text": "USBIsochronousOutTransferResult", "type": "interface", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#usbisochronousouttransferresult", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-usbdevice-open'] = {"text": "open()", "type": "method", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevice-open", "export": true, "normative": true, "for_": ["USBDevice"]};
+window.refsData['#dom-usbdevice-configuration'] = {"text": "configuration", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevice-configuration", "export": true, "normative": true, "for_": ["USBDevice"]};
+window.refsData['#dom-usbdevice-selectconfiguration'] = {"text": "selectConfiguration(configurationValue)", "type": "method", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevice-selectconfiguration", "export": true, "normative": true, "for_": ["USBDevice"]};
+window.refsData['#dom-usbdevice-controltransferout'] = {"text": "controlTransferOut(setup)", "type": "method", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevice-controltransferout", "export": true, "normative": true, "for_": ["USBDevice"]};
+window.refsData['#dom-usbcontroltransferparameters-requesttype'] = {"text": "requestType", "type": "dict-member", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbcontroltransferparameters-requesttype", "export": true, "normative": true, "for_": ["USBControlTransferParameters"]};
+window.refsData['#dom-usbrequesttype-vendor'] = {"text": "\"vendor\"", "type": "enum-value", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbrequesttype-vendor", "export": true, "normative": true, "for_": ["USBRequestType"]};
+window.refsData['#dom-usbcontroltransferparameters-recipient'] = {"text": "recipient", "type": "dict-member", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbcontroltransferparameters-recipient", "export": true, "normative": true, "for_": ["USBControlTransferParameters"]};
+window.refsData['#dom-usbrecipient-interface'] = {"text": "\"interface\"", "type": "enum-value", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbrecipient-interface", "export": true, "normative": true, "for_": ["USBRecipient"]};
+window.refsData['#dom-usbcontroltransferparameters-request'] = {"text": "request", "type": "dict-member", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbcontroltransferparameters-request", "export": true, "normative": true, "for_": ["USBControlTransferParameters"]};
+window.refsData['#dom-usbcontroltransferparameters-value'] = {"text": "value", "type": "dict-member", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbcontroltransferparameters-value", "export": true, "normative": true, "for_": ["USBControlTransferParameters"]};
+window.refsData['#dom-usbcontroltransferparameters-index'] = {"text": "index", "type": "dict-member", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbcontroltransferparameters-index", "export": true, "normative": true, "for_": ["USBControlTransferParameters"]};
+window.refsData['#dom-usbdevice-transferin'] = {"text": "transferIn(endpointNumber, length)", "type": "method", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevice-transferin", "export": true, "normative": true, "for_": ["USBDevice"]};
+window.refsData['#dom-usbintransferresult-data'] = {"text": "data", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbintransferresult-data", "export": true, "normative": true, "for_": ["USBInTransferResult"]};
+window.refsData['#dom-usbintransferresult-status'] = {"text": "status", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbintransferresult-status", "export": true, "normative": true, "for_": ["USBInTransferResult"]};
+window.refsData['#dom-usbdevice-clearhalt'] = {"text": "clearHalt(direction, endpointNumber)", "type": "method", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevice-clearhalt", "export": true, "normative": true, "for_": ["USBDevice"]};
+window.refsData['#dom-usbdevice-usbversionmajor'] = {"text": "usbVersionMajor", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevice-usbversionmajor", "export": true, "normative": true, "for_": ["USBDevice"]};
+window.refsData['#dom-usbdevice-usbversionminor'] = {"text": "usbVersionMinor", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevice-usbversionminor", "export": true, "normative": true, "for_": ["USBDevice"]};
+window.refsData['#dom-usbdevice-usbversionsubminor'] = {"text": "usbVersionSubminor", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevice-usbversionsubminor", "export": true, "normative": true, "for_": ["USBDevice"]};
+window.refsData['#dom-usbdevice-deviceclass'] = {"text": "deviceClass", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevice-deviceclass", "export": true, "normative": true, "for_": ["USBDevice"]};
+window.refsData['#dom-usbdevice-devicesubclass'] = {"text": "deviceSubclass", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevice-devicesubclass", "export": true, "normative": true, "for_": ["USBDevice"]};
+window.refsData['#dom-usbdevice-deviceprotocol'] = {"text": "deviceProtocol", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevice-deviceprotocol", "export": true, "normative": true, "for_": ["USBDevice"]};
+window.refsData['#dom-usbdevice-vendorid'] = {"text": "vendorId", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevice-vendorid", "export": true, "normative": true, "for_": ["USBDevice"]};
+window.refsData['#dom-usbdevice-productid'] = {"text": "productId", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevice-productid", "export": true, "normative": true, "for_": ["USBDevice"]};
+window.refsData['#dom-usbdevice-deviceversionmajor'] = {"text": "deviceVersionMajor", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevice-deviceversionmajor", "export": true, "normative": true, "for_": ["USBDevice"]};
+window.refsData['#dom-usbdevice-deviceversionminor'] = {"text": "deviceVersionMinor", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevice-deviceversionminor", "export": true, "normative": true, "for_": ["USBDevice"]};
+window.refsData['#dom-usbdevice-deviceversionsubminor'] = {"text": "deviceVersionSubminor", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevice-deviceversionsubminor", "export": true, "normative": true, "for_": ["USBDevice"]};
+window.refsData['#dom-usbdevice-manufacturername'] = {"text": "manufacturerName", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevice-manufacturername", "export": true, "normative": true, "for_": ["USBDevice"]};
+window.refsData['#dom-usbdevice-productname'] = {"text": "productName", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevice-productname", "export": true, "normative": true, "for_": ["USBDevice"]};
+window.refsData['#dom-usbdevice-serialnumber'] = {"text": "serialNumber", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevice-serialnumber", "export": true, "normative": true, "for_": ["USBDevice"]};
+window.refsData['#dom-usbdevice-configurations'] = {"text": "configurations", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevice-configurations", "export": true, "normative": true, "for_": ["USBDevice"]};
+window.refsData['#dom-usbdevice-opened'] = {"text": "opened", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevice-opened", "export": true, "normative": true, "for_": ["USBDevice"]};
+window.refsData['https://webidl.spec.whatwg.org/#networkerror'] = {"text": "NetworkError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#networkerror", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-usbdevice-close'] = {"text": "close()", "type": "method", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevice-close", "export": true, "normative": true, "for_": ["USBDevice"]};
+window.refsData['https://webidl.spec.whatwg.org/#aborterror'] = {"text": "AbortError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#aborterror", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-usbdevice-releaseinterface'] = {"text": "releaseInterface(interfaceNumber)", "type": "method", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevice-releaseinterface", "export": true, "normative": true, "for_": ["USBDevice"]};
+window.refsData['https://webidl.spec.whatwg.org/#invalidstateerror'] = {"text": "InvalidStateError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invalidstateerror", "export": true, "normative": true, "for_": []};
+window.refsData['#default-endpoint'] = {"text": "default control pipe", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#default-endpoint", "export": true, "normative": true, "for_": []};
+window.refsData['#active-configuration'] = {"text": "active configuration", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#active-configuration", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-usbinterface-claimed'] = {"text": "claimed", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbinterface-claimed", "export": true, "normative": true, "for_": ["USBInterface"]};
+window.refsData['#dom-usbdevice-selectalternateinterface'] = {"text": "selectAlternateInterface(interfaceNumber, alternateSetting)", "type": "method", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevice-selectalternateinterface", "export": true, "normative": true, "for_": ["USBDevice"]};
+window.refsData['#dom-usbdevice-controltransferin'] = {"text": "controlTransferIn(setup, length)", "type": "method", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevice-controltransferin", "export": true, "normative": true, "for_": ["USBDevice"]};
+window.refsData['#check-the-validity-of-the-control-transfer-parameters'] = {"text": "check the validity of the control transfer parameters", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#check-the-validity-of-the-control-transfer-parameters", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-ArrayBuffer'] = {"text": "ArrayBuffer", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-ArrayBuffer", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DataView'] = {"text": "DataView", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DataView", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-usbtransferstatus-stall'] = {"text": "\"stall\"", "type": "enum-value", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbtransferstatus-stall", "export": true, "normative": true, "for_": ["USBTransferStatus"]};
+window.refsData['#dom-usbtransferstatus-babble'] = {"text": "\"babble\"", "type": "enum-value", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbtransferstatus-babble", "export": true, "normative": true, "for_": ["USBTransferStatus"]};
+window.refsData['#dom-usbtransferstatus-ok'] = {"text": "\"ok\"", "type": "enum-value", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbtransferstatus-ok", "export": true, "normative": true, "for_": ["USBTransferStatus"]};
+window.refsData['#setup-packet'] = {"text": "setup packet", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#setup-packet", "export": true, "normative": true, "for_": []};
+window.refsData['#data-stage'] = {"text": "data stage", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#data-stage", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-usbouttransferresult-status'] = {"text": "status", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbouttransferresult-status", "export": true, "normative": true, "for_": ["USBOutTransferResult"]};
+window.refsData['#dom-usbouttransferresult-byteswritten'] = {"text": "bytesWritten", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbouttransferresult-byteswritten", "export": true, "normative": true, "for_": ["USBOutTransferResult"]};
+window.refsData['https://webidl.spec.whatwg.org/#invalidaccesserror'] = {"text": "InvalidAccessError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invalidaccesserror", "export": true, "normative": true, "for_": []};
+window.refsData['#bulk-transfers'] = {"text": "bulk transfers", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#bulk-transfers", "export": true, "normative": true, "for_": []};
+window.refsData['#interrupt-transfers'] = {"text": "interrupt transfers", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#interrupt-transfers", "export": true, "normative": true, "for_": []};
+window.refsData['#in-transfers'] = {"text": "in transfers", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#in-transfers", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-usbdevice-transferout'] = {"text": "transferOut(endpointNumber, data)", "type": "method", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevice-transferout", "export": true, "normative": true, "for_": ["USBDevice"]};
+window.refsData['#out-transfers'] = {"text": "out transfers", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#out-transfers", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-usbdevice-isochronoustransferin'] = {"text": "isochronousTransferIn(endpointNumber, packetLengths)", "type": "method", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevice-isochronoustransferin", "export": true, "normative": true, "for_": ["USBDevice"]};
+window.refsData['#dom-usbisochronousintransferresult-data'] = {"text": "data", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbisochronousintransferresult-data", "export": true, "normative": true, "for_": ["USBIsochronousInTransferResult"]};
+window.refsData['#isochronous-transfers'] = {"text": "isochronous transfers", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#isochronous-transfers", "export": true, "normative": true, "for_": []};
+window.refsData['#usbisochronousintransferpacket'] = {"text": "USBIsochronousInTransferPacket", "type": "interface", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#usbisochronousintransferpacket", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-usbisochronousintransferresult-packets'] = {"text": "packets", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbisochronousintransferresult-packets", "export": true, "normative": true, "for_": ["USBIsochronousInTransferResult"]};
+window.refsData['#dom-usbisochronousintransferpacket-data'] = {"text": "data", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbisochronousintransferpacket-data", "export": true, "normative": true, "for_": ["USBIsochronousInTransferPacket"]};
+window.refsData['#dom-usbisochronousintransferpacket-status'] = {"text": "status", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbisochronousintransferpacket-status", "export": true, "normative": true, "for_": ["USBIsochronousInTransferPacket"]};
+window.refsData['#dom-usbdevice-isochronoustransferout'] = {"text": "isochronousTransferOut(endpointNumber, data, packetLengths)", "type": "method", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevice-isochronoustransferout", "export": true, "normative": true, "for_": ["USBDevice"]};
+window.refsData['#usbisochronousouttransferpacket'] = {"text": "USBIsochronousOutTransferPacket", "type": "interface", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#usbisochronousouttransferpacket", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-usbisochronousouttransferresult-packets'] = {"text": "packets", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbisochronousouttransferresult-packets", "export": true, "normative": true, "for_": ["USBIsochronousOutTransferResult"]};
+window.refsData['#dom-usbisochronousouttransferpacket-byteswritten'] = {"text": "bytesWritten", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbisochronousouttransferpacket-byteswritten", "export": true, "normative": true, "for_": ["USBIsochronousOutTransferPacket"]};
+window.refsData['#dom-usbisochronousouttransferpacket-status'] = {"text": "status", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbisochronousouttransferpacket-status", "export": true, "normative": true, "for_": ["USBIsochronousOutTransferPacket"]};
+window.refsData['#dom-usbdevice-reset'] = {"text": "reset()", "type": "method", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdevice-reset", "export": true, "normative": true, "for_": ["USBDevice"]};
+window.refsData['#enumdef-usbrequesttype'] = {"text": "USBRequestType", "type": "enum", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#enumdef-usbrequesttype", "export": true, "normative": true, "for_": []};
+window.refsData['#enumdef-usbrecipient'] = {"text": "USBRecipient", "type": "enum", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#enumdef-usbrecipient", "export": true, "normative": true, "for_": []};
+window.refsData['#enumdef-usbtransferstatus'] = {"text": "USBTransferStatus", "type": "enum", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#enumdef-usbtransferstatus", "export": true, "normative": true, "for_": []};
+window.refsData['#setup-stage'] = {"text": "setup stage", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#setup-stage", "export": true, "normative": true, "for_": []};
+window.refsData['#status-stage'] = {"text": "status stage", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#status-stage", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-usbrecipient-endpoint'] = {"text": "\"endpoint\"", "type": "enum-value", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbrecipient-endpoint", "export": true, "normative": true, "for_": ["USBRecipient"]};
+window.refsData['#dom-usbdirection-in'] = {"text": "\"in\"", "type": "enum-value", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdirection-in", "export": true, "normative": true, "for_": ["USBDirection"]};
+window.refsData['#dom-usbdirection-out'] = {"text": "\"out\"", "type": "enum-value", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbdirection-out", "export": true, "normative": true, "for_": ["USBDirection"]};
+window.refsData['#usbinterface'] = {"text": "USBInterface", "type": "interface", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#usbinterface", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-usbconfiguration-configurationvalue'] = {"text": "configurationValue", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbconfiguration-configurationvalue", "export": true, "normative": true, "for_": ["USBConfiguration"]};
+window.refsData['#configuration-descriptor'] = {"text": "configuration descriptor", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#configuration-descriptor", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-usbconfiguration-configurationname'] = {"text": "configurationName", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbconfiguration-configurationname", "export": true, "normative": true, "for_": ["USBConfiguration"]};
+window.refsData['#dom-usbconfiguration-interfaces'] = {"text": "interfaces", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbconfiguration-interfaces", "export": true, "normative": true, "for_": ["USBConfiguration"]};
+window.refsData['#usbalternateinterface'] = {"text": "USBAlternateInterface", "type": "interface", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#usbalternateinterface", "export": true, "normative": true, "for_": []};
+window.refsData['#usbendpoint'] = {"text": "USBEndpoint", "type": "interface", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#usbendpoint", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-usbinterface-alternates'] = {"text": "alternates", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbinterface-alternates", "export": true, "normative": true, "for_": ["USBInterface"]};
+window.refsData['#dom-usbinterface-interfacenumber'] = {"text": "interfaceNumber", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbinterface-interfacenumber", "export": true, "normative": true, "for_": ["USBInterface"]};
+window.refsData['#dom-usbinterface-alternate'] = {"text": "alternate", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbinterface-alternate", "export": true, "normative": true, "for_": ["USBInterface"]};
+window.refsData['#dom-usbalternateinterface-alternatesetting'] = {"text": "alternateSetting", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbalternateinterface-alternatesetting", "export": true, "normative": true, "for_": ["USBAlternateInterface"]};
+window.refsData['#dom-usbalternateinterface-interfaceclass'] = {"text": "interfaceClass", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbalternateinterface-interfaceclass", "export": true, "normative": true, "for_": ["USBAlternateInterface"]};
+window.refsData['#dom-usbalternateinterface-interfacesubclass'] = {"text": "interfaceSubclass", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbalternateinterface-interfacesubclass", "export": true, "normative": true, "for_": ["USBAlternateInterface"]};
+window.refsData['#dom-usbalternateinterface-interfaceprotocol'] = {"text": "interfaceProtocol", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbalternateinterface-interfaceprotocol", "export": true, "normative": true, "for_": ["USBAlternateInterface"]};
+window.refsData['#dom-usbalternateinterface-interfacename'] = {"text": "interfaceName", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbalternateinterface-interfacename", "export": true, "normative": true, "for_": ["USBAlternateInterface"]};
+window.refsData['#dom-usbalternateinterface-endpoints'] = {"text": "endpoints", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbalternateinterface-endpoints", "export": true, "normative": true, "for_": ["USBAlternateInterface"]};
+window.refsData['#endpoint-descriptor'] = {"text": "endpoint descriptor", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#endpoint-descriptor", "export": true, "normative": true, "for_": []};
+window.refsData['#enumdef-usbendpointtype'] = {"text": "USBEndpointType", "type": "enum", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#enumdef-usbendpointtype", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-usbendpoint-endpointnumber'] = {"text": "endpointNumber", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbendpoint-endpointnumber", "export": true, "normative": true, "for_": ["USBEndpoint"]};
+window.refsData['#dom-usbendpoint-direction'] = {"text": "direction", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbendpoint-direction", "export": true, "normative": true, "for_": ["USBEndpoint"]};
+window.refsData['#dom-usbendpoint-type'] = {"text": "type", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbendpoint-type", "export": true, "normative": true, "for_": ["USBEndpoint"]};
+window.refsData['#dom-usbendpoint-packetsize'] = {"text": "packetSize", "type": "attribute", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dom-usbendpoint-packetsize", "export": true, "normative": true, "for_": ["USBEndpoint"]};
+window.refsData['https://w3c.github.io/webappsec-permissions-policy/#policy-controlled-feature'] = {"text": "policy-controlled feature", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "current", "url": "https://w3c.github.io/webappsec-permissions-policy/#policy-controlled-feature", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webappsec-permissions-policy/#policy-controlled-feature-default-allowlist'] = {"text": "default allowlist", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "current", "url": "https://w3c.github.io/webappsec-permissions-policy/#policy-controlled-feature-default-allowlist", "export": true, "normative": true, "for_": ["policy-controlled feature"]};
+window.refsData['https://w3c.github.io/permissions/#dfn-powerful-feature'] = {"text": "powerful feature", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-powerful-feature", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dfn-permission-descriptor-type'] = {"text": "permission descriptor type", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-permission-descriptor-type", "export": true, "normative": true, "for_": ["powerful feature"]};
+window.refsData['https://w3c.github.io/permissions/#dom-permissiondescriptor'] = {"text": "PermissionDescriptor", "type": "dictionary", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dom-permissiondescriptor", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dfn-extra-permission-data-type'] = {"text": "extra permission data type", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-extra-permission-data-type", "export": true, "normative": true, "for_": ["powerful feature"]};
+window.refsData['#dictdef-allowedusbdevice'] = {"text": "AllowedUSBDevice", "type": "dictionary", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#dictdef-allowedusbdevice", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dfn-permission-result-type'] = {"text": "permission result type", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-permission-result-type", "export": true, "normative": true, "for_": ["powerful feature"]};
+window.refsData['https://w3c.github.io/permissions/#dom-permissionstatus'] = {"text": "PermissionStatus", "type": "interface", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dom-permissionstatus", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dfn-permission-query-algorithm'] = {"text": "permission query algorithm", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-permission-query-algorithm", "export": true, "normative": true, "for_": ["powerful feature"]};
+window.refsData['https://w3c.github.io/permissions/#dom-permissionstate-prompt'] = {"text": "prompt", "type": "enum-value", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dom-permissionstate-prompt", "export": true, "normative": true, "for_": ["PermissionState"]};
+window.refsData['https://wicg.github.io/permissions-request/#permission-request-algorithm'] = {"text": "permission request algorithm", "type": "dfn", "spec": "permissions-request", "shortname": "permissions-request", "level": "1", "status": "current", "url": "https://wicg.github.io/permissions-request/#permission-request-algorithm", "export": true, "normative": true, "for_": []};
+window.refsData['#request-the-usb-permission'] = {"text": "request the \"usb\" permission", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#request-the-usb-permission", "export": true, "normative": true, "for_": []};
+window.refsData['#descriptors'] = {"text": "descriptors", "type": "dfn", "spec": "webusb-1", "shortname": "webusb", "level": "1", "status": "local", "url": "#descriptors", "export": true, "normative": true, "for_": []};
 </script>

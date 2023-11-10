@@ -488,6 +488,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -1767,8 +1804,6 @@ the <code class="idl"><a data-link-type="idl" href="https://www.w3.org/TR/mediac
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -2016,7 +2051,6 @@ the <code class="idl"><a data-link-type="idl" href="https://www.w3.org/TR/mediac
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -2454,6 +2488,310 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#mediastream'] = {"text": "MediaStream", "type": "interface", "spec": "", "shortname": "mediastream-recording", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#mediastream", "export": true, "normative": true, "for_": []};
+window.refsData['#mediarecorder'] = {"text": "MediaRecorder", "type": "interface", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#mediarecorder", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediarecorder-start'] = {"text": "start()", "type": "method", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-start", "export": true, "normative": true, "for_": ["MediaRecorder"]};
+window.refsData['#dom-mediarecorder-stop'] = {"text": "stop()", "type": "method", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-stop", "export": true, "normative": true, "for_": ["MediaRecorder"]};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack'] = {"text": "MediaStreamTrack", "type": "interface", "spec": "", "shortname": "mediastream-recording", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediarecorder-ondataavailable'] = {"text": "ondataavailable", "type": "attribute", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-ondataavailable", "export": true, "normative": true, "for_": ["MediaRecorder"]};
+window.refsData['https://w3c.github.io/FileAPI/#dfn-Blob'] = {"text": "Blob", "type": "interface", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#dfn-Blob", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#eventtarget'] = {"text": "EventTarget", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#eventtarget", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediarecorder-mediarecorder'] = {"text": "MediaRecorder(stream, options)", "type": "constructor", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-mediarecorder", "export": true, "normative": true, "for_": ["MediaRecorder"]};
+window.refsData['#dictdef-mediarecorderoptions'] = {"text": "MediaRecorderOptions", "type": "dictionary", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dictdef-mediarecorderoptions", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediarecorder-stream'] = {"text": "stream", "type": "attribute", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-stream", "export": true, "normative": true, "for_": ["MediaRecorder"]};
+window.refsData['https://heycam.github.io/webidl/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "", "status": "anchor-block", "url": "https://heycam.github.io/webidl/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediarecorder-mimetype'] = {"text": "mimeType", "type": "attribute", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-mimetype", "export": true, "normative": true, "for_": ["MediaRecorder"]};
+window.refsData['#enumdef-recordingstate'] = {"text": "RecordingState", "type": "enum", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#enumdef-recordingstate", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediarecorder-state'] = {"text": "state", "type": "attribute", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-state", "export": true, "normative": true, "for_": ["MediaRecorder"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler'] = {"text": "EventHandler", "type": "typedef", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediarecorder-onstart'] = {"text": "onstart", "type": "attribute", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-onstart", "export": true, "normative": true, "for_": ["MediaRecorder"]};
+window.refsData['#dom-mediarecorder-onstop'] = {"text": "onstop", "type": "attribute", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-onstop", "export": true, "normative": true, "for_": ["MediaRecorder"]};
+window.refsData['#dom-mediarecorder-onpause'] = {"text": "onpause", "type": "attribute", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-onpause", "export": true, "normative": true, "for_": ["MediaRecorder"]};
+window.refsData['#dom-mediarecorder-onresume'] = {"text": "onresume", "type": "attribute", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-onresume", "export": true, "normative": true, "for_": ["MediaRecorder"]};
+window.refsData['#dom-mediarecorder-onerror'] = {"text": "onerror", "type": "attribute", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-onerror", "export": true, "normative": true, "for_": ["MediaRecorder"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-long'] = {"text": "unsigned long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-long", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediarecorder-videobitspersecond'] = {"text": "videoBitsPerSecond", "type": "attribute", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-videobitspersecond", "export": true, "normative": true, "for_": ["MediaRecorder"]};
+window.refsData['#dom-mediarecorder-audiobitspersecond'] = {"text": "audioBitsPerSecond", "type": "attribute", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-audiobitspersecond", "export": true, "normative": true, "for_": ["MediaRecorder"]};
+window.refsData['#enumdef-bitratemode'] = {"text": "BitrateMode", "type": "enum", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#enumdef-bitratemode", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediarecorder-audiobitratemode'] = {"text": "audioBitrateMode", "type": "attribute", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-audiobitratemode", "export": true, "normative": true, "for_": ["MediaRecorder"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediarecorder-pause'] = {"text": "pause()", "type": "method", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-pause", "export": true, "normative": true, "for_": ["MediaRecorder"]};
+window.refsData['#dom-mediarecorder-resume'] = {"text": "resume()", "type": "method", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-resume", "export": true, "normative": true, "for_": ["MediaRecorder"]};
+window.refsData['#dom-mediarecorder-requestdata'] = {"text": "requestData()", "type": "method", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-requestdata", "export": true, "normative": true, "for_": ["MediaRecorder"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediarecorder-istypesupported'] = {"text": "isTypeSupported(type)", "type": "method", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-istypesupported", "export": true, "normative": true, "for_": ["MediaRecorder"]};
+window.refsData['#abstract-opdef-is-type-supported'] = {"text": "is type supported", "type": "abstract-op", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#abstract-opdef-is-type-supported", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediarecorderoptions-mimetype'] = {"text": "mimeType", "type": "dict-member", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorderoptions-mimetype", "export": true, "normative": true, "for_": ["MediaRecorderOptions"]};
+window.refsData['https://webidl.spec.whatwg.org/#notsupportederror'] = {"text": "NotSupportedError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#notsupportederror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMException'] = {"text": "DOMException", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMException", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediarecorderoptions-bitspersecond'] = {"text": "bitsPerSecond", "type": "dict-member", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorderoptions-bitspersecond", "export": true, "normative": true, "for_": ["MediaRecorderOptions"]};
+window.refsData['#constrainedmimetype'] = {"text": "[[constrainedmimetype]]", "type": "dfn", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#constrainedmimetype", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-recordingstate-inactive'] = {"text": "inactive", "type": "enum-value", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-recordingstate-inactive", "export": true, "normative": true, "for_": ["RecordingState"]};
+window.refsData['#dom-mediarecorderoptions-videobitspersecond'] = {"text": "videoBitsPerSecond", "type": "dict-member", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorderoptions-videobitspersecond", "export": true, "normative": true, "for_": ["MediaRecorderOptions"]};
+window.refsData['#dom-mediarecorderoptions-audiobitspersecond'] = {"text": "audioBitsPerSecond", "type": "dict-member", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorderoptions-audiobitspersecond", "export": true, "normative": true, "for_": ["MediaRecorderOptions"]};
+window.refsData['#constrainedbitspersecond'] = {"text": "[[constrainedbitspersecond]]", "type": "dfn", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#constrainedbitspersecond", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediarecorderoptions-audiobitratemode'] = {"text": "audioBitrateMode", "type": "dict-member", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorderoptions-audiobitratemode", "export": true, "normative": true, "for_": ["MediaRecorderOptions"]};
+window.refsData['#eventdef-mediarecorder-start'] = {"text": "start", "type": "event", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#eventdef-mediarecorder-start", "export": true, "normative": true, "for_": ["MediaRecorder"]};
+window.refsData['#eventdef-mediarecorder-stop'] = {"text": "stop", "type": "event", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#eventdef-mediarecorder-stop", "export": true, "normative": true, "for_": ["MediaRecorder"]};
+window.refsData['#eventdef-mediarecorder-dataavailable'] = {"text": "dataavailable", "type": "event", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#eventdef-mediarecorder-dataavailable", "export": true, "normative": true, "for_": ["MediaRecorder"]};
+window.refsData['#dom-blobevent-data'] = {"text": "data", "type": "attribute", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-blobevent-data", "export": true, "normative": true, "for_": ["BlobEvent"]};
+window.refsData['#eventdef-mediarecorder-pause'] = {"text": "pause", "type": "event", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#eventdef-mediarecorder-pause", "export": true, "normative": true, "for_": ["MediaRecorder"]};
+window.refsData['#eventdef-mediarecorder-resume'] = {"text": "resume", "type": "event", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#eventdef-mediarecorder-resume", "export": true, "normative": true, "for_": ["MediaRecorder"]};
+window.refsData['#mediarecordererrorevent'] = {"text": "MediaRecorderErrorEvent", "type": "interface", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#mediarecordererrorevent", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#idl-def-MediaStreamTrackState.live'] = {"text": "live", "type": "enum-value", "spec": "", "shortname": "mediastream-recording", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#idl-def-MediaStreamTrackState.live", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#track-set'] = {"text": "track set", "type": "dfn", "spec": "", "shortname": "mediastream-recording", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#track-set", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#invalidstateerror'] = {"text": "InvalidStateError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invalidstateerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/webrtc-identity/#isolated-media-streams'] = {"text": "isolation properties", "type": "dfn", "spec": "", "shortname": "mediastream-recording", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/webrtc-identity/#isolated-media-streams", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#securityerror'] = {"text": "SecurityError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#securityerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#stream-inactive'] = {"text": "inactive", "type": "dfn", "spec": "", "shortname": "mediastream-recording", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#stream-inactive", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-recordingstate-recording'] = {"text": "recording", "type": "enum-value", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-recordingstate-recording", "export": true, "normative": true, "for_": ["RecordingState"]};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel'] = {"text": "in parallel", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-event-fire'] = {"text": "fire an event", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-event-fire", "export": true, "normative": true, "for_": []};
+window.refsData['#abstract-opdef-inactivate-the-recorder'] = {"text": "Inactivate the recorder", "type": "abstract-op", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#abstract-opdef-inactivate-the-recorder", "export": true, "normative": true, "for_": []};
+window.refsData['#fire-an-error-event'] = {"text": "fire an error event", "type": "dfn", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#fire-an-error-event", "export": true, "normative": true, "for_": []};
+window.refsData['#fire-a-blob-event'] = {"text": "fire a blob event", "type": "dfn", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#fire-a-blob-event", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#invalidmodificationerror'] = {"text": "InvalidModificationError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invalidmodificationerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#unknownerror'] = {"text": "UnknownError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#unknownerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#idl-def-MediaStreamTrackState.ended'] = {"text": "ended", "type": "enum-value", "spec": "", "shortname": "mediastream-recording", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#idl-def-MediaStreamTrackState.ended", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediarecorder-start-timeslice-timeslice'] = {"text": "timeslice", "type": "argument", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-start-timeslice-timeslice", "export": true, "normative": true, "for_": ["MediaRecorder/start()", "MediaRecorder/start(timeslice)"]};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-muted'] = {"text": "muted", "type": "attribute", "spec": "", "shortname": "mediastream-recording", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-muted", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-enabled'] = {"text": "enabled", "type": "attribute", "spec": "", "shortname": "mediastream-recording", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-enabled", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-recordingstate-paused'] = {"text": "paused", "type": "enum-value", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-recordingstate-paused", "export": true, "normative": true, "for_": ["RecordingState"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-fetch-resume'] = {"text": "resumed", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-fetch-resume", "export": true, "normative": true, "for_": ["fetch"]};
+window.refsData['#blobevent'] = {"text": "BlobEvent", "type": "interface", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#blobevent", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bitratemode-constant'] = {"text": "\"constant\"", "type": "enum-value", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-bitratemode-constant", "export": true, "normative": true, "for_": ["BitrateMode"]};
+window.refsData['#dom-bitratemode-variable'] = {"text": "\"variable\"", "type": "enum-value", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-bitratemode-variable", "export": true, "normative": true, "for_": ["BitrateMode"]};
+window.refsData['https://dom.spec.whatwg.org/#event'] = {"text": "Event", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#event", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-blobevent-blobevent'] = {"text": "BlobEvent(type, eventInitDict)", "type": "constructor", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-blobevent-blobevent", "export": true, "normative": true, "for_": ["BlobEvent"]};
+window.refsData['#dictdef-blobeventinit'] = {"text": "BlobEventInit", "type": "dictionary", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dictdef-blobeventinit", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#SameObject'] = {"text": "SameObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SameObject", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/hr-time/#dom-domhighrestimestamp'] = {"text": "DOMHighResTimeStamp", "type": "interface", "spec": "", "shortname": "mediastream-recording", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/hr-time/#dom-domhighrestimestamp", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-blobevent-timecode'] = {"text": "timecode", "type": "attribute", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-blobevent-timecode", "export": true, "normative": true, "for_": ["BlobEvent"]};
+window.refsData['https://w3c.github.io/FileAPI/#dfn-type'] = {"text": "type", "type": "attribute", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#dfn-type", "export": true, "normative": true, "for_": ["Blob"]};
+window.refsData['#dom-blobeventinit-data'] = {"text": "data", "type": "dict-member", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-blobeventinit-data", "export": true, "normative": true, "for_": ["BlobEventInit"]};
+window.refsData['#dom-blobeventinit-timecode'] = {"text": "timecode", "type": "dict-member", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-blobeventinit-timecode", "export": true, "normative": true, "for_": ["BlobEventInit"]};
+window.refsData['#dom-mediarecordererrorevent-error'] = {"text": "error", "type": "attribute", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecordererrorevent-error", "export": true, "normative": true, "for_": ["MediaRecorderErrorEvent"]};
+window.refsData['https://dom.spec.whatwg.org/#dictdef-eventinit'] = {"text": "EventInit", "type": "dictionary", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dictdef-eventinit", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediarecordererroreventinit-error'] = {"text": "error", "type": "dict-member", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecordererroreventinit-error", "export": true, "normative": true, "for_": ["MediaRecorderErrorEventInit"]};
+window.refsData['#dom-mediarecordererrorevent-mediarecordererrorevent'] = {"text": "MediaRecorderErrorEvent(type, eventInitDict)", "type": "constructor", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecordererrorevent-mediarecordererrorevent", "export": true, "normative": true, "for_": ["MediaRecorderErrorEvent"]};
+window.refsData['#dictdef-mediarecordererroreventinit'] = {"text": "MediaRecorderErrorEventInit", "type": "dictionary", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dictdef-mediarecordererroreventinit", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#secure-context'] = {"text": "secure context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#secure-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/fingerprinting-guidance/#dfn-active-fingerprinting'] = {"text": "active fingerprinting", "type": "dfn", "spec": "", "shortname": "mediastream-recording", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/fingerprinting-guidance/#dfn-active-fingerprinting", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/fingerprinting-guidance/#dfn-fingerprinting-surface'] = {"text": "fingerprinting surface", "type": "dfn", "spec": "", "shortname": "mediastream-recording", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/fingerprinting-guidance/#dfn-fingerprinting-surface", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia'] = {"text": "getUserMedia()", "type": "method", "spec": "", "shortname": "mediastream-recording", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia", "export": true, "normative": true, "for_": []};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

@@ -488,6 +488,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -2217,8 +2254,6 @@ For instance, embedding the user’s location in the metadata of the digitzed im
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -2466,7 +2501,6 @@ For instance, embedding the user’s location in the metadata of the digitzed im
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -2993,4 +3027,396 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack'] = {"text": "MediaStreamTrack", "type": "interface", "spec": "", "shortname": "image-capture", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/FileAPI/#dfn-Blob'] = {"text": "Blob", "type": "interface", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#dfn-Blob", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-imagecapture-takephoto'] = {"text": "takePhoto()", "type": "method", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-imagecapture-takephoto", "export": true, "normative": true, "for_": ["ImageCapture"]};
+window.refsData['https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html#imagebitmap'] = {"text": "ImageBitmap", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html#imagebitmap", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-imagecapture-grabframe'] = {"text": "grabFrame()", "type": "method", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-imagecapture-grabframe", "export": true, "normative": true, "for_": ["ImageCapture"]};
+window.refsData['#dom-imagecapture-getphotocapabilities'] = {"text": "getPhotoCapabilities()", "type": "method", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-imagecapture-getphotocapabilities", "export": true, "normative": true, "for_": ["ImageCapture"]};
+window.refsData['#dom-imagecapture-getphotosettings'] = {"text": "getPhotoSettings()", "type": "method", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-imagecapture-getphotosettings", "export": true, "normative": true, "for_": ["ImageCapture"]};
+window.refsData['#dictdef-photosettings'] = {"text": "PhotoSettings", "type": "dictionary", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dictdef-photosettings", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-promise'] = {"text": "Promise", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-promise", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-imagecapture-imagecapture'] = {"text": "ImageCapture(videoTrack)", "type": "constructor", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-imagecapture-imagecapture", "export": true, "normative": true, "for_": ["ImageCapture"]};
+window.refsData['#dictdef-photocapabilities'] = {"text": "PhotoCapabilities", "type": "dictionary", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dictdef-photocapabilities", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-imagecapture-track'] = {"text": "track", "type": "attribute", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-imagecapture-track", "export": true, "normative": true, "for_": ["ImageCapture"]};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#widl-MediaStreamTrack-kind'] = {"text": "kind", "type": "attribute", "spec": "", "shortname": "image-capture", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#widl-MediaStreamTrack-kind", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMException'] = {"text": "DOMException", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMException", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#notsupportederror'] = {"text": "NotSupportedError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#notsupportederror", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#widl-MediaStreamTrack-readyState'] = {"text": "readyState", "type": "attribute", "spec": "", "shortname": "image-capture", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#widl-MediaStreamTrack-readyState", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#idl-def-MediaStreamTrackState.live'] = {"text": "live", "type": "enum-value", "spec": "", "shortname": "image-capture", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#idl-def-MediaStreamTrackState.live", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#a-promise-rejected-with'] = {"text": "a promise rejected with", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#a-promise-rejected-with", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#invalidstateerror'] = {"text": "InvalidStateError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invalidstateerror", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-imagecapture-takephoto-photosettings-photosettings'] = {"text": "photoSettings", "type": "argument", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-imagecapture-takephoto-photosettings-photosettings", "export": true, "normative": true, "for_": ["ImageCapture/takePhoto()", "ImageCapture/takePhoto(photoSettings)"]};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#widl-MediaStreamTrack-onmute'] = {"text": "onmute", "type": "method", "spec": "", "shortname": "image-capture", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#widl-MediaStreamTrack-onmute", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#widl-MediaStreamTrack-onunmute'] = {"text": "onunmute", "type": "method", "spec": "", "shortname": "image-capture", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#widl-MediaStreamTrack-onunmute", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#unknownerror'] = {"text": "UnknownError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#unknownerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#operationerror'] = {"text": "OperationError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#operationerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html#dom-imagebitmap-width'] = {"text": "width", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html#dom-imagebitmap-width", "export": true, "normative": true, "for_": ["ImageBitmap"]};
+window.refsData['https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html#dom-imagebitmap-height'] = {"text": "height", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html#dom-imagebitmap-height", "export": true, "normative": true, "for_": ["ImageBitmap"]};
+window.refsData['#enumdef-redeyereduction'] = {"text": "RedEyeReduction", "type": "enum", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#enumdef-redeyereduction", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-photocapabilities-redeyereduction'] = {"text": "redEyeReduction", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-photocapabilities-redeyereduction", "export": true, "normative": true, "for_": ["PhotoCapabilities"]};
+window.refsData['#dictdef-mediasettingsrange'] = {"text": "MediaSettingsRange", "type": "dictionary", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dictdef-mediasettingsrange", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-photocapabilities-imageheight'] = {"text": "imageHeight", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-photocapabilities-imageheight", "export": true, "normative": true, "for_": ["PhotoCapabilities"]};
+window.refsData['#dom-photocapabilities-imagewidth'] = {"text": "imageWidth", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-photocapabilities-imagewidth", "export": true, "normative": true, "for_": ["PhotoCapabilities"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['#enumdef-filllightmode'] = {"text": "FillLightMode", "type": "enum", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#enumdef-filllightmode", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-photocapabilities-filllightmode'] = {"text": "fillLightMode", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-photocapabilities-filllightmode", "export": true, "normative": true, "for_": ["PhotoCapabilities"]};
+window.refsData['#red-eye-reduction'] = {"text": "red eye reduction", "type": "dfn", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#red-eye-reduction", "export": true, "normative": true, "for_": []};
+window.refsData['#image-height'] = {"text": "image height", "type": "dfn", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#image-height", "export": true, "normative": true, "for_": []};
+window.refsData['#image-width'] = {"text": "image width", "type": "dfn", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#image-width", "export": true, "normative": true, "for_": []};
+window.refsData['#fill-light-mode'] = {"text": "fill light mode", "type": "dfn", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#fill-light-mode", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-photosettings-filllightmode'] = {"text": "fillLightMode", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-photosettings-filllightmode", "export": true, "normative": true, "for_": ["PhotoSettings"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-double'] = {"text": "double", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-double", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-photosettings-imageheight'] = {"text": "imageHeight", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-photosettings-imageheight", "export": true, "normative": true, "for_": ["PhotoSettings"]};
+window.refsData['#dom-photosettings-imagewidth'] = {"text": "imageWidth", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-photosettings-imagewidth", "export": true, "normative": true, "for_": ["PhotoSettings"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-photosettings-redeyereduction'] = {"text": "redEyeReduction", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-photosettings-redeyereduction", "export": true, "normative": true, "for_": ["PhotoSettings"]};
+window.refsData['#dom-mediasettingsrange-max'] = {"text": "max", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediasettingsrange-max", "export": true, "normative": true, "for_": ["MediaSettingsRange"]};
+window.refsData['#dom-mediasettingsrange-min'] = {"text": "min", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediasettingsrange-min", "export": true, "normative": true, "for_": ["MediaSettingsRange"]};
+window.refsData['#dom-mediasettingsrange-step'] = {"text": "step", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediasettingsrange-step", "export": true, "normative": true, "for_": ["MediaSettingsRange"]};
+window.refsData['#dom-redeyereduction-never'] = {"text": "\"never\"", "type": "enum-value", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-redeyereduction-never", "export": true, "normative": true, "for_": ["RedEyeReduction"]};
+window.refsData['#dom-redeyereduction-always'] = {"text": "\"always\"", "type": "enum-value", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-redeyereduction-always", "export": true, "normative": true, "for_": ["RedEyeReduction"]};
+window.refsData['#dom-redeyereduction-controllable'] = {"text": "\"controllable\"", "type": "enum-value", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-redeyereduction-controllable", "export": true, "normative": true, "for_": ["RedEyeReduction"]};
+window.refsData['#dom-filllightmode-auto'] = {"text": "\"auto\"", "type": "enum-value", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-filllightmode-auto", "export": true, "normative": true, "for_": ["FillLightMode"]};
+window.refsData['#dom-filllightmode-off'] = {"text": "\"off\"", "type": "enum-value", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-filllightmode-off", "export": true, "normative": true, "for_": ["FillLightMode"]};
+window.refsData['#dom-filllightmode-flash'] = {"text": "\"flash\"", "type": "enum-value", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-filllightmode-flash", "export": true, "normative": true, "for_": ["FillLightMode"]};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#defining-a-new-constrainable-property'] = {"text": "constrainable property", "type": "dfn", "spec": "", "shortname": "image-capture", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#defining-a-new-constrainable-property", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#widl-MediaStreamTrack-getCapabilities-MediaTrackCapabilities'] = {"text": "getCapabilities()", "type": "method", "spec": "", "shortname": "image-capture", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#widl-MediaStreamTrack-getCapabilities-MediaTrackCapabilities", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#widl-ConstrainablePattern-getSettings-Settings'] = {"text": "getSettings()", "type": "method", "spec": "", "shortname": "image-capture", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#widl-ConstrainablePattern-getSettings-Settings", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#widl-MediaStreamTrack-getConstraints-MediaTrackConstraints'] = {"text": "getConstraints()", "type": "method", "spec": "", "shortname": "image-capture", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#widl-MediaStreamTrack-getConstraints-MediaTrackConstraints", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-applyconstraints'] = {"text": "applyConstraints()", "type": "method", "spec": "", "shortname": "image-capture", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-applyconstraints", "export": true, "normative": true, "for_": []};
+window.refsData['#imagecapture'] = {"text": "ImageCapture", "type": "interface", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#imagecapture", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#idl-def-MediaTrackSupportedConstraints'] = {"text": "MediaTrackSupportedConstraints", "type": "dictionary", "spec": "", "shortname": "image-capture", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#idl-def-MediaTrackSupportedConstraints", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#mediadevices-interface-extensions'] = {"text": "MediaDevices", "type": "interface", "spec": "", "shortname": "image-capture", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#mediadevices-interface-extensions", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#widl-MediaDevices-getSupportedConstraints-MediaTrackSupportedConstraints'] = {"text": "getSupportedConstraints()", "type": "method", "spec": "", "shortname": "image-capture", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#widl-MediaDevices-getSupportedConstraints-MediaTrackSupportedConstraints", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediatracksupportedconstraints-whitebalancemode'] = {"text": "whiteBalanceMode", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksupportedconstraints-whitebalancemode", "export": true, "normative": true, "for_": ["MediaTrackSupportedConstraints"]};
+window.refsData['#dom-mediatracksupportedconstraints-exposuremode'] = {"text": "exposureMode", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksupportedconstraints-exposuremode", "export": true, "normative": true, "for_": ["MediaTrackSupportedConstraints"]};
+window.refsData['#dom-mediatracksupportedconstraints-focusmode'] = {"text": "focusMode", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksupportedconstraints-focusmode", "export": true, "normative": true, "for_": ["MediaTrackSupportedConstraints"]};
+window.refsData['#dom-mediatracksupportedconstraints-pointsofinterest'] = {"text": "pointsOfInterest", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksupportedconstraints-pointsofinterest", "export": true, "normative": true, "for_": ["MediaTrackSupportedConstraints"]};
+window.refsData['#dom-mediatracksupportedconstraints-exposurecompensation'] = {"text": "exposureCompensation", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksupportedconstraints-exposurecompensation", "export": true, "normative": true, "for_": ["MediaTrackSupportedConstraints"]};
+window.refsData['#dom-mediatracksupportedconstraints-exposuretime'] = {"text": "exposureTime", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksupportedconstraints-exposuretime", "export": true, "normative": true, "for_": ["MediaTrackSupportedConstraints"]};
+window.refsData['#dom-mediatracksupportedconstraints-colortemperature'] = {"text": "colorTemperature", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksupportedconstraints-colortemperature", "export": true, "normative": true, "for_": ["MediaTrackSupportedConstraints"]};
+window.refsData['#dom-mediatracksupportedconstraints-iso'] = {"text": "iso", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksupportedconstraints-iso", "export": true, "normative": true, "for_": ["MediaTrackSupportedConstraints"]};
+window.refsData['#dom-mediatracksupportedconstraints-brightness'] = {"text": "brightness", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksupportedconstraints-brightness", "export": true, "normative": true, "for_": ["MediaTrackSupportedConstraints"]};
+window.refsData['#dom-mediatracksupportedconstraints-contrast'] = {"text": "contrast", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksupportedconstraints-contrast", "export": true, "normative": true, "for_": ["MediaTrackSupportedConstraints"]};
+window.refsData['#dom-mediatracksupportedconstraints-pan'] = {"text": "pan", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksupportedconstraints-pan", "export": true, "normative": true, "for_": ["MediaTrackSupportedConstraints"]};
+window.refsData['#dom-mediatracksupportedconstraints-saturation'] = {"text": "saturation", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksupportedconstraints-saturation", "export": true, "normative": true, "for_": ["MediaTrackSupportedConstraints"]};
+window.refsData['#dom-mediatracksupportedconstraints-sharpness'] = {"text": "sharpness", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksupportedconstraints-sharpness", "export": true, "normative": true, "for_": ["MediaTrackSupportedConstraints"]};
+window.refsData['#dom-mediatracksupportedconstraints-focusdistance'] = {"text": "focusDistance", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksupportedconstraints-focusdistance", "export": true, "normative": true, "for_": ["MediaTrackSupportedConstraints"]};
+window.refsData['#dom-mediatracksupportedconstraints-tilt'] = {"text": "tilt", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksupportedconstraints-tilt", "export": true, "normative": true, "for_": ["MediaTrackSupportedConstraints"]};
+window.refsData['#dom-mediatracksupportedconstraints-zoom'] = {"text": "zoom", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksupportedconstraints-zoom", "export": true, "normative": true, "for_": ["MediaTrackSupportedConstraints"]};
+window.refsData['#dom-mediatracksupportedconstraints-torch'] = {"text": "torch", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksupportedconstraints-torch", "export": true, "normative": true, "for_": ["MediaTrackSupportedConstraints"]};
+window.refsData['#white-balance-mode'] = {"text": "white balance mode", "type": "dfn", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#white-balance-mode", "export": true, "normative": true, "for_": []};
+window.refsData['#color-temperature'] = {"text": "color temperature", "type": "dfn", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#color-temperature", "export": true, "normative": true, "for_": []};
+window.refsData['#exposure'] = {"text": "exposure", "type": "dfn", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#exposure", "export": true, "normative": true, "for_": []};
+window.refsData['#exposure-compensation'] = {"text": "exposure compensation", "type": "dfn", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#exposure-compensation", "export": true, "normative": true, "for_": []};
+window.refsData['#exposure-time'] = {"text": "exposure time", "type": "dfn", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#exposure-time", "export": true, "normative": true, "for_": []};
+window.refsData['#iso'] = {"text": "iso", "type": "dfn", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#iso", "export": true, "normative": true, "for_": []};
+window.refsData['#focus-mode'] = {"text": "focus mode", "type": "dfn", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#focus-mode", "export": true, "normative": true, "for_": []};
+window.refsData['#points-of-interest'] = {"text": "points of interest", "type": "dfn", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#points-of-interest", "export": true, "normative": true, "for_": []};
+window.refsData['#brightness'] = {"text": "brightness", "type": "dfn", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#brightness", "export": true, "normative": true, "for_": []};
+window.refsData['#contrast'] = {"text": "contrast", "type": "dfn", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#contrast", "export": true, "normative": true, "for_": []};
+window.refsData['#pan'] = {"text": "pan", "type": "dfn", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#pan", "export": true, "normative": true, "for_": []};
+window.refsData['#saturation'] = {"text": "saturation", "type": "dfn", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#saturation", "export": true, "normative": true, "for_": []};
+window.refsData['#sharpness'] = {"text": "sharpness", "type": "dfn", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#sharpness", "export": true, "normative": true, "for_": []};
+window.refsData['#focus-distance'] = {"text": "focus distance", "type": "dfn", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#focus-distance", "export": true, "normative": true, "for_": []};
+window.refsData['#tilt'] = {"text": "tilt", "type": "dfn", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#tilt", "export": true, "normative": true, "for_": []};
+window.refsData['#zoom'] = {"text": "zoom", "type": "dfn", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#zoom", "export": true, "normative": true, "for_": []};
+window.refsData['#torch'] = {"text": "torch", "type": "dfn", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#torch", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#idl-def-MediaTrackCapabilities'] = {"text": "MediaTrackCapabilities", "type": "dictionary", "spec": "", "shortname": "image-capture", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#idl-def-MediaTrackCapabilities", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediatrackcapabilities-whitebalancemode'] = {"text": "whiteBalanceMode", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackcapabilities-whitebalancemode", "export": true, "normative": true, "for_": ["MediaTrackCapabilities"]};
+window.refsData['#dom-mediatrackcapabilities-exposuremode'] = {"text": "exposureMode", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackcapabilities-exposuremode", "export": true, "normative": true, "for_": ["MediaTrackCapabilities"]};
+window.refsData['#dom-mediatrackcapabilities-focusmode'] = {"text": "focusMode", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackcapabilities-focusmode", "export": true, "normative": true, "for_": ["MediaTrackCapabilities"]};
+window.refsData['#dom-mediatrackcapabilities-exposurecompensation'] = {"text": "exposureCompensation", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackcapabilities-exposurecompensation", "export": true, "normative": true, "for_": ["MediaTrackCapabilities"]};
+window.refsData['#dom-mediatrackcapabilities-exposuretime'] = {"text": "exposureTime", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackcapabilities-exposuretime", "export": true, "normative": true, "for_": ["MediaTrackCapabilities"]};
+window.refsData['#dom-mediatrackcapabilities-colortemperature'] = {"text": "colorTemperature", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackcapabilities-colortemperature", "export": true, "normative": true, "for_": ["MediaTrackCapabilities"]};
+window.refsData['#dom-mediatrackcapabilities-iso'] = {"text": "iso", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackcapabilities-iso", "export": true, "normative": true, "for_": ["MediaTrackCapabilities"]};
+window.refsData['#dom-mediatrackcapabilities-brightness'] = {"text": "brightness", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackcapabilities-brightness", "export": true, "normative": true, "for_": ["MediaTrackCapabilities"]};
+window.refsData['#dom-mediatrackcapabilities-contrast'] = {"text": "contrast", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackcapabilities-contrast", "export": true, "normative": true, "for_": ["MediaTrackCapabilities"]};
+window.refsData['#dom-mediatrackcapabilities-saturation'] = {"text": "saturation", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackcapabilities-saturation", "export": true, "normative": true, "for_": ["MediaTrackCapabilities"]};
+window.refsData['#dom-mediatrackcapabilities-sharpness'] = {"text": "sharpness", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackcapabilities-sharpness", "export": true, "normative": true, "for_": ["MediaTrackCapabilities"]};
+window.refsData['#dom-mediatrackcapabilities-focusdistance'] = {"text": "focusDistance", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackcapabilities-focusdistance", "export": true, "normative": true, "for_": ["MediaTrackCapabilities"]};
+window.refsData['#dom-mediatrackcapabilities-pan'] = {"text": "pan", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackcapabilities-pan", "export": true, "normative": true, "for_": ["MediaTrackCapabilities"]};
+window.refsData['#dom-mediatrackcapabilities-tilt'] = {"text": "tilt", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackcapabilities-tilt", "export": true, "normative": true, "for_": ["MediaTrackCapabilities"]};
+window.refsData['#dom-mediatrackcapabilities-zoom'] = {"text": "zoom", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackcapabilities-zoom", "export": true, "normative": true, "for_": ["MediaTrackCapabilities"]};
+window.refsData['#dom-mediatrackcapabilities-torch'] = {"text": "torch", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackcapabilities-torch", "export": true, "normative": true, "for_": ["MediaTrackCapabilities"]};
+window.refsData['#enumdef-meteringmode'] = {"text": "MeteringMode", "type": "enum", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#enumdef-meteringmode", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dfn-request-permission-to-use'] = {"text": "requesting permission to use", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-request-permission-to-use", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/mediacapture-main/#dom-cameradevicepermissiondescriptor-pantiltzoom'] = {"text": "panTiltZoom", "type": "dict-member", "spec": "mediacapture-streams", "shortname": "mediacapture-streams", "level": "1", "status": "current", "url": "https://w3c.github.io/mediacapture-main/#dom-cameradevicepermissiondescriptor-pantiltzoom", "export": true, "normative": true, "for_": ["CameraDevicePermissionDescriptor"]};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia'] = {"text": "getUserMedia()", "type": "method", "spec": "", "shortname": "image-capture", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/mediacapture-main/#dom-mediastream'] = {"text": "MediaStream", "type": "interface", "spec": "mediacapture-streams", "shortname": "mediacapture-streams", "level": "1", "status": "current", "url": "https://w3c.github.io/mediacapture-main/#dom-mediastream", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#idl-def-MediaTrackConstraintSet'] = {"text": "MediaTrackConstraintSet", "type": "dictionary", "spec": "", "shortname": "image-capture", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#idl-def-MediaTrackConstraintSet", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#idl-def-MediaTrackSettings'] = {"text": "MediaTrackSettings", "type": "dictionary", "spec": "", "shortname": "image-capture", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#idl-def-MediaTrackSettings", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#idl-def-MediaTrackConstraints'] = {"text": "MediaTrackConstraints", "type": "dictionary", "spec": "", "shortname": "image-capture", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#idl-def-MediaTrackConstraints", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#idl-def-constraindomstring'] = {"text": "ConstrainDOMString", "type": "interface", "spec": "", "shortname": "image-capture", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#idl-def-constraindomstring", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediatrackconstraintset-whitebalancemode'] = {"text": "whiteBalanceMode", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackconstraintset-whitebalancemode", "export": true, "normative": true, "for_": ["MediaTrackConstraintSet"]};
+window.refsData['#dom-mediatrackconstraintset-exposuremode'] = {"text": "exposureMode", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackconstraintset-exposuremode", "export": true, "normative": true, "for_": ["MediaTrackConstraintSet"]};
+window.refsData['#dom-mediatrackconstraintset-focusmode'] = {"text": "focusMode", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackconstraintset-focusmode", "export": true, "normative": true, "for_": ["MediaTrackConstraintSet"]};
+window.refsData['#typedefdef-constrainpoint2d'] = {"text": "ConstrainPoint2D", "type": "typedef", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#typedefdef-constrainpoint2d", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediatrackconstraintset-pointsofinterest'] = {"text": "pointsOfInterest", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackconstraintset-pointsofinterest", "export": true, "normative": true, "for_": ["MediaTrackConstraintSet"]};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#idl-def-constraindouble'] = {"text": "ConstrainDouble", "type": "interface", "spec": "", "shortname": "image-capture", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#idl-def-constraindouble", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediatrackconstraintset-exposurecompensation'] = {"text": "exposureCompensation", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackconstraintset-exposurecompensation", "export": true, "normative": true, "for_": ["MediaTrackConstraintSet"]};
+window.refsData['#dom-mediatrackconstraintset-exposuretime'] = {"text": "exposureTime", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackconstraintset-exposuretime", "export": true, "normative": true, "for_": ["MediaTrackConstraintSet"]};
+window.refsData['#dom-mediatrackconstraintset-colortemperature'] = {"text": "colorTemperature", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackconstraintset-colortemperature", "export": true, "normative": true, "for_": ["MediaTrackConstraintSet"]};
+window.refsData['#dom-mediatrackconstraintset-iso'] = {"text": "iso", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackconstraintset-iso", "export": true, "normative": true, "for_": ["MediaTrackConstraintSet"]};
+window.refsData['#dom-mediatrackconstraintset-brightness'] = {"text": "brightness", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackconstraintset-brightness", "export": true, "normative": true, "for_": ["MediaTrackConstraintSet"]};
+window.refsData['#dom-mediatrackconstraintset-contrast'] = {"text": "contrast", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackconstraintset-contrast", "export": true, "normative": true, "for_": ["MediaTrackConstraintSet"]};
+window.refsData['#dom-mediatrackconstraintset-saturation'] = {"text": "saturation", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackconstraintset-saturation", "export": true, "normative": true, "for_": ["MediaTrackConstraintSet"]};
+window.refsData['#dom-mediatrackconstraintset-sharpness'] = {"text": "sharpness", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackconstraintset-sharpness", "export": true, "normative": true, "for_": ["MediaTrackConstraintSet"]};
+window.refsData['#dom-mediatrackconstraintset-focusdistance'] = {"text": "focusDistance", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackconstraintset-focusdistance", "export": true, "normative": true, "for_": ["MediaTrackConstraintSet"]};
+window.refsData['#dom-mediatrackconstraintset-pan'] = {"text": "pan", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackconstraintset-pan", "export": true, "normative": true, "for_": ["MediaTrackConstraintSet"]};
+window.refsData['#dom-mediatrackconstraintset-tilt'] = {"text": "tilt", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackconstraintset-tilt", "export": true, "normative": true, "for_": ["MediaTrackConstraintSet"]};
+window.refsData['#dom-mediatrackconstraintset-zoom'] = {"text": "zoom", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackconstraintset-zoom", "export": true, "normative": true, "for_": ["MediaTrackConstraintSet"]};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#idl-def-ConstrainBoolean'] = {"text": "ConstrainBoolean", "type": "interface", "spec": "", "shortname": "image-capture", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#idl-def-ConstrainBoolean", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediatrackconstraintset-torch'] = {"text": "torch", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatrackconstraintset-torch", "export": true, "normative": true, "for_": ["MediaTrackConstraintSet"]};
+window.refsData['#dom-mediatracksettings-whitebalancemode'] = {"text": "whiteBalanceMode", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksettings-whitebalancemode", "export": true, "normative": true, "for_": ["MediaTrackSettings"]};
+window.refsData['#dom-mediatracksettings-exposuremode'] = {"text": "exposureMode", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksettings-exposuremode", "export": true, "normative": true, "for_": ["MediaTrackSettings"]};
+window.refsData['#dom-mediatracksettings-focusmode'] = {"text": "focusMode", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksettings-focusmode", "export": true, "normative": true, "for_": ["MediaTrackSettings"]};
+window.refsData['#dictdef-point2d'] = {"text": "Point2D", "type": "dictionary", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dictdef-point2d", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediatracksettings-pointsofinterest'] = {"text": "pointsOfInterest", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksettings-pointsofinterest", "export": true, "normative": true, "for_": ["MediaTrackSettings"]};
+window.refsData['#dom-mediatracksettings-exposurecompensation'] = {"text": "exposureCompensation", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksettings-exposurecompensation", "export": true, "normative": true, "for_": ["MediaTrackSettings"]};
+window.refsData['#dom-mediatracksettings-exposuretime'] = {"text": "exposureTime", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksettings-exposuretime", "export": true, "normative": true, "for_": ["MediaTrackSettings"]};
+window.refsData['#dom-mediatracksettings-colortemperature'] = {"text": "colorTemperature", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksettings-colortemperature", "export": true, "normative": true, "for_": ["MediaTrackSettings"]};
+window.refsData['#dom-mediatracksettings-iso'] = {"text": "iso", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksettings-iso", "export": true, "normative": true, "for_": ["MediaTrackSettings"]};
+window.refsData['#dom-mediatracksettings-brightness'] = {"text": "brightness", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksettings-brightness", "export": true, "normative": true, "for_": ["MediaTrackSettings"]};
+window.refsData['#dom-mediatracksettings-contrast'] = {"text": "contrast", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksettings-contrast", "export": true, "normative": true, "for_": ["MediaTrackSettings"]};
+window.refsData['#dom-mediatracksettings-saturation'] = {"text": "saturation", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksettings-saturation", "export": true, "normative": true, "for_": ["MediaTrackSettings"]};
+window.refsData['#dom-mediatracksettings-sharpness'] = {"text": "sharpness", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksettings-sharpness", "export": true, "normative": true, "for_": ["MediaTrackSettings"]};
+window.refsData['#dom-mediatracksettings-focusdistance'] = {"text": "focusDistance", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksettings-focusdistance", "export": true, "normative": true, "for_": ["MediaTrackSettings"]};
+window.refsData['#dom-mediatracksettings-pan'] = {"text": "pan", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksettings-pan", "export": true, "normative": true, "for_": ["MediaTrackSettings"]};
+window.refsData['#dom-mediatracksettings-tilt'] = {"text": "tilt", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksettings-tilt", "export": true, "normative": true, "for_": ["MediaTrackSettings"]};
+window.refsData['#dom-mediatracksettings-zoom'] = {"text": "zoom", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksettings-zoom", "export": true, "normative": true, "for_": ["MediaTrackSettings"]};
+window.refsData['#dom-mediatracksettings-torch'] = {"text": "torch", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-mediatracksettings-torch", "export": true, "normative": true, "for_": ["MediaTrackSettings"]};
+window.refsData['#dom-meteringmode-manual'] = {"text": "manual", "type": "enum-value", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-meteringmode-manual", "export": true, "normative": true, "for_": ["MeteringMode"]};
+window.refsData['#dom-meteringmode-continuous'] = {"text": "continuous", "type": "enum-value", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-meteringmode-continuous", "export": true, "normative": true, "for_": ["MeteringMode"]};
+window.refsData['#dom-meteringmode-single-shot'] = {"text": "single-shot", "type": "enum-value", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-meteringmode-single-shot", "export": true, "normative": true, "for_": ["MeteringMode"]};
+window.refsData['#dom-constrainpoint2dparameters-exact'] = {"text": "exact", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-constrainpoint2dparameters-exact", "export": true, "normative": true, "for_": ["ConstrainPoint2DParameters"]};
+window.refsData['#dom-constrainpoint2dparameters-ideal'] = {"text": "ideal", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-constrainpoint2dparameters-ideal", "export": true, "normative": true, "for_": ["ConstrainPoint2DParameters"]};
+window.refsData['#dictdef-constrainpoint2dparameters'] = {"text": "ConstrainPoint2DParameters", "type": "dictionary", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dictdef-constrainpoint2dparameters", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#dfn-allowed-required-constraints-for-device-selection'] = {"text": "allowed required constraints for device selection", "type": "dfn", "spec": "", "shortname": "image-capture", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#dfn-allowed-required-constraints-for-device-selection", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#dfn-optional-basic-constraints'] = {"text": "optional basic constraints", "type": "dfn", "spec": "", "shortname": "image-capture", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#dfn-optional-basic-constraints", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#dfn-advanced-constraints'] = {"text": "advanced constraints", "type": "dfn", "spec": "", "shortname": "image-capture", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#dfn-advanced-constraints", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#dfn-required-constraints'] = {"text": "required constraints", "type": "dfn", "spec": "", "shortname": "image-capture", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#dfn-required-constraints", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/mediacapture-streams/#dfn-fitness-distance'] = {"text": "fitness distance", "type": "dfn", "spec": "", "shortname": "image-capture", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#dfn-fitness-distance", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/mediacapture-main/#dom-devicepermissiondescriptor-deviceid'] = {"text": "deviceId", "type": "dict-member", "spec": "mediacapture-streams", "shortname": "mediacapture-streams", "level": "1", "status": "current", "url": "https://w3c.github.io/mediacapture-main/#dom-devicepermissiondescriptor-deviceid", "export": true, "normative": true, "for_": ["DevicePermissionDescriptor"]};
+window.refsData['https://www.w3.org/TR/page-visibility/#dom-visibilitystate'] = {"text": "visibilityState", "type": "attribute", "spec": "", "shortname": "image-capture", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/page-visibility/#dom-visibilitystate", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context'] = {"text": "top-level browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#securityerror'] = {"text": "SecurityError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#securityerror", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-meteringmode-none'] = {"text": "\"none\"", "type": "enum-value", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-meteringmode-none", "export": true, "normative": true, "for_": ["MeteringMode"]};
+window.refsData['#dom-point2d-x'] = {"text": "x", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-point2d-x", "export": true, "normative": true, "for_": ["Point2D"]};
+window.refsData['#dom-point2d-y'] = {"text": "y", "type": "dict-member", "spec": "image-capture", "shortname": "image-capture", "level": "", "status": "local", "url": "#dom-point2d-y", "export": true, "normative": true, "for_": ["Point2D"]};
 </script>

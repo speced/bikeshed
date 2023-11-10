@@ -702,6 +702,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -4014,8 +4051,6 @@ p#two <c- p>{</c-> <c- k>clip</c-><c- p>:</c-> <c- nf>rect</c-><c- p>(</c-><c- m
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -4263,7 +4298,6 @@ p#two <c- p>{</c-> <c- k>clip</c-><c- p>:</c-> <c- nf>rect</c-><c- p>(</c-><c- m
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -4893,4 +4927,477 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#propdef-clip-path'] = {"text": "clip-path", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-clip-path", "export": true, "normative": true, "for_": []};
+window.refsData['#elementdef-clippath'] = {"text": "clippath", "type": "element", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#elementdef-clippath", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/struct.html#graphics-element'] = {"text": "graphics element", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/struct.html#graphics-element", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-mask-image'] = {"text": "mask-image", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask-image", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-mask-border-source'] = {"text": "mask-border-source", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask-border-source", "export": true, "normative": true, "for_": []};
+window.refsData['#elementdef-mask'] = {"text": "mask", "type": "element", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#elementdef-mask", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-mask-position'] = {"text": "mask-position", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask-position", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-mask-size'] = {"text": "mask-size", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask-size", "export": true, "normative": true, "for_": []};
+window.refsData['#mask-border-image-area'] = {"text": "mask border image area", "type": "dfn", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#mask-border-image-area", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-mask-border'] = {"text": "mask-border", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask-border", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-mask'] = {"text": "mask", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/render.html#TermStackingContext'] = {"text": "stacking contexts", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/render.html#TermStackingContext", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/coords.html#TermObjectBoundingBox'] = {"text": "object bounding box", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/coords.html#TermObjectBoundingBox", "export": true, "normative": true, "for_": []};
+window.refsData['#mask-layer-image'] = {"text": "mask layer image", "type": "dfn", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#mask-layer-image", "export": true, "normative": true, "for_": []};
+window.refsData['#mask-painting-area'] = {"text": "mask painting area", "type": "dfn", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#mask-painting-area", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#background-painting-area'] = {"text": "background painting area", "type": "dfn", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#background-painting-area", "export": false, "normative": true, "for_": []};
+window.refsData['#mask-positioning-area'] = {"text": "mask positioning area", "type": "dfn", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#mask-positioning-area", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#background-positioning-area'] = {"text": "background positioning area", "type": "dfn", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#background-positioning-area", "export": false, "normative": true, "for_": []};
+window.refsData['#mask-border-image'] = {"text": "mask border image", "type": "dfn", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#mask-border-image", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#border-image-area'] = {"text": "border image area", "type": "dfn", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#border-image-area", "export": false, "normative": true, "for_": []};
+window.refsData['#propdef-clip'] = {"text": "clip", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-clip", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#propdef-overflow'] = {"text": "overflow", "type": "property", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#propdef-overflow", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-contain-2/#valdef-content-visibility-visible'] = {"text": "visible", "type": "value", "spec": "css-contain-2", "shortname": "css-contain", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-contain-2/#valdef-content-visibility-visible", "export": true, "normative": true, "for_": ["content-visibility"]};
+window.refsData['https://svgwg.org/svg2-draft/struct.html#elementdef-use'] = {"text": "use", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-use", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-ui-4/#propdef-pointer-events'] = {"text": "pointer-events", "type": "property", "spec": "css-ui-4", "shortname": "css-ui", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-ui-4/#propdef-pointer-events", "export": true, "normative": true, "for_": []};
+window.refsData['#clipping-region'] = {"text": "clipping region", "type": "dfn", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#clipping-region", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-clip-source'] = {"text": "<clip-source>", "type": "type", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#typedef-clip-source", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-shapes-1/#typedef-basic-shape'] = {"text": "<basic-shape>", "type": "type", "spec": "css-shapes-1", "shortname": "css-shapes", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-shapes-1/#typedef-basic-shape", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-any'] = {"text": "||", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-any", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-geometry-box'] = {"text": "<geometry-box>", "type": "type", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#typedef-geometry-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/struct.html#container-element'] = {"text": "container element", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/struct.html#container-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/struct.html#elementdef-defs'] = {"text": "defs", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-defs", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#url-value'] = {"text": "<url>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#url-value", "export": true, "normative": true, "for_": []};
+window.refsData['#clipping-path'] = {"text": "clipping path", "type": "dfn", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#clipping-path", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-shapes-1/#typedef-shape-box'] = {"text": "<shape-box>", "type": "type", "spec": "css-shapes-1", "shortname": "css-shapes", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-shapes-1/#typedef-shape-box", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-mask-clip-border-box'] = {"text": "border-box", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-mask-clip-border-box", "export": true, "normative": true, "for_": ["mask-clip"]};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border-radius'] = {"text": "border-radius", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-radius", "export": true, "normative": true, "for_": []};
+window.refsData['#stroke-bounding-box'] = {"text": "stroke bounding box", "type": "dfn", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#stroke-bounding-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/coords.html#ViewBoxAttribute'] = {"text": "viewbox", "type": "element-attr", "spec": "svg2", "shortname": "svg2", "level": "", "status": "anchor-block", "url": "https://svgwg.org/svg2-draft/coords.html#ViewBoxAttribute", "export": true, "normative": true, "for_": ["svg"]};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#used-value'] = {"text": "used value", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#used-value", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-mask-clip-content-box'] = {"text": "content-box", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-mask-clip-content-box", "export": true, "normative": true, "for_": ["mask-clip"]};
+window.refsData['#valdef-mask-clip-padding-box'] = {"text": "padding-box", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-mask-clip-padding-box", "export": true, "normative": true, "for_": ["mask-clip"]};
+window.refsData['#valdef-clip-path-fill-box'] = {"text": "fill-box", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-clip-path-fill-box", "export": true, "normative": true, "for_": ["clip-path"]};
+window.refsData['#valdef-clip-path-stroke-box'] = {"text": "stroke-box", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-clip-path-stroke-box", "export": true, "normative": true, "for_": ["clip-path"]};
+window.refsData['#valdef-clip-path-view-box'] = {"text": "view-box", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-clip-path-view-box", "export": true, "normative": true, "for_": ["clip-path"]};
+window.refsData['https://drafts.csswg.org/css-color-4/#propdef-opacity'] = {"text": "opacity", "type": "property", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-color-4/#propdef-opacity", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-polygon'] = {"text": "polygon()", "type": "function", "spec": "css-shapes-1", "shortname": "css-shapes", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-polygon", "export": true, "normative": true, "for_": ["<basic-shape>"]};
+window.refsData['https://svgwg.org/svg2-draft/render.html#TermNeverRenderedElement'] = {"text": "never-rendered element", "type": "dfn", "spec": "svg2", "shortname": "svg2", "level": "", "status": "anchor-block", "url": "https://svgwg.org/svg2-draft/render.html#TermNeverRenderedElement", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/struct.html#elementdef-desc'] = {"text": "desc", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-desc", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/struct.html#elementdef-title'] = {"text": "title", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-title", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/struct.html#elementdef-metadata'] = {"text": "metadata", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-metadata", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/specs/animations/#elementdef-animate'] = {"text": "animate", "type": "element", "spec": "svg-animations", "shortname": "svg-animations", "level": "1", "status": "current", "url": "https://svgwg.org/specs/animations/#elementdef-animate", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/specs/animations/#elementdef-animateMotion'] = {"text": "animatemotion", "type": "element", "spec": "svg-animations", "shortname": "svg-animations", "level": "1", "status": "current", "url": "https://svgwg.org/specs/animations/#elementdef-animateMotion", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/specs/animations/#elementdef-animateTransform'] = {"text": "animatetransform", "type": "element", "spec": "svg-animations", "shortname": "svg-animations", "level": "1", "status": "current", "url": "https://svgwg.org/specs/animations/#elementdef-animateTransform", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/specs/animations/#elementdef-set'] = {"text": "set", "type": "element", "spec": "svg-animations", "shortname": "svg-animations", "level": "1", "status": "current", "url": "https://svgwg.org/specs/animations/#elementdef-set", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/shapes.html#elementdef-circle'] = {"text": "circle", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/shapes.html#elementdef-circle", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/shapes.html#elementdef-ellipse'] = {"text": "ellipse", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/shapes.html#elementdef-ellipse", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/shapes.html#elementdef-line'] = {"text": "line", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/shapes.html#elementdef-line", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/paths.html#elementdef-path'] = {"text": "path", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/paths.html#elementdef-path", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/shapes.html#elementdef-polygon'] = {"text": "polygon", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/shapes.html#elementdef-polygon", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/shapes.html#elementdef-polyline'] = {"text": "polyline", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/shapes.html#elementdef-polyline", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/shapes.html#elementdef-rect'] = {"text": "rect", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/shapes.html#elementdef-rect", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/text.html#elementdef-text'] = {"text": "text", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/text.html#elementdef-text", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/interact.html#elementdef-script'] = {"text": "script", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/interact.html#elementdef-script", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-inline-3/#propdef-alignment-baseline'] = {"text": "alignment-baseline", "type": "property", "spec": "css-inline-3", "shortname": "css-inline", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-inline-3/#propdef-alignment-baseline", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-inline-3/#propdef-baseline-shift'] = {"text": "baseline-shift", "type": "property", "spec": "css-inline-3", "shortname": "css-inline", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-inline-3/#propdef-baseline-shift", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-clip-rule'] = {"text": "clip-rule", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-clip-rule", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-color-4/#propdef-color'] = {"text": "color", "type": "property", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-color-4/#propdef-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/painting.html#ColorInterpolationProperty'] = {"text": "color-interpolation", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/painting.html#ColorInterpolationProperty", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.fxtf.org/filter-effects-1/#propdef-color-interpolation-filters'] = {"text": "color-interpolation-filters", "type": "property", "spec": "filter-effects-1", "shortname": "filter-effects", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/filter-effects-1/#propdef-color-interpolation-filters", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/SVG2/painting.html#ColorRenderingProperty'] = {"text": "color-rendering", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "snapshot", "url": "https://www.w3.org/TR/SVG2/painting.html#ColorRenderingProperty", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-ui-4/#propdef-cursor'] = {"text": "cursor", "type": "property", "spec": "css-ui-4", "shortname": "css-ui", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-ui-4/#propdef-cursor", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-3/#propdef-direction'] = {"text": "direction", "type": "property", "spec": "css-writing-modes-3", "shortname": "css-writing-modes", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-3/#propdef-direction", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#propdef-display'] = {"text": "display", "type": "property", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#propdef-display", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-inline-3/#propdef-dominant-baseline'] = {"text": "dominant-baseline", "type": "property", "spec": "css-inline-3", "shortname": "css-inline", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-inline-3/#propdef-dominant-baseline", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/painting.html#FillProperty'] = {"text": "fill", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/painting.html#FillProperty", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/painting.html#FillOpacityProperty'] = {"text": "fill-opacity", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/painting.html#FillOpacityProperty", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/painting.html#FillRuleProperty'] = {"text": "fill-rule", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/painting.html#FillRuleProperty", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.fxtf.org/filter-effects-1/#propdef-filter'] = {"text": "filter", "type": "property", "spec": "filter-effects-1", "shortname": "filter-effects", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/filter-effects-1/#propdef-filter", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.fxtf.org/filter-effects-1/#propdef-flood-color'] = {"text": "flood-color", "type": "property", "spec": "filter-effects-1", "shortname": "filter-effects", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/filter-effects-1/#propdef-flood-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.fxtf.org/filter-effects-1/#propdef-flood-opacity'] = {"text": "flood-opacity", "type": "property", "spec": "filter-effects-1", "shortname": "filter-effects", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/filter-effects-1/#propdef-flood-opacity", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font'] = {"text": "font", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font-family'] = {"text": "font-family", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-family", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font-size'] = {"text": "font-size", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-size", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-fonts-5/#propdef-font-size-adjust'] = {"text": "font-size-adjust", "type": "property", "spec": "css-fonts-5", "shortname": "css-fonts", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-fonts-5/#propdef-font-size-adjust", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font-stretch'] = {"text": "font-stretch", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-stretch", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font-style'] = {"text": "font-style", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-style", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font-variant'] = {"text": "font-variant", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-variant", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font-weight'] = {"text": "font-weight", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-weight", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#propdef-glyph-orientation-vertical'] = {"text": "glyph-orientation-vertical", "type": "property", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#propdef-glyph-orientation-vertical", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-images-3/#propdef-image-rendering'] = {"text": "image-rendering", "type": "property", "spec": "css-images-3", "shortname": "css-images", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-images-3/#propdef-image-rendering", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-4/#propdef-letter-spacing'] = {"text": "letter-spacing", "type": "property", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#propdef-letter-spacing", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.fxtf.org/filter-effects-1/#propdef-lighting-color'] = {"text": "lighting-color", "type": "property", "spec": "filter-effects-1", "shortname": "filter-effects", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/filter-effects-1/#propdef-lighting-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/painting.html#MarkerProperty'] = {"text": "marker", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/painting.html#MarkerProperty", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/painting.html#MarkerEndProperty'] = {"text": "marker-end", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/painting.html#MarkerEndProperty", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/painting.html#MarkerMidProperty'] = {"text": "marker-mid", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/painting.html#MarkerMidProperty", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/painting.html#MarkerStartProperty'] = {"text": "marker-start", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/painting.html#MarkerStartProperty", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/painting.html#ShapeRenderingProperty'] = {"text": "shape-rendering", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/painting.html#ShapeRenderingProperty", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/pservers.html#StopColorProperty'] = {"text": "stop-color", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/pservers.html#StopColorProperty", "export": true, "normative": true, "for_": ["stop"]};
+window.refsData['https://svgwg.org/svg2-draft/pservers.html#StopOpacityProperty'] = {"text": "stop-opacity", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/pservers.html#StopOpacityProperty", "export": true, "normative": true, "for_": ["stop"]};
+window.refsData['https://svgwg.org/svg2-draft/painting.html#StrokeProperty'] = {"text": "stroke", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/painting.html#StrokeProperty", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/painting.html#StrokeDasharrayProperty'] = {"text": "stroke-dasharray", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/painting.html#StrokeDasharrayProperty", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/painting.html#StrokeDashoffsetProperty'] = {"text": "stroke-dashoffset", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/painting.html#StrokeDashoffsetProperty", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/painting.html#StrokeLinecapProperty'] = {"text": "stroke-linecap", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/painting.html#StrokeLinecapProperty", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/painting.html#StrokeLinejoinProperty'] = {"text": "stroke-linejoin", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/painting.html#StrokeLinejoinProperty", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/painting.html#StrokeMiterlimitProperty'] = {"text": "stroke-miterlimit", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/painting.html#StrokeMiterlimitProperty", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/painting.html#StrokeOpacityProperty'] = {"text": "stroke-opacity", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/painting.html#StrokeOpacityProperty", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/painting.html#StrokeWidthProperty'] = {"text": "stroke-width", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/painting.html#StrokeWidthProperty", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/text.html#TextAnchorProperty'] = {"text": "text-anchor", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/text.html#TextAnchorProperty", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration'] = {"text": "text-decoration", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/painting.html#TextRenderingProperty'] = {"text": "text-rendering", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/painting.html#TextRenderingProperty", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-3/#propdef-unicode-bidi'] = {"text": "unicode-bidi", "type": "property", "spec": "css-writing-modes-3", "shortname": "css-writing-modes", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-3/#propdef-unicode-bidi", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#propdef-visibility'] = {"text": "visibility", "type": "property", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#propdef-visibility", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-4/#propdef-word-spacing'] = {"text": "word-spacing", "type": "property", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#propdef-word-spacing", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#propdef-writing-mode'] = {"text": "writing-mode", "type": "property", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#propdef-writing-mode", "export": true, "normative": true, "for_": []};
+window.refsData['#element-attrdef-clippath-clippathunits'] = {"text": "clippathunits", "type": "element-attr", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#element-attrdef-clippath-clippathunits", "export": true, "normative": true, "for_": ["clipPath"]};
+window.refsData['#valdef-clippathunits-userspaceonuse'] = {"text": "userspaceonuse", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-clippathunits-userspaceonuse", "export": true, "normative": true, "for_": ["clipPathUnits"]};
+window.refsData['#valdef-clippathunits-objectboundingbox'] = {"text": "objectboundingbox", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-clippathunits-objectboundingbox", "export": true, "normative": true, "for_": ["clipPathUnits"]};
+window.refsData['https://drafts.csswg.org/css-transforms-1/#user-coordinate-system'] = {"text": "user coordinate system", "type": "dfn", "spec": "css-transforms-1", "shortname": "css-transforms", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transforms-1/#user-coordinate-system", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/coords.html#bounding-box'] = {"text": "bounding box", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/coords.html#bounding-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#px'] = {"text": "px", "type": "value", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#px", "export": true, "normative": true, "for_": ["<length>"]};
+window.refsData['https://drafts.csswg.org/css-display-4/#valdef-display-none'] = {"text": "none", "type": "value", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#valdef-display-none", "export": true, "normative": true, "for_": ["display", "<display-box>"]};
+window.refsData['https://svgwg.org/svg2-draft/shapes.html#basic-shape'] = {"text": "basic shape", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/shapes.html#basic-shape", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-clip-rule-nonzero'] = {"text": "nonzero", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-clip-rule-nonzero", "export": true, "normative": true, "for_": ["clip-rule"]};
+window.refsData['#valdef-clip-rule-evenodd'] = {"text": "evenodd", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-clip-rule-evenodd", "export": true, "normative": true, "for_": ["clip-rule"]};
+window.refsData['#typedef-mask-reference'] = {"text": "<mask-reference>", "type": "type", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#typedef-mask-reference", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-comma'] = {"text": "#", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-comma", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-images-3/#typedef-image'] = {"text": "<image>", "type": "type", "spec": "css-images-3", "shortname": "css-images", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-images-3/#typedef-image", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-mask-source'] = {"text": "<mask-source>", "type": "type", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#typedef-mask-source", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-mask-composite'] = {"text": "mask-composite", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask-composite", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-mask-mode'] = {"text": "mask-mode", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask-mode", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-masking-mode'] = {"text": "<masking-mode>", "type": "type", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#typedef-masking-mode", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-mask-mode-alpha'] = {"text": "alpha", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-mask-mode-alpha", "export": true, "normative": true, "for_": ["mask-mode"]};
+window.refsData['#valdef-mask-mode-luminance'] = {"text": "luminance", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-mask-mode-luminance", "export": true, "normative": true, "for_": ["mask-mode"]};
+window.refsData['#propdef-mask-type'] = {"text": "mask-type", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask-type", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-mask-type-alpha'] = {"text": "alpha", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-mask-type-alpha", "export": true, "normative": true, "for_": ["mask-type"]};
+window.refsData['#valdef-mask-type-luminance'] = {"text": "luminance", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-mask-type-luminance", "export": true, "normative": true, "for_": ["mask-type"]};
+window.refsData['#propdef-mask-repeat'] = {"text": "mask-repeat", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask-repeat", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#typedef-repeat-style'] = {"text": "<repeat-style>", "type": "type", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#typedef-repeat-style", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-background-repeat'] = {"text": "background-repeat", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background-repeat", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#typedef-position'] = {"text": "<position>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#typedef-position", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-background-position'] = {"text": "background-position", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background-position", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#length-value'] = {"text": "<length>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#length-value", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-mask-clip'] = {"text": "mask-clip", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask-clip", "export": true, "normative": true, "for_": []};
+window.refsData['#element-attrdef-mask-x'] = {"text": "x", "type": "element-attr", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#element-attrdef-mask-x", "export": true, "normative": true, "for_": ["mask"]};
+window.refsData['#element-attrdef-mask-y'] = {"text": "y", "type": "element-attr", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#element-attrdef-mask-y", "export": true, "normative": true, "for_": ["mask"]};
+window.refsData['#element-attrdef-mask-width'] = {"text": "width", "type": "element-attr", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#element-attrdef-mask-width", "export": true, "normative": true, "for_": ["mask"]};
+window.refsData['#element-attrdef-mask-height'] = {"text": "height", "type": "element-attr", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#element-attrdef-mask-height", "export": true, "normative": true, "for_": ["mask"]};
+window.refsData['#element-attrdef-mask-maskunits'] = {"text": "maskunits", "type": "element-attr", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#element-attrdef-mask-maskunits", "export": true, "normative": true, "for_": ["mask"]};
+window.refsData['#valdef-mask-clip-fill-box'] = {"text": "fill-box", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-mask-clip-fill-box", "export": true, "normative": true, "for_": ["mask-clip"]};
+window.refsData['#valdef-mask-clip-stroke-box'] = {"text": "stroke-box", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-mask-clip-stroke-box", "export": true, "normative": true, "for_": ["mask-clip"]};
+window.refsData['#valdef-mask-clip-view-box'] = {"text": "view-box", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-mask-clip-view-box", "export": true, "normative": true, "for_": ["mask-clip"]};
+window.refsData['#propdef-mask-origin'] = {"text": "mask-origin", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask-origin", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-break-4/#propdef-box-decoration-break'] = {"text": "box-decoration-break", "type": "property", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-break-4/#propdef-box-decoration-break", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-mask-origin-content-box'] = {"text": "content-box", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-mask-origin-content-box", "export": true, "normative": true, "for_": ["mask-origin"]};
+window.refsData['#valdef-mask-origin-padding-box'] = {"text": "padding-box", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-mask-origin-padding-box", "export": true, "normative": true, "for_": ["mask-origin"]};
+window.refsData['#valdef-mask-origin-border-box'] = {"text": "border-box", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-mask-origin-border-box", "export": true, "normative": true, "for_": ["mask-origin"]};
+window.refsData['#valdef-mask-origin-fill-box'] = {"text": "fill-box", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-mask-origin-fill-box", "export": true, "normative": true, "for_": ["mask-origin"]};
+window.refsData['#valdef-mask-origin-stroke-box'] = {"text": "stroke-box", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-mask-origin-stroke-box", "export": true, "normative": true, "for_": ["mask-origin"]};
+window.refsData['#valdef-mask-origin-view-box'] = {"text": "view-box", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-mask-origin-view-box", "export": true, "normative": true, "for_": ["mask-origin"]};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-background-origin'] = {"text": "background-origin", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background-origin", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#typedef-bg-size'] = {"text": "<bg-size>", "type": "type", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#typedef-bg-size", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-background-size'] = {"text": "background-size", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background-size", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-compositing-operator'] = {"text": "<compositing-operator>", "type": "type", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#typedef-compositing-operator", "export": true, "normative": true, "for_": []};
+window.refsData['#source'] = {"text": "source", "type": "dfn", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#source", "export": true, "normative": true, "for_": []};
+window.refsData['#destination'] = {"text": "destination", "type": "dfn", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#destination", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-mask-composite-add'] = {"text": "add", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-mask-composite-add", "export": true, "normative": true, "for_": ["mask-composite"]};
+window.refsData['#valdef-mask-composite-subtract'] = {"text": "subtract", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-mask-composite-subtract", "export": true, "normative": true, "for_": ["mask-composite"]};
+window.refsData['#valdef-mask-composite-intersect'] = {"text": "intersect", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-mask-composite-intersect", "export": true, "normative": true, "for_": ["mask-composite"]};
+window.refsData['#valdef-mask-composite-exclude'] = {"text": "exclude", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-mask-composite-exclude", "export": true, "normative": true, "for_": ["mask-composite"]};
+window.refsData['#typedef-mask-layer'] = {"text": "<mask-layer>", "type": "type", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#typedef-mask-layer", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-opt'] = {"text": "?", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-mask-clip-no-clip'] = {"text": "no-clip", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-mask-clip-no-clip", "export": true, "normative": true, "for_": ["mask-clip"]};
+window.refsData['#mask-image'] = {"text": "mask image", "type": "dfn", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#mask-image", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.fxtf.org/filter-effects-1/#valdef-color-interpolation-filters-linearrgb'] = {"text": "linearrgb", "type": "value", "spec": "filter-effects-1", "shortname": "filter-effects", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/filter-effects-1/#valdef-color-interpolation-filters-linearrgb", "export": true, "normative": true, "for_": ["color-interpolation-filters"]};
+window.refsData['https://drafts.fxtf.org/filter-effects-1/#elementdef-fecolormatrix'] = {"text": "fecolormatrix", "type": "element", "spec": "filter-effects-1", "shortname": "filter-effects", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/filter-effects-1/#elementdef-fecolormatrix", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border-image'] = {"text": "border-image", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-image", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-mask-border-mode'] = {"text": "mask-border-mode", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask-border-mode", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-mask-border-mode-alpha'] = {"text": "alpha", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-mask-border-mode-alpha", "export": true, "normative": true, "for_": ["mask-border-mode"]};
+window.refsData['#valdef-mask-border-mode-luminance'] = {"text": "luminance", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-mask-border-mode-luminance", "export": true, "normative": true, "for_": ["mask-border-mode"]};
+window.refsData['#propdef-mask-border-slice'] = {"text": "mask-border-slice", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask-border-slice", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-num-range'] = {"text": "{a,b}", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-num-range", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border-image-slice'] = {"text": "border-image-slice", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-image-slice", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-mask-border-width'] = {"text": "mask-border-width", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask-border-width", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#typedef-length-percentage'] = {"text": "<length-percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#typedef-length-percentage", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#number-value'] = {"text": "<number>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#number-value", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-mask-border-outset'] = {"text": "mask-border-outset", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask-border-outset", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border-image-width'] = {"text": "border-image-width", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-image-width", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border-width'] = {"text": "border-width", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-width", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-mask-border-repeat'] = {"text": "mask-border-repeat", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask-border-repeat", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border-image-repeat'] = {"text": "border-image-repeat", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-image-repeat", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/struct.html#elementdef-g'] = {"text": "g", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-g", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/struct.html#elementdef-svg'] = {"text": "svg", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-svg", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/struct.html#elementdef-symbol'] = {"text": "symbol", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-symbol", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/pservers.html#elementdef-linearGradient'] = {"text": "lineargradient", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/pservers.html#elementdef-linearGradient", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/pservers.html#elementdef-radialGradient'] = {"text": "radialgradient", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/pservers.html#elementdef-radialGradient", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/linking.html#elementdef-a'] = {"text": "a", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/linking.html#elementdef-a", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.fxtf.org/filter-effects-1/#elementdef-filter'] = {"text": "filter", "type": "element", "spec": "filter-effects-1", "shortname": "filter-effects", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/filter-effects-1/#elementdef-filter", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/obsolete.html#font'] = {"text": "font", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/obsolete.html#font", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/embedded.html#elementdef-foreignObject'] = {"text": "foreignobject", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/embedded.html#elementdef-foreignObject", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/embedded.html#elementdef-image'] = {"text": "image", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/embedded.html#elementdef-image", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/painting.html#elementdef-marker'] = {"text": "marker", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/painting.html#elementdef-marker", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/pservers.html#elementdef-pattern'] = {"text": "pattern", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/pservers.html#elementdef-pattern", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/styling.html#elementdef-style'] = {"text": "style", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/styling.html#elementdef-style", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/struct.html#elementdef-switch'] = {"text": "switch", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-switch", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/linking.html#elementdef-view'] = {"text": "view", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/linking.html#elementdef-view", "export": true, "normative": true, "for_": []};
+window.refsData['#element-attrdef-mask-maskcontentunits'] = {"text": "maskcontentunits", "type": "element-attr", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#element-attrdef-mask-maskcontentunits", "export": true, "normative": true, "for_": ["mask"]};
+window.refsData['#valdef-maskunits-userspaceonuse'] = {"text": "userspaceonuse", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-maskunits-userspaceonuse", "export": true, "normative": true, "for_": ["maskUnits"]};
+window.refsData['#valdef-maskunits-objectboundingbox'] = {"text": "objectboundingbox", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-maskunits-objectboundingbox", "export": true, "normative": true, "for_": ["maskUnits"]};
+window.refsData['#valdef-maskcontentunits-userspaceonuse'] = {"text": "userspaceonuse", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-maskcontentunits-userspaceonuse", "export": true, "normative": true, "for_": ["maskContentUnits"]};
+window.refsData['#valdef-maskcontentunits-objectboundingbox'] = {"text": "objectboundingbox", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-maskcontentunits-objectboundingbox", "export": true, "normative": true, "for_": ["maskContentUnits"]};
+window.refsData['#valdef-mask-mode-match-source'] = {"text": "match-source", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-mask-mode-match-source", "export": true, "normative": true, "for_": ["mask-mode"]};
+window.refsData['#funcdef-clip-rect'] = {"text": "rect()", "type": "function", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#funcdef-clip-rect", "export": true, "normative": true, "for_": ["clip"]};
+window.refsData['https://drafts.csswg.org/css2/#valdef-clip-auto'] = {"text": "auto", "type": "value", "spec": "css22", "shortname": "css", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css2/#valdef-clip-auto", "export": true, "normative": true, "for_": ["clip"]};
+window.refsData['#typedef-clip-top'] = {"text": "<top>", "type": "type", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#typedef-clip-top", "export": true, "normative": true, "for_": ["clip"]};
+window.refsData['#typedef-clip-right'] = {"text": "<right>", "type": "type", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#typedef-clip-right", "export": true, "normative": true, "for_": ["clip"]};
+window.refsData['#typedef-clip-bottom'] = {"text": "<bottom>", "type": "type", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#typedef-clip-bottom", "export": true, "normative": true, "for_": ["clip"]};
+window.refsData['#typedef-clip-left'] = {"text": "<left>", "type": "type", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#typedef-clip-left", "export": true, "normative": true, "for_": ["clip"]};
+window.refsData['https://svgwg.org/svg2-draft/text.html#TermTextContentElement'] = {"text": "text content element", "type": "dfn", "spec": "svg2", "shortname": "svg2", "level": "", "status": "anchor-block", "url": "https://svgwg.org/svg2-draft/text.html#TermTextContentElement", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.fxtf.org/fill-stroke-3/#valdef-stroke-linejoin-miter'] = {"text": "miter", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "current", "url": "https://drafts.fxtf.org/fill-stroke-3/#valdef-stroke-linejoin-miter", "export": true, "normative": true, "for_": ["stroke-linejoin"]};
+window.refsData['https://drafts.fxtf.org/fill-stroke-3/#valdef-stroke-linecap-square'] = {"text": "square", "type": "value", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "current", "url": "https://drafts.fxtf.org/fill-stroke-3/#valdef-stroke-linecap-square", "export": true, "normative": true, "for_": ["stroke-linecap"]};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['#svgclippathelement'] = {"text": "SVGClipPathElement", "type": "interface", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#svgclippathelement", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/types.html#InterfaceSVGElement'] = {"text": "SVGElement", "type": "interface", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/types.html#InterfaceSVGElement", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/types.html#InterfaceSVGAnimatedEnumeration'] = {"text": "SVGAnimatedEnumeration", "type": "interface", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/types.html#InterfaceSVGAnimatedEnumeration", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-svgclippathelement-clippathunits'] = {"text": "clipPathUnits", "type": "attribute", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#dom-svgclippathelement-clippathunits", "export": true, "normative": true, "for_": ["SVGClipPathElement"]};
+window.refsData['https://svgwg.org/svg2-draft/coords.html#InterfaceSVGAnimatedTransformList'] = {"text": "SVGAnimatedTransformList", "type": "interface", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/coords.html#InterfaceSVGAnimatedTransformList", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-svgclippathelement-transform'] = {"text": "transform", "type": "attribute", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#dom-svgclippathelement-transform", "export": true, "normative": true, "for_": ["SVGClipPathElement"]};
+window.refsData['https://svgwg.org/svg2-draft/types.html#InterfaceSVGUnitTypes'] = {"text": "SVGUnitTypes", "type": "interface", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/types.html#InterfaceSVGUnitTypes", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-transforms-1/#propdef-transform'] = {"text": "transform", "type": "property", "spec": "css-transforms-1", "shortname": "css-transforms", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transforms-1/#propdef-transform", "export": true, "normative": true, "for_": []};
+window.refsData['#svgmaskelement'] = {"text": "SVGMaskElement", "type": "interface", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#svgmaskelement", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-svgmaskelement-maskunits'] = {"text": "maskUnits", "type": "attribute", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#dom-svgmaskelement-maskunits", "export": true, "normative": true, "for_": ["SVGMaskElement"]};
+window.refsData['#dom-svgmaskelement-maskcontentunits'] = {"text": "maskContentUnits", "type": "attribute", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#dom-svgmaskelement-maskcontentunits", "export": true, "normative": true, "for_": ["SVGMaskElement"]};
+window.refsData['https://svgwg.org/svg2-draft/types.html#InterfaceSVGAnimatedLength'] = {"text": "SVGAnimatedLength", "type": "interface", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/types.html#InterfaceSVGAnimatedLength", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-svgmaskelement-x'] = {"text": "x", "type": "attribute", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#dom-svgmaskelement-x", "export": true, "normative": true, "for_": ["SVGMaskElement"]};
+window.refsData['#dom-svgmaskelement-y'] = {"text": "y", "type": "attribute", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#dom-svgmaskelement-y", "export": true, "normative": true, "for_": ["SVGMaskElement"]};
+window.refsData['#dom-svgmaskelement-width'] = {"text": "width", "type": "attribute", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#dom-svgmaskelement-width", "export": true, "normative": true, "for_": ["SVGMaskElement"]};
+window.refsData['#dom-svgmaskelement-height'] = {"text": "height", "type": "attribute", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#dom-svgmaskelement-height", "export": true, "normative": true, "for_": ["SVGMaskElement"]};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-background'] = {"text": "background", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-mask-border-slice-fill'] = {"text": "fill", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#valdef-mask-border-slice-fill", "export": true, "normative": true, "for_": ["mask-border-slice"]};
+window.refsData['https://drafts.csswg.org/css-speech-1/#valdef-voice-family-child'] = {"text": "child", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-speech-1/#valdef-voice-family-child", "export": true, "normative": true, "for_": ["voice-family"]};window.refsData['#propdef-clip'] = {"text": "clip", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-clip", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-clip-path'] = {"text": "clip-path", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-clip-path", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-clip-rule'] = {"text": "clip-rule", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-clip-rule", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-mask'] = {"text": "mask", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-mask-border'] = {"text": "mask-border", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask-border", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-mask-border-mode'] = {"text": "mask-border-mode", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask-border-mode", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-mask-border-outset'] = {"text": "mask-border-outset", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask-border-outset", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-mask-border-repeat'] = {"text": "mask-border-repeat", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask-border-repeat", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-mask-border-slice'] = {"text": "mask-border-slice", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask-border-slice", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-mask-border-source'] = {"text": "mask-border-source", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask-border-source", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-mask-border-width'] = {"text": "mask-border-width", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask-border-width", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-mask-clip'] = {"text": "mask-clip", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask-clip", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-mask-composite'] = {"text": "mask-composite", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask-composite", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-mask-image'] = {"text": "mask-image", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask-image", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-mask-mode'] = {"text": "mask-mode", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask-mode", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-mask-origin'] = {"text": "mask-origin", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask-origin", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-mask-position'] = {"text": "mask-position", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask-position", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-mask-repeat'] = {"text": "mask-repeat", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask-repeat", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-mask-size'] = {"text": "mask-size", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask-size", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-mask-type'] = {"text": "mask-type", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "local", "url": "#propdef-mask-type", "export": true, "normative": true, "for_": []};
 </script>

@@ -692,6 +692,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -3708,8 +3745,6 @@ plus a computed color
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -3957,7 +3992,6 @@ plus a computed color
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -4451,4 +4485,337 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-first-line'] = {"text": "::first-line", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-first-line", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-first-letter'] = {"text": "::first-letter", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-first-letter", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/selectors-4/#pseudo-element'] = {"text": "pseudo-element", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "current", "url": "https://drafts.csswg.org/selectors-4/#pseudo-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#css-wide-keywords'] = {"text": "css-wide keywords", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-4/#typographic-character-unit'] = {"text": "typographic character unit", "type": "dfn", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#typographic-character-unit", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-4/#typographic-letter-unit'] = {"text": "typographic letter unit", "type": "dfn", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#typographic-letter-unit", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#letter'] = {"text": "letter", "type": "dfn", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#letter", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-4/#content-language'] = {"text": "content language", "type": "dfn", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#content-language", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#inline-box'] = {"text": "inline box", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#inline-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#box'] = {"text": "box", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#box", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['https://drafts.csswg.org/css-break-3/#fragment'] = {"text": "fragment", "type": "dfn", "spec": "css-break-3", "shortname": "css-break", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-break-3/#fragment", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#in-flow'] = {"text": "in-flow", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#in-flow", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#block-level'] = {"text": "block-level", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#block-level", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#block-container'] = {"text": "block container", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#block-container", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#inline-formatting-context'] = {"text": "inline formatting context", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#inline-formatting-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#anonymous'] = {"text": "anonymous", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#anonymous", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['https://drafts.csswg.org/css-display-4/#inline-level'] = {"text": "inline-level", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#inline-level", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-ruby-1/#ruby-container'] = {"text": "ruby container", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-ruby-1/#ruby-container", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-ruby-1/#ruby-base-box'] = {"text": "ruby base", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-ruby-1/#ruby-base-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#non-replaced'] = {"text": "non-replaced", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#non-replaced", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#atomic-inline'] = {"text": "atomic inline", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#atomic-inline", "export": true, "normative": true, "for_": []};
+window.refsData['#decorating-box'] = {"text": "decorating box", "type": "dfn", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#decorating-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-position-3/#relative-position'] = {"text": "relatively position", "type": "dfn", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#relative-position", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#propdef-visibility'] = {"text": "visibility", "type": "property", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#propdef-visibility", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-shadow'] = {"text": "text-shadow", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-shadow", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#propdef-display'] = {"text": "display", "type": "property", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#propdef-display", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-decoration-line'] = {"text": "text-decoration-line", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-decoration-line", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-any'] = {"text": "||", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-any", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#longhand'] = {"text": "sub-property", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#longhand", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-decoration'] = {"text": "text-decoration", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-decoration", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-cascade-6/#cascade'] = {"text": "cascade", "type": "dfn", "spec": "css-cascade-6", "shortname": "css-cascade", "level": "6", "status": "current", "url": "https://drafts.csswg.org/css-cascade-6/#cascade", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#shorthand-property'] = {"text": "shorthand", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#shorthand-property", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#vertical-writing-mode'] = {"text": "vertical writing mode", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#vertical-writing-mode", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-underline-position'] = {"text": "text-underline-position", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-underline-position", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-text-decoration-line-spelling-error'] = {"text": "spelling-error", "type": "value", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#valdef-text-decoration-line-spelling-error", "export": true, "normative": true, "for_": ["text-decoration-line"]};
+window.refsData['#valdef-text-decoration-line-grammar-error'] = {"text": "grammar-error", "type": "value", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#valdef-text-decoration-line-grammar-error", "export": true, "normative": true, "for_": ["text-decoration-line"]};
+window.refsData['https://drafts.fxtf.org/fill-stroke-3/#propdef-stroke'] = {"text": "stroke", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "current", "url": "https://drafts.fxtf.org/fill-stroke-3/#propdef-stroke", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.fxtf.org/fill-stroke-3/#propdef-fill'] = {"text": "fill", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "current", "url": "https://drafts.fxtf.org/fill-stroke-3/#propdef-fill", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-decoration-style'] = {"text": "text-decoration-style", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-decoration-style", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-decoration-color'] = {"text": "text-decoration-color", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-decoration-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-color-5/#typedef-color'] = {"text": "<color>", "type": "type", "spec": "css-color-5", "shortname": "css-color", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-color-5/#typedef-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-decoration-thickness'] = {"text": "text-decoration-thickness", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-decoration-thickness", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#length-value'] = {"text": "<length>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#length-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#percentage-value'] = {"text": "<percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#percentage-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#first-available-font'] = {"text": "first available font", "type": "dfn", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#first-available-font", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-text-decoration-thickness-auto'] = {"text": "auto", "type": "value", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#valdef-text-decoration-thickness-auto", "export": true, "normative": true, "for_": ["text-decoration-thickness"]};
+window.refsData['#propdef-text-underline-offset'] = {"text": "text-underline-offset", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-underline-offset", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-decoration-skip'] = {"text": "text-decoration-skip", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-decoration-skip", "export": true, "normative": true, "for_": []};
+window.refsData['#considered-text'] = {"text": "considered text", "type": "dfn", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#considered-text", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#over'] = {"text": "over", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#over", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#under'] = {"text": "under", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#under", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-inline-3/#valdef-alignment-baseline-baseline'] = {"text": "baseline", "type": "value", "spec": "css-inline-3", "shortname": "css-inline", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-inline-3/#valdef-alignment-baseline-baseline", "export": true, "normative": true, "for_": ["alignment-baseline", "vertical-align"]};
+window.refsData['https://drafts.csswg.org/css-inline-3/#propdef-vertical-align'] = {"text": "vertical-align", "type": "property", "spec": "css-inline-3", "shortname": "css-inline", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-inline-3/#propdef-vertical-align", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font-size'] = {"text": "font-size", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-size", "export": true, "normative": true, "for_": []};
+window.refsData['#underline-zero-position'] = {"text": "zero position", "type": "dfn", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#underline-zero-position", "export": true, "normative": true, "for_": []};
+window.refsData['#underline-left'] = {"text": "left", "type": "value", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#underline-left", "export": true, "normative": true, "for_": ["text-underline-position"]};
+window.refsData['#underline-right'] = {"text": "right", "type": "value", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#underline-right", "export": true, "normative": true, "for_": ["text-underline-position"]};
+window.refsData['#underline-auto'] = {"text": "auto", "type": "value", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#underline-auto", "export": true, "normative": true, "for_": ["text-underline-position"]};
+window.refsData['#underline-under'] = {"text": "under", "type": "value", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#underline-under", "export": true, "normative": true, "for_": ["text-underline-position"]};
+window.refsData['#valdef-text-underline-offset-auto'] = {"text": "auto", "type": "value", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#valdef-text-underline-offset-auto", "export": true, "normative": true, "for_": ["text-underline-offset"]};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#typographic-mode'] = {"text": "typographic mode", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#typographic-mode", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-text-underline-position-from-font'] = {"text": "from-font", "type": "value", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#valdef-text-underline-position-from-font", "export": true, "normative": true, "for_": ["text-underline-position"]};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font-variant-position'] = {"text": "font-variant-position", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-variant-position", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-decoration-skip-ink'] = {"text": "text-decoration-skip-ink", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-decoration-skip-ink", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-decoration-skip-self'] = {"text": "text-decoration-skip-self", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-decoration-skip-self", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-decoration-skip-box'] = {"text": "text-decoration-skip-box", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-decoration-skip-box", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-decoration-skip-inset'] = {"text": "text-decoration-skip-inset", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-decoration-skip-inset", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-decoration-skip-spaces'] = {"text": "text-decoration-skip-spaces", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-decoration-skip-spaces", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-text-decoration-skip-none'] = {"text": "none", "type": "value", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#valdef-text-decoration-skip-none", "export": true, "normative": true, "for_": ["text-decoration-skip"]};
+window.refsData['#valdef-text-decoration-skip-spaces-none'] = {"text": "none", "type": "value", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#valdef-text-decoration-skip-spaces-none", "export": true, "normative": true, "for_": ["text-decoration-skip-spaces"]};
+window.refsData['#spacer'] = {"text": "spacer", "type": "dfn", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#spacer", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-4/#propdef-letter-spacing'] = {"text": "letter-spacing", "type": "property", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#propdef-letter-spacing", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-4/#propdef-word-spacing'] = {"text": "word-spacing", "type": "property", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#propdef-word-spacing", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-text-decoration-skip-ink-auto'] = {"text": "auto", "type": "value", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#valdef-text-decoration-skip-ink-auto", "export": true, "normative": true, "for_": ["text-decoration-skip-ink"]};
+window.refsData['#propdef-text-emphasis'] = {"text": "text-emphasis", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-emphasis", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-emphasis-style'] = {"text": "text-emphasis-style", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-emphasis-style", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-emphasis-color'] = {"text": "text-emphasis-color", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-emphasis-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-emphasis-position'] = {"text": "text-emphasis-position", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-emphasis-position", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#string-value'] = {"text": "<string>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#string-value", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-text-emphasis-style-none'] = {"text": "none", "type": "value", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#valdef-text-emphasis-style-none", "export": true, "normative": true, "for_": ["text-emphasis-style"]};
+window.refsData['#valdef-text-emphasis-style-filled'] = {"text": "filled", "type": "value", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#valdef-text-emphasis-style-filled", "export": true, "normative": true, "for_": ["text-emphasis-style"]};
+window.refsData['#valdef-text-text-emphasis-open'] = {"text": "open", "type": "value", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#valdef-text-text-emphasis-open", "export": true, "normative": true, "for_": ["text-text-emphasis"]};
+window.refsData['#valdef-text-emphasis-style-circle'] = {"text": "circle", "type": "value", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#valdef-text-emphasis-style-circle", "export": true, "normative": true, "for_": ["text-emphasis-style"]};
+window.refsData['#valdef-text-emphasis-style-sesame'] = {"text": "sesame", "type": "value", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#valdef-text-emphasis-style-sesame", "export": true, "normative": true, "for_": ["text-emphasis-style"]};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#valdef-font-variant-east-asian-ruby'] = {"text": "ruby", "type": "value", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#valdef-font-variant-east-asian-ruby", "export": true, "normative": true, "for_": ["font-variant-east-asian"]};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#writing-mode'] = {"text": "writing mode", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#writing-mode", "export": true, "normative": true, "for_": []};
+window.refsData['#character'] = {"text": "character", "type": "dfn", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#character", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-color-4/#valdef-color-currentcolor'] = {"text": "currentcolor", "type": "value", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-color-4/#valdef-color-currentcolor", "export": true, "normative": true, "for_": ["<color>"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-all'] = {"text": "&&", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-all", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-opt'] = {"text": "?", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-text-emphasis-position-right'] = {"text": "right", "type": "value", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#valdef-text-emphasis-position-right", "export": true, "normative": true, "for_": ["text-emphasis-position"]};
+window.refsData['https://drafts.csswg.org/css-ruby-1/#ruby-annotation-box'] = {"text": "ruby annotation", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-ruby-1/#ruby-annotation-box", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-emphasis-skip'] = {"text": "text-emphasis-skip", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-emphasis-skip", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-text-emphasis-skip-symbols'] = {"text": "symbols", "type": "value", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#valdef-text-emphasis-skip-symbols", "export": true, "normative": true, "for_": ["text-emphasis-skip"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-num-range'] = {"text": "{a,b}", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-num-range", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-comma'] = {"text": "#", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-comma", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#box-shadow-none'] = {"text": "none", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#box-shadow-none", "export": true, "normative": true, "for_": ["box-shadow"]};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-box-shadow'] = {"text": "box-shadow", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-box-shadow", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#shadow-inset'] = {"text": "inset", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#shadow-inset", "export": true, "normative": true, "for_": ["box-shadow"]};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#scrollable-overflow-region'] = {"text": "scrollable overflow region", "type": "dfn", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#scrollable-overflow-region", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#ink-overflow'] = {"text": "ink overflow", "type": "dfn", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#ink-overflow", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-text-decoration-skip-ink-all'] = {"text": "all", "type": "value", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#valdef-text-decoration-skip-ink-all", "export": true, "normative": true, "for_": ["text-decoration-skip-ink"]};window.refsData['#propdef-text-decoration'] = {"text": "text-decoration", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-decoration", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-decoration-color'] = {"text": "text-decoration-color", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-decoration-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-decoration-line'] = {"text": "text-decoration-line", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-decoration-line", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-decoration-skip'] = {"text": "text-decoration-skip", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-decoration-skip", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-decoration-skip-box'] = {"text": "text-decoration-skip-box", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-decoration-skip-box", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-decoration-skip-ink'] = {"text": "text-decoration-skip-ink", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-decoration-skip-ink", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-decoration-skip-inset'] = {"text": "text-decoration-skip-inset", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-decoration-skip-inset", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-decoration-skip-self'] = {"text": "text-decoration-skip-self", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-decoration-skip-self", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-decoration-skip-spaces'] = {"text": "text-decoration-skip-spaces", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-decoration-skip-spaces", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-decoration-style'] = {"text": "text-decoration-style", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-decoration-style", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-decoration-thickness'] = {"text": "text-decoration-thickness", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-decoration-thickness", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-emphasis'] = {"text": "text-emphasis", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-emphasis", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-emphasis-color'] = {"text": "text-emphasis-color", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-emphasis-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-emphasis-position'] = {"text": "text-emphasis-position", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-emphasis-position", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-emphasis-skip'] = {"text": "text-emphasis-skip", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-emphasis-skip", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-emphasis-style'] = {"text": "text-emphasis-style", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-emphasis-style", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-shadow'] = {"text": "text-shadow", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-shadow", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-underline-offset'] = {"text": "text-underline-offset", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-underline-offset", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-underline-position'] = {"text": "text-underline-position", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "local", "url": "#propdef-text-underline-position", "export": true, "normative": true, "for_": []};
 </script>

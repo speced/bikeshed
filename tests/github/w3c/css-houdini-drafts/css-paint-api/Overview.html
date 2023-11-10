@@ -705,6 +705,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -2283,8 +2320,6 @@ to fix all such channels.</p>
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -2532,7 +2567,6 @@ to fix all such channels.</p>
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -3032,6 +3066,328 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://drafts.csswg.org/css-images-3/#typedef-image'] = {"text": "<image>", "type": "type", "spec": "css-images-3", "shortname": "css-images", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-images-3/#typedef-image", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-css-paintworklet'] = {"text": "paintWorklet", "type": "attribute", "spec": "css-paint-api-1", "shortname": "css-paint-api", "level": "1", "status": "local", "url": "#dom-css-paintworklet", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['https://html.spec.whatwg.org/multipage/worklets.html#worklet'] = {"text": "Worklet", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/worklets.html#worklet", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/worklets.html#worklet-global-scope-type'] = {"text": "worklet global scope type", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/worklets.html#worklet-global-scope-type", "export": true, "normative": true, "for_": []};
+window.refsData['#paintworkletglobalscope'] = {"text": "PaintWorkletGlobalScope", "type": "interface", "spec": "css-paint-api-1", "shortname": "css-paint-api", "level": "1", "status": "local", "url": "#paintworkletglobalscope", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/worklets.html#worklet-destination-type'] = {"text": "worklet destination type", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/worklets.html#worklet-destination-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-1/#namespacedef-css'] = {"text": "CSS", "type": "namespace", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#namespacedef-css", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#SameObject'] = {"text": "SameObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SameObject", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-paintworkletglobalscope-devicepixelratio'] = {"text": "devicePixelRatio", "type": "attribute", "spec": "css-paint-api-1", "shortname": "css-paint-api", "level": "1", "status": "local", "url": "#dom-paintworkletglobalscope-devicepixelratio", "export": true, "normative": true, "for_": ["PaintWorkletGlobalScope"]};
+window.refsData['https://drafts.csswg.org/cssom-view-1/#dom-window-devicepixelratio'] = {"text": "devicePixelRatio", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-view-1/#dom-window-devicepixelratio", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['https://webidl.spec.whatwg.org/#Global'] = {"text": "Global", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Global", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/worklets.html#workletglobalscope'] = {"text": "WorkletGlobalScope", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/worklets.html#workletglobalscope", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-paintworkletglobalscope-registerpaint'] = {"text": "registerPaint(name, paintCtor)", "type": "method", "spec": "css-paint-api-1", "shortname": "css-paint-api", "level": "1", "status": "local", "url": "#dom-paintworkletglobalscope-registerpaint", "export": true, "normative": true, "for_": ["PaintWorkletGlobalScope"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#VoidFunction'] = {"text": "VoidFunction", "type": "callback", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#VoidFunction", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unrestricted-double'] = {"text": "unrestricted double", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unrestricted-double", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-paintrenderingcontext2dsettings'] = {"text": "PaintRenderingContext2DSettings", "type": "dictionary", "spec": "css-paint-api-1", "shortname": "css-paint-api", "level": "1", "status": "local", "url": "#dictdef-paintrenderingcontext2dsettings", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#struct'] = {"text": "struct", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#struct", "export": true, "normative": true, "for_": []};
+window.refsData['#funcdef-paint'] = {"text": "paint()", "type": "function", "spec": "css-paint-api-1", "shortname": "css-paint-api", "level": "1", "status": "local", "url": "#funcdef-paint", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-constructor'] = {"text": "constructor", "type": "dfn", "spec": "", "shortname": "css-paint-api", "level": "1", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-constructor", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#function'] = {"text": "function", "type": "dfn", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#function", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-callback-function'] = {"text": "callback function", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-callback-function", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list'] = {"text": "list", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-document'] = {"text": "document", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-document", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.css-houdini.org/css-properties-values-api-1/#syntax-definition'] = {"text": "syntax definition", "type": "dfn", "spec": "css-properties-values-api-1", "shortname": "css-properties-values-api", "level": "1", "status": "current", "url": "https://drafts.css-houdini.org/css-properties-values-api-1/#syntax-definition", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ordered-map'] = {"text": "map", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ordered-map", "export": true, "normative": true, "for_": []};
+window.refsData['#draw-a-paint-image'] = {"text": "draw a paint image", "type": "dfn", "spec": "css-paint-api-1", "shortname": "css-paint-api", "level": "1", "status": "local", "url": "#draw-a-paint-image", "export": true, "normative": true, "for_": []};
+window.refsData['#paint-class-instances'] = {"text": "paint class instances", "type": "dfn", "spec": "css-paint-api-1", "shortname": "css-paint-api", "level": "1", "status": "local", "url": "#paint-class-instances", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-throw'] = {"text": "throw", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-throw", "export": true, "normative": true, "for_": ["exception"]};
+window.refsData['https://tc39.github.io/ecma262/#sec-native-error-types-used-in-this-standard-typeerror'] = {"text": "typeerror", "type": "dfn", "spec": "", "shortname": "css-paint-api", "level": "1", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-native-error-types-used-in-this-standard-typeerror", "export": true, "normative": true, "for_": []};
+window.refsData['#paint-definitions'] = {"text": "paint definitions", "type": "dfn", "spec": "css-paint-api-1", "shortname": "css-paint-api", "level": "1", "status": "local", "url": "#paint-definitions", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#map-exists'] = {"text": "exist", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-exists", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['https://webidl.spec.whatwg.org/#invalidmodificationerror'] = {"text": "InvalidModificationError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invalidmodificationerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMException'] = {"text": "DOMException", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMException", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-get-o-p'] = {"text": "get", "type": "dfn", "spec": "", "shortname": "css-paint-api", "level": "1", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-get-o-p", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#web-idl-arguments-list-converting'] = {"text": "converting", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#web-idl-arguments-list-converting", "export": false, "normative": true, "for_": ["Web IDL arguments list"]};
+window.refsData['https://drafts.csswg.org/cssom-1/#supported-css-property'] = {"text": "supported css property", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#supported-css-property", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-variables-2/#custom-property'] = {"text": "custom property", "type": "dfn", "spec": "css-variables-2", "shortname": "css-variables", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-variables-2/#custom-property", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-empty'] = {"text": "empty", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-empty", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['https://infra.spec.whatwg.org/#list-iterate'] = {"text": "for each", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-iterate", "export": true, "normative": true, "for_": ["list", "set"]};
+window.refsData['https://drafts.css-houdini.org/css-properties-values-api-1/#consume-a-syntax-definition'] = {"text": "consume a syntax definition", "type": "dfn", "spec": "css-properties-values-api-1", "shortname": "css-properties-values-api", "level": "1", "status": "current", "url": "https://drafts.css-houdini.org/css-properties-values-api-1/#consume-a-syntax-definition", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-append'] = {"text": "append", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-append", "export": true, "normative": true, "for_": ["list"]};
+window.refsData['https://tc39.github.io/ecma262/#sec-isconstructor'] = {"text": "isconstructor", "type": "dfn", "spec": "", "shortname": "css-paint-api", "level": "1", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-isconstructor", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-ecmascript-data-types-and-values'] = {"text": "type", "type": "dfn", "spec": "", "shortname": "css-paint-api", "level": "1", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-ecmascript-data-types-and-values", "export": true, "normative": true, "for_": []};
+window.refsData['#paint-definition'] = {"text": "paint definition", "type": "dfn", "spec": "css-paint-api-1", "shortname": "css-paint-api", "level": "1", "status": "local", "url": "#paint-definition", "export": true, "normative": true, "for_": []};
+window.refsData['#paint-definition-class-constructor'] = {"text": "class constructor", "type": "dfn", "spec": "css-paint-api-1", "shortname": "css-paint-api", "level": "1", "status": "local", "url": "#paint-definition-class-constructor", "export": true, "normative": true, "for_": ["paint definition"]};
+window.refsData['#paint-definition-paint-function'] = {"text": "paint function", "type": "dfn", "spec": "css-paint-api-1", "shortname": "css-paint-api", "level": "1", "status": "local", "url": "#paint-definition-paint-function", "export": true, "normative": true, "for_": ["paint definition"]};
+window.refsData['#paint-definition-constructor-valid-flag'] = {"text": "constructor valid flag", "type": "dfn", "spec": "css-paint-api-1", "shortname": "css-paint-api", "level": "1", "status": "local", "url": "#paint-definition-constructor-valid-flag", "export": true, "normative": true, "for_": ["paint definition"]};
+window.refsData['#paint-definition-input-properties'] = {"text": "input properties", "type": "dfn", "spec": "css-paint-api-1", "shortname": "css-paint-api", "level": "1", "status": "local", "url": "#paint-definition-input-properties", "export": true, "normative": true, "for_": ["paint definition"]};
+window.refsData['#paint-definition-paintrenderingcontext2dsettings-object'] = {"text": "paintrenderingcontext2dsettings object", "type": "dfn", "spec": "css-paint-api-1", "shortname": "css-paint-api", "level": "1", "status": "local", "url": "#paint-definition-paintrenderingcontext2dsettings-object", "export": true, "normative": true, "for_": ["paint definition"]};
+window.refsData['https://infra.spec.whatwg.org/#map-set'] = {"text": "set", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-set", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task'] = {"text": "queue a task", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task", "export": true, "normative": true, "for_": []};
+window.refsData['#document-paint-definitions'] = {"text": "document paint definitions", "type": "dfn", "spec": "css-paint-api-1", "shortname": "css-paint-api", "level": "1", "status": "local", "url": "#document-paint-definitions", "export": true, "normative": true, "for_": []};
+window.refsData['#document-paint-definition'] = {"text": "document paint definition", "type": "dfn", "spec": "css-paint-api-1", "shortname": "css-paint-api", "level": "1", "status": "local", "url": "#document-paint-definition", "export": true, "normative": true, "for_": []};
+window.refsData['#document-paint-definition-input-properties'] = {"text": "input properties", "type": "dfn", "spec": "css-paint-api-1", "shortname": "css-paint-api", "level": "1", "status": "local", "url": "#document-paint-definition-input-properties", "export": true, "normative": true, "for_": ["document paint definition"]};
+window.refsData['#document-paint-definition-input-argument-syntaxes'] = {"text": "input argument syntaxes", "type": "dfn", "spec": "css-paint-api-1", "shortname": "css-paint-api", "level": "1", "status": "local", "url": "#document-paint-definition-input-argument-syntaxes", "export": true, "normative": true, "for_": ["document paint definition"]};
+window.refsData['#document-paint-definition-paintrenderingcontext2dsettings-object'] = {"text": "paintrenderingcontext2dsettings object", "type": "dfn", "spec": "css-paint-api-1", "shortname": "css-paint-api", "level": "1", "status": "local", "url": "#document-paint-definition-paintrenderingcontext2dsettings-object", "export": true, "normative": true, "for_": ["document paint definition"]};
+window.refsData['https://infra.spec.whatwg.org/#map-get'] = {"text": "get", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-get", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['#paintsize'] = {"text": "PaintSize", "type": "interface", "spec": "css-paint-api-1", "shortname": "css-paint-api", "level": "1", "status": "local", "url": "#paintsize", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.css-houdini.org/css-typed-om-1/#stylepropertymap'] = {"text": "StylePropertyMap", "type": "interface", "spec": "css-typed-om-1", "shortname": "css-typed-om", "level": "1", "status": "current", "url": "https://drafts.css-houdini.org/css-typed-om-1/#stylepropertymap", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#typedef-ident'] = {"text": "<ident>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#typedef-ident", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-comma'] = {"text": ",", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-comma", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#typedef-declaration-value'] = {"text": "<declaration-value>", "type": "type", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#typedef-declaration-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-opt'] = {"text": "?", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-ui-4/#propdef-cursor'] = {"text": "cursor", "type": "property", "spec": "css-ui-4", "shortname": "css-ui", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-ui-4/#propdef-cursor", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-images-4/#invalid-image'] = {"text": "invalid image", "type": "dfn", "spec": "css-images-4", "shortname": "css-images", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-images-4/#invalid-image", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#computed-value'] = {"text": "computed value", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#computed-value", "export": true, "normative": true, "for_": []};
+window.refsData['#paintrenderingcontext2d'] = {"text": "PaintRenderingContext2D", "type": "interface", "spec": "css-paint-api-1", "shortname": "css-paint-api", "level": "1", "status": "local", "url": "#paintrenderingcontext2d", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/canvas.html#canvasstate'] = {"text": "CanvasState", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/canvas.html#canvasstate", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/canvas.html#canvastransform'] = {"text": "CanvasTransform", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/canvas.html#canvastransform", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/canvas.html#canvascompositing'] = {"text": "CanvasCompositing", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/canvas.html#canvascompositing", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/canvas.html#canvasimagesmoothing'] = {"text": "CanvasImageSmoothing", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/canvas.html#canvasimagesmoothing", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/canvas.html#canvasfillstrokestyles'] = {"text": "CanvasFillStrokeStyles", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/canvas.html#canvasfillstrokestyles", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/canvas.html#canvasshadowstyles'] = {"text": "CanvasShadowStyles", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/canvas.html#canvasshadowstyles", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/canvas.html#canvasrect'] = {"text": "CanvasRect", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/canvas.html#canvasrect", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/canvas.html#canvasdrawpath'] = {"text": "CanvasDrawPath", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/canvas.html#canvasdrawpath", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/canvas.html#canvasdrawimage'] = {"text": "CanvasDrawImage", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/canvas.html#canvasdrawimage", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/canvas.html#canvaspathdrawingstyles'] = {"text": "CanvasPathDrawingStyles", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/canvas.html#canvaspathdrawingstyles", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/canvas.html#canvaspath'] = {"text": "CanvasPath", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/canvas.html#canvaspath", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/canvas.html#canvasrenderingcontext2d'] = {"text": "CanvasRenderingContext2D", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/canvas.html#canvasrenderingcontext2d", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/canvas.html#canvasimagedata'] = {"text": "CanvasImageData", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/canvas.html#canvasimagedata", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/canvas.html#canvasuserinterface'] = {"text": "CanvasUserInterface", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/canvas.html#canvasuserinterface", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/canvas.html#canvastext'] = {"text": "CanvasText", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/canvas.html#canvastext", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/canvas.html#canvastextdrawingstyles'] = {"text": "CanvasTextDrawingStyles", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/canvas.html#canvastextdrawingstyles", "export": true, "normative": true, "for_": []};
+window.refsData['#paintrenderingcontext2d-output-bitmap'] = {"text": "output bitmap", "type": "dfn", "spec": "css-paint-api-1", "shortname": "css-paint-api", "level": "1", "status": "local", "url": "#paintrenderingcontext2d-output-bitmap", "export": true, "normative": true, "for_": ["PaintRenderingContext2D"]};
+window.refsData['https://drafts.csswg.org/css-images-3/#concrete-object-size'] = {"text": "concrete object size", "type": "dfn", "spec": "css-images-3", "shortname": "css-images", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-images-3/#concrete-object-size", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-set-bitmap-dimensions'] = {"text": "set bitmap dimensions", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-set-bitmap-dimensions", "export": false, "normative": true, "for_": []};
+window.refsData['#paintrenderingcontext2d-alpha'] = {"text": "alpha", "type": "dfn", "spec": "css-paint-api-1", "shortname": "css-paint-api", "level": "1", "status": "local", "url": "#paintrenderingcontext2d-alpha", "export": true, "normative": true, "for_": ["PaintRenderingContext2D"]};
+window.refsData['#dom-paintrenderingcontext2dsettings-alpha'] = {"text": "alpha", "type": "dict-member", "spec": "css-paint-api-1", "shortname": "css-paint-api", "level": "1", "status": "local", "url": "#dom-paintrenderingcontext2dsettings-alpha", "export": true, "normative": true, "for_": ["PaintRenderingContext2DSettings"]};
+window.refsData['https://html.spec.whatwg.org/multipage/canvas.html#reset-the-rendering-context-to-its-default-state'] = {"text": "reset the rendering context to its default state", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/canvas.html#reset-the-rendering-context-to-its-default-state", "export": false, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/canvas.html#canvasimagesource'] = {"text": "CanvasImageSource", "type": "typedef", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/canvas.html#canvasimagesource", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.css-houdini.org/css-typed-om-1/#cssimagevalue'] = {"text": "CSSImageValue", "type": "interface", "spec": "css-typed-om-1", "shortname": "css-typed-om", "level": "1", "status": "current", "url": "https://drafts.css-houdini.org/css-typed-om-1/#cssimagevalue", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/canvas.html#dom-context-2d-drawimage'] = {"text": "drawImage()", "type": "method", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/canvas.html#dom-context-2d-drawimage", "export": true, "normative": true, "for_": ["CanvasDrawImage"]};
+window.refsData['https://drafts.csswg.org/css-display-4/#box'] = {"text": "box", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#box", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['https://drafts.csswg.org/css-images-3/#object-size-negotiation'] = {"text": "object size negotiation", "type": "dfn", "spec": "css-images-3", "shortname": "css-images", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-images-3/#object-size-negotiation", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-images-3/#natural-dimensions'] = {"text": "natural dimension", "type": "dfn", "spec": "css-images-3", "shortname": "css-images", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-images-3/#natural-dimensions", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-double'] = {"text": "double", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-double", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/worklets.html#concept-worklet-global-scopes'] = {"text": "global scopes", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/worklets.html#concept-worklet-global-scopes", "export": true, "normative": true, "for_": ["Worklet"]};
+window.refsData['https://html.spec.whatwg.org/multipage/worklets.html#create-a-worklet-global-scope'] = {"text": "create a worklet global scope", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/worklets.html#create-a-worklet-global-scope", "export": true, "normative": true, "for_": []};
+window.refsData['#invoke-a-paint-callback'] = {"text": "invoke a paint callback", "type": "dfn", "spec": "css-paint-api-1", "shortname": "css-paint-api", "level": "1", "status": "local", "url": "#invoke-a-paint-callback", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel'] = {"text": "in parallel", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-construct'] = {"text": "construct", "type": "dfn", "spec": "", "shortname": "css-paint-api", "level": "1", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-construct", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.css-houdini.org/css-typed-om-1/#stylepropertymapreadonly'] = {"text": "StylePropertyMapReadOnly", "type": "interface", "spec": "css-typed-om-1", "shortname": "css-typed-om", "level": "1", "status": "current", "url": "https://drafts.css-houdini.org/css-typed-om-1/#stylepropertymapreadonly", "export": true, "normative": true, "for_": []};
+window.refsData['#create-a-paintrenderingcontext2d-object'] = {"text": "create a paintrenderingcontext2d object", "type": "dfn", "spec": "css-paint-api-1", "shortname": "css-paint-api", "level": "1", "status": "local", "url": "#create-a-paintrenderingcontext2d-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#invoke-a-callback-function'] = {"text": "invoke", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invoke-a-callback-function", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-callback-this-value'] = {"text": "callback this value", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-callback-this-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border-image'] = {"text": "border-image", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-image", "export": true, "normative": true, "for_": []};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

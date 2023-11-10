@@ -878,6 +878,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -5355,8 +5392,6 @@ the Windows Internet Explorer browser.</p>
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -5604,7 +5639,6 @@ the Windows Internet Explorer browser.</p>
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -6254,4 +6288,475 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#html-elements'] = {"text": "html elements", "type": "dfn", "spec": "", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#html-elements", "export": true, "normative": true, "for_": []};
+window.refsData['#viewport'] = {"text": "viewport", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#viewport", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#propdef-overflow-x'] = {"text": "overflow-x", "type": "property", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#propdef-overflow-x", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#propdef-overflow-y'] = {"text": "overflow-y", "type": "property", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#propdef-overflow-y", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#valdef-overflow-hidden'] = {"text": "hidden", "type": "value", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#valdef-overflow-hidden", "export": true, "normative": true, "for_": ["overflow", "overflow-x", "overflow-y"]};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#valdef-overflow-clip'] = {"text": "clip", "type": "value", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#valdef-overflow-clip", "export": true, "normative": true, "for_": ["overflow", "overflow-x", "overflow-y"]};
+window.refsData['#the-html-body-element'] = {"text": "the html body element", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#the-html-body-element", "export": true, "normative": true, "for_": []};
+window.refsData['#css-layout-box'] = {"text": "css layout box", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#css-layout-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#parent-element'] = {"text": "parent element", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#parent-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#valdef-overflow-visible'] = {"text": "visible", "type": "value", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#valdef-overflow-visible", "export": true, "normative": true, "for_": ["overflow", "overflow-x", "overflow-y"]};
+window.refsData['https://html.spec.whatwg.org/multipage/sections.html#the-body-element'] = {"text": "body", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/sections.html#the-body-element", "export": true, "normative": true, "for_": []};
+window.refsData['#potentially-scrollable'] = {"text": "potentially scrollable", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#potentially-scrollable", "export": true, "normative": true, "for_": []};
+window.refsData['#scrolling-box'] = {"text": "scrolling box", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#scrolling-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#propdef-overflow'] = {"text": "overflow", "type": "property", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#propdef-overflow", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#valdef-overflow-auto'] = {"text": "auto", "type": "value", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#valdef-overflow-auto", "export": true, "normative": true, "for_": ["overflow", "overflow-x", "overflow-y"]};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#block-end'] = {"text": "block-end", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#block-end", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#inline-end'] = {"text": "inline-end", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#inline-end", "export": true, "normative": true, "for_": []};
+window.refsData['#overflow-directions'] = {"text": "overflow directions", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#overflow-directions", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#initial-containing-block'] = {"text": "initial containing block", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#initial-containing-block", "export": true, "normative": true, "for_": []};
+window.refsData['#margin-edge'] = {"text": "margin edge", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#margin-edge", "export": true, "normative": true, "for_": []};
+window.refsData['#padding-edge'] = {"text": "padding edge", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#padding-edge", "export": true, "normative": true, "for_": []};
+window.refsData['#scrolling-area'] = {"text": "scrolling area", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#scrolling-area", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#propdef-display'] = {"text": "display", "type": "property", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#propdef-display", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#valdef-display-table-column'] = {"text": "table-column", "type": "value", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#valdef-display-table-column", "export": true, "normative": true, "for_": ["display", "<display-internal>"]};
+window.refsData['https://drafts.csswg.org/css-display-4/#valdef-display-table-column-group'] = {"text": "table-column-group", "type": "value", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#valdef-display-table-column-group", "export": true, "normative": true, "for_": ["display", "<display-internal>"]};
+window.refsData['#svg-layout-box'] = {"text": "svg layout box", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#svg-layout-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#px'] = {"text": "px", "type": "value", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#px", "export": true, "normative": true, "for_": ["<length>"]};
+window.refsData['#dom-window-matchmedia'] = {"text": "matchMedia(query)", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-window-matchmedia", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['#smooth-scroll-aborted'] = {"text": "smooth scroll aborted", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#smooth-scroll-aborted", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-smooth-scroll'] = {"text": "smooth scroll", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#concept-smooth-scroll", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-behavior'] = {"text": "scroll-behavior", "type": "property", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#propdef-scroll-behavior", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-scroll-behavior-smooth'] = {"text": "smooth", "type": "value", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#valdef-scroll-behavior-smooth", "export": true, "normative": true, "for_": ["scroll-behavior"]};
+window.refsData['#concept-instant-scroll'] = {"text": "instant scroll", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#concept-instant-scroll", "export": true, "normative": true, "for_": []};
+window.refsData['#beginning-edges'] = {"text": "beginning edges", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#beginning-edges", "export": true, "normative": true, "for_": []};
+window.refsData['#perform-a-scroll'] = {"text": "perform a scroll", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#perform-a-scroll", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#window'] = {"text": "Window", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window", "export": true, "normative": true, "for_": []};
+window.refsData['#enumdef-scrollbehavior'] = {"text": "ScrollBehavior", "type": "enum", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#enumdef-scrollbehavior", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-scrolloptions'] = {"text": "ScrollOptions", "type": "dictionary", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dictdef-scrolloptions", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unrestricted-double'] = {"text": "unrestricted double", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unrestricted-double", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#NewObject'] = {"text": "NewObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#NewObject", "export": true, "normative": true, "for_": []};
+window.refsData['#mediaquerylist'] = {"text": "MediaQueryList", "type": "interface", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#mediaquerylist", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-1/#cssomstring'] = {"text": "CSSOMString", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#cssomstring", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#SameObject'] = {"text": "SameObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SameObject", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Replaceable'] = {"text": "Replaceable", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Replaceable", "export": true, "normative": true, "for_": []};
+window.refsData['#screen'] = {"text": "Screen", "type": "interface", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#screen", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-window-screen'] = {"text": "screen", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-window-screen", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-window-moveto'] = {"text": "moveTo(x, y)", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-window-moveto", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['http://heycam.github.io/webidl/#idl-long'] = {"text": "long", "type": "interface", "spec": "", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "http://heycam.github.io/webidl/#idl-long", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-window-moveby'] = {"text": "moveBy(x, y)", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-window-moveby", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['#dom-window-resizeto'] = {"text": "resizeTo(width, height)", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-window-resizeto", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['#dom-window-resizeby'] = {"text": "resizeBy(x, y)", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-window-resizeby", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['#dom-window-innerwidth'] = {"text": "innerWidth", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-window-innerwidth", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['#dom-window-innerheight'] = {"text": "innerHeight", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-window-innerheight", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['http://heycam.github.io/webidl/#idl-double'] = {"text": "double", "type": "interface", "spec": "", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "http://heycam.github.io/webidl/#idl-double", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-window-scrollx'] = {"text": "scrollX", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-window-scrollx", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['#dom-window-pagexoffset'] = {"text": "pageXOffset", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-window-pagexoffset", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['#dom-window-scrolly'] = {"text": "scrollY", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-window-scrolly", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['#dom-window-pageyoffset'] = {"text": "pageYOffset", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-window-pageyoffset", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['#dom-window-scroll'] = {"text": "scroll(options)", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-window-scroll", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['#dictdef-scrolltooptions'] = {"text": "ScrollToOptions", "type": "dictionary", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dictdef-scrolltooptions", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-window-scrollto'] = {"text": "scrollTo(options)", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-window-scrollto", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['#dom-window-scrollby'] = {"text": "scrollBy(options)", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-window-scrollby", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['#dom-window-screenx'] = {"text": "screenX", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-window-screenx", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['#dom-window-screenleft'] = {"text": "screenLeft", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-window-screenleft", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['#dom-window-screeny'] = {"text": "screenY", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-window-screeny", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['#dom-window-screentop'] = {"text": "screenTop", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-window-screentop", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['#dom-window-outerwidth'] = {"text": "outerWidth", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-window-outerwidth", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['#dom-window-outerheight'] = {"text": "outerHeight", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-window-outerheight", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['#dom-window-devicepixelratio'] = {"text": "devicePixelRatio", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-window-devicepixelratio", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['https://drafts.csswg.org/cssom/#parse-a-media-query-list'] = {"text": "parse a media query list", "type": "dfn", "spec": "", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/cssom/#parse-a-media-query-list", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#context-object'] = {"text": "context object", "type": "dfn", "spec": "", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "https://dom.spec.whatwg.org/#context-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#concept-document-window'] = {"text": "associated document", "type": "dfn", "spec": "", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-document-window", "export": true, "normative": true, "for_": []};
+window.refsData['#mediaquerylist-document'] = {"text": "document", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#mediaquerylist-document", "export": true, "normative": true, "for_": ["MediaQueryList"]};
+window.refsData['#media-query-list'] = {"text": "media query list", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#media-query-list", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#windowproxy'] = {"text": "WindowProxy", "type": "interface", "spec": "", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#windowproxy", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#browsing-context'] = {"text": "browsing context", "type": "dfn", "spec": "", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#responsible-browsing-context'] = {"text": "responsible browsing context", "type": "dfn", "spec": "", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#responsible-browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#incumbent-settings-object'] = {"text": "incumbent settings object", "type": "dfn", "spec": "", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#incumbent-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['#allowed-to-resize-and-move'] = {"text": "allowed to resize and move", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#allowed-to-resize-and-move", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#auxiliary-browsing-context'] = {"text": "auxiliary browsing context", "type": "dfn", "spec": "", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#auxiliary-browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#familiar-with'] = {"text": "familiar with", "type": "dfn", "spec": "", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#familiar-with", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-scrolltooptions-left'] = {"text": "left", "type": "dict-member", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-scrolltooptions-left", "export": true, "normative": true, "for_": ["ScrollToOptions"]};
+window.refsData['#dom-scrolltooptions-top'] = {"text": "top", "type": "dict-member", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-scrolltooptions-top", "export": true, "normative": true, "for_": ["ScrollToOptions"]};
+window.refsData['http://heycam.github.io/webidl/#dfn-convert-ecmascript-to-idl-value'] = {"text": "converted to an idl value", "type": "dfn", "spec": "", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "http://heycam.github.io/webidl/#dfn-convert-ecmascript-to-idl-value", "export": true, "normative": true, "for_": []};
+window.refsData['#normalize-non-finite-values'] = {"text": "normalize non-finite values", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#normalize-non-finite-values", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-scrolloptions-behavior'] = {"text": "behavior", "type": "dict-member", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-scrolloptions-behavior", "export": true, "normative": true, "for_": ["ScrollOptions"]};
+window.refsData['#web-exposed-screen-area'] = {"text": "web-exposed screen area", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#web-exposed-screen-area", "export": true, "normative": true, "for_": []};
+window.refsData['#page-zoom'] = {"text": "page zoom", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#page-zoom", "export": true, "normative": true, "for_": []};
+window.refsData['#pinch-zoom'] = {"text": "pinch zoom", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#pinch-zoom", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-open'] = {"text": "open(url, target, features)", "type": "method", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-open", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['https://infra.spec.whatwg.org/#ordered-map'] = {"text": "map", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ordered-map", "export": true, "normative": true, "for_": []};
+window.refsData['#supported-open-feature-name-left'] = {"text": "left", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#supported-open-feature-name-left", "export": true, "normative": true, "for_": ["supported open() feature name"]};
+window.refsData['https://infra.spec.whatwg.org/#map-exists'] = {"text": "exist", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-exists", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#rules-for-parsing-integers'] = {"text": "rules for parsing integers", "type": "dfn", "spec": "", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#rules-for-parsing-integers", "export": true, "normative": true, "for_": []};
+window.refsData['#web-exposed-available-screen-area'] = {"text": "web-exposed available screen area", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#web-exposed-available-screen-area", "export": true, "normative": true, "for_": []};
+window.refsData['#supported-open-feature-name-top'] = {"text": "top", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#supported-open-feature-name-top", "export": true, "normative": true, "for_": ["supported open() feature name"]};
+window.refsData['#supported-open-feature-name-width'] = {"text": "width", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#supported-open-feature-name-width", "export": true, "normative": true, "for_": ["supported open() feature name"]};
+window.refsData['#supported-open-feature-name-height'] = {"text": "height", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#supported-open-feature-name-height", "export": true, "normative": true, "for_": ["supported open() feature name"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-agent-event-loop'] = {"text": "event loop", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-agent-event-loop", "export": true, "normative": true, "for_": ["agent"]};
+window.refsData['https://drafts.csswg.org/cssom/#serialize-a-media-query-list'] = {"text": "serialize a media query list", "type": "dfn", "spec": "", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/cssom/#serialize-a-media-query-list", "export": true, "normative": true, "for_": []};
+window.refsData['#mediaquerylist-matches-state'] = {"text": "matches state", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#mediaquerylist-matches-state", "export": true, "normative": true, "for_": ["MediaQueryList"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-event-fire'] = {"text": "fire an event", "type": "dfn", "spec": "", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "https://dom.spec.whatwg.org/#concept-event-fire", "export": true, "normative": true, "for_": []};
+window.refsData['#mediaquerylistevent'] = {"text": "MediaQueryListEvent", "type": "interface", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#mediaquerylistevent", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#dom-event-type'] = {"text": "type", "type": "attribute", "spec": "", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "https://dom.spec.whatwg.org/#dom-event-type", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['#eventdef-mediaquerylist-change'] = {"text": "change", "type": "event", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#eventdef-mediaquerylist-change", "export": true, "normative": true, "for_": ["MediaQueryList"]};
+window.refsData['https://dom.spec.whatwg.org/#dom-event-istrusted'] = {"text": "isTrusted", "type": "attribute", "spec": "", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "https://dom.spec.whatwg.org/#dom-event-istrusted", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['#dom-mediaquerylist-media'] = {"text": "media", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-mediaquerylist-media", "export": true, "normative": true, "for_": ["MediaQueryList"]};
+window.refsData['#mediaquerylist-media'] = {"text": "media", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#mediaquerylist-media", "export": true, "normative": true, "for_": ["MediaQueryList"]};
+window.refsData['#dom-mediaquerylistevent-matches'] = {"text": "matches", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-mediaquerylistevent-matches", "export": true, "normative": true, "for_": ["MediaQueryListEvent"]};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#eventtarget'] = {"text": "EventTarget", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#eventtarget", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediaquerylist-matches'] = {"text": "matches", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-mediaquerylist-matches", "export": true, "normative": true, "for_": ["MediaQueryList"]};
+window.refsData['#dom-mediaquerylist-addlistener'] = {"text": "addListener(callback)", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-mediaquerylist-addlistener", "export": true, "normative": true, "for_": ["MediaQueryList"]};
+window.refsData['https://dom.spec.whatwg.org/#callbackdef-eventlistener'] = {"text": "EventListener", "type": "callback", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#callbackdef-eventlistener", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediaquerylist-removelistener'] = {"text": "removeListener(callback)", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-mediaquerylist-removelistener", "export": true, "normative": true, "for_": ["MediaQueryList"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler'] = {"text": "EventHandler", "type": "typedef", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediaquerylist-onchange'] = {"text": "onchange", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-mediaquerylist-onchange", "export": true, "normative": true, "for_": ["MediaQueryList"]};
+window.refsData['https://dom.spec.whatwg.org/#add-an-event-listener'] = {"text": "add an event listener", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#add-an-event-listener", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-event-listener'] = {"text": "event listener", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-event-listener", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#event-listener-type'] = {"text": "type", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#event-listener-type", "export": false, "normative": true, "for_": ["event listener"]};
+window.refsData['https://dom.spec.whatwg.org/#event-listener-callback'] = {"text": "callback", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#event-listener-callback", "export": false, "normative": true, "for_": ["event listener"]};
+window.refsData['https://dom.spec.whatwg.org/#eventtarget-event-listener-list'] = {"text": "event listener list", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#eventtarget-event-listener-list", "export": false, "normative": true, "for_": ["EventTarget"]};
+window.refsData['https://infra.spec.whatwg.org/#list-contain'] = {"text": "contain", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-contain", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['https://dom.spec.whatwg.org/#event-listener-capture'] = {"text": "capture", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#event-listener-capture", "export": false, "normative": true, "for_": ["event listener"]};
+window.refsData['https://dom.spec.whatwg.org/#remove-an-event-listener'] = {"text": "remove an event listener", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#remove-an-event-listener", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#dom-eventtarget-addeventlistener'] = {"text": "addEventListener(type, callback)", "type": "method", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-eventtarget-addeventlistener", "export": true, "normative": true, "for_": ["EventTarget"]};
+window.refsData['https://dom.spec.whatwg.org/#dom-eventtarget-removeeventlistener'] = {"text": "removeEventListener(type, callback)", "type": "method", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-eventtarget-removeeventlistener", "export": true, "normative": true, "for_": ["EventTarget"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-handlers'] = {"text": "event handlers", "type": "dfn", "spec": "", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-handlers", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-event-type'] = {"text": "event handler event type", "type": "dfn", "spec": "", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-event-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-idl-attributes'] = {"text": "event handler idl attributes", "type": "dfn", "spec": "", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-idl-attributes", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#event'] = {"text": "Event", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#event", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-mediaquerylisteventinit'] = {"text": "MediaQueryListEventInit", "type": "dictionary", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dictdef-mediaquerylisteventinit", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediaquerylistevent-media'] = {"text": "media", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-mediaquerylistevent-media", "export": true, "normative": true, "for_": ["MediaQueryListEvent"]};
+window.refsData['https://dom.spec.whatwg.org/#dictdef-eventinit'] = {"text": "EventInit", "type": "dictionary", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dictdef-eventinit", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-screen-availwidth'] = {"text": "availWidth", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-screen-availwidth", "export": true, "normative": true, "for_": ["Screen"]};
+window.refsData['#dom-screen-availheight'] = {"text": "availHeight", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-screen-availheight", "export": true, "normative": true, "for_": ["Screen"]};
+window.refsData['#dom-screen-width'] = {"text": "width", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-screen-width", "export": true, "normative": true, "for_": ["Screen"]};
+window.refsData['#dom-screen-height'] = {"text": "height", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-screen-height", "export": true, "normative": true, "for_": ["Screen"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-long'] = {"text": "unsigned long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-long", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-screen-colordepth'] = {"text": "colorDepth", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-screen-colordepth", "export": true, "normative": true, "for_": ["Screen"]};
+window.refsData['#dom-screen-pixeldepth'] = {"text": "pixelDepth", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-screen-pixeldepth", "export": true, "normative": true, "for_": ["Screen"]};
+window.refsData['https://drafts.csswg.org/mediaqueries-4/#mf-colors'] = {"text": "color media query", "type": "dfn", "spec": "", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/mediaqueries-4/#mf-colors", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#element'] = {"text": "Element", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#element", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-document-elementfrompoint'] = {"text": "elementFromPoint(x, y)", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-document-elementfrompoint", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-document-elementsfrompoint'] = {"text": "elementsFromPoint(x, y)", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-document-elementsfrompoint", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['#caretposition'] = {"text": "CaretPosition", "type": "interface", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#caretposition", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-document-caretpositionfrompoint'] = {"text": "caretPositionFromPoint(x, y)", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-document-caretpositionfrompoint", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['#dom-document-scrollingelement'] = {"text": "scrollingElement", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-document-scrollingelement", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['#layout-box'] = {"text": "layout box", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#layout-box", "export": true, "normative": true, "for_": []};
+window.refsData['#transforms'] = {"text": "transforms", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#transforms", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-ui-4/#propdef-pointer-events'] = {"text": "pointer-events", "type": "property", "spec": "css-ui-4", "shortname": "css-ui", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-ui-4/#propdef-pointer-events", "export": true, "normative": true, "for_": []};
+window.refsData['#caret-position'] = {"text": "caret position", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#caret-position", "export": true, "normative": true, "for_": []};
+window.refsData['#caret-node'] = {"text": "caret node", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#caret-node", "export": true, "normative": true, "for_": []};
+window.refsData['#caret-offset'] = {"text": "caret offset", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#caret-offset", "export": true, "normative": true, "for_": []};
+window.refsData['#caret-range'] = {"text": "caret range", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#caret-range", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#range'] = {"text": "Range", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#range", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#dom-range-startcontainer'] = {"text": "startContainer", "type": "attribute", "spec": "", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "https://dom.spec.whatwg.org/#dom-range-startcontainer", "export": true, "normative": true, "for_": ["Range"]};
+window.refsData['https://dom.spec.whatwg.org/#dom-range-startoffset'] = {"text": "startOffset", "type": "attribute", "spec": "", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "https://dom.spec.whatwg.org/#dom-range-startoffset", "export": true, "normative": true, "for_": ["Range"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-document-quirks'] = {"text": "quirks mode", "type": "dfn", "spec": "", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "https://dom.spec.whatwg.org/#concept-document-quirks", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-element-scrolltop'] = {"text": "scrollTop", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-element-scrolltop", "export": true, "normative": true, "for_": ["Element"]};
+window.refsData['#dom-element-scrollleft'] = {"text": "scrollLeft", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-element-scrollleft", "export": true, "normative": true, "for_": ["Element"]};
+window.refsData['https://dom.spec.whatwg.org/#node'] = {"text": "Node", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#node", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-caretposition-offsetnode'] = {"text": "offsetNode", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-caretposition-offsetnode", "export": true, "normative": true, "for_": ["CaretPosition"]};
+window.refsData['#dom-caretposition-offset'] = {"text": "offset", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-caretposition-offset", "export": true, "normative": true, "for_": ["CaretPosition"]};
+window.refsData['https://drafts.fxtf.org/geometry-1/#domrect'] = {"text": "DOMRect", "type": "interface", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/geometry-1/#domrect", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-caretposition-getclientrect'] = {"text": "getClientRect()", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-caretposition-getclientrect", "export": true, "normative": true, "for_": ["CaretPosition"]};
+window.refsData['#dom-range-getclientrects'] = {"text": "getClientRects()", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-range-getclientrects", "export": true, "normative": true, "for_": ["Range"]};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#live'] = {"text": "live", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#live", "export": false, "normative": true, "for_": []};
+window.refsData['#enumdef-scrolllogicalposition'] = {"text": "ScrollLogicalPosition", "type": "enum", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#enumdef-scrolllogicalposition", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.fxtf.org/geometry-1/#domrectlist'] = {"text": "DOMRectList", "type": "interface", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/geometry-1/#domrectlist", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-element-getclientrects'] = {"text": "getClientRects()", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-element-getclientrects", "export": true, "normative": true, "for_": ["Element"]};
+window.refsData['#dom-element-getboundingclientrect'] = {"text": "getBoundingClientRect()", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-element-getboundingclientrect", "export": true, "normative": true, "for_": ["Element"]};
+window.refsData['#dom-element-scrollintoview'] = {"text": "scrollIntoView(arg)", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-element-scrollintoview", "export": true, "normative": true, "for_": ["Element"]};
+window.refsData['#dictdef-scrollintoviewoptions'] = {"text": "ScrollIntoViewOptions", "type": "dictionary", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dictdef-scrollintoviewoptions", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-element-scroll'] = {"text": "scroll(options)", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-element-scroll", "export": true, "normative": true, "for_": ["Element"]};
+window.refsData['#dom-element-scrollto'] = {"text": "scrollTo(options)", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-element-scrollto", "export": true, "normative": true, "for_": ["Element"]};
+window.refsData['#dom-element-scrollby'] = {"text": "scrollBy(options)", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-element-scrollby", "export": true, "normative": true, "for_": ["Element"]};
+window.refsData['#dom-element-scrollwidth'] = {"text": "scrollWidth", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-element-scrollwidth", "export": true, "normative": true, "for_": ["Element"]};
+window.refsData['#dom-element-scrollheight'] = {"text": "scrollHeight", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-element-scrollheight", "export": true, "normative": true, "for_": ["Element"]};
+window.refsData['#dom-element-clienttop'] = {"text": "clientTop", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-element-clienttop", "export": true, "normative": true, "for_": ["Element"]};
+window.refsData['#dom-element-clientleft'] = {"text": "clientLeft", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-element-clientleft", "export": true, "normative": true, "for_": ["Element"]};
+window.refsData['#dom-element-clientwidth'] = {"text": "clientWidth", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-element-clientwidth", "export": true, "normative": true, "for_": ["Element"]};
+window.refsData['#dom-element-clientheight'] = {"text": "clientHeight", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-element-clientheight", "export": true, "normative": true, "for_": ["Element"]};
+window.refsData['https://drafts.csswg.org/css-break-4/#box-fragment'] = {"text": "box fragment", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-break-4/#box-fragment", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-3/#valdef-display-table'] = {"text": "table", "type": "value", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-display-3/#valdef-display-table", "export": true, "normative": true, "for_": ["display", "<display-inside>"]};
+window.refsData['https://drafts.csswg.org/css-display-4/#valdef-display-inline-table'] = {"text": "inline-table", "type": "value", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#valdef-display-inline-table", "export": true, "normative": true, "for_": ["display", "<display-legacy>"]};
+window.refsData['https://www.w3.org/TR/CSS21/visuren.html#anonymous-block-level'] = {"text": "anonymous block box", "type": "dfn", "spec": "", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/CSS21/visuren.html#anonymous-block-level", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.fxtf.org/geometry-1/#dom-domrect-x'] = {"text": "x", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/geometry-1/#dom-domrect-x", "export": true, "normative": true, "for_": ["DOMRect"]};
+window.refsData['https://drafts.fxtf.org/geometry-1/#dom-domrect-y'] = {"text": "y", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/geometry-1/#dom-domrect-y", "export": true, "normative": true, "for_": ["DOMRect"]};
+window.refsData['https://drafts.fxtf.org/geometry-1/#dom-domrect-width'] = {"text": "width", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/geometry-1/#dom-domrect-width", "export": true, "normative": true, "for_": ["DOMRect"]};
+window.refsData['https://drafts.fxtf.org/geometry-1/#dom-domrect-height'] = {"text": "height", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/geometry-1/#dom-domrect-height", "export": true, "normative": true, "for_": ["DOMRect"]};
+window.refsData['#dom-scrollintoviewoptions-block'] = {"text": "block", "type": "dict-member", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-scrollintoviewoptions-block", "export": true, "normative": true, "for_": ["ScrollIntoViewOptions"]};
+window.refsData['#dom-scrollintoviewoptions-inline'] = {"text": "inline", "type": "dict-member", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-scrollintoviewoptions-inline", "export": true, "normative": true, "for_": ["ScrollIntoViewOptions"]};
+window.refsData['#scroll-an-element-into-view'] = {"text": "scroll an element into view", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#scroll-an-element-into-view", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-node-document'] = {"text": "node document", "type": "dfn", "spec": "", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "https://dom.spec.whatwg.org/#concept-node-document", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#active-document'] = {"text": "active document", "type": "dfn", "spec": "", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#active-document", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-document-defaultview'] = {"text": "defaultView", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-document-defaultview", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['#scroll-an-element'] = {"text": "scroll an element", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#scroll-an-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border-top-width'] = {"text": "border-top-width", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-top-width", "export": true, "normative": true, "for_": []};
+window.refsData['#border-edge'] = {"text": "border edge", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#border-edge", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border-left-width'] = {"text": "border-left-width", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-left-width", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#same-origin'] = {"text": "same origin", "type": "dfn", "spec": "", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#same-origin", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#block-flow-direction'] = {"text": "block flow direction", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#block-flow-direction", "export": true, "normative": true, "for_": []};
+window.refsData['#ending-edges'] = {"text": "ending edges", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#ending-edges", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#inline-base-direction'] = {"text": "inline base direction", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#inline-base-direction", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/dom.html#htmlelement'] = {"text": "HTMLElement", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dom.html#htmlelement", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-htmlelement-offsetparent'] = {"text": "offsetParent", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-htmlelement-offsetparent", "export": true, "normative": true, "for_": ["HTMLElement"]};
+window.refsData['#dom-htmlelement-offsettop'] = {"text": "offsetTop", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-htmlelement-offsettop", "export": true, "normative": true, "for_": ["HTMLElement"]};
+window.refsData['#dom-htmlelement-offsetleft'] = {"text": "offsetLeft", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-htmlelement-offsetleft", "export": true, "normative": true, "for_": ["HTMLElement"]};
+window.refsData['#dom-htmlelement-offsetwidth'] = {"text": "offsetWidth", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-htmlelement-offsetwidth", "export": true, "normative": true, "for_": ["HTMLElement"]};
+window.refsData['#dom-htmlelement-offsetheight'] = {"text": "offsetHeight", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-htmlelement-offsetheight", "export": true, "normative": true, "for_": ["HTMLElement"]};
+window.refsData['https://drafts.csswg.org/css-position-3/#propdef-position'] = {"text": "position", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-position", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-position-3/#valdef-position-fixed'] = {"text": "fixed", "type": "value", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#valdef-position-fixed", "export": true, "normative": true, "for_": ["position"]};
+window.refsData['https://drafts.csswg.org/css-scoping-1/#flat-tree'] = {"text": "flat tree", "type": "dfn", "spec": "css-scoping-1", "shortname": "css-scoping", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-scoping-1/#flat-tree", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-closed-shadow-hidden'] = {"text": "closed-shadow-hidden", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-closed-shadow-hidden", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-position-3/#valdef-position-static'] = {"text": "static", "type": "value", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#valdef-position-static", "export": true, "normative": true, "for_": ["position"]};
+window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#htmlimageelement'] = {"text": "HTMLImageElement", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#htmlimageelement", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-htmlimageelement-x'] = {"text": "x", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-htmlimageelement-x", "export": true, "normative": true, "for_": ["HTMLImageElement"]};
+window.refsData['#dom-htmlimageelement-y'] = {"text": "y", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-htmlimageelement-y", "export": true, "normative": true, "for_": ["HTMLImageElement"]};
+window.refsData['#dom-range-getboundingclientrect'] = {"text": "getBoundingClientRect()", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-range-getboundingclientrect", "export": true, "normative": true, "for_": ["Range"]};
+window.refsData['https://dom.spec.whatwg.org/#text'] = {"text": "Text", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#text", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-4/#typographic-character-unit'] = {"text": "typographic character unit", "type": "dfn", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#typographic-character-unit", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/DOM-Level-3-Events/#interface-MouseEvent'] = {"text": "MouseEvent", "type": "interface", "spec": "", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/DOM-Level-3-Events/#interface-MouseEvent", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mouseevent-screenx'] = {"text": "screenX", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-mouseevent-screenx", "export": true, "normative": true, "for_": ["MouseEvent"]};
+window.refsData['#dom-mouseevent-screeny'] = {"text": "screenY", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-mouseevent-screeny", "export": true, "normative": true, "for_": ["MouseEvent"]};
+window.refsData['#dom-mouseevent-pagex'] = {"text": "pageX", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-mouseevent-pagex", "export": true, "normative": true, "for_": ["MouseEvent"]};
+window.refsData['#dom-mouseevent-pagey'] = {"text": "pageY", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-mouseevent-pagey", "export": true, "normative": true, "for_": ["MouseEvent"]};
+window.refsData['#dom-mouseevent-clientx'] = {"text": "clientX", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-mouseevent-clientx", "export": true, "normative": true, "for_": ["MouseEvent"]};
+window.refsData['#dom-mouseevent-clienty'] = {"text": "clientY", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-mouseevent-clienty", "export": true, "normative": true, "for_": ["MouseEvent"]};
+window.refsData['#dom-mouseevent-x'] = {"text": "x", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-mouseevent-x", "export": true, "normative": true, "for_": ["MouseEvent"]};
+window.refsData['#dom-mouseevent-y'] = {"text": "y", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-mouseevent-y", "export": true, "normative": true, "for_": ["MouseEvent"]};
+window.refsData['#dom-mouseevent-offsetx'] = {"text": "offsetX", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-mouseevent-offsetx", "export": true, "normative": true, "for_": ["MouseEvent"]};
+window.refsData['#dom-mouseevent-offsety'] = {"text": "offsetY", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-mouseevent-offsety", "export": true, "normative": true, "for_": ["MouseEvent"]};
+window.refsData['https://w3c.github.io/uievents/#dictdef-mouseeventinit'] = {"text": "MouseEventInit", "type": "dictionary", "spec": "uievents", "shortname": "uievents", "level": "1", "status": "current", "url": "https://w3c.github.io/uievents/#dictdef-mouseeventinit", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#dispatch-flag'] = {"text": "dispatch flag", "type": "dfn", "spec": "", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "https://dom.spec.whatwg.org/#dispatch-flag", "export": true, "normative": true, "for_": []};
+window.refsData['#geometryutils'] = {"text": "GeometryUtils", "type": "interface", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#geometryutils", "export": true, "normative": true, "for_": []};
+window.refsData['#enumdef-cssboxtype'] = {"text": "CSSBoxType", "type": "enum", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#enumdef-cssboxtype", "export": true, "normative": true, "for_": []};
+window.refsData['#typedefdef-geometrynode'] = {"text": "GeometryNode", "type": "typedef", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#typedefdef-geometrynode", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.fxtf.org/geometry-1/#domquad'] = {"text": "DOMQuad", "type": "interface", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/geometry-1/#domquad", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-geometryutils-getboxquads'] = {"text": "getBoxQuads(options)", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-geometryutils-getboxquads", "export": true, "normative": true, "for_": ["GeometryUtils"]};
+window.refsData['#dictdef-boxquadoptions'] = {"text": "BoxQuadOptions", "type": "dictionary", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dictdef-boxquadoptions", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-geometryutils-convertquadfromnode'] = {"text": "convertQuadFromNode(quad, from, options)", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-geometryutils-convertquadfromnode", "export": true, "normative": true, "for_": ["GeometryUtils"]};
+window.refsData['https://drafts.fxtf.org/geometry-1/#dictdef-domquadinit'] = {"text": "DOMQuadInit", "type": "dictionary", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/geometry-1/#dictdef-domquadinit", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-convertcoordinateoptions'] = {"text": "ConvertCoordinateOptions", "type": "dictionary", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dictdef-convertcoordinateoptions", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-geometryutils-convertrectfromnode'] = {"text": "convertRectFromNode(rect, from, options)", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-geometryutils-convertrectfromnode", "export": true, "normative": true, "for_": ["GeometryUtils"]};
+window.refsData['https://drafts.fxtf.org/geometry-1/#domrectreadonly'] = {"text": "DOMRectReadOnly", "type": "interface", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/geometry-1/#domrectreadonly", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.fxtf.org/geometry-1/#dompoint'] = {"text": "DOMPoint", "type": "interface", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/geometry-1/#dompoint", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-geometryutils-convertpointfromnode'] = {"text": "convertPointFromNode(point, from, options)", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#dom-geometryutils-convertpointfromnode", "export": true, "normative": true, "for_": ["GeometryUtils"]};
+window.refsData['https://drafts.fxtf.org/geometry-1/#dictdef-dompointinit'] = {"text": "DOMPointInit", "type": "dictionary", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/geometry-1/#dictdef-dompointinit", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#csspseudoelement'] = {"text": "CSSPseudoElement", "type": "interface", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#csspseudoelement", "export": true, "normative": true, "for_": []};
+window.refsData['#eventdef-window-resize'] = {"text": "resize", "type": "event", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#eventdef-window-resize", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['#pending-scroll-event-targets'] = {"text": "pending scroll event targets", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#pending-scroll-event-targets", "export": true, "normative": true, "for_": []};
+window.refsData['#eventdef-document-scroll'] = {"text": "scroll", "type": "event", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#eventdef-document-scroll", "export": true, "normative": true, "for_": ["Document", "Element"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-scroll-behavior-auto'] = {"text": "auto", "type": "value", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#valdef-scroll-behavior-auto", "export": true, "normative": true, "for_": ["scroll-behavior"]};window.refsData['#propdef-scroll-behavior'] = {"text": "scroll-behavior", "type": "property", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "local", "url": "#propdef-scroll-behavior", "export": true, "normative": true, "for_": []};
 </script>

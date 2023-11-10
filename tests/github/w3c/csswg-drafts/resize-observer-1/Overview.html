@@ -692,6 +692,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -2191,8 +2228,6 @@ will be considered for delivery in the next loop.</p>
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -2440,7 +2475,6 @@ will be considered for delivery in the next loop.</p>
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -2896,4 +2930,281 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://dom.spec.whatwg.org/#element'] = {"text": "Element", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#element", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css3-positioning/#viewport'] = {"text": "viewport", "type": "dfn", "spec": "", "shortname": "resize-observer", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/css3-positioning/#viewport", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-view-1/#eventdef-window-resize'] = {"text": "resize", "type": "event", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-view-1/#eventdef-window-resize", "export": true, "normative": true, "for_": ["Window", "VisualViewport"]};
+window.refsData['https://www.w3.org/TR/css-display-3/#propdef-display'] = {"text": "display", "type": "dfn", "spec": "", "shortname": "resize-observer", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/css-display-3/#propdef-display", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#mutationobserver'] = {"text": "MutationObserver", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#mutationobserver", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/intersection-observer/#intersection-observer-interface'] = {"text": "IntersectionObserver", "type": "interface", "spec": "", "shortname": "resize-observer", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/intersection-observer/#intersection-observer-interface", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-resizeobserverboxoptions-border-box'] = {"text": "\"border-box\"", "type": "enum-value", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobserverboxoptions-border-box", "export": true, "normative": true, "for_": ["ResizeObserverBoxOptions"]};
+window.refsData['https://www.w3.org/TR/CSS21/box.html#box-border-area'] = {"text": "box border area", "type": "dfn", "spec": "", "shortname": "resize-observer", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/CSS21/box.html#box-border-area", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-resizeobserverboxoptions-content-box'] = {"text": "\"content-box\"", "type": "enum-value", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobserverboxoptions-content-box", "export": true, "normative": true, "for_": ["ResizeObserverBoxOptions"]};
+window.refsData['https://drafts.csswg.org/css-box-3/#content-area'] = {"text": "content area", "type": "dfn", "spec": "", "shortname": "resize-observer", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/css-box-3/#content-area", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-resizeobserverboxoptions-device-pixel-content-box'] = {"text": "\"device-pixel-content-box\"", "type": "enum-value", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobserverboxoptions-device-pixel-content-box", "export": true, "normative": true, "for_": ["ResizeObserverBoxOptions"]};
+window.refsData['https://www.w3.org/TR/cssom-view-1/#dom-window-devicepixelratio'] = {"text": "devicepixelratio", "type": "dfn", "spec": "", "shortname": "resize-observer", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/cssom-view-1/#dom-window-devicepixelratio", "export": true, "normative": true, "for_": []};
+window.refsData['#enumdef-resizeobserverboxoptions'] = {"text": "ResizeObserverBoxOptions", "type": "enum", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#enumdef-resizeobserverboxoptions", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-resizeobserver-resizeobserver'] = {"text": "ResizeObserver(callback)", "type": "constructor", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobserver-resizeobserver", "export": true, "normative": true, "for_": ["ResizeObserver"]};
+window.refsData['#callbackdef-resizeobservercallback'] = {"text": "ResizeObserverCallback", "type": "callback", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#callbackdef-resizeobservercallback", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-resizeobserver-observe'] = {"text": "observe(target, options)", "type": "method", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobserver-observe", "export": true, "normative": true, "for_": ["ResizeObserver"]};
+window.refsData['#dictdef-resizeobserveroptions'] = {"text": "ResizeObserverOptions", "type": "dictionary", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dictdef-resizeobserveroptions", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-resizeobserver-unobserve'] = {"text": "unobserve(target)", "type": "method", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobserver-unobserve", "export": true, "normative": true, "for_": ["ResizeObserver"]};
+window.refsData['#dom-resizeobserver-disconnect'] = {"text": "disconnect()", "type": "method", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobserver-disconnect", "export": true, "normative": true, "for_": ["ResizeObserver"]};
+window.refsData['#resizeobserver'] = {"text": "ResizeObserver", "type": "interface", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#resizeobserver", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-resizeobserver-callback-slot'] = {"text": "[[callback]]", "type": "attribute", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobserver-callback-slot", "export": true, "normative": true, "for_": ["ResizeObserver"]};
+window.refsData['#dom-resizeobserver-observationtargets-slot'] = {"text": "[[observationTargets]]", "type": "attribute", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobserver-observationtargets-slot", "export": true, "normative": true, "for_": ["ResizeObserver"]};
+window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-document-resizeobservers-slot'] = {"text": "[[resizeObservers]]", "type": "attribute", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-document-resizeobservers-slot", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['#resizeobservation'] = {"text": "ResizeObservation", "type": "interface", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#resizeobservation", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-resizeobserver-activetargets-slot'] = {"text": "[[activeTargets]]", "type": "attribute", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobserver-activetargets-slot", "export": true, "normative": true, "for_": ["ResizeObserver"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['#resizeobserverentry'] = {"text": "ResizeObserverEntry", "type": "interface", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#resizeobserverentry", "export": true, "normative": true, "for_": []};
+window.refsData['#broadcast-active-observations'] = {"text": "broadcast active observations", "type": "dfn", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#broadcast-active-observations", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-resizeobserverentry-target'] = {"text": "target", "type": "attribute", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobserverentry-target", "export": true, "normative": true, "for_": ["ResizeObserverEntry"]};
+window.refsData['https://drafts.fxtf.org/geometry-1/#domrectreadonly'] = {"text": "DOMRectReadOnly", "type": "interface", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/geometry-1/#domrectreadonly", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-resizeobserverentry-contentrect'] = {"text": "contentRect", "type": "attribute", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobserverentry-contentrect", "export": true, "normative": true, "for_": ["ResizeObserverEntry"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-frozen-array'] = {"text": "FrozenArray", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-frozen-array", "export": true, "normative": true, "for_": []};
+window.refsData['#resizeobserversize'] = {"text": "ResizeObserverSize", "type": "interface", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#resizeobserversize", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-resizeobserverentry-borderboxsize'] = {"text": "borderBoxSize", "type": "attribute", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobserverentry-borderboxsize", "export": true, "normative": true, "for_": ["ResizeObserverEntry"]};
+window.refsData['#dom-resizeobserverentry-contentboxsize'] = {"text": "contentBoxSize", "type": "attribute", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobserverentry-contentboxsize", "export": true, "normative": true, "for_": ["ResizeObserverEntry"]};
+window.refsData['#dom-resizeobserverentry-devicepixelcontentboxsize'] = {"text": "devicePixelContentBoxSize", "type": "attribute", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobserverentry-devicepixelcontentboxsize", "export": true, "normative": true, "for_": ["ResizeObserverEntry"]};
+window.refsData['#content-rect'] = {"text": "content rect", "type": "dfn", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#content-rect", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#border-box'] = {"text": "border box", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#border-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css3-multicol/#'] = {"text": "multi-column", "type": "dfn", "spec": "", "shortname": "resize-observer", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/css3-multicol/#", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unrestricted-double'] = {"text": "unrestricted double", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unrestricted-double", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-resizeobservation-target'] = {"text": "target", "type": "attribute", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobservation-target", "export": true, "normative": true, "for_": ["ResizeObservation"]};
+window.refsData['#dom-resizeobservation-observedbox'] = {"text": "observedBox", "type": "attribute", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobservation-observedbox", "export": true, "normative": true, "for_": ["ResizeObservation"]};
+window.refsData['#dom-resizeobservation-lastreportedsizes'] = {"text": "lastReportedSizes", "type": "attribute", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobservation-lastreportedsizes", "export": true, "normative": true, "for_": ["ResizeObservation"]};
+window.refsData['#calculate-box-size'] = {"text": "calculate box size", "type": "dfn", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#calculate-box-size", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-document'] = {"text": "document", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-document", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/CSS2/box.html#content-width'] = {"text": "content width", "type": "dfn", "spec": "", "shortname": "resize-observer", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/CSS2/box.html#content-width", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/CSS2/box.html#content-height'] = {"text": "content height", "type": "dfn", "spec": "", "shortname": "resize-observer", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/CSS2/box.html#content-height", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-3/#padding-physical'] = {"text": "padding top", "type": "dfn", "spec": "", "shortname": "resize-observer", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/css-box-3/#padding-physical", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/SVG2/coords.html#BoundingBoxes'] = {"text": "bounding box", "type": "dfn", "spec": "", "shortname": "resize-observer", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/SVG2/coords.html#BoundingBoxes", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/SVG2/types.html#InterfaceSVGGraphicsElement'] = {"text": "svggraphicselement", "type": "dfn", "spec": "", "shortname": "resize-observer", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/SVG2/types.html#InterfaceSVGGraphicsElement", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-resizeobserver-skippedtargets-slot'] = {"text": "[[skippedTargets]]", "type": "attribute", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobserver-skippedtargets-slot", "export": true, "normative": true, "for_": ["ResizeObserver"]};
+window.refsData['#dom-resizeobservation-isactive'] = {"text": "isActive()", "type": "method", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobservation-isactive", "export": true, "normative": true, "for_": ["ResizeObservation"]};
+window.refsData['#calculate-depth-for-node'] = {"text": "calculate depth for node", "type": "dfn", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#calculate-depth-for-node", "export": true, "normative": true, "for_": []};
+window.refsData['#create-and-populate-a-resizeobserverentry'] = {"text": "create and populate a resizeobserverentry", "type": "dfn", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#create-and-populate-a-resizeobserverentry", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#errorevent'] = {"text": "ErrorEvent", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#errorevent", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/types.html#InterfaceSVGGraphicsElement'] = {"text": "SVGGraphicsElement", "type": "interface", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/types.html#InterfaceSVGGraphicsElement", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#border-area'] = {"text": "border area", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#border-area", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#processing-model-8'] = {"text": "html processing model", "type": "dfn", "spec": "", "shortname": "resize-observer", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#processing-model-8", "export": true, "normative": true, "for_": []};
+window.refsData['#gather-active-observations-at-depth'] = {"text": "gather active observations at depth", "type": "dfn", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#gather-active-observations-at-depth", "export": true, "normative": true, "for_": []};
+window.refsData['#has-active-observations'] = {"text": "has active observations", "type": "dfn", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#has-active-observations", "export": true, "normative": true, "for_": []};
+window.refsData['#has-skipped-observations'] = {"text": "has skipped observations", "type": "dfn", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#has-skipped-observations", "export": true, "normative": true, "for_": []};
+window.refsData['#deliver-resize-loop-error-notification'] = {"text": "deliver resize loop error notification", "type": "dfn", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#deliver-resize-loop-error-notification", "export": true, "normative": true, "for_": []};
 </script>

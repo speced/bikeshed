@@ -471,6 +471,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -2178,8 +2215,6 @@ web-animation. <a href="https://github.com/w3c/csswg-drafts/issues/2071">[Issue 
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -2427,7 +2462,6 @@ web-animation. <a href="https://github.com/w3c/csswg-drafts/issues/2071">[Issue 
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -2908,6 +2942,353 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#animation-worklet'] = {"text": "animation worklet", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#animation-worklet", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations#animation-effect'] = {"text": "animation effect", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#animation-effect", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#animation'] = {"text": "Animation", "type": "interface", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#animation", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/worklets.html#worklet'] = {"text": "Worklet", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/worklets.html#worklet", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-css-animationworklet'] = {"text": "animationWorklet", "type": "attribute", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#dom-css-animationworklet", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-1/#namespacedef-css'] = {"text": "CSS", "type": "namespace", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#namespacedef-css", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#SameObject'] = {"text": "SameObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SameObject", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/worklets.html#worklet-global-scope-type'] = {"text": "worklet global scope type", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/worklets.html#worklet-global-scope-type", "export": true, "normative": true, "for_": []};
+window.refsData['#animationworkletglobalscope'] = {"text": "AnimationWorkletGlobalScope", "type": "interface", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#animationworkletglobalscope", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Global'] = {"text": "Global", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Global", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/worklets.html#workletglobalscope'] = {"text": "WorkletGlobalScope", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/worklets.html#workletglobalscope", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-animationworkletglobalscope-registeranimator'] = {"text": "registerAnimator(name, animatorCtor)", "type": "method", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#dom-animationworkletglobalscope-registeranimator", "export": true, "normative": true, "for_": ["AnimationWorkletGlobalScope"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['#callbackdef-animatorinstanceconstructor'] = {"text": "AnimatorInstanceConstructor", "type": "callback", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#callbackdef-animatorinstanceconstructor", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-any'] = {"text": "any", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-any", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations#concept-animation'] = {"text": "animation", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#concept-animation", "export": true, "normative": true, "for_": []};
+window.refsData['#workletanimation'] = {"text": "WorkletAnimation", "type": "interface", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#workletanimation", "export": true, "normative": true, "for_": []};
+window.refsData['#stateless-animator'] = {"text": "stateless animator", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#stateless-animator", "export": true, "normative": true, "for_": []};
+window.refsData['#stateful-animator'] = {"text": "stateful animator", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#stateful-animator", "export": true, "normative": true, "for_": []};
+window.refsData['#animator-instance'] = {"text": "animator instance", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#animator-instance", "export": true, "normative": true, "for_": []};
+window.refsData['#state-function'] = {"text": "state function", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#state-function", "export": true, "normative": true, "for_": []};
+window.refsData['#migrate-an-animator-instance'] = {"text": "migrate an animator instance", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#migrate-an-animator-instance", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#struct'] = {"text": "struct", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#struct", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#typedef-ident'] = {"text": "<ident>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#typedef-ident", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-callback-function'] = {"text": "callback function", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-callback-function", "export": true, "normative": true, "for_": []};
+window.refsData['https://heycam.github.io/webidl/#Function'] = {"text": "function", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://heycam.github.io/webidl/#Function", "export": true, "normative": true, "for_": []};
+window.refsData['#animator-definition'] = {"text": "animator definition", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#animator-definition", "export": true, "normative": true, "for_": []};
+window.refsData['#animator-definition-stateful-flag'] = {"text": "stateful flag", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#animator-definition-stateful-flag", "export": true, "normative": true, "for_": ["animator definition"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-document'] = {"text": "document", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-document", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ordered-map'] = {"text": "map", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ordered-map", "export": true, "normative": true, "for_": []};
+window.refsData['#stateful-animator-definition'] = {"text": "stateful animator definition", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#stateful-animator-definition", "export": true, "normative": true, "for_": []};
+window.refsData['https://heycam.github.io/webidl/#dfn-throw'] = {"text": "throw", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://heycam.github.io/webidl/#dfn-throw", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-native-error-types-used-in-this-standard-typeerror'] = {"text": "typeerror", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-native-error-types-used-in-this-standard-typeerror", "export": true, "normative": true, "for_": []};
+window.refsData['#animator-definitions'] = {"text": "animator definitions", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#animator-definitions", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#map-exists'] = {"text": "exist", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-exists", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['https://heycam.github.io/webidl/#notsupportederror'] = {"text": "notsupportederror", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://heycam.github.io/webidl/#notsupportederror", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-isconstructor'] = {"text": "isconstructor", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-isconstructor", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-get-o-p'] = {"text": "get", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-get-o-p", "export": true, "normative": true, "for_": []};
+window.refsData['https://heycam.github.io/webidl/#es-type-mapping'] = {"text": "converting", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://heycam.github.io/webidl/#es-type-mapping", "export": true, "normative": true, "for_": []};
+window.refsData['#animator-name'] = {"text": "animator name", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#animator-name", "export": true, "normative": true, "for_": []};
+window.refsData['#class-constructor'] = {"text": "class constructor", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#class-constructor", "export": true, "normative": true, "for_": []};
+window.refsData['#animate-function'] = {"text": "animate function", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#animate-function", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#map-set'] = {"text": "set", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-set", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task'] = {"text": "queue a task", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task", "export": true, "normative": true, "for_": []};
+window.refsData['#document-animator-definitions'] = {"text": "document animator definitions", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#document-animator-definitions", "export": true, "normative": true, "for_": []};
+window.refsData['#document-animator-definition'] = {"text": "document animator definition", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#document-animator-definition", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#map-get'] = {"text": "get", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-get", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['#document-animator-definition-stateful-flag'] = {"text": "stateful flag", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#document-animator-definition-stateful-flag", "export": true, "normative": true, "for_": ["document animator definition"]};
+window.refsData['https://drafts.csswg.org/web-animations#local-time'] = {"text": "local time", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#local-time", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations#start-delay'] = {"text": "start delay", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#start-delay", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations#end-delay'] = {"text": "end delay", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#end-delay", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations#fill-mode'] = {"text": "fill mode", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#fill-mode", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations#iteration-start'] = {"text": "iteration start", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#iteration-start", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations#iteration-count'] = {"text": "iteration count", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#iteration-count", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations#iteration-duration'] = {"text": "iteration duration", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#iteration-duration", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations#playback-direction'] = {"text": "playback direction", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#playback-direction", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations#timing-function'] = {"text": "timing function", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#timing-function", "export": true, "normative": true, "for_": []};
+window.refsData['#animator-effect'] = {"text": "animator effect", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#animator-effect", "export": true, "normative": true, "for_": []};
+window.refsData['#workletanimationeffect'] = {"text": "WorkletAnimationEffect", "type": "interface", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#workletanimationeffect", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#dictdef-effecttiming'] = {"text": "EffectTiming", "type": "dictionary", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#dictdef-effecttiming", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-workletanimationeffect-gettiming'] = {"text": "getTiming()", "type": "method", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#dom-workletanimationeffect-gettiming", "export": true, "normative": true, "for_": ["WorkletAnimationEffect"]};
+window.refsData['https://drafts.csswg.org/web-animations-1/#dictdef-computedeffecttiming'] = {"text": "ComputedEffectTiming", "type": "dictionary", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#dictdef-computedeffecttiming", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-workletanimationeffect-getcomputedtiming'] = {"text": "getComputedTiming()", "type": "method", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#dom-workletanimationeffect-getcomputedtiming", "export": true, "normative": true, "for_": ["WorkletAnimationEffect"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-double'] = {"text": "double", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-double", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-workletanimationeffect-localtime'] = {"text": "localTime", "type": "attribute", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#dom-workletanimationeffect-localtime", "export": true, "normative": true, "for_": ["WorkletAnimationEffect"]};
+window.refsData['https://drafts.csswg.org/web-animations-1/#animationeffect'] = {"text": "AnimationEffect", "type": "interface", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#animationeffect", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#dom-animationeffect-updatetiming'] = {"text": "updateTiming()", "type": "method", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#dom-animationeffect-updatetiming", "export": true, "normative": true, "for_": ["AnimationEffect"]};
+window.refsData['#sync-requested-flag'] = {"text": "sync requested flag", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#sync-requested-flag", "export": true, "normative": true, "for_": []};
+window.refsData['#animator'] = {"text": "animator", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#animator", "export": true, "normative": true, "for_": []};
+window.refsData['#frame-requested-flag'] = {"text": "frame requested flag", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#frame-requested-flag", "export": true, "normative": true, "for_": []};
+window.refsData['#worklet-animation'] = {"text": "worklet animation", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#worklet-animation", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations#timeline'] = {"text": "timeline", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#timeline", "export": true, "normative": true, "for_": []};
+window.refsData['http://w3c.github.io/html/infrastructure.html#structureddeserialize'] = {"text": "structureddeserialize", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "http://w3c.github.io/html/infrastructure.html#structureddeserialize", "export": true, "normative": true, "for_": []};
+window.refsData['https://heycam.github.io/webidl/#construct-a-callback-function'] = {"text": "constructing", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://heycam.github.io/webidl/#construct-a-callback-function", "export": true, "normative": true, "for_": []};
+window.refsData['#corresponding-effect'] = {"text": "corresponding effect", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#corresponding-effect", "export": true, "normative": true, "for_": []};
+window.refsData['#animator-current-time'] = {"text": "animator current time", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#animator-current-time", "export": true, "normative": true, "for_": []};
+window.refsData['#effect'] = {"text": "effect", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#effect", "export": true, "normative": true, "for_": []};
+window.refsData['#animator-timeline'] = {"text": "animator timeline", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#animator-timeline", "export": true, "normative": true, "for_": []};
+window.refsData['#animator-serialized-options'] = {"text": "animator serialized options", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#animator-serialized-options", "export": true, "normative": true, "for_": []};
+window.refsData['#animator-instance-set'] = {"text": "animator instance set", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#animator-instance-set", "export": true, "normative": true, "for_": []};
+window.refsData['#run-animators'] = {"text": "run animators", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#run-animators", "export": true, "normative": true, "for_": []};
+window.refsData['https://heycam.github.io/webidl/#invoke-a-callback-function'] = {"text": "invoke", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://heycam.github.io/webidl/#invoke-a-callback-function", "export": true, "normative": true, "for_": []};
+window.refsData['https://heycam.github.io/webidl/#dfn-callback-this-value'] = {"text": "callback this value", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://heycam.github.io/webidl/#dfn-callback-this-value", "export": true, "normative": true, "for_": []};
+window.refsData['#sync-local-times-to-document'] = {"text": "sync local times to document", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#sync-local-times-to-document", "export": true, "normative": true, "for_": []};
+window.refsData['#stateful-animator-instance'] = {"text": "stateful animator instance", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#stateful-animator-instance", "export": true, "normative": true, "for_": []};
+window.refsData['http://w3c.github.io/html/infrastructure.html#structuredserialize'] = {"text": "structuredserialize", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "http://w3c.github.io/html/infrastructure.html#structuredserialize", "export": true, "normative": true, "for_": []};
+window.refsData['#remove-an-animator-instance'] = {"text": "remove an animator instance", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#remove-an-animator-instance", "export": true, "normative": true, "for_": []};
+window.refsData['#create-a-new-animator-instance'] = {"text": "create a new animator instance", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#create-a-new-animator-instance", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations#current-time'] = {"text": "current time", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#current-time", "export": true, "normative": true, "for_": []};
+window.refsData['#corresponding-animator-instance'] = {"text": "corresponding animator instance", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#corresponding-animator-instance", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations#inherited-time'] = {"text": "inherited time", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#inherited-time", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations#play-state'] = {"text": "play state", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#play-state", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-workletanimation-workletanimation'] = {"text": "WorkletAnimation(animatorName, effects, timeline, options)", "type": "constructor", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#dom-workletanimation-workletanimation", "export": true, "normative": true, "for_": ["WorkletAnimation"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#animationtimeline'] = {"text": "AnimationTimeline", "type": "interface", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#animationtimeline", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations#set-the-timeline-of-an-animation'] = {"text": "set the timeline of an animation", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#set-the-timeline-of-an-animation", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations#the-documents-default-timeline'] = {"text": "default document timeline", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#the-documents-default-timeline", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#window'] = {"text": "Window", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#current-global-object'] = {"text": "current global object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#current-global-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list'] = {"text": "list", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list", "export": true, "normative": true, "for_": []};
+window.refsData['#workletgroupeffect'] = {"text": "WorkletGroupEffect", "type": "interface", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#workletgroupeffect", "export": true, "normative": true, "for_": []};
+window.refsData['#serialized-options'] = {"text": "serialized options", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#serialized-options", "export": true, "normative": true, "for_": []};
+window.refsData['#animation-animator-name'] = {"text": "animation animator name", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#animation-animator-name", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations#set-the-target-effect-of-an-animation'] = {"text": "set the target effect of an animation", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#set-the-target-effect-of-an-animation", "export": true, "normative": true, "for_": []};
+window.refsData['#set-animator-instance-of-worklet-animation'] = {"text": "set animator instance of worklet animation", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#set-animator-instance-of-worklet-animation", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-transitions-1/#transition-start-time'] = {"text": "start time", "type": "dfn", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transitions-1/#transition-start-time", "export": true, "normative": true, "for_": ["transition"]};
+window.refsData['https://drafts.csswg.org/web-animations-1/#dom-animation-finish'] = {"text": "finish()", "type": "method", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#dom-animation-finish", "export": true, "normative": true, "for_": ["Animation"]};
+window.refsData['https://drafts.csswg.org/web-animations#playback-rate'] = {"text": "playback rate", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#playback-rate", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-2/#dom-animationeffect-getcomputedtiming'] = {"text": "getComputedTiming()", "type": "method", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "current", "url": "https://drafts.csswg.org/web-animations-2/#dom-animationeffect-getcomputedtiming", "export": true, "normative": true, "for_": ["AnimationEffect"]};
+window.refsData['https://drafts.csswg.org/web-animations#effect-value'] = {"text": "effect value", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#effect-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/#run-the-animation-frame-callbacks'] = {"text": "running the animation frame callbacks", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/#run-the-animation-frame-callbacks", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations#target-property'] = {"text": "target property", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#target-property", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations#ready'] = {"text": "ready", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#ready", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations#idle'] = {"text": "idle", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#idle", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations#finished'] = {"text": "finished", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#finished", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations#running'] = {"text": "running", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#running", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations#paused'] = {"text": "paused", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#paused", "export": true, "normative": true, "for_": []};
+window.refsData['#associate-animator-instance-of-worklet-animation'] = {"text": "associate animator instance of worklet animation", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#associate-animator-instance-of-worklet-animation", "export": true, "normative": true, "for_": []};
+window.refsData['#disassociate-animator-instance-of-worklet-animation'] = {"text": "disassociate animator instance of worklet animation", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#disassociate-animator-instance-of-worklet-animation", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations#replace-state'] = {"text": "replace state", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#replace-state", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations#active'] = {"text": "active", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#active", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations#persisted'] = {"text": "persisted", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#persisted", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations#removed'] = {"text": "removed", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#removed", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations#set-the-current-time'] = {"text": "set the current time", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#set-the-current-time", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations#set-the-start-time'] = {"text": "set the start time", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#set-the-start-time", "export": true, "normative": true, "for_": []};
+window.refsData['#sync-animation-timings-to-worklet'] = {"text": "sync animation timings to worklet", "type": "dfn", "spec": "css-animation-worklet-1", "shortname": "css-animation-worklet", "level": "1", "status": "local", "url": "#sync-animation-timings-to-worklet", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations#update-the-timing-properties-of-an-animation-effect'] = {"text": "update the timing properties of an animation effect", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#update-the-timing-properties-of-an-animation-effect", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations#effect-stack'] = {"text": "effect stack", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#effect-stack", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations#animation-class'] = {"text": "animation class", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations#animation-class", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/web-animations/level-2/#group-effect'] = {"text": "group effect", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://w3c.github.io/web-animations/level-2/#group-effect", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/web-animations/level-2/#child-effect'] = {"text": "child effect", "type": "dfn", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://w3c.github.io/web-animations/level-2/#child-effect", "export": true, "normative": true, "for_": []};
+window.refsData['https://wicg.github.io/scroll-animations/#scrolltimeline'] = {"text": "ScrollTimeline", "type": "interface", "spec": "", "shortname": "css-animation-worklet", "level": "1", "status": "anchor-block", "url": "https://wicg.github.io/scroll-animations/#scrolltimeline", "export": true, "normative": true, "for_": []};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

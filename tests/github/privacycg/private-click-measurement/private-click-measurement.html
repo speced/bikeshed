@@ -469,6 +469,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -1147,8 +1184,6 @@ for their feedback on this proposal.</p>
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -1396,7 +1431,6 @@ for their feedback on this proposal.</p>
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -1772,6 +1806,248 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#attribution'] = {"text": "attribution", "type": "dfn", "spec": "private-click-measurement", "shortname": "private-click-measurement", "level": "", "status": "local", "url": "#attribution", "export": true, "normative": true, "for_": []};
+window.refsData['#eight-bit-decimal-value'] = {"text": "eight-bit decimal value", "type": "dfn", "spec": "private-click-measurement", "shortname": "private-click-measurement", "level": "", "status": "local", "url": "#eight-bit-decimal-value", "export": true, "normative": true, "for_": []};
+window.refsData['#four-bit-decimal-value'] = {"text": "four-bit decimal value", "type": "dfn", "spec": "private-click-measurement", "shortname": "private-click-measurement", "level": "", "status": "local", "url": "#four-bit-decimal-value", "export": true, "normative": true, "for_": []};
+window.refsData['#six-bit-decimal-value'] = {"text": "six-bit decimal value", "type": "dfn", "spec": "private-click-measurement", "shortname": "private-click-measurement", "level": "", "status": "local", "url": "#six-bit-decimal-value", "export": true, "normative": true, "for_": []};
+window.refsData['#click-source-website'] = {"text": "click source website", "type": "dfn", "spec": "private-click-measurement", "shortname": "private-click-measurement", "level": "", "status": "local", "url": "#click-source-website", "export": true, "normative": true, "for_": []};
+window.refsData['#attribution-source-id'] = {"text": "attribution source id", "type": "dfn", "spec": "private-click-measurement", "shortname": "private-click-measurement", "level": "", "status": "local", "url": "#attribution-source-id", "export": true, "normative": true, "for_": []};
+window.refsData['#attribution-destination-website'] = {"text": "attribution destination website", "type": "dfn", "spec": "private-click-measurement", "shortname": "private-click-measurement", "level": "", "status": "local", "url": "#attribution-destination-website", "export": true, "normative": true, "for_": []};
+window.refsData['#trigger-data'] = {"text": "trigger data", "type": "dfn", "spec": "private-click-measurement", "shortname": "private-click-measurement", "level": "", "status": "local", "url": "#trigger-data", "export": true, "normative": true, "for_": []};
+window.refsData['#triggering-event'] = {"text": "triggering event", "type": "dfn", "spec": "private-click-measurement", "shortname": "private-click-measurement", "level": "", "status": "local", "url": "#triggering-event", "export": true, "normative": true, "for_": []};
+window.refsData['#click-source-attribute-on-pair'] = {"text": "click source-attribute-on pair", "type": "dfn", "spec": "private-click-measurement", "shortname": "private-click-measurement", "level": "", "status": "local", "url": "#click-source-attribute-on-pair", "export": true, "normative": true, "for_": []};
+window.refsData['#attribution-report'] = {"text": "attribution report", "type": "dfn", "spec": "private-click-measurement", "shortname": "private-click-measurement", "level": "", "status": "local", "url": "#attribution-report", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/text-level-semantics.html#htmlanchorelement'] = {"text": "HTMLAnchorElement", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/text-level-semantics.html#htmlanchorelement", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/custom-elements.html#cereactions'] = {"text": "CEReactions", "type": "extended-attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/custom-elements.html#cereactions", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-long'] = {"text": "unsigned long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-long", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-htmlanchorelement-attributionsourceid'] = {"text": "attributionSourceId", "type": "attribute", "spec": "private-click-measurement", "shortname": "private-click-measurement", "level": "", "status": "local", "url": "#dom-htmlanchorelement-attributionsourceid", "export": true, "normative": true, "for_": ["HTMLAnchorElement"]};
+window.refsData['#dom-htmlanchorelement-attributiondestination'] = {"text": "attributionDestination", "type": "attribute", "spec": "private-click-measurement", "shortname": "private-click-measurement", "level": "", "status": "local", "url": "#dom-htmlanchorelement-attributiondestination", "export": true, "normative": true, "for_": ["HTMLAnchorElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/links.html#htmlhyperlinkelementutils'] = {"text": "HTMLHyperlinkElementUtils", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/links.html#htmlhyperlinkelementutils", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#tuple'] = {"text": "tuple", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#tuple", "export": true, "normative": true, "for_": []};
+window.refsData['#generate-a-tiggering-event-url'] = {"text": "generate a tiggering event url", "type": "dfn", "spec": "private-click-measurement", "shortname": "private-click-measurement", "level": "", "status": "local", "url": "#generate-a-tiggering-event-url", "export": true, "normative": true, "for_": []};
+window.refsData['#optional-trigger-priority'] = {"text": "optional trigger priority", "type": "dfn", "spec": "private-click-measurement", "shortname": "private-click-measurement", "level": "", "status": "local", "url": "#optional-trigger-priority", "export": true, "normative": true, "for_": []};
+window.refsData['#generate-an-attribution-report-url'] = {"text": "generate an attribution report url", "type": "dfn", "spec": "private-click-measurement", "shortname": "private-click-measurement", "level": "", "status": "local", "url": "#generate-an-attribution-report-url", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#string-concatenate'] = {"text": "concatenate", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#string-concatenate", "export": true, "normative": true, "for_": ["string"]};
+window.refsData['https://url.spec.whatwg.org/#dom-url-url'] = {"text": "URL(url, base)", "type": "constructor", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#dom-url-url", "export": true, "normative": true, "for_": ["URL"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#site'] = {"text": "site", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#site", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#string'] = {"text": "string", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#string", "export": true, "normative": true, "for_": []};
+window.refsData['#extract-a-four-bit-decimal-value'] = {"text": "extract a four-bit decimal value", "type": "dfn", "spec": "private-click-measurement", "shortname": "private-click-measurement", "level": "", "status": "local", "url": "#extract-a-four-bit-decimal-value", "export": true, "normative": true, "for_": []};
+window.refsData['#extract-a-six-bit-decimal-value'] = {"text": "extract a six-bit decimal value", "type": "dfn", "spec": "private-click-measurement", "shortname": "private-click-measurement", "level": "", "status": "local", "url": "#extract-a-six-bit-decimal-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#string-length'] = {"text": "length", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#string-length", "export": true, "normative": true, "for_": ["string", "JavaScript string", "scalar value string"]};
+window.refsData['https://infra.spec.whatwg.org/#code-unit'] = {"text": "code unit", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#code-unit", "export": true, "normative": true, "for_": []};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

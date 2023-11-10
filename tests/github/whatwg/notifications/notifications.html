@@ -20,6 +20,43 @@ a[href].issue-return {
     text-decoration: none;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
  <body class="h-entry status-LS">
   <div class="head">
     <a class="logo" href="https://whatwg.org/"> <img alt="WHATWG" crossorigin height="100" src="https://resources.whatwg.org/logo-notifications.svg"> </a> 
@@ -1808,8 +1845,6 @@ if ("serviceWorker" in navigator) {
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -2057,7 +2092,6 @@ if ("serviceWorker" in navigator) {
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -2581,4 +2615,350 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#concept-notification'] = {"text": "notification", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#concept-notification", "export": true, "normative": true, "for_": []};
+window.refsData['#show-steps'] = {"text": "show steps", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#show-steps", "export": true, "normative": true, "for_": []};
+window.refsData['#tag'] = {"text": "tag", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#tag", "export": true, "normative": true, "for_": ["notification"]};
+window.refsData['#image-resource'] = {"text": "image resource", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#image-resource", "export": true, "normative": true, "for_": ["notification"]};
+window.refsData['#icon-resource'] = {"text": "icon resource", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#icon-resource", "export": true, "normative": true, "for_": ["notification"]};
+window.refsData['#badge-resource'] = {"text": "badge resource", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#badge-resource", "export": true, "normative": true, "for_": ["notification"]};
+window.refsData['#vibration-pattern'] = {"text": "vibration pattern", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#vibration-pattern", "export": true, "normative": true, "for_": ["notification"]};
+window.refsData['#actions'] = {"text": "action", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#actions", "export": true, "normative": true, "for_": ["notification"]};
+window.refsData['#action-icon-resource'] = {"text": "icon resource", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#action-icon-resource", "export": true, "normative": true, "for_": ["action"]};
+window.refsData['#service-worker-registration'] = {"text": "service worker registration", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#service-worker-registration", "export": true, "normative": true, "for_": ["notification"]};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-throw'] = {"text": "throw", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-throw", "export": true, "normative": true, "for_": ["exception"]};
+window.refsData['#persistent-notification'] = {"text": "persistent notification", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#persistent-notification", "export": true, "normative": true, "for_": []};
+window.refsData['#data'] = {"text": "data", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#data", "export": true, "normative": true, "for_": ["notification"]};
+window.refsData['https://html.spec.whatwg.org/multipage/structured-data.html#structuredserializeforstorage'] = {"text": "StructuredSerializeForStorage", "type": "abstract-op", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/structured-data.html#structuredserializeforstorage", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-title'] = {"text": "title", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#concept-title", "export": true, "normative": true, "for_": ["notification"]};
+window.refsData['#concept-direction'] = {"text": "direction", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#concept-direction", "export": true, "normative": true, "for_": ["notification"]};
+window.refsData['#concept-language'] = {"text": "language", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#concept-language", "export": true, "normative": true, "for_": ["notification"]};
+window.refsData['#concept-origin'] = {"text": "origin", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#concept-origin", "export": true, "normative": true, "for_": ["notification"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#entry-settings-object'] = {"text": "entry settings object", "type": "dfn", "spec": "", "shortname": "notifications", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#entry-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-origin'] = {"text": "origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-origin", "export": true, "normative": true, "for_": ["environment settings object"]};
+window.refsData['#body'] = {"text": "body", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#body", "export": true, "normative": true, "for_": ["notification"]};
+window.refsData['https://url.spec.whatwg.org/#concept-url-parser'] = {"text": "url parser", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-parser", "export": true, "normative": true, "for_": []};
+window.refsData['#image-url'] = {"text": "image url", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#image-url", "export": true, "normative": true, "for_": ["notification"]};
+window.refsData['#icon-url'] = {"text": "icon url", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#icon-url", "export": true, "normative": true, "for_": ["notification"]};
+window.refsData['#badge-url'] = {"text": "badge url", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#badge-url", "export": true, "normative": true, "for_": ["notification"]};
+window.refsData['https://w3c.github.io/vibration/#dfn-validate-and-normalize'] = {"text": "validate and normalize", "type": "dfn", "spec": "", "shortname": "notifications", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/vibration/#dfn-validate-and-normalize", "export": true, "normative": true, "for_": []};
+window.refsData['#timestamp'] = {"text": "timestamp", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#timestamp", "export": true, "normative": true, "for_": ["notification"]};
+window.refsData['#renotify-preference-flag'] = {"text": "renotify preference flag", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#renotify-preference-flag", "export": true, "normative": true, "for_": ["notification"]};
+window.refsData['#silent-preference-flag'] = {"text": "silent preference flag", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#silent-preference-flag", "export": true, "normative": true, "for_": ["notification"]};
+window.refsData['#require-interaction-preference-flag'] = {"text": "require interaction preference flag", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#require-interaction-preference-flag", "export": true, "normative": true, "for_": ["notification"]};
+window.refsData['#maximum-number-of-actions'] = {"text": "maximum number of actions", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#maximum-number-of-actions", "export": true, "normative": true, "for_": []};
+window.refsData['#action-name'] = {"text": "name", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#action-name", "export": true, "normative": true, "for_": ["action"]};
+window.refsData['#action-title'] = {"text": "title", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#action-title", "export": true, "normative": true, "for_": ["action"]};
+window.refsData['#action-icon-url'] = {"text": "icon url", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#action-icon-url", "export": true, "normative": true, "for_": ["action"]};
+window.refsData['https://infra.spec.whatwg.org/#list'] = {"text": "list", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list", "export": true, "normative": true, "for_": []};
+window.refsData['#close-steps'] = {"text": "close steps", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#close-steps", "export": true, "normative": true, "for_": []};
+window.refsData['#non-persistent-notification'] = {"text": "non-persistent notification", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#non-persistent-notification", "export": true, "normative": true, "for_": []};
+window.refsData['#list-of-notifications'] = {"text": "list of notifications", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#list-of-notifications", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-notification-close'] = {"text": "close()", "type": "method", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-notification-close", "export": true, "normative": true, "for_": ["Notification"]};
+window.refsData['#notification'] = {"text": "Notification", "type": "interface", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#notification", "export": true, "normative": true, "for_": []};
+window.refsData['#permission'] = {"text": "permission", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#permission", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#concept-origin'] = {"text": "origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-origin", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-fetch'] = {"text": "fetch", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-fetch", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel'] = {"text": "in parallel", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response'] = {"text": "response", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-internal-response'] = {"text": "internal response", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-internal-response", "export": true, "normative": true, "for_": ["filtered response"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response-type'] = {"text": "type", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response-type", "export": true, "normative": true, "for_": ["response"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#same-origin'] = {"text": "same origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#same-origin", "export": true, "normative": true, "for_": []};
+window.refsData['#handle-close-events'] = {"text": "handle close events", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#handle-close-events", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-replace'] = {"text": "replace", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-replace", "export": true, "normative": true, "for_": ["list"]};
+window.refsData['https://infra.spec.whatwg.org/#list-remove'] = {"text": "remove", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-remove", "export": true, "normative": true, "for_": ["list", "set"]};
+window.refsData['https://infra.spec.whatwg.org/#list-append'] = {"text": "append", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-append", "export": true, "normative": true, "for_": ["list"]};
+window.refsData['#alert-steps'] = {"text": "alert steps", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#alert-steps", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task'] = {"text": "queue a task", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-event-fire'] = {"text": "fire an event", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-event-fire", "export": true, "normative": true, "for_": []};
+window.refsData['#fire-a-service-worker-notification-event'] = {"text": "fire a service worker notification event", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#fire-a-service-worker-notification-event", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#dom-event-cancelable'] = {"text": "cancelable", "type": "attribute", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-event-cancelable", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#dom-window-focus'] = {"text": "focus()", "type": "method", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/interaction.html#dom-window-focus", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#browsing-context'] = {"text": "browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-contain'] = {"text": "contain", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-contain", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['https://w3c.github.io/vibration/#dfn-perform-vibration'] = {"text": "perform vibration", "type": "dfn", "spec": "", "shortname": "notifications", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/vibration/#dfn-perform-vibration", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#eventtarget'] = {"text": "EventTarget", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#eventtarget", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-notification-notification'] = {"text": "Notification(title, options)", "type": "constructor", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-notification-notification", "export": true, "normative": true, "for_": ["Notification"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-notificationoptions'] = {"text": "NotificationOptions", "type": "dictionary", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dictdef-notificationoptions", "export": true, "normative": true, "for_": []};
+window.refsData['#enumdef-notificationpermission'] = {"text": "NotificationPermission", "type": "enum", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#enumdef-notificationpermission", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-notification-permission'] = {"text": "permission", "type": "attribute", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-notification-permission", "export": true, "normative": true, "for_": ["Notification"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-promise'] = {"text": "Promise", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-promise", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-notification-requestpermission'] = {"text": "requestPermission(deprecatedCallback)", "type": "method", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-notification-requestpermission", "export": true, "normative": true, "for_": ["Notification"]};
+window.refsData['#callbackdef-notificationpermissioncallback'] = {"text": "NotificationPermissionCallback", "type": "callback", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#callbackdef-notificationpermissioncallback", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-long'] = {"text": "unsigned long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-long", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-notification-maxactions'] = {"text": "maxActions", "type": "attribute", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-notification-maxactions", "export": true, "normative": true, "for_": ["Notification"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler'] = {"text": "EventHandler", "type": "typedef", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-notification-onclick'] = {"text": "onclick", "type": "attribute", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-notification-onclick", "export": true, "normative": true, "for_": ["Notification"]};
+window.refsData['#dom-notification-onshow'] = {"text": "onshow", "type": "attribute", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-notification-onshow", "export": true, "normative": true, "for_": ["Notification"]};
+window.refsData['#dom-notification-onerror'] = {"text": "onerror", "type": "attribute", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-notification-onerror", "export": true, "normative": true, "for_": ["Notification"]};
+window.refsData['#dom-notification-onclose'] = {"text": "onclose", "type": "attribute", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-notification-onclose", "export": true, "normative": true, "for_": ["Notification"]};
+window.refsData['#dom-notification-title'] = {"text": "title", "type": "attribute", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-notification-title", "export": true, "normative": true, "for_": ["Notification"]};
+window.refsData['#enumdef-notificationdirection'] = {"text": "NotificationDirection", "type": "enum", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#enumdef-notificationdirection", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-notification-dir'] = {"text": "dir", "type": "attribute", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-notification-dir", "export": true, "normative": true, "for_": ["Notification"]};
+window.refsData['#dom-notification-lang'] = {"text": "lang", "type": "attribute", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-notification-lang", "export": true, "normative": true, "for_": ["Notification"]};
+window.refsData['#dom-notification-body'] = {"text": "body", "type": "attribute", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-notification-body", "export": true, "normative": true, "for_": ["Notification"]};
+window.refsData['#dom-notification-tag'] = {"text": "tag", "type": "attribute", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-notification-tag", "export": true, "normative": true, "for_": ["Notification"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-USVString'] = {"text": "USVString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-USVString", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-notification-image'] = {"text": "image", "type": "attribute", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-notification-image", "export": true, "normative": true, "for_": ["Notification"]};
+window.refsData['#dom-notification-icon'] = {"text": "icon", "type": "attribute", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-notification-icon", "export": true, "normative": true, "for_": ["Notification"]};
+window.refsData['#dom-notification-badge'] = {"text": "badge", "type": "attribute", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-notification-badge", "export": true, "normative": true, "for_": ["Notification"]};
+window.refsData['https://webidl.spec.whatwg.org/#SameObject'] = {"text": "SameObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SameObject", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-frozen-array'] = {"text": "FrozenArray", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-frozen-array", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-notification-vibrate'] = {"text": "vibrate", "type": "attribute", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-notification-vibrate", "export": true, "normative": true, "for_": ["Notification"]};
+window.refsData['#dom-notification-timestamp'] = {"text": "timestamp", "type": "attribute", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-notification-timestamp", "export": true, "normative": true, "for_": ["Notification"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-notification-renotify'] = {"text": "renotify", "type": "attribute", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-notification-renotify", "export": true, "normative": true, "for_": ["Notification"]};
+window.refsData['#dom-notification-silent'] = {"text": "silent", "type": "attribute", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-notification-silent", "export": true, "normative": true, "for_": ["Notification"]};
+window.refsData['#dom-notification-requireinteraction'] = {"text": "requireInteraction", "type": "attribute", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-notification-requireinteraction", "export": true, "normative": true, "for_": ["Notification"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-any'] = {"text": "any", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-any", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-notification-data'] = {"text": "data", "type": "attribute", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-notification-data", "export": true, "normative": true, "for_": ["Notification"]};
+window.refsData['#dictdef-notificationaction'] = {"text": "NotificationAction", "type": "dictionary", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dictdef-notificationaction", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-notification-actions'] = {"text": "actions", "type": "attribute", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-notification-actions", "export": true, "normative": true, "for_": ["Notification"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/vibration/#idl-def-vibratepattern'] = {"text": "VibratePattern", "type": "interface", "spec": "", "shortname": "notifications", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/vibration/#idl-def-vibratepattern", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-serviceworkerregistration-shownotification'] = {"text": "showNotification(title)", "type": "method", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-serviceworkerregistration-shownotification", "export": true, "normative": true, "for_": ["ServiceWorkerRegistration"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-event-listener'] = {"text": "event listener", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-event-listener", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#current-global-object'] = {"text": "current global object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#current-global-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#serviceworkerglobalscope'] = {"text": "ServiceWorkerGlobalScope", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#serviceworkerglobalscope", "export": true, "normative": true, "for_": []};
+window.refsData['#create-a-notification'] = {"text": "creating a notification", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#create-a-notification", "export": true, "normative": true, "for_": []};
+window.refsData['#fetch-steps'] = {"text": "fetch steps", "type": "dfn", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#fetch-steps", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#report-the-exception'] = {"text": "report the exception", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#report-the-exception", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-handlers'] = {"text": "event handler", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-handlers", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-event-type'] = {"text": "event handler event type", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-event-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#concept-url-serializer'] = {"text": "url serializer", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-serializer", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/structured-data.html#structureddeserialize'] = {"text": "StructuredDeserialize", "type": "abstract-op", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/structured-data.html#structureddeserialize", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-realm'] = {"text": "relevant realm", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-realm", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-notificationaction-action'] = {"text": "action", "type": "dict-member", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-notificationaction-action", "export": true, "normative": true, "for_": ["NotificationAction"]};
+window.refsData['#dom-notificationaction-title'] = {"text": "title", "type": "dict-member", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-notificationaction-title", "export": true, "normative": true, "for_": ["NotificationAction"]};
+window.refsData['#dom-notificationaction-icon'] = {"text": "icon", "type": "dict-member", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-notificationaction-icon", "export": true, "normative": true, "for_": ["NotificationAction"]};
+window.refsData['https://tc39.github.io/ecma262/#sec-object.freeze'] = {"text": "freeze", "type": "dfn", "spec": "", "shortname": "notifications", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-object.freeze", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-create-frozen-array'] = {"text": "create a frozen array", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-create-frozen-array", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#serviceworkerregistration'] = {"text": "ServiceWorkerRegistration", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#serviceworkerregistration", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-serviceworkerregistration-getnotifications'] = {"text": "getNotifications(filter)", "type": "method", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-serviceworkerregistration-getnotifications", "export": true, "normative": true, "for_": ["ServiceWorkerRegistration"]};
+window.refsData['#dictdef-getnotificationoptions'] = {"text": "GetNotificationOptions", "type": "dictionary", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dictdef-getnotificationoptions", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#extendableevent'] = {"text": "ExtendableEvent", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#extendableevent", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-notificationeventinit'] = {"text": "NotificationEventInit", "type": "dictionary", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dictdef-notificationeventinit", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#dictdef-extendableeventinit'] = {"text": "ExtendableEventInit", "type": "dictionary", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#dictdef-extendableeventinit", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-serviceworkerglobalscope-onnotificationclick'] = {"text": "onnotificationclick", "type": "attribute", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-serviceworkerglobalscope-onnotificationclick", "export": true, "normative": true, "for_": ["ServiceWorkerGlobalScope"]};
+window.refsData['#dom-serviceworkerglobalscope-onnotificationclose'] = {"text": "onnotificationclose", "type": "attribute", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-serviceworkerglobalscope-onnotificationclose", "export": true, "normative": true, "for_": ["ServiceWorkerGlobalScope"]};
+window.refsData['https://w3c.github.io/ServiceWorker/#dfn-active-worker'] = {"text": "active worker", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#dfn-active-worker", "export": true, "normative": true, "for_": ["service worker registration"]};
+window.refsData['https://infra.spec.whatwg.org/#list-iterate'] = {"text": "for each", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-iterate", "export": true, "normative": true, "for_": ["list", "set"]};
+window.refsData['https://w3c.github.io/ServiceWorker/#fire-functional-event'] = {"text": "fire functional event", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#fire-functional-event", "export": true, "normative": true, "for_": []};
+window.refsData['#notificationevent'] = {"text": "NotificationEvent", "type": "interface", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#notificationevent", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-notificationevent-notification'] = {"text": "notification", "type": "attribute", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-notificationevent-notification", "export": true, "normative": true, "for_": ["NotificationEvent"]};
+window.refsData['#dom-notificationevent-action'] = {"text": "action", "type": "attribute", "spec": "notifications", "shortname": "notifications", "level": "", "status": "local", "url": "#dom-notificationevent-action", "export": true, "normative": true, "for_": ["NotificationEvent"]};
 </script>

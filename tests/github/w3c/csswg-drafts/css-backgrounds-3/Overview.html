@@ -469,6 +469,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -4307,8 +4344,6 @@ the earlier definition.</p>
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -4556,7 +4591,6 @@ the earlier definition.</p>
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -5035,4 +5069,389 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#propdef-box-shadow'] = {"text": "box-shadow", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-box-shadow", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border'] = {"text": "border", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-ruby-1/#ruby-base-container-box'] = {"text": "ruby base container", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "snapshot", "url": "https://www.w3.org/TR/css-ruby-1/#ruby-base-container-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-ruby-1/#ruby-annotation-container-box'] = {"text": "ruby annotation container", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "snapshot", "url": "https://www.w3.org/TR/css-ruby-1/#ruby-annotation-container-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-break-4/#propdef-box-decoration-break'] = {"text": "box-decoration-break", "type": "property", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-break-4/#propdef-box-decoration-break", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-image'] = {"text": "border-image", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-image", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-values-4/#css-wide-keywords'] = {"text": "css-wide keywords", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-4/#css-wide-keywords", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-background-color'] = {"text": "background-color", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-background-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-background-image'] = {"text": "background-image", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-background-image", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-background-image-none'] = {"text": "none", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-background-image-none", "export": true, "normative": true, "for_": ["background-image"]};
+window.refsData['#propdef-background-origin'] = {"text": "background-origin", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-background-origin", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-background-repeat'] = {"text": "background-repeat", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-background-repeat", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-color-4/#typedef-color'] = {"text": "<color>", "type": "type", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-color-4/#typedef-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-background-clip'] = {"text": "background-clip", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-background-clip", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-bg-image'] = {"text": "<bg-image>", "type": "type", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#typedef-bg-image", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-images-3/#typedef-image'] = {"text": "<image>", "type": "type", "spec": "css-images-3", "shortname": "css-images", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-images-3/#typedef-image", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-repeat-style'] = {"text": "<repeat-style>", "type": "type", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#typedef-repeat-style", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-values-4/#mult-num-range'] = {"text": "{a,b}", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-4/#mult-num-range", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-background-repeat-repeat'] = {"text": "repeat", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-background-repeat-repeat", "export": true, "normative": true, "for_": ["background-repeat"]};
+window.refsData['#valdef-background-repeat-space'] = {"text": "space", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-background-repeat-space", "export": true, "normative": true, "for_": ["background-repeat"]};
+window.refsData['#valdef-background-repeat-round'] = {"text": "round", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-background-repeat-round", "export": true, "normative": true, "for_": ["background-repeat"]};
+window.refsData['#valdef-background-repeat-no-repeat'] = {"text": "no-repeat", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-background-repeat-no-repeat", "export": true, "normative": true, "for_": ["background-repeat"]};
+window.refsData['#propdef-background-position'] = {"text": "background-position", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-background-position", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-background-size'] = {"text": "background-size", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-background-size", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-background-repeat-repeat-y'] = {"text": "repeat-y", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-background-repeat-repeat-y", "export": true, "normative": true, "for_": ["background-repeat"]};
+window.refsData['#propdef-background-attachment'] = {"text": "background-attachment", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-background-attachment", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-attachment'] = {"text": "<attachment>", "type": "type", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#typedef-attachment", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-background-attachment-fixed'] = {"text": "fixed", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-background-attachment-fixed", "export": true, "normative": true, "for_": ["background-attachment"]};
+window.refsData['#valdef-background-attachment-scroll'] = {"text": "scroll", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-background-attachment-scroll", "export": true, "normative": true, "for_": ["background-attachment"]};
+window.refsData['#valdef-background-attachment-local'] = {"text": "local", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-background-attachment-local", "export": true, "normative": true, "for_": ["background-attachment"]};
+window.refsData['#background-painting-area'] = {"text": "background painting area", "type": "dfn", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#background-painting-area", "export": true, "normative": true, "for_": []};
+window.refsData['#background-positioning-area'] = {"text": "background positioning area", "type": "dfn", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#background-positioning-area", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-background-clip-border-box'] = {"text": "border-box", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-background-clip-border-box", "export": true, "normative": true, "for_": ["background-clip"]};
+window.refsData['#valdef-background-clip-padding-box'] = {"text": "padding-box", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-background-clip-padding-box", "export": true, "normative": true, "for_": ["background-clip"]};
+window.refsData['#typedef-bg-position'] = {"text": "<bg-position>", "type": "type", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#typedef-bg-position", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-values-4/#typedef-length-percentage'] = {"text": "<length-percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-4/#typedef-length-percentage", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-values-4/#mult-opt'] = {"text": "?", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-4/#mult-opt", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-values-4/#comb-all'] = {"text": "&&", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-4/#comb-all", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-background-position-center'] = {"text": "center", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-background-position-center", "export": true, "normative": true, "for_": ["background-position"]};
+window.refsData['https://www.w3.org/TR/css-values-4/#percentage-value'] = {"text": "<percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-4/#percentage-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-values-4/#length-value'] = {"text": "<length>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-4/#length-value", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-background-position-top'] = {"text": "top", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-background-position-top", "export": true, "normative": true, "for_": ["background-position"]};
+window.refsData['#valdef-background-position-right'] = {"text": "right", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-background-position-right", "export": true, "normative": true, "for_": ["background-position"]};
+window.refsData['#valdef-background-position-bottom'] = {"text": "bottom", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-background-position-bottom", "export": true, "normative": true, "for_": ["background-position"]};
+window.refsData['#valdef-background-position-left'] = {"text": "left", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-background-position-left", "export": true, "normative": true, "for_": ["background-position"]};
+window.refsData['#propdef-background'] = {"text": "background", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-background", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-box'] = {"text": "<box>", "type": "type", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#typedef-box", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-radius'] = {"text": "border-radius", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-radius", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-background-origin-border-box'] = {"text": "border-box", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-background-origin-border-box", "export": true, "normative": true, "for_": ["background-origin"]};
+window.refsData['#typedef-bg-size'] = {"text": "<bg-size>", "type": "type", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#typedef-bg-size", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-images-3/#natural-aspect-ratio'] = {"text": "natural aspect ratio", "type": "dfn", "spec": "css-images-3", "shortname": "css-images", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-images-3/#natural-aspect-ratio", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-background-size-auto'] = {"text": "auto", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-background-size-auto", "export": true, "normative": true, "for_": ["background-size"]};
+window.refsData['https://www.w3.org/TR/css-images-3/#natural-size'] = {"text": "natural size", "type": "dfn", "spec": "css-images-3", "shortname": "css-images", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-images-3/#natural-size", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-images-3/#natural-width'] = {"text": "natural width", "type": "dfn", "spec": "css-images-3", "shortname": "css-images", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-images-3/#natural-width", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-images-3/#natural-height'] = {"text": "natural height", "type": "dfn", "spec": "css-images-3", "shortname": "css-images", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-images-3/#natural-height", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-background-size-contain'] = {"text": "contain", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-background-size-contain", "export": true, "normative": true, "for_": ["background-size"]};
+window.refsData['#typedef-bg-layer'] = {"text": "<bg-layer>", "type": "type", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#typedef-bg-layer", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-final-bg-layer'] = {"text": "<final-bg-layer>", "type": "type", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#typedef-final-bg-layer", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-values-4/#comb-any'] = {"text": "||", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-4/#comb-any", "export": true, "normative": true, "for_": []};
+window.refsData['#canvas-background'] = {"text": "canvas background", "type": "dfn", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#canvas-background", "export": true, "normative": true, "for_": []};
+window.refsData['#canvas-surface'] = {"text": "canvas surface", "type": "dfn", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#canvas-surface", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/selectors-3/#sel-first-line'] = {"text": "::first-line", "type": "selector", "spec": "selectors-3", "shortname": "selectors", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/selectors-3/#sel-first-line", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-style'] = {"text": "border-style", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-style", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-color'] = {"text": "border-color", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-width'] = {"text": "border-width", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-width", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-top-color'] = {"text": "border-top-color", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-top-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-right-color'] = {"text": "border-right-color", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-right-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-bottom-color'] = {"text": "border-bottom-color", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-bottom-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-left-color'] = {"text": "border-left-color", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-left-color", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-line-style'] = {"text": "<line-style>", "type": "type", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#typedef-line-style", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-top-style'] = {"text": "border-top-style", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-top-style", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-right-style'] = {"text": "border-right-style", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-right-style", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-bottom-style'] = {"text": "border-bottom-style", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-bottom-style", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-left-style'] = {"text": "border-left-style", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-left-style", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-image-width'] = {"text": "border-image-width", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-image-width", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-line-style-none'] = {"text": "none", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-line-style-none", "export": true, "normative": true, "for_": ["<line-style>", "border", "border-bottom-style", "border-left-style", "border-right-style", "border-style", "border-top-style"]};
+window.refsData['#valdef-line-style-ridge'] = {"text": "ridge", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-line-style-ridge", "export": true, "normative": true, "for_": ["<line-style>", "border", "border-bottom-style", "border-left-style", "border-right-style", "border-style", "border-top-style"]};
+window.refsData['#valdef-line-style-groove'] = {"text": "groove", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-line-style-groove", "export": true, "normative": true, "for_": ["<line-style>", "border", "border-bottom-style", "border-left-style", "border-right-style", "border-style", "border-top-style"]};
+window.refsData['#valdef-line-style-inset'] = {"text": "inset", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-line-style-inset", "export": true, "normative": true, "for_": ["<line-style>", "border", "border-bottom-style", "border-left-style", "border-right-style", "border-style", "border-top-style"]};
+window.refsData['#valdef-line-style-outset'] = {"text": "outset", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-line-style-outset", "export": true, "normative": true, "for_": ["<line-style>", "border", "border-bottom-style", "border-left-style", "border-right-style", "border-style", "border-top-style"]};
+window.refsData['#typedef-line-width'] = {"text": "<line-width>", "type": "type", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#typedef-line-width", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-line-style-hidden'] = {"text": "hidden", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-line-style-hidden", "export": true, "normative": true, "for_": ["<line-style>", "border", "border-bottom-style", "border-left-style", "border-right-style", "border-style", "border-top-style"]};
+window.refsData['#valdef-line-width-medium'] = {"text": "medium", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-line-width-medium", "export": true, "normative": true, "for_": ["<line-width>", "border", "border-bottom-width", "border-left-width", "border-right-width", "border-top-width", "border-width"]};
+window.refsData['#propdef-border-top-width'] = {"text": "border-top-width", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-top-width", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-right-width'] = {"text": "border-right-width", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-right-width", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-bottom-width'] = {"text": "border-bottom-width", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-bottom-width", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-left-width'] = {"text": "border-left-width", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-left-width", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-box-4/#propdef-margin'] = {"text": "margin", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-box-4/#propdef-margin", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-box-4/#propdef-padding'] = {"text": "padding", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-box-4/#propdef-padding", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-left'] = {"text": "border-left", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-left", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-box-4/#border-box'] = {"text": "border box", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-box-4/#border-box", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-top-left-radius'] = {"text": "border-top-left-radius", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-top-left-radius", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-line-style-solid'] = {"text": "solid", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-line-style-solid", "export": true, "normative": true, "for_": ["<line-style>", "border", "border-bottom-style", "border-left-style", "border-right-style", "border-style", "border-top-style"]};
+window.refsData['#valdef-line-style-dotted'] = {"text": "dotted", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-line-style-dotted", "export": true, "normative": true, "for_": ["<line-style>", "border", "border-bottom-style", "border-left-style", "border-right-style", "border-style", "border-top-style"]};
+window.refsData['#border-radii'] = {"text": "border radius", "type": "dfn", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#border-radii", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-display-3/#replaced-element'] = {"text": "replaced element", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-display-3/#replaced-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css2/#propdef-border-collapse'] = {"text": "border-collapse", "type": "property", "spec": "css22", "shortname": "css", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css2/#propdef-border-collapse", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css2/#valdef-border-collapse-collapse'] = {"text": "collapse", "type": "value", "spec": "css22", "shortname": "css", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css2/#valdef-border-collapse-collapse", "export": true, "normative": true, "for_": ["border-collapse"]};
+window.refsData['#propdef-border-image-source'] = {"text": "border-image-source", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-image-source", "export": true, "normative": true, "for_": []};
+window.refsData['#border-image-area'] = {"text": "border image area", "type": "dfn", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#border-image-area", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-image-slice'] = {"text": "border-image-slice", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-image-slice", "export": true, "normative": true, "for_": []};
+window.refsData['#border-image-slice-fill'] = {"text": "fill", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#border-image-slice-fill", "export": true, "normative": true, "for_": ["border-image-slice"]};
+window.refsData['https://www.w3.org/TR/css-values-4/#number-value'] = {"text": "<number>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-4/#number-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-images-3/#natural-dimensions'] = {"text": "natural dimension", "type": "dfn", "spec": "css-images-3", "shortname": "css-images", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-images-3/#natural-dimensions", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-images-3/#specified-size'] = {"text": "specified size", "type": "dfn", "spec": "css-images-3", "shortname": "css-images", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-images-3/#specified-size", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-images-3/#default-object-size'] = {"text": "default object size", "type": "dfn", "spec": "css-images-3", "shortname": "css-images", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-images-3/#default-object-size", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-border-image-width-auto'] = {"text": "auto", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-border-image-width-auto", "export": true, "normative": true, "for_": ["border-image-width"]};
+window.refsData['#propdef-border-image-outset'] = {"text": "border-image-outset", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-image-outset", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-image-repeat'] = {"text": "border-image-repeat", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-image-repeat", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-border-image-repeat-stretch'] = {"text": "stretch", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-border-image-repeat-stretch", "export": true, "normative": true, "for_": ["border-image-repeat"]};
+window.refsData['#valdef-border-image-repeat-round'] = {"text": "round", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-border-image-repeat-round", "export": true, "normative": true, "for_": ["border-image-repeat"]};
+window.refsData['#valdef-border-image-repeat-repeat'] = {"text": "repeat", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-border-image-repeat-repeat", "export": true, "normative": true, "for_": ["border-image-repeat"]};
+window.refsData['#valdef-border-image-repeat-space'] = {"text": "space", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-border-image-repeat-space", "export": true, "normative": true, "for_": ["border-image-repeat"]};
+window.refsData['#typedef-shadow'] = {"text": "<shadow>", "type": "type", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#typedef-shadow", "export": true, "normative": true, "for_": []};
+window.refsData['#box-shadow-none'] = {"text": "none", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#box-shadow-none", "export": true, "normative": true, "for_": ["box-shadow"]};
+window.refsData['#shadow-inset'] = {"text": "inset", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#shadow-inset", "export": true, "normative": true, "for_": ["box-shadow"]};
+window.refsData['https://www.w3.org/TR/css-values-4/#mult-num'] = {"text": "{a}", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-4/#mult-num", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-color-4/#valdef-color-currentcolor'] = {"text": "currentcolor", "type": "value", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-color-4/#valdef-color-currentcolor", "export": true, "normative": true, "for_": ["<color>"]};
+window.refsData['#outer-box-shadow'] = {"text": "outer box-shadow", "type": "dfn", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#outer-box-shadow", "export": true, "normative": true, "for_": []};
+window.refsData['#inner-box-shadow'] = {"text": "inner box-shadow", "type": "dfn", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#inner-box-shadow", "export": true, "normative": true, "for_": []};
+window.refsData['#spread-distance'] = {"text": "spread distance", "type": "dfn", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#spread-distance", "export": true, "normative": true, "for_": []};
+window.refsData['#blur-radius'] = {"text": "blur radius", "type": "dfn", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#blur-radius", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-background-repeat-repeat-x'] = {"text": "repeat-x", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-background-repeat-repeat-x", "export": true, "normative": true, "for_": ["background-repeat"]};
+window.refsData['#propdef-border-top'] = {"text": "border-top", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-top", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-bottom'] = {"text": "border-bottom", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-bottom", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-right'] = {"text": "border-right", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-right", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-text-decor-4/#propdef-text-shadow'] = {"text": "text-shadow", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-text-decor-4/#propdef-text-shadow", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/filter-effects-1/#funcdef-filter-drop-shadow'] = {"text": "drop-shadow()", "type": "function", "spec": "filter-effects-1", "shortname": "filter-effects", "level": "1", "status": "snapshot", "url": "https://www.w3.org/TR/filter-effects-1/#funcdef-filter-drop-shadow", "export": true, "normative": true, "for_": ["filter"]};
+window.refsData['https://www.w3.org/TR/css-values-4/#css-bracketed-range-notation'] = {"text": "css bracketed range notation", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-4/#css-bracketed-range-notation", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-values-3/#typedef-position'] = {"text": "<position>", "type": "type", "spec": "css-values-3", "shortname": "css-values", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-3/#typedef-position", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/selectors-3/#first-letter0'] = {"text": "::first-letter", "type": "selector", "spec": "selectors-3", "shortname": "selectors", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/selectors-3/#first-letter0", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-background-clip-content-box'] = {"text": "content-box", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#valdef-background-clip-content-box", "export": true, "normative": true, "for_": ["background-clip"]};window.refsData['#propdef-background'] = {"text": "background", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-background", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-background-attachment'] = {"text": "background-attachment", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-background-attachment", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-background-clip'] = {"text": "background-clip", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-background-clip", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-background-color'] = {"text": "background-color", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-background-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-background-image'] = {"text": "background-image", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-background-image", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-background-origin'] = {"text": "background-origin", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-background-origin", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-background-position'] = {"text": "background-position", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-background-position", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-background-repeat'] = {"text": "background-repeat", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-background-repeat", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-background-size'] = {"text": "background-size", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-background-size", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border'] = {"text": "border", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-bottom'] = {"text": "border-bottom", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-bottom", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-bottom-color'] = {"text": "border-bottom-color", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-bottom-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-bottom-left-radius'] = {"text": "border-bottom-left-radius", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-bottom-left-radius", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-bottom-right-radius'] = {"text": "border-bottom-right-radius", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-bottom-right-radius", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-bottom-style'] = {"text": "border-bottom-style", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-bottom-style", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-bottom-width'] = {"text": "border-bottom-width", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-bottom-width", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-color'] = {"text": "border-color", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-image'] = {"text": "border-image", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-image", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-image-outset'] = {"text": "border-image-outset", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-image-outset", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-image-repeat'] = {"text": "border-image-repeat", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-image-repeat", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-image-slice'] = {"text": "border-image-slice", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-image-slice", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-image-source'] = {"text": "border-image-source", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-image-source", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-image-width'] = {"text": "border-image-width", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-image-width", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-left'] = {"text": "border-left", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-left", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-left-color'] = {"text": "border-left-color", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-left-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-left-style'] = {"text": "border-left-style", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-left-style", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-left-width'] = {"text": "border-left-width", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-left-width", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-radius'] = {"text": "border-radius", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-radius", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-right'] = {"text": "border-right", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-right", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-right-color'] = {"text": "border-right-color", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-right-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-right-style'] = {"text": "border-right-style", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-right-style", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-right-width'] = {"text": "border-right-width", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-right-width", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-style'] = {"text": "border-style", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-style", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-top'] = {"text": "border-top", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-top", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-top-color'] = {"text": "border-top-color", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-top-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-top-left-radius'] = {"text": "border-top-left-radius", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-top-left-radius", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-top-right-radius'] = {"text": "border-top-right-radius", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-top-right-radius", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-top-style'] = {"text": "border-top-style", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-top-style", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-top-width'] = {"text": "border-top-width", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-top-width", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-width'] = {"text": "border-width", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-border-width", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-box-shadow'] = {"text": "box-shadow", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "local", "url": "#propdef-box-shadow", "export": true, "normative": true, "for_": []};
 </script>

@@ -471,6 +471,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -1905,8 +1942,6 @@ based on the device’s display.</p>
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -2154,7 +2189,6 @@ based on the device’s display.</p>
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -2621,4 +2655,337 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://www.w3.org/TR/media-source/#dom-mediasource-istypesupported'] = {"text": "isTypeSupported()", "type": "method", "spec": "media-source", "shortname": "media-source", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/media-source/#dom-mediasource-istypesupported", "export": true, "normative": true, "for_": ["MediaSource"]};
+window.refsData['https://html.spec.whatwg.org/multipage/#dom-navigator-canplaytype'] = {"text": "canPlayType()", "type": "method", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/#dom-navigator-canplaytype", "export": true, "normative": true, "for_": ["HTMLMediaElement"]};
+window.refsData['#dictdef-videoconfiguration'] = {"text": "VideoConfiguration", "type": "dictionary", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dictdef-videoconfiguration", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-audioconfiguration'] = {"text": "AudioConfiguration", "type": "dictionary", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dictdef-audioconfiguration", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-mediaconfiguration'] = {"text": "MediaConfiguration", "type": "dictionary", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dictdef-mediaconfiguration", "export": true, "normative": true, "for_": []};
+window.refsData['#enumdef-mediadecodingtype'] = {"text": "MediaDecodingType", "type": "enum", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#enumdef-mediadecodingtype", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-mediacapabilitieskeysystemconfiguration'] = {"text": "MediaCapabilitiesKeySystemConfiguration", "type": "dictionary", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dictdef-mediacapabilitieskeysystemconfiguration", "export": true, "normative": true, "for_": []};
+window.refsData['#enumdef-mediaencodingtype'] = {"text": "MediaEncodingType", "type": "enum", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#enumdef-mediaencodingtype", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-mediadecodingconfiguration'] = {"text": "MediaDecodingConfiguration", "type": "dictionary", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dictdef-mediadecodingconfiguration", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-mediaencodingconfiguration'] = {"text": "MediaEncodingConfiguration", "type": "dictionary", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dictdef-mediaencodingconfiguration", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#map-exists'] = {"text": "exist", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-exists", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['#valid-audio-configuration'] = {"text": "valid audio configuration", "type": "dfn", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#valid-audio-configuration", "export": true, "normative": true, "for_": []};
+window.refsData['#valid-video-configuration'] = {"text": "valid video configuration", "type": "dfn", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#valid-video-configuration", "export": true, "normative": true, "for_": []};
+window.refsData['#valid-mediaconfiguration'] = {"text": "valid mediaconfiguration", "type": "dfn", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#valid-mediaconfiguration", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediadecodingconfiguration-keysystemconfiguration'] = {"text": "keySystemConfiguration", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-mediadecodingconfiguration-keysystemconfiguration", "export": true, "normative": true, "for_": ["MediaDecodingConfiguration"]};
+window.refsData['#dom-mediadecodingtype-file'] = {"text": "\"file\"", "type": "enum-value", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-mediadecodingtype-file", "export": true, "normative": true, "for_": ["MediaDecodingType"]};
+window.refsData['#dom-mediadecodingtype-media-source'] = {"text": "\"media-source\"", "type": "enum-value", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-mediadecodingtype-media-source", "export": true, "normative": true, "for_": ["MediaDecodingType"]};
+window.refsData['#dom-mediadecodingtype-webrtc'] = {"text": "\"webrtc\"", "type": "enum-value", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-mediadecodingtype-webrtc", "export": true, "normative": true, "for_": ["MediaDecodingType"]};
+window.refsData['https://www.w3.org/TR/media-source/#mediasource'] = {"text": "MediaSource", "type": "interface", "spec": "media-source", "shortname": "media-source", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/media-source/#mediasource", "export": true, "normative": true, "for_": ["MediaSource"]};
+window.refsData['https://www.w3.org/TR/webrtc/#interface-definition'] = {"text": "RTCPeerConnection", "type": "interface", "spec": "webrtc", "shortname": "webrtc", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/webrtc/#interface-definition", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediaencodingtype-record'] = {"text": "\"record\"", "type": "enum-value", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-mediaencodingtype-record", "export": true, "normative": true, "for_": ["MediaEncodingType"]};
+window.refsData['#dom-mediaencodingtype-webrtc'] = {"text": "\"webrtc\"", "type": "enum-value", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-mediaencodingtype-webrtc", "export": true, "normative": true, "for_": ["MediaEncodingType"]};
+window.refsData['https://www.w3.org/TR/mediastream-recording/#mediarecorder'] = {"text": "MediaRecorder", "type": "interface", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediastream-recording/#mediarecorder", "export": true, "normative": true, "for_": []};
+window.refsData['https://mimesniff.spec.whatwg.org/#valid-mime-type'] = {"text": "valid mime type", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "anchor-block", "url": "https://mimesniff.spec.whatwg.org/#valid-mime-type", "export": true, "normative": true, "for_": []};
+window.refsData['#valid-media-mime-type'] = {"text": "valid media mime type", "type": "dfn", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#valid-media-mime-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-videoconfiguration-contenttype'] = {"text": "contentType", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-videoconfiguration-contenttype", "export": true, "normative": true, "for_": ["VideoConfiguration"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-long'] = {"text": "unsigned long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-long", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-videoconfiguration-width'] = {"text": "width", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-videoconfiguration-width", "export": true, "normative": true, "for_": ["VideoConfiguration"]};
+window.refsData['#dom-videoconfiguration-height'] = {"text": "height", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-videoconfiguration-height", "export": true, "normative": true, "for_": ["VideoConfiguration"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-long-long'] = {"text": "unsigned long long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-long-long", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-videoconfiguration-bitrate'] = {"text": "bitrate", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-videoconfiguration-bitrate", "export": true, "normative": true, "for_": ["VideoConfiguration"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-double'] = {"text": "double", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-double", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-videoconfiguration-framerate'] = {"text": "framerate", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-videoconfiguration-framerate", "export": true, "normative": true, "for_": ["VideoConfiguration"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-videoconfiguration-hasalphachannel'] = {"text": "hasAlphaChannel", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-videoconfiguration-hasalphachannel", "export": true, "normative": true, "for_": ["VideoConfiguration"]};
+window.refsData['#enumdef-hdrmetadatatype'] = {"text": "HdrMetadataType", "type": "enum", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#enumdef-hdrmetadatatype", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-videoconfiguration-hdrmetadatatype'] = {"text": "hdrMetadataType", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-videoconfiguration-hdrmetadatatype", "export": true, "normative": true, "for_": ["VideoConfiguration"]};
+window.refsData['#enumdef-colorgamut'] = {"text": "ColorGamut", "type": "enum", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#enumdef-colorgamut", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-videoconfiguration-colorgamut'] = {"text": "colorGamut", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-videoconfiguration-colorgamut", "export": true, "normative": true, "for_": ["VideoConfiguration"]};
+window.refsData['#enumdef-transferfunction'] = {"text": "TransferFunction", "type": "enum", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#enumdef-transferfunction", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-videoconfiguration-transferfunction'] = {"text": "transferFunction", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-videoconfiguration-transferfunction", "export": true, "normative": true, "for_": ["VideoConfiguration"]};
+window.refsData['#dom-videoconfiguration-scalabilitymode'] = {"text": "scalabilityMode", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-videoconfiguration-scalabilitymode", "export": true, "normative": true, "for_": ["VideoConfiguration"]};
+window.refsData['#valid-video-mime-type'] = {"text": "valid video mime type", "type": "dfn", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#valid-video-mime-type", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-hdrmetadatatype-smptest2086'] = {"text": "\"smpteSt2086\"", "type": "enum-value", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-hdrmetadatatype-smptest2086", "export": true, "normative": true, "for_": ["HdrMetadataType"]};
+window.refsData['#dom-hdrmetadatatype-smptest2094-10'] = {"text": "\"smpteSt2094-10\"", "type": "enum-value", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-hdrmetadatatype-smptest2094-10", "export": true, "normative": true, "for_": ["HdrMetadataType"]};
+window.refsData['#dom-hdrmetadatatype-smptest2094-40'] = {"text": "\"smpteSt2094-40\"", "type": "enum-value", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-hdrmetadatatype-smptest2094-40", "export": true, "normative": true, "for_": ["HdrMetadataType"]};
+window.refsData['#dom-colorgamut-srgb'] = {"text": "\"srgb\"", "type": "enum-value", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-colorgamut-srgb", "export": true, "normative": true, "for_": ["ColorGamut"]};
+window.refsData['#dom-colorgamut-p3'] = {"text": "\"p3\"", "type": "enum-value", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-colorgamut-p3", "export": true, "normative": true, "for_": ["ColorGamut"]};
+window.refsData['#dom-colorgamut-rec2020'] = {"text": "\"rec2020\"", "type": "enum-value", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-colorgamut-rec2020", "export": true, "normative": true, "for_": ["ColorGamut"]};
+window.refsData['#dom-transferfunction-srgb'] = {"text": "\"srgb\"", "type": "enum-value", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-transferfunction-srgb", "export": true, "normative": true, "for_": ["TransferFunction"]};
+window.refsData['#dom-transferfunction-pq'] = {"text": "\"pq\"", "type": "enum-value", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-transferfunction-pq", "export": true, "normative": true, "for_": ["TransferFunction"]};
+window.refsData['#dom-transferfunction-hlg'] = {"text": "\"hlg\"", "type": "enum-value", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-transferfunction-hlg", "export": true, "normative": true, "for_": ["TransferFunction"]};
+window.refsData['#dom-audioconfiguration-contenttype'] = {"text": "contentType", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-audioconfiguration-contenttype", "export": true, "normative": true, "for_": ["AudioConfiguration"]};
+window.refsData['#dom-audioconfiguration-channels'] = {"text": "channels", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-audioconfiguration-channels", "export": true, "normative": true, "for_": ["AudioConfiguration"]};
+window.refsData['#dom-audioconfiguration-bitrate'] = {"text": "bitrate", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-audioconfiguration-bitrate", "export": true, "normative": true, "for_": ["AudioConfiguration"]};
+window.refsData['#dom-audioconfiguration-samplerate'] = {"text": "samplerate", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-audioconfiguration-samplerate", "export": true, "normative": true, "for_": ["AudioConfiguration"]};
+window.refsData['#dom-audioconfiguration-spatialrendering'] = {"text": "spatialRendering", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-audioconfiguration-spatialrendering", "export": true, "normative": true, "for_": ["AudioConfiguration"]};
+window.refsData['#valid-audio-mime-type'] = {"text": "valid audio mime type", "type": "dfn", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#valid-audio-mime-type", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediacapabilitiesinfo-supported'] = {"text": "supported", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-mediacapabilitiesinfo-supported", "export": true, "normative": true, "for_": ["MediaCapabilitiesInfo"]};
+window.refsData['#dom-mediacapabilitieskeysystemconfiguration-keysystem'] = {"text": "keySystem", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-mediacapabilitieskeysystemconfiguration-keysystem", "export": true, "normative": true, "for_": ["MediaCapabilitiesKeySystemConfiguration"]};
+window.refsData['#dom-mediacapabilitieskeysystemconfiguration-initdatatype'] = {"text": "initDataType", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-mediacapabilitieskeysystemconfiguration-initdatatype", "export": true, "normative": true, "for_": ["MediaCapabilitiesKeySystemConfiguration"]};
+window.refsData['#dom-mediacapabilitieskeysystemconfiguration-distinctiveidentifier'] = {"text": "distinctiveIdentifier", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-mediacapabilitieskeysystemconfiguration-distinctiveidentifier", "export": true, "normative": true, "for_": ["MediaCapabilitiesKeySystemConfiguration"]};
+window.refsData['#dom-mediacapabilitieskeysystemconfiguration-persistentstate'] = {"text": "persistentState", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-mediacapabilitieskeysystemconfiguration-persistentstate", "export": true, "normative": true, "for_": ["MediaCapabilitiesKeySystemConfiguration"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediacapabilitieskeysystemconfiguration-sessiontypes'] = {"text": "sessionTypes", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-mediacapabilitieskeysystemconfiguration-sessiontypes", "export": true, "normative": true, "for_": ["MediaCapabilitiesKeySystemConfiguration"]};
+window.refsData['#dictdef-keysystemtrackconfiguration'] = {"text": "KeySystemTrackConfiguration", "type": "dictionary", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dictdef-keysystemtrackconfiguration", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediacapabilitieskeysystemconfiguration-audio'] = {"text": "audio", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-mediacapabilitieskeysystemconfiguration-audio", "export": true, "normative": true, "for_": ["MediaCapabilitiesKeySystemConfiguration"]};
+window.refsData['#dom-mediacapabilitieskeysystemconfiguration-video'] = {"text": "video", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-mediacapabilitieskeysystemconfiguration-video", "export": true, "normative": true, "for_": ["MediaCapabilitiesKeySystemConfiguration"]};
+window.refsData['https://www.w3.org/TR/encrypted-media/#navigator-extension:-requestmediakeysystemaccess()'] = {"text": "requestMediaKeySystemAccess()", "type": "interface", "spec": "encrypted-media", "shortname": "encrypted-media", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/encrypted-media/#navigator-extension:-requestmediakeysystemaccess()", "export": true, "normative": true, "for_": ["EME"]};
+window.refsData['https://www.w3.org/TR/encrypted-media/#dom-mediakeysystemaccess-keysystem'] = {"text": "keySystem", "type": "attribute", "spec": "encrypted-media", "shortname": "encrypted-media", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/encrypted-media/#dom-mediakeysystemaccess-keysystem", "export": true, "normative": true, "for_": ["EME"]};
+window.refsData['https://www.w3.org/TR/encrypted-media/#dom-mediakeysystemconfiguration-initdatatypes'] = {"text": "initDataTypes", "type": "attribute", "spec": "encrypted-media", "shortname": "encrypted-media", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/encrypted-media/#dom-mediakeysystemconfiguration-initdatatypes", "export": true, "normative": true, "for_": ["EME"]};
+window.refsData['https://www.w3.org/TR/encrypted-media/#dom-mediakeysystemconfiguration-distinctiveidentifier'] = {"text": "distinctiveIdentifier", "type": "attribute", "spec": "encrypted-media", "shortname": "encrypted-media", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/encrypted-media/#dom-mediakeysystemconfiguration-distinctiveidentifier", "export": true, "normative": true, "for_": ["EME"]};
+window.refsData['https://www.w3.org/TR/encrypted-media/#dom-mediakeysystemconfiguration-persistentstate'] = {"text": "persistentState", "type": "attribute", "spec": "encrypted-media", "shortname": "encrypted-media", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/encrypted-media/#dom-mediakeysystemconfiguration-persistentstate", "export": true, "normative": true, "for_": ["EME"]};
+window.refsData['https://www.w3.org/TR/encrypted-media/#dom-mediakeysystemconfiguration-sessiontypes'] = {"text": "sessionTypes", "type": "attribute", "spec": "encrypted-media", "shortname": "encrypted-media", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/encrypted-media/#dom-mediakeysystemconfiguration-sessiontypes", "export": true, "normative": true, "for_": ["EME"]};
+window.refsData['#dom-keysystemtrackconfiguration-robustness'] = {"text": "robustness", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-keysystemtrackconfiguration-robustness", "export": true, "normative": true, "for_": ["KeySystemTrackConfiguration"]};
+window.refsData['#dom-keysystemtrackconfiguration-encryptionscheme'] = {"text": "encryptionScheme", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-keysystemtrackconfiguration-encryptionscheme", "export": true, "normative": true, "for_": ["KeySystemTrackConfiguration"]};
+window.refsData['https://www.w3.org/TR/encrypted-media/#dom-mediakeysystemmediacapability-robustness'] = {"text": "robustness", "type": "attribute", "spec": "encrypted-media", "shortname": "encrypted-media", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/encrypted-media/#dom-mediakeysystemmediacapability-robustness", "export": true, "normative": true, "for_": ["EME"]};
+window.refsData['https://w3c.github.io/encrypted-media/#dom-mediakeysystemmediacapability-encryptionscheme'] = {"text": "encryptionScheme", "type": "attribute", "spec": "encrypted-media-draft", "shortname": "encrypted-media-draft", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/encrypted-media/#dom-mediakeysystemmediacapability-encryptionscheme", "export": true, "normative": true, "for_": ["EME"]};
+window.refsData['#dom-mediacapabilitiesinfo-smooth'] = {"text": "smooth", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-mediacapabilitiesinfo-smooth", "export": true, "normative": true, "for_": ["MediaCapabilitiesInfo"]};
+window.refsData['#dom-mediacapabilitiesinfo-powerefficient'] = {"text": "powerEfficient", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-mediacapabilitiesinfo-powerefficient", "export": true, "normative": true, "for_": ["MediaCapabilitiesInfo"]};
+window.refsData['#dictdef-mediacapabilitiesinfo'] = {"text": "MediaCapabilitiesInfo", "type": "dictionary", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dictdef-mediacapabilitiesinfo", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediacapabilitiesdecodinginfo-keysystemaccess'] = {"text": "keySystemAccess", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-mediacapabilitiesdecodinginfo-keysystemaccess", "export": true, "normative": true, "for_": ["MediaCapabilitiesDecodingInfo"]};
+window.refsData['#dom-mediacapabilitiesdecodinginfo-configuration'] = {"text": "configuration", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-mediacapabilitiesdecodinginfo-configuration", "export": true, "normative": true, "for_": ["MediaCapabilitiesDecodingInfo"]};
+window.refsData['#dom-mediacapabilitiesencodinginfo-configuration'] = {"text": "configuration", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-mediacapabilitiesencodinginfo-configuration", "export": true, "normative": true, "for_": ["MediaCapabilitiesEncodingInfo"]};
+window.refsData['#dictdef-mediacapabilitiesdecodinginfo'] = {"text": "MediaCapabilitiesDecodingInfo", "type": "dictionary", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dictdef-mediacapabilitiesdecodinginfo", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/encrypted-media/#mediakeysystemaccess-interface'] = {"text": "MediaKeySystemAccess", "type": "interface", "spec": "encrypted-media", "shortname": "encrypted-media", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/encrypted-media/#mediakeysystemaccess-interface", "export": true, "normative": true, "for_": ["EME"]};
+window.refsData['https://www.w3.org/TR/encrypted-media/#mediakeys-interface'] = {"text": "MediaKeys", "type": "interface", "spec": "encrypted-media", "shortname": "encrypted-media", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/encrypted-media/#mediakeys-interface", "export": true, "normative": true, "for_": ["EME"]};
+window.refsData['#dictdef-mediacapabilitiesencodinginfo'] = {"text": "MediaCapabilitiesEncodingInfo", "type": "dictionary", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dictdef-mediacapabilitiesencodinginfo", "export": true, "normative": true, "for_": []};
+window.refsData['#check-encrypted-decoding-support'] = {"text": "check encrypted decoding support", "type": "dfn", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#check-encrypted-decoding-support", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/encrypted-media/#key-system'] = {"text": "key system", "type": "dfn", "spec": "encrypted-media", "shortname": "encrypted-media", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/encrypted-media/#key-system", "export": true, "normative": true, "for_": ["EME"]};
+window.refsData['https://html.spec.whatwg.org/multipage/#concept-origin'] = {"text": "origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/#concept-origin", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-document'] = {"text": "document", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "", "status": "anchor-block", "url": "https://dom.spec.whatwg.org/#concept-document", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/encrypted-media/#mediakeysystemconfiguration-dictionary'] = {"text": "MediaKeySystemConfiguration", "type": "interface", "spec": "encrypted-media", "shortname": "encrypted-media", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/encrypted-media/#mediakeysystemconfiguration-dictionary", "export": true, "normative": true, "for_": ["EME"]};
+window.refsData['#dom-mediaconfiguration-audio'] = {"text": "audio", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-mediaconfiguration-audio", "export": true, "normative": true, "for_": ["MediaConfiguration"]};
+window.refsData['https://www.w3.org/TR/encrypted-media/#dom-mediakeysystemconfiguration-audiocapabilities'] = {"text": "audioCapabilities", "type": "interface", "spec": "encrypted-media", "shortname": "encrypted-media", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/encrypted-media/#dom-mediakeysystemconfiguration-audiocapabilities", "export": true, "normative": true, "for_": ["EME"]};
+window.refsData['https://www.w3.org/TR/encrypted-media/#mediakeysystemmediacapability-dictionary'] = {"text": "MediaKeySystemMediaCapability", "type": "interface", "spec": "encrypted-media", "shortname": "encrypted-media", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/encrypted-media/#mediakeysystemmediacapability-dictionary", "export": true, "normative": true, "for_": ["EME"]};
+window.refsData['https://www.w3.org/TR/encrypted-media/#dom-mediakeysystemmediacapability-contenttype'] = {"text": "contentType", "type": "interface", "spec": "encrypted-media", "shortname": "encrypted-media", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/encrypted-media/#dom-mediakeysystemmediacapability-contenttype", "export": true, "normative": true, "for_": ["EME"]};
+window.refsData['#dom-mediaconfiguration-video'] = {"text": "video", "type": "dict-member", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-mediaconfiguration-video", "export": true, "normative": true, "for_": ["MediaConfiguration"]};
+window.refsData['https://www.w3.org/TR/encrypted-media/#get-supported-configuration'] = {"text": "get supported configuration", "type": "dfn", "spec": "encrypted-media", "shortname": "encrypted-media", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/encrypted-media/#get-supported-configuration", "export": true, "normative": true, "for_": ["EME"]};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/system-state.html#navigator'] = {"text": "Navigator", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/system-state.html#navigator", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#SameObject'] = {"text": "SameObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SameObject", "export": true, "normative": true, "for_": []};
+window.refsData['#mediacapabilities'] = {"text": "MediaCapabilities", "type": "interface", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#mediacapabilities", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#workernavigator'] = {"text": "WorkerNavigator", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/workers.html#workernavigator", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#NewObject'] = {"text": "NewObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#NewObject", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-promise'] = {"text": "Promise", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-promise", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediacapabilities-decodinginfo'] = {"text": "decodingInfo(configuration)", "type": "method", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-mediacapabilities-decodinginfo", "export": true, "normative": true, "for_": ["MediaCapabilities"]};
+window.refsData['#valid-mediadecodingconfiguration'] = {"text": "valid mediadecodingconfiguration", "type": "dfn", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#valid-mediadecodingconfiguration", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-typeerror'] = {"text": "TypeError", "type": "interface", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-typeerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/#global-object'] = {"text": "global object", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/#global-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#workerglobalscope'] = {"text": "WorkerGlobalScope", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/workers.html#workerglobalscope", "export": true, "normative": true, "for_": []};
+window.refsData['https://heycam.github.io/webidl/#idl-DOMException'] = {"text": "DOMException", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "", "status": "anchor-block", "url": "https://heycam.github.io/webidl/#idl-DOMException", "export": true, "normative": true, "for_": []};
+window.refsData['https://heycam.github.io/webidl/#invalidstateerror'] = {"text": "invalidstateerror", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "", "status": "anchor-block", "url": "https://heycam.github.io/webidl/#invalidstateerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/secure-contexts/#settings-object'] = {"text": "is the environment settings object settings a secure context?", "type": "dfn", "spec": "secure-contexts", "shortname": "secure-contexts", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/secure-contexts/#settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/#relevant-settings-object'] = {"text": "relevant settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/#relevant-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://heycam.github.io/webidl/#securityerror'] = {"text": "securityerror", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "", "status": "anchor-block", "url": "https://heycam.github.io/webidl/#securityerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel'] = {"text": "in parallel", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel", "export": true, "normative": true, "for_": []};
+window.refsData['#create-a-mediacapabilitiesdecodinginfo'] = {"text": "create a mediacapabilitiesdecodinginfo", "type": "dfn", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#create-a-mediacapabilitiesdecodinginfo", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediacapabilities-encodinginfo'] = {"text": "encodingInfo(configuration)", "type": "method", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#dom-mediacapabilities-encodinginfo", "export": true, "normative": true, "for_": ["MediaCapabilities"]};
+window.refsData['#create-a-mediacapabilitiesencodinginfo'] = {"text": "create a mediacapabilitiesencodinginfo", "type": "dfn", "spec": "media-capabilities", "shortname": "media-capabilities", "level": "", "status": "local", "url": "#create-a-mediacapabilitiesencodinginfo", "export": true, "normative": true, "for_": []};
 </script>

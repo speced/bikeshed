@@ -730,6 +730,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -2652,8 +2689,6 @@ for their reviews, comments, and corrections.</p>
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -2901,7 +2936,6 @@ for their reviews, comments, and corrections.</p>
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -3358,4 +3392,284 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://drafts.csswg.org/css-transforms-1/#local-coordinate-system'] = {"text": "local coordinate system", "type": "dfn", "spec": "css-transforms-1", "shortname": "css-transforms", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transforms-1/#local-coordinate-system", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-offset-path'] = {"text": "offset-path", "type": "property", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#propdef-offset-path", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-offset-position'] = {"text": "offset-position", "type": "property", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#propdef-offset-position", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/render.html#TermStackingContext'] = {"text": "stacking contexts", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/render.html#TermStackingContext", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-transforms-1/#propdef-transform'] = {"text": "transform", "type": "property", "spec": "css-transforms-1", "shortname": "css-transforms", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transforms-1/#propdef-transform", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-transforms-2/#propdef-translate'] = {"text": "translate", "type": "property", "spec": "css-transforms-2", "shortname": "css-transforms", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-transforms-2/#propdef-translate", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-transforms-2/#propdef-scale'] = {"text": "scale", "type": "property", "spec": "css-transforms-2", "shortname": "css-transforms", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-transforms-2/#propdef-scale", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-transforms-2/#propdef-rotate'] = {"text": "rotate", "type": "property", "spec": "css-transforms-2", "shortname": "css-transforms", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-transforms-2/#propdef-rotate", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-offset-distance'] = {"text": "offset-distance", "type": "property", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#propdef-offset-distance", "export": true, "normative": true, "for_": []};
+window.refsData['#anchor-point'] = {"text": "anchor point", "type": "dfn", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#anchor-point", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-offset-anchor'] = {"text": "offset-anchor", "type": "property", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#propdef-offset-anchor", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-offset-rotate'] = {"text": "offset-rotate", "type": "property", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#propdef-offset-rotate", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
+window.refsData['#funcdef-offset-path-ray'] = {"text": "ray()", "type": "function", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#funcdef-offset-path-ray", "export": true, "normative": true, "for_": ["offset-path"]};
+window.refsData['#funcdef-offsetpath-pathfunc-path'] = {"text": "path()", "type": "function", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#funcdef-offsetpath-pathfunc-path", "export": true, "normative": true, "for_": ["offsetpath-pathfunc"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#url-value'] = {"text": "<url>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#url-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-shapes-1/#typedef-basic-shape'] = {"text": "<basic-shape>", "type": "type", "spec": "css-shapes-1", "shortname": "css-shapes", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-shapes-1/#typedef-basic-shape", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-all'] = {"text": "&&", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-all", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#typedef-coord-box'] = {"text": "<coord-box>", "type": "type", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#typedef-coord-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-opt'] = {"text": "?", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "export": true, "normative": true, "for_": []};
+window.refsData['#offset-path'] = {"text": "offset path", "type": "dfn", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#offset-path", "export": true, "normative": true, "for_": []};
+window.refsData['#offset-path-initial-position'] = {"text": "initial position", "type": "dfn", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#offset-path-initial-position", "export": true, "normative": true, "for_": ["offset path"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#angle-value'] = {"text": "<angle>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#angle-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-images-3/#typedef-size'] = {"text": "<size>", "type": "type", "spec": "css-images-3", "shortname": "css-images", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-images-3/#typedef-size", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-circle'] = {"text": "circle()", "type": "function", "spec": "css-shapes-1", "shortname": "css-shapes", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-circle", "export": true, "normative": true, "for_": ["<basic-shape>"]};
+window.refsData['https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-ellipse'] = {"text": "ellipse()", "type": "function", "spec": "css-shapes-1", "shortname": "css-shapes", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-ellipse", "export": true, "normative": true, "for_": ["<basic-shape>"]};
+window.refsData['https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-inset'] = {"text": "inset()", "type": "function", "spec": "css-shapes-1", "shortname": "css-shapes", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-inset", "export": true, "normative": true, "for_": ["<basic-shape>"]};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border-radius'] = {"text": "border-radius", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-radius", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-polygon'] = {"text": "polygon()", "type": "function", "spec": "css-shapes-1", "shortname": "css-shapes", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-polygon", "export": true, "normative": true, "for_": ["<basic-shape>"]};
+window.refsData['#valdef-offset-rotate-auto'] = {"text": "auto", "type": "value", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#valdef-offset-rotate-auto", "export": true, "normative": true, "for_": ["offset-rotate"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#string-value'] = {"text": "<string>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#string-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/shapes.html#TermShapeElement'] = {"text": "shape elements", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/shapes.html#TermShapeElement", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#used-value'] = {"text": "used value", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#used-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.fxtf.org/css-masking-1/#valdef-mask-clip-content-box'] = {"text": "content-box", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/css-masking-1/#valdef-mask-clip-content-box", "export": true, "normative": true, "for_": ["mask-clip"]};
+window.refsData['https://drafts.fxtf.org/css-masking-1/#valdef-mask-clip-padding-box'] = {"text": "padding-box", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/css-masking-1/#valdef-mask-clip-padding-box", "export": true, "normative": true, "for_": ["mask-clip"]};
+window.refsData['https://drafts.fxtf.org/css-masking-1/#valdef-mask-clip-border-box'] = {"text": "border-box", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/css-masking-1/#valdef-mask-clip-border-box", "export": true, "normative": true, "for_": ["mask-clip"]};
+window.refsData['https://drafts.fxtf.org/css-masking-1/#valdef-clip-path-fill-box'] = {"text": "fill-box", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/css-masking-1/#valdef-clip-path-fill-box", "export": true, "normative": true, "for_": ["clip-path"]};
+window.refsData['https://drafts.fxtf.org/css-masking-1/#valdef-clip-path-stroke-box'] = {"text": "stroke-box", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/css-masking-1/#valdef-clip-path-stroke-box", "export": true, "normative": true, "for_": ["clip-path"]};
+window.refsData['https://drafts.fxtf.org/css-masking-1/#valdef-clip-path-view-box'] = {"text": "view-box", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/css-masking-1/#valdef-clip-path-view-box", "export": true, "normative": true, "for_": ["clip-path"]};
+window.refsData['https://drafts.csswg.org/css-contain-2/#propdef-contain'] = {"text": "contain", "type": "property", "spec": "css-contain-2", "shortname": "css-contain", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-contain-2/#propdef-contain", "export": true, "normative": true, "for_": []};
+window.refsData['#used-offset-distance'] = {"text": "used offset distance", "type": "dfn", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#used-offset-distance", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#typedef-length-percentage'] = {"text": "<length-percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#typedef-length-percentage", "export": true, "normative": true, "for_": []};
+window.refsData['#offset-distance'] = {"text": "offset distance", "type": "dfn", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#offset-distance", "export": true, "normative": true, "for_": []};
+window.refsData['#total-length'] = {"text": "total length", "type": "dfn", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#total-length", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#typedef-position'] = {"text": "<position>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#typedef-position", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#length-value'] = {"text": "<length>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#length-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-position-3/#propdef-position'] = {"text": "position", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-position", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-position-3/#valdef-position-static'] = {"text": "static", "type": "value", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#valdef-position-static", "export": true, "normative": true, "for_": ["position"]};
+window.refsData['https://drafts.csswg.org/css-position-3/#propdef-left'] = {"text": "left", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-left", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-position-3/#propdef-top'] = {"text": "top", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-top", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.fxtf.org/css-masking-1/#typedef-geometry-box'] = {"text": "<geometry-box>", "type": "type", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/css-masking-1/#typedef-geometry-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-transforms-1/#propdef-transform-origin'] = {"text": "transform-origin", "type": "property", "spec": "css-transforms-1", "shortname": "css-transforms", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transforms-1/#propdef-transform-origin", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-background-position'] = {"text": "background-position", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background-position", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#percentage-value'] = {"text": "<percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#percentage-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-any'] = {"text": "||", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-any", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-offset-rotate-reverse'] = {"text": "reverse", "type": "value", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#valdef-offset-rotate-reverse", "export": true, "normative": true, "for_": ["offset-rotate"]};
+window.refsData['https://svgwg.org/svg2-draft/paths.html#TermPathDirection'] = {"text": "direction of a path", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/paths.html#TermPathDirection", "export": false, "normative": true, "for_": []};
+window.refsData['#p'] = {"text": "p", "type": "dfn", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#p", "export": true, "normative": true, "for_": []};
+window.refsData['#t2'] = {"text": "t2", "type": "dfn", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#t2", "export": true, "normative": true, "for_": []};
+window.refsData['#t1'] = {"text": "t1", "type": "dfn", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#t1", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-transforms-1/#funcdef-transform-rotate'] = {"text": "rotate()", "type": "function", "spec": "css-transforms-1", "shortname": "css-transforms", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transforms-1/#funcdef-transform-rotate", "export": true, "normative": true, "for_": ["transform"]};
+window.refsData['#propdef-offset'] = {"text": "offset", "type": "property", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#propdef-offset", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-req'] = {"text": "!", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-req", "export": true, "normative": true, "for_": []};window.refsData['#propdef-offset'] = {"text": "offset", "type": "property", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#propdef-offset", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-offset-anchor'] = {"text": "offset-anchor", "type": "property", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#propdef-offset-anchor", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-offset-distance'] = {"text": "offset-distance", "type": "property", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#propdef-offset-distance", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-offset-path'] = {"text": "offset-path", "type": "property", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#propdef-offset-path", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-offset-position'] = {"text": "offset-position", "type": "property", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#propdef-offset-position", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-offset-rotate'] = {"text": "offset-rotate", "type": "property", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#propdef-offset-rotate", "export": true, "normative": true, "for_": []};
 </script>

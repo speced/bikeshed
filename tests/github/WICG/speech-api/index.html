@@ -689,6 +689,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -3990,8 +4027,6 @@ See <a href="https://lists.w3.org/Archives/Public/public-speech-api/2012Jun/0179
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -4239,7 +4274,6 @@ See <a href="https://lists.w3.org/Archives/Public/public-speech-api/2012Jun/0179
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -4745,4 +4779,332 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#eventtarget'] = {"text": "EventTarget", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#eventtarget", "export": true, "normative": true, "for_": []};
+window.refsData['#speechgrammarlist'] = {"text": "SpeechGrammarList", "type": "interface", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#speechgrammarlist", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-speechrecognition-grammars'] = {"text": "grammars", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechrecognition-grammars", "export": true, "normative": true, "for_": ["SpeechRecognition"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-speechrecognition-lang'] = {"text": "lang", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechrecognition-lang", "export": true, "normative": true, "for_": ["SpeechRecognition"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-speechrecognition-continuous'] = {"text": "continuous", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechrecognition-continuous", "export": true, "normative": true, "for_": ["SpeechRecognition"]};
+window.refsData['#dom-speechrecognition-interimresults'] = {"text": "interimResults", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechrecognition-interimresults", "export": true, "normative": true, "for_": ["SpeechRecognition"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-long'] = {"text": "unsigned long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-long", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-speechrecognition-maxalternatives'] = {"text": "maxAlternatives", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechrecognition-maxalternatives", "export": true, "normative": true, "for_": ["SpeechRecognition"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-speechrecognition-start'] = {"text": "start()", "type": "method", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechrecognition-start", "export": true, "normative": true, "for_": ["SpeechRecognition"]};
+window.refsData['#dom-speechrecognition-stop'] = {"text": "stop()", "type": "method", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechrecognition-stop", "export": true, "normative": true, "for_": ["SpeechRecognition"]};
+window.refsData['#dom-speechrecognition-abort'] = {"text": "abort()", "type": "method", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechrecognition-abort", "export": true, "normative": true, "for_": ["SpeechRecognition"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler'] = {"text": "EventHandler", "type": "typedef", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-speechrecognitionerrorcode-no-speech'] = {"text": "\"no-speech\"", "type": "enum-value", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechrecognitionerrorcode-no-speech", "export": true, "normative": true, "for_": ["SpeechRecognitionErrorCode"]};
+window.refsData['#dom-speechrecognitionerrorcode-aborted'] = {"text": "\"aborted\"", "type": "enum-value", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechrecognitionerrorcode-aborted", "export": true, "normative": true, "for_": ["SpeechRecognitionErrorCode"]};
+window.refsData['#dom-speechrecognitionerrorcode-audio-capture'] = {"text": "\"audio-capture\"", "type": "enum-value", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechrecognitionerrorcode-audio-capture", "export": true, "normative": true, "for_": ["SpeechRecognitionErrorCode"]};
+window.refsData['#dom-speechrecognitionerrorcode-network'] = {"text": "\"network\"", "type": "enum-value", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechrecognitionerrorcode-network", "export": true, "normative": true, "for_": ["SpeechRecognitionErrorCode"]};
+window.refsData['#dom-speechrecognitionerrorcode-not-allowed'] = {"text": "\"not-allowed\"", "type": "enum-value", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechrecognitionerrorcode-not-allowed", "export": true, "normative": true, "for_": ["SpeechRecognitionErrorCode"]};
+window.refsData['#dom-speechrecognitionerrorcode-service-not-allowed'] = {"text": "\"service-not-allowed\"", "type": "enum-value", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechrecognitionerrorcode-service-not-allowed", "export": true, "normative": true, "for_": ["SpeechRecognitionErrorCode"]};
+window.refsData['#dom-speechrecognitionerrorcode-bad-grammar'] = {"text": "\"bad-grammar\"", "type": "enum-value", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechrecognitionerrorcode-bad-grammar", "export": true, "normative": true, "for_": ["SpeechRecognitionErrorCode"]};
+window.refsData['#dom-speechrecognitionerrorcode-language-not-supported'] = {"text": "\"language-not-supported\"", "type": "enum-value", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechrecognitionerrorcode-language-not-supported", "export": true, "normative": true, "for_": ["SpeechRecognitionErrorCode"]};
+window.refsData['https://dom.spec.whatwg.org/#event'] = {"text": "Event", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#event", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-speechrecognitionerroreventinit'] = {"text": "SpeechRecognitionErrorEventInit", "type": "dictionary", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dictdef-speechrecognitionerroreventinit", "export": true, "normative": true, "for_": []};
+window.refsData['#enumdef-speechrecognitionerrorcode'] = {"text": "SpeechRecognitionErrorCode", "type": "enum", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#enumdef-speechrecognitionerrorcode", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-speechrecognitionerrorevent-error'] = {"text": "error", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechrecognitionerrorevent-error", "export": true, "normative": true, "for_": ["SpeechRecognitionErrorEvent"]};
+window.refsData['#dom-speechrecognitionerrorevent-message'] = {"text": "message", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechrecognitionerrorevent-message", "export": true, "normative": true, "for_": ["SpeechRecognitionErrorEvent"]};
+window.refsData['https://dom.spec.whatwg.org/#dictdef-eventinit'] = {"text": "EventInit", "type": "dictionary", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dictdef-eventinit", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-speechrecognitionalternative-transcript'] = {"text": "transcript", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechrecognitionalternative-transcript", "export": true, "normative": true, "for_": ["SpeechRecognitionAlternative"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-float'] = {"text": "float", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-float", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-speechrecognitionalternative-confidence'] = {"text": "confidence", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechrecognitionalternative-confidence", "export": true, "normative": true, "for_": ["SpeechRecognitionAlternative"]};
+window.refsData['#dom-speechrecognitionresult-length'] = {"text": "length", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechrecognitionresult-length", "export": true, "normative": true, "for_": ["SpeechRecognitionResult"]};
+window.refsData['#speechrecognitionalternative'] = {"text": "SpeechRecognitionAlternative", "type": "interface", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#speechrecognitionalternative", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-speechrecognitionresult-item'] = {"text": "item(index)", "type": "method", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechrecognitionresult-item", "export": true, "normative": true, "for_": ["SpeechRecognitionResult"]};
+window.refsData['#dom-speechrecognitionresult-isfinal'] = {"text": "isFinal", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechrecognitionresult-isfinal", "export": true, "normative": true, "for_": ["SpeechRecognitionResult"]};
+window.refsData['#dom-speechrecognitionresultlist-length'] = {"text": "length", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechrecognitionresultlist-length", "export": true, "normative": true, "for_": ["SpeechRecognitionResultList"]};
+window.refsData['#speechrecognitionresult'] = {"text": "SpeechRecognitionResult", "type": "interface", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#speechrecognitionresult", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-speechrecognitionresultlist-item'] = {"text": "item(index)", "type": "method", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechrecognitionresultlist-item", "export": true, "normative": true, "for_": ["SpeechRecognitionResultList"]};
+window.refsData['#dictdef-speechrecognitioneventinit'] = {"text": "SpeechRecognitionEventInit", "type": "dictionary", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dictdef-speechrecognitioneventinit", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-speechrecognitionevent-resultindex'] = {"text": "resultIndex", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechrecognitionevent-resultindex", "export": true, "normative": true, "for_": ["SpeechRecognitionEvent"]};
+window.refsData['#speechrecognitionresultlist'] = {"text": "SpeechRecognitionResultList", "type": "interface", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#speechrecognitionresultlist", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-speechrecognitionevent-results'] = {"text": "results", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechrecognitionevent-results", "export": true, "normative": true, "for_": ["SpeechRecognitionEvent"]};
+window.refsData['#dom-speechgrammar-src'] = {"text": "src", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechgrammar-src", "export": true, "normative": true, "for_": ["SpeechGrammar"]};
+window.refsData['#dom-speechgrammar-weight'] = {"text": "weight", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechgrammar-weight", "export": true, "normative": true, "for_": ["SpeechGrammar"]};
+window.refsData['#dom-speechgrammarlist-length'] = {"text": "length", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechgrammarlist-length", "export": true, "normative": true, "for_": ["SpeechGrammarList"]};
+window.refsData['#speechgrammar'] = {"text": "SpeechGrammar", "type": "interface", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#speechgrammar", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-speechgrammarlist-item'] = {"text": "item(index)", "type": "method", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechgrammarlist-item", "export": true, "normative": true, "for_": ["SpeechGrammarList"]};
+window.refsData['#dom-speechgrammarlist-addfromuri'] = {"text": "addFromURI(src, weight)", "type": "method", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechgrammarlist-addfromuri", "export": true, "normative": true, "for_": ["SpeechGrammarList"]};
+window.refsData['#dom-speechgrammarlist-addfromstring'] = {"text": "addFromString(string, weight)", "type": "method", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechgrammarlist-addfromstring", "export": true, "normative": true, "for_": ["SpeechGrammarList"]};
+window.refsData['https://html.spec.whatwg.org/multipage/dom.html#language'] = {"text": "language", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dom.html#language", "export": true, "normative": true, "for_": ["Node"]};
+window.refsData['#eventdef-speechrecognition-error'] = {"text": "error", "type": "event", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#eventdef-speechrecognition-error", "export": true, "normative": true, "for_": ["SpeechRecognition"]};
+window.refsData['#eventdef-speechrecognition-end'] = {"text": "end", "type": "event", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#eventdef-speechrecognition-end", "export": true, "normative": true, "for_": ["SpeechRecognition"]};
+window.refsData['https://webidl.spec.whatwg.org/#invalidstateerror'] = {"text": "InvalidStateError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invalidstateerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMException'] = {"text": "DOMException", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMException", "export": true, "normative": true, "for_": []};
+window.refsData['#eventdef-speechrecognition-speechend'] = {"text": "speechend", "type": "event", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#eventdef-speechrecognition-speechend", "export": true, "normative": true, "for_": ["SpeechRecognition"]};
+window.refsData['#eventdef-speechrecognition-audioend'] = {"text": "audioend", "type": "event", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#eventdef-speechrecognition-audioend", "export": true, "normative": true, "for_": ["SpeechRecognition"]};
+window.refsData['#eventdef-speechrecognition-speechstart'] = {"text": "speechstart", "type": "event", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#eventdef-speechrecognition-speechstart", "export": true, "normative": true, "for_": ["SpeechRecognition"]};
+window.refsData['#eventdef-speechrecognition-audiostart'] = {"text": "audiostart", "type": "event", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#eventdef-speechrecognition-audiostart", "export": true, "normative": true, "for_": ["SpeechRecognition"]};
+window.refsData['#eventdef-speechrecognition-soundstart'] = {"text": "soundstart", "type": "event", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#eventdef-speechrecognition-soundstart", "export": true, "normative": true, "for_": ["SpeechRecognition"]};
+window.refsData['#speechrecognitionevent'] = {"text": "SpeechRecognitionEvent", "type": "interface", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#speechrecognitionevent", "export": true, "normative": true, "for_": []};
+window.refsData['#speechrecognitionerrorevent'] = {"text": "SpeechRecognitionErrorEvent", "type": "interface", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#speechrecognitionerrorevent", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-speechsynthesis-pending'] = {"text": "pending", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesis-pending", "export": true, "normative": true, "for_": ["SpeechSynthesis"]};
+window.refsData['#dom-speechsynthesis-speaking'] = {"text": "speaking", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesis-speaking", "export": true, "normative": true, "for_": ["SpeechSynthesis"]};
+window.refsData['#dom-speechsynthesis-paused'] = {"text": "paused", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesis-paused", "export": true, "normative": true, "for_": ["SpeechSynthesis"]};
+window.refsData['#dom-speechsynthesis-speak'] = {"text": "speak(utterance)", "type": "method", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesis-speak", "export": true, "normative": true, "for_": ["SpeechSynthesis"]};
+window.refsData['#speechsynthesisutterance'] = {"text": "SpeechSynthesisUtterance", "type": "interface", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#speechsynthesisutterance", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-speechsynthesis-cancel'] = {"text": "cancel()", "type": "method", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesis-cancel", "export": true, "normative": true, "for_": ["SpeechSynthesis"]};
+window.refsData['#dom-speechsynthesis-pause'] = {"text": "pause()", "type": "method", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesis-pause", "export": true, "normative": true, "for_": ["SpeechSynthesis"]};
+window.refsData['#dom-speechsynthesis-resume'] = {"text": "resume()", "type": "method", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesis-resume", "export": true, "normative": true, "for_": ["SpeechSynthesis"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['#speechsynthesisvoice'] = {"text": "SpeechSynthesisVoice", "type": "interface", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#speechsynthesisvoice", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-speechsynthesis-getvoices'] = {"text": "getVoices()", "type": "method", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesis-getvoices", "export": true, "normative": true, "for_": ["SpeechSynthesis"]};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#window'] = {"text": "Window", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#SameObject'] = {"text": "SameObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SameObject", "export": true, "normative": true, "for_": []};
+window.refsData['#speechsynthesis'] = {"text": "SpeechSynthesis", "type": "interface", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#speechsynthesis", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-speechsynthesisutterance-text'] = {"text": "text", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesisutterance-text", "export": true, "normative": true, "for_": ["SpeechSynthesisUtterance"]};
+window.refsData['#dom-speechsynthesisutterance-lang'] = {"text": "lang", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesisutterance-lang", "export": true, "normative": true, "for_": ["SpeechSynthesisUtterance"]};
+window.refsData['#dom-speechsynthesisutterance-voice'] = {"text": "voice", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesisutterance-voice", "export": true, "normative": true, "for_": ["SpeechSynthesisUtterance"]};
+window.refsData['#dom-speechsynthesisutterance-volume'] = {"text": "volume", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesisutterance-volume", "export": true, "normative": true, "for_": ["SpeechSynthesisUtterance"]};
+window.refsData['#dom-speechsynthesisutterance-rate'] = {"text": "rate", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesisutterance-rate", "export": true, "normative": true, "for_": ["SpeechSynthesisUtterance"]};
+window.refsData['#dom-speechsynthesisutterance-pitch'] = {"text": "pitch", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesisutterance-pitch", "export": true, "normative": true, "for_": ["SpeechSynthesisUtterance"]};
+window.refsData['#dictdef-speechsynthesiseventinit'] = {"text": "SpeechSynthesisEventInit", "type": "dictionary", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dictdef-speechsynthesiseventinit", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-speechsynthesisevent-utterance'] = {"text": "utterance", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesisevent-utterance", "export": true, "normative": true, "for_": ["SpeechSynthesisEvent"]};
+window.refsData['#dom-speechsynthesisevent-charindex'] = {"text": "charIndex", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesisevent-charindex", "export": true, "normative": true, "for_": ["SpeechSynthesisEvent"]};
+window.refsData['#dom-speechsynthesisevent-charlength'] = {"text": "charLength", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesisevent-charlength", "export": true, "normative": true, "for_": ["SpeechSynthesisEvent"]};
+window.refsData['#dom-speechsynthesisevent-elapsedtime'] = {"text": "elapsedTime", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesisevent-elapsedtime", "export": true, "normative": true, "for_": ["SpeechSynthesisEvent"]};
+window.refsData['#dom-speechsynthesisevent-name'] = {"text": "name", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesisevent-name", "export": true, "normative": true, "for_": ["SpeechSynthesisEvent"]};
+window.refsData['#dom-speechsynthesiserrorcode-canceled'] = {"text": "\"canceled\"", "type": "enum-value", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesiserrorcode-canceled", "export": true, "normative": true, "for_": ["SpeechSynthesisErrorCode"]};
+window.refsData['#dom-speechsynthesiserrorcode-interrupted'] = {"text": "\"interrupted\"", "type": "enum-value", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesiserrorcode-interrupted", "export": true, "normative": true, "for_": ["SpeechSynthesisErrorCode"]};
+window.refsData['#dom-speechsynthesiserrorcode-audio-busy'] = {"text": "\"audio-busy\"", "type": "enum-value", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesiserrorcode-audio-busy", "export": true, "normative": true, "for_": ["SpeechSynthesisErrorCode"]};
+window.refsData['#dom-speechsynthesiserrorcode-audio-hardware'] = {"text": "\"audio-hardware\"", "type": "enum-value", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesiserrorcode-audio-hardware", "export": true, "normative": true, "for_": ["SpeechSynthesisErrorCode"]};
+window.refsData['#dom-speechsynthesiserrorcode-network'] = {"text": "\"network\"", "type": "enum-value", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesiserrorcode-network", "export": true, "normative": true, "for_": ["SpeechSynthesisErrorCode"]};
+window.refsData['#dom-speechsynthesiserrorcode-synthesis-unavailable'] = {"text": "\"synthesis-unavailable\"", "type": "enum-value", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesiserrorcode-synthesis-unavailable", "export": true, "normative": true, "for_": ["SpeechSynthesisErrorCode"]};
+window.refsData['#dom-speechsynthesiserrorcode-synthesis-failed'] = {"text": "\"synthesis-failed\"", "type": "enum-value", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesiserrorcode-synthesis-failed", "export": true, "normative": true, "for_": ["SpeechSynthesisErrorCode"]};
+window.refsData['#dom-speechsynthesiserrorcode-language-unavailable'] = {"text": "\"language-unavailable\"", "type": "enum-value", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesiserrorcode-language-unavailable", "export": true, "normative": true, "for_": ["SpeechSynthesisErrorCode"]};
+window.refsData['#dom-speechsynthesiserrorcode-voice-unavailable'] = {"text": "\"voice-unavailable\"", "type": "enum-value", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesiserrorcode-voice-unavailable", "export": true, "normative": true, "for_": ["SpeechSynthesisErrorCode"]};
+window.refsData['#dom-speechsynthesiserrorcode-text-too-long'] = {"text": "\"text-too-long\"", "type": "enum-value", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesiserrorcode-text-too-long", "export": true, "normative": true, "for_": ["SpeechSynthesisErrorCode"]};
+window.refsData['#dom-speechsynthesiserrorcode-invalid-argument'] = {"text": "\"invalid-argument\"", "type": "enum-value", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesiserrorcode-invalid-argument", "export": true, "normative": true, "for_": ["SpeechSynthesisErrorCode"]};
+window.refsData['#dom-speechsynthesiserrorcode-not-allowed'] = {"text": "\"not-allowed\"", "type": "enum-value", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesiserrorcode-not-allowed", "export": true, "normative": true, "for_": ["SpeechSynthesisErrorCode"]};
+window.refsData['#speechsynthesisevent'] = {"text": "SpeechSynthesisEvent", "type": "interface", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#speechsynthesisevent", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-speechsynthesiserroreventinit'] = {"text": "SpeechSynthesisErrorEventInit", "type": "dictionary", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dictdef-speechsynthesiserroreventinit", "export": true, "normative": true, "for_": []};
+window.refsData['#enumdef-speechsynthesiserrorcode'] = {"text": "SpeechSynthesisErrorCode", "type": "enum", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#enumdef-speechsynthesiserrorcode", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-speechsynthesiserrorevent-error'] = {"text": "error", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesiserrorevent-error", "export": true, "normative": true, "for_": ["SpeechSynthesisErrorEvent"]};
+window.refsData['#dom-speechsynthesisvoice-voiceuri'] = {"text": "voiceURI", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesisvoice-voiceuri", "export": true, "normative": true, "for_": ["SpeechSynthesisVoice"]};
+window.refsData['#dom-speechsynthesisvoice-name'] = {"text": "name", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesisvoice-name", "export": true, "normative": true, "for_": ["SpeechSynthesisVoice"]};
+window.refsData['#dom-speechsynthesisvoice-lang'] = {"text": "lang", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesisvoice-lang", "export": true, "normative": true, "for_": ["SpeechSynthesisVoice"]};
+window.refsData['#dom-speechsynthesisvoice-localservice'] = {"text": "localService", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesisvoice-localservice", "export": true, "normative": true, "for_": ["SpeechSynthesisVoice"]};
+window.refsData['#dom-speechsynthesisvoice-default'] = {"text": "default", "type": "attribute", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#dom-speechsynthesisvoice-default", "export": true, "normative": true, "for_": ["SpeechSynthesisVoice"]};
+window.refsData['#eventdef-speechsynthesisutterance-end'] = {"text": "end", "type": "event", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#eventdef-speechsynthesisutterance-end", "export": true, "normative": true, "for_": ["SpeechSynthesisUtterance"]};
+window.refsData['#eventdef-speechsynthesisutterance-error'] = {"text": "error", "type": "event", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#eventdef-speechsynthesisutterance-error", "export": true, "normative": true, "for_": ["SpeechSynthesisUtterance"]};
+window.refsData['#speechsynthesiserrorevent'] = {"text": "SpeechSynthesisErrorEvent", "type": "interface", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#speechsynthesiserrorevent", "export": true, "normative": true, "for_": []};
+window.refsData['#eventdef-speechsynthesisutterance-start'] = {"text": "start", "type": "event", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#eventdef-speechsynthesisutterance-start", "export": true, "normative": true, "for_": ["SpeechSynthesisUtterance"]};
+window.refsData['#eventdef-speechsynthesisutterance-mark'] = {"text": "mark", "type": "event", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#eventdef-speechsynthesisutterance-mark", "export": true, "normative": true, "for_": ["SpeechSynthesisUtterance"]};
+window.refsData['#eventdef-speechsynthesisutterance-boundary'] = {"text": "boundary", "type": "event", "spec": "speech-api", "shortname": "speech-api", "level": "", "status": "local", "url": "#eventdef-speechsynthesisutterance-boundary", "export": true, "normative": true, "for_": ["SpeechSynthesisUtterance"]};
 </script>

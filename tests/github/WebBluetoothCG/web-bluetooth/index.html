@@ -739,6 +739,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -6665,8 +6702,6 @@ and/or give the user a way to retry failed operations. <a href="https://github.c
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -6914,7 +6949,6 @@ and/or give the user a way to retry failed operations. <a href="https://github.c
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -7676,6 +7710,590 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#generic-attribute-profile'] = {"text": "generic attribute profile", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#generic-attribute-profile", "export": true, "normative": true, "for_": []};
+window.refsData['#broadcaster'] = {"text": "broadcaster", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#broadcaster", "export": true, "normative": true, "for_": []};
+window.refsData['#observer'] = {"text": "observer", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#observer", "export": true, "normative": true, "for_": []};
+window.refsData['#peripheral'] = {"text": "peripheral", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#peripheral", "export": true, "normative": true, "for_": []};
+window.refsData['#central'] = {"text": "central", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#central", "export": true, "normative": true, "for_": []};
+window.refsData['#gatt-server'] = {"text": "gatt server", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#gatt-server", "export": true, "normative": true, "for_": []};
+window.refsData['#service'] = {"text": "service", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#service", "export": true, "normative": true, "for_": []};
+window.refsData['#characteristic'] = {"text": "characteristic", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#characteristic", "export": true, "normative": true, "for_": []};
+window.refsData['#descriptor'] = {"text": "descriptor", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#descriptor", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetooth-requestdevice'] = {"text": "requestDevice()", "type": "method", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetooth-requestdevice", "export": true, "normative": true, "for_": ["Bluetooth"]};
+window.refsData['#dom-bluetoothremotegattserver-connect'] = {"text": "connect()", "type": "method", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattserver-connect", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTServer"]};
+window.refsData['#dom-bluetoothremotegattserver-getprimaryservice'] = {"text": "getPrimaryService(service)", "type": "method", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattserver-getprimaryservice", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTServer"]};
+window.refsData['https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.heart_rate.xml#'] = {"text": "org.bluetooth.service.heart_rate", "type": "enum", "spec": "bluetooth-assigned", "shortname": "bluetooth-assigned", "level": "", "status": "anchor-block", "url": "https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.heart_rate.xml#", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothremotegattservice-getcharacteristic'] = {"text": "getCharacteristic(characteristic)", "type": "method", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattservice-getcharacteristic", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTService"]};
+window.refsData['https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.body_sensor_location.xml#'] = {"text": "org.bluetooth.characteristic.body_sensor_location", "type": "enum", "spec": "bluetooth-assigned", "shortname": "bluetooth-assigned", "level": "", "status": "anchor-block", "url": "https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.body_sensor_location.xml#", "export": true, "normative": true, "for_": []};
+window.refsData['https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.heart_rate_measurement.xml#'] = {"text": "org.bluetooth.characteristic.heart_rate_measurement", "type": "enum", "spec": "bluetooth-assigned", "shortname": "bluetooth-assigned", "level": "", "status": "anchor-block", "url": "https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.heart_rate_measurement.xml#", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothremotegattcharacteristic-readvalue'] = {"text": "readValue()", "type": "method", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattcharacteristic-readvalue", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTCharacteristic"]};
+window.refsData['#dom-bluetoothremotegattcharacteristic-startnotifications'] = {"text": "startNotifications()", "type": "method", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattcharacteristic-startnotifications", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTCharacteristic"]};
+window.refsData['#eventdef-bluetoothremotegattcharacteristic-characteristicvaluechanged'] = {"text": "characteristicvaluechanged", "type": "event", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#eventdef-bluetoothremotegattcharacteristic-characteristicvaluechanged", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTCharacteristic"]};
+window.refsData['#dom-bluetoothremotegattcharacteristic-value'] = {"text": "value", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattcharacteristic-value", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTCharacteristic"]};
+window.refsData['https://tc39.github.io/ecma262/#sec-dataview-constructor'] = {"text": "DataView", "type": "interface", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-dataview-constructor", "export": true, "normative": true, "for_": []};
+window.refsData['#bluetoothremotegattcharacteristic'] = {"text": "BluetoothRemoteGATTCharacteristic", "type": "interface", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#bluetoothremotegattcharacteristic", "export": true, "normative": true, "for_": []};
+window.refsData['https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.heart_rate_control_point.xml#'] = {"text": "org.bluetooth.characteristic.heart_rate_control_point", "type": "enum", "spec": "bluetooth-assigned", "shortname": "bluetooth-assigned", "level": "", "status": "anchor-block", "url": "https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.heart_rate_control_point.xml#", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothremotegattcharacteristic-writevalue'] = {"text": "writeValue(value)", "type": "method", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattcharacteristic-writevalue", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTCharacteristic"]};
+window.refsData['#revoke-bluetooth-access'] = {"text": "revoke bluetooth access", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#revoke-bluetooth-access", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#secure-context'] = {"text": "secure context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#secure-context", "export": true, "normative": true, "for_": []};
+window.refsData['#gatt-blocklist'] = {"text": "gatt blocklist", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#gatt-blocklist", "export": true, "normative": true, "for_": []};
+window.refsData['#definition-of-keys-and-values'] = {"text": "definition of keys and values", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#definition-of-keys-and-values", "export": true, "normative": true, "for_": []};
+window.refsData['#bd_addr'] = {"text": "bd_addr", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#bd_addr", "export": true, "normative": true, "for_": []};
+window.refsData['#public-device-address'] = {"text": "public device address", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#public-device-address", "export": true, "normative": true, "for_": []};
+window.refsData['#static-device-address'] = {"text": "static device address", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#static-device-address", "export": true, "normative": true, "for_": []};
+window.refsData['#read-bd_addr-command'] = {"text": "read bd_addr command", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#read-bd_addr-command", "export": true, "normative": true, "for_": []};
+window.refsData['#identity-resolving-key'] = {"text": "identity resolving key", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#identity-resolving-key", "export": true, "normative": true, "for_": []};
+window.refsData['#private-address'] = {"text": "private address", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#private-address", "export": true, "normative": true, "for_": []};
+window.refsData['#resolvable-private-address-resolution-procedure'] = {"text": "resolvable private address resolution procedure", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#resolvable-private-address-resolution-procedure", "export": true, "normative": true, "for_": []};
+window.refsData['#bluetooth-device-name'] = {"text": "bluetooth device name", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#bluetooth-device-name", "export": true, "normative": true, "for_": []};
+window.refsData['#privacy-feature'] = {"text": "privacy feature", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#privacy-feature", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetooth-getavailability'] = {"text": "getAvailability()", "type": "method", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetooth-getavailability", "export": true, "normative": true, "for_": ["Bluetooth"]};
+window.refsData['https://w3c.github.io/fingerprinting-guidance/#dfn-fingerprinting-surface'] = {"text": "fingerprinting surface", "type": "dfn", "spec": "fingerprinting-guidance", "shortname": "fingerprinting-guidance", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/fingerprinting-guidance/#dfn-fingerprinting-surface", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-promise-objects'] = {"text": "Promise", "type": "interface", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-promise-objects", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#BufferSource'] = {"text": "BufferSource", "type": "typedef", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#BufferSource", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['#typedefdef-bluetoothserviceuuid'] = {"text": "BluetoothServiceUUID", "type": "typedef", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#typedefdef-bluetoothserviceuuid", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothlescanfilterinit-services'] = {"text": "services", "type": "dict-member", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothlescanfilterinit-services", "export": true, "normative": true, "for_": ["BluetoothLEScanFilterInit"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothlescanfilterinit-name'] = {"text": "name", "type": "dict-member", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothlescanfilterinit-name", "export": true, "normative": true, "for_": ["BluetoothLEScanFilterInit"]};
+window.refsData['#dom-bluetoothlescanfilterinit-nameprefix'] = {"text": "namePrefix", "type": "dict-member", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothlescanfilterinit-nameprefix", "export": true, "normative": true, "for_": ["BluetoothLEScanFilterInit"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-object'] = {"text": "object", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-object", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothlescanfilterinit-manufacturerdata'] = {"text": "manufacturerData", "type": "dict-member", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothlescanfilterinit-manufacturerdata", "export": true, "normative": true, "for_": ["BluetoothLEScanFilterInit"]};
+window.refsData['#dom-bluetoothlescanfilterinit-servicedata'] = {"text": "serviceData", "type": "dict-member", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothlescanfilterinit-servicedata", "export": true, "normative": true, "for_": ["BluetoothLEScanFilterInit"]};
+window.refsData['#dictdef-bluetoothlescanfilterinit'] = {"text": "BluetoothLEScanFilterInit", "type": "dictionary", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dictdef-bluetoothlescanfilterinit", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-requestdeviceoptions-filters'] = {"text": "filters", "type": "dict-member", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-requestdeviceoptions-filters", "export": true, "normative": true, "for_": ["RequestDeviceOptions"]};
+window.refsData['#dom-requestdeviceoptions-optionalservices'] = {"text": "optionalServices", "type": "dict-member", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-requestdeviceoptions-optionalservices", "export": true, "normative": true, "for_": ["RequestDeviceOptions"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-short'] = {"text": "unsigned short", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-short", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-requestdeviceoptions-optionalmanufacturerdata'] = {"text": "optionalManufacturerData", "type": "dict-member", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-requestdeviceoptions-optionalmanufacturerdata", "export": true, "normative": true, "for_": ["RequestDeviceOptions"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-requestdeviceoptions-acceptalldevices'] = {"text": "acceptAllDevices", "type": "dict-member", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-requestdeviceoptions-acceptalldevices", "export": true, "normative": true, "for_": ["RequestDeviceOptions"]};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#SecureContext'] = {"text": "SecureContext", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SecureContext", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#eventtarget'] = {"text": "EventTarget", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#eventtarget", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-promise'] = {"text": "Promise", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-promise", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler'] = {"text": "EventHandler", "type": "typedef", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#SameObject'] = {"text": "SameObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SameObject", "export": true, "normative": true, "for_": []};
+window.refsData['#bluetoothdevice'] = {"text": "BluetoothDevice", "type": "interface", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#bluetoothdevice", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetooth-referringdevice'] = {"text": "referringDevice", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetooth-referringdevice", "export": true, "normative": true, "for_": ["Bluetooth"]};
+window.refsData['#dom-bluetooth-getdevices'] = {"text": "getDevices()", "type": "method", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetooth-getdevices", "export": true, "normative": true, "for_": ["Bluetooth"]};
+window.refsData['#dictdef-requestdeviceoptions'] = {"text": "RequestDeviceOptions", "type": "dictionary", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dictdef-requestdeviceoptions", "export": true, "normative": true, "for_": []};
+window.refsData['#bluetooth'] = {"text": "Bluetooth", "type": "interface", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#bluetooth", "export": true, "normative": true, "for_": []};
+window.refsData['#bluetoothdeviceeventhandlers'] = {"text": "BluetoothDeviceEventHandlers", "type": "interface", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#bluetoothdeviceeventhandlers", "export": true, "normative": true, "for_": []};
+window.refsData['#characteristiceventhandlers'] = {"text": "CharacteristicEventHandlers", "type": "interface", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#characteristiceventhandlers", "export": true, "normative": true, "for_": []};
+window.refsData['#serviceeventhandlers'] = {"text": "ServiceEventHandlers", "type": "interface", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#serviceeventhandlers", "export": true, "normative": true, "for_": []};
+window.refsData['#eventdef-bluetooth-availabilitychanged'] = {"text": "availabilitychanged", "type": "event", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#eventdef-bluetooth-availabilitychanged", "export": true, "normative": true, "for_": ["Bluetooth"]};
+window.refsData['#matches-a-filter'] = {"text": "matches any filter", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#matches-a-filter", "export": true, "normative": true, "for_": []};
+window.refsData['#manufacturer-specific-data'] = {"text": "manufacturer specific data", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#manufacturer-specific-data", "export": true, "normative": true, "for_": []};
+window.refsData['#service-data'] = {"text": "service data", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#service-data", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-bluetoothdatafilterinit'] = {"text": "BluetoothDataFilterInit", "type": "dictionary", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dictdef-bluetoothdatafilterinit", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothdatafilterinit-mask'] = {"text": "mask", "type": "dict-member", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothdatafilterinit-mask", "export": true, "normative": true, "for_": ["BluetoothDataFilterInit"]};
+window.refsData['#dom-bluetoothdatafilterinit-dataprefix'] = {"text": "dataPrefix", "type": "dict-member", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothdatafilterinit-dataprefix", "export": true, "normative": true, "for_": ["BluetoothDataFilterInit"]};
+window.refsData['#eventdef-bluetoothremotegattservice-serviceadded'] = {"text": "serviceadded", "type": "event", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#eventdef-bluetoothremotegattservice-serviceadded", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTService"]};
+window.refsData['https://tc39.github.io/ecma262/#sec-native-error-types-used-in-this-standard-typeerror'] = {"text": "TypeError", "type": "interface", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-native-error-types-used-in-this-standard-typeerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-object-internal-methods-and-internal-slots'] = {"text": "internal slot", "type": "dfn", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-object-internal-methods-and-internal-slots", "export": true, "normative": true, "for_": []};
+window.refsData['#bluetooth-device'] = {"text": "bluetooth device", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#bluetooth-device", "export": true, "normative": true, "for_": []};
+window.refsData['#bluetooth-cache-bluetooth-cache'] = {"text": "bluetooth cache", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#bluetooth-cache-bluetooth-cache", "export": true, "normative": true, "for_": ["Bluetooth cache"]};
+window.refsData['#bluetoothremotegattservice'] = {"text": "BluetoothRemoteGATTService", "type": "interface", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#bluetoothremotegattservice", "export": true, "normative": true, "for_": []};
+window.refsData['#bluetoothremotegattdescriptor'] = {"text": "BluetoothRemoteGATTDescriptor", "type": "interface", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#bluetoothremotegattdescriptor", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsing-the-web.html#initialise-the-document-object'] = {"text": "initializing the document object", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsing-the-web.html#initialise-the-document-object", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetooth-referringdevice-slot'] = {"text": "[[referringDevice]]", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetooth-referringdevice-slot", "export": true, "normative": true, "for_": ["Bluetooth"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#browsing-context'] = {"text": "browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsing-the-web.html#navigate'] = {"text": "navigate", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsing-the-web.html#navigate", "export": true, "normative": true, "for_": []};
+window.refsData['#get-the-bluetoothdevice-representing'] = {"text": "get the bluetoothdevice representing", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#get-the-bluetoothdevice-representing", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-code-realms'] = {"text": "realm", "type": "dfn", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-code-realms", "export": true, "normative": true, "for_": []};
+window.refsData['#extended-inquiry-response'] = {"text": "extended inquiry response", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#extended-inquiry-response", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-ownpropertykeys'] = {"text": "[[OwnPropertyKeys]]", "type": "method", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-ownpropertykeys", "export": true, "normative": true, "for_": ["Object"]};
+window.refsData['#bluetoothdatafilterinit-matches'] = {"text": "matches", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#bluetoothdatafilterinit-matches", "export": true, "normative": true, "for_": ["BluetoothDataFilterInit"]};
+window.refsData['#bluetoothdatafilterinit-canonicalizing'] = {"text": "canonicalizing", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#bluetoothdatafilterinit-canonicalizing", "export": true, "normative": true, "for_": ["BluetoothDataFilterInit"]};
+window.refsData['https://heycam.github.io/webidl/#dfn-get-buffer-source-copy'] = {"text": "a copy of the bytes held", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "", "status": "anchor-block", "url": "https://heycam.github.io/webidl/#dfn-get-buffer-source-copy", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-bluetoothpermissionstorage'] = {"text": "BluetoothPermissionStorage", "type": "dictionary", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dictdef-bluetoothpermissionstorage", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#a-new-promise'] = {"text": "a new promise", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#a-new-promise", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel'] = {"text": "in parallel", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-array-objects'] = {"text": "Array", "type": "interface", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-array-objects", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothpermissionstorage-alloweddevices'] = {"text": "allowedDevices", "type": "dict-member", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothpermissionstorage-alloweddevices", "export": true, "normative": true, "for_": ["BluetoothPermissionStorage"]};
+window.refsData['#dom-allowedbluetoothdevice-device-slot'] = {"text": "[[device]]", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-allowedbluetoothdevice-device-slot", "export": true, "normative": true, "for_": ["AllowedBluetoothDevice"]};
+window.refsData['https://webidl.spec.whatwg.org/#resolve'] = {"text": "resolve", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#resolve", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothdevice-watchadvertisements'] = {"text": "watchAdvertisements()", "type": "method", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothdevice-watchadvertisements", "export": true, "normative": true, "for_": ["BluetoothDevice"]};
+window.refsData['#eventdef-bluetoothdevice-advertisementreceived'] = {"text": "advertisementreceived", "type": "event", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#eventdef-bluetoothdevice-advertisementreceived", "export": true, "normative": true, "for_": ["BluetoothDevice"]};
+window.refsData['https://webidl.spec.whatwg.org/#reject'] = {"text": "reject", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#reject", "export": true, "normative": true, "for_": []};
+window.refsData['#request-bluetooth-devices'] = {"text": "request bluetooth devices", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#request-bluetooth-devices", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#notfounderror'] = {"text": "NotFoundError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#notfounderror", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-global'] = {"text": "relevant global object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-global", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#securityerror'] = {"text": "SecurityError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#securityerror", "export": true, "normative": true, "for_": []};
+window.refsData['#uuid'] = {"text": "uuid", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#uuid", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-set-objects'] = {"text": "Set", "type": "interface", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-set-objects", "export": true, "normative": true, "for_": []};
+window.refsData['#bluetoothlescanfilterinit-canonicalizing'] = {"text": "canonicalizing", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#bluetoothlescanfilterinit-canonicalizing", "export": true, "normative": true, "for_": ["BluetoothLEScanFilterInit"]};
+window.refsData['https://tc39.github.io/ecma262/#sec-array.prototype.map'] = {"text": "Array.prototype.map", "type": "method", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-array.prototype.map", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothuuid-getservice'] = {"text": "getService(name)", "type": "method", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothuuid-getservice", "export": true, "normative": true, "for_": ["BluetoothUUID"]};
+window.refsData['#blocklisted'] = {"text": "blocklisted", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#blocklisted", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dfn-permission-state'] = {"text": "permission state", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-permission-state", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#non-secure-context'] = {"text": "non-secure context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#non-secure-context", "export": true, "normative": true, "for_": []};
+window.refsData['#scan-for-devices'] = {"text": "scan for devices", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#scan-for-devices", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dfn-prompt-the-user-to-choose'] = {"text": "prompt the user to choose", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-prompt-the-user-to-choose", "export": true, "normative": true, "for_": []};
+window.refsData['#add-device-to-storage'] = {"text": "add device to storage", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#add-device-to-storage", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dfn-extra-permission-data'] = {"text": "extra permission data", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-extra-permission-data", "export": true, "normative": true, "for_": ["powerful feature"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#current-settings-object'] = {"text": "current settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#current-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-allowedbluetoothdevice-mayusegatt'] = {"text": "mayUseGATT", "type": "dict-member", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-allowedbluetoothdevice-mayusegatt", "export": true, "normative": true, "for_": ["AllowedBluetoothDevice"]};
+window.refsData['#dom-allowedbluetoothdevice-allowedservices'] = {"text": "allowedServices", "type": "dict-member", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-allowedbluetoothdevice-allowedservices", "export": true, "normative": true, "for_": ["AllowedBluetoothDevice"]};
+window.refsData['#dom-allowedbluetoothdevice-allowedmanufacturerdata'] = {"text": "allowedManufacturerData", "type": "dict-member", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-allowedbluetoothdevice-allowedmanufacturerdata", "export": true, "normative": true, "for_": ["AllowedBluetoothDevice"]};
+window.refsData['#populate-the-bluetooth-cache'] = {"text": "populate the bluetooth cache", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#populate-the-bluetooth-cache", "export": true, "normative": true, "for_": []};
+window.refsData['https://encoding.spec.whatwg.org/#utf-8-encode'] = {"text": "utf-8 encode", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "1", "status": "current", "url": "https://encoding.spec.whatwg.org/#utf-8-encode", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-canonicalnumericindexstring'] = {"text": "CanonicalNumericIndexString", "type": "abstract-op", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-canonicalnumericindexstring", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-isinteger'] = {"text": "IsInteger", "type": "abstract-op", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-isinteger", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-convert-ecmascript-to-idl-value'] = {"text": "converted to an idl value", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-convert-ecmascript-to-idl-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-convert-idl-to-ecmascript-value'] = {"text": "converted to an ecmascript value", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-convert-idl-to-ecmascript-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-createdataproperty'] = {"text": "CreateDataProperty", "type": "abstract-op", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-createdataproperty", "export": true, "normative": true, "for_": []};
+window.refsData['#att-bearer'] = {"text": "att bearer", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#att-bearer", "export": true, "normative": true, "for_": []};
+window.refsData['#general-discovery-procedure'] = {"text": "general discovery procedure", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#general-discovery-procedure", "export": true, "normative": true, "for_": []};
+window.refsData['#discoverable-mode'] = {"text": "discoverable mode", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#discoverable-mode", "export": true, "normative": true, "for_": []};
+window.refsData['#passive-scanning'] = {"text": "passive scanning", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#passive-scanning", "export": true, "normative": true, "for_": []};
+window.refsData['#observation-procedure'] = {"text": "observation procedure", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#observation-procedure", "export": true, "normative": true, "for_": []};
+window.refsData['#device-discovery-procedure'] = {"text": "device discovery procedure", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#device-discovery-procedure", "export": true, "normative": true, "for_": []};
+window.refsData['#supported-physical-transports'] = {"text": "supported physical transports", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#supported-physical-transports", "export": true, "normative": true, "for_": []};
+window.refsData['#name-discovery-procedure'] = {"text": "name discovery procedure", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#name-discovery-procedure", "export": true, "normative": true, "for_": []};
+window.refsData['#service-uuid-data-type'] = {"text": "service uuids", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#service-uuid-data-type", "export": true, "normative": true, "for_": []};
+window.refsData['#searching-for-services'] = {"text": "searching for services", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#searching-for-services", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-allowedbluetoothdevice-deviceid'] = {"text": "deviceId", "type": "dict-member", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-allowedbluetoothdevice-deviceid", "export": true, "normative": true, "for_": ["AllowedBluetoothDevice"]};
+window.refsData['https://w3c.github.io/permissions/#dom-permissions-query'] = {"text": "query()", "type": "method", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dom-permissions-query", "export": true, "normative": true, "for_": ["Permissions"]};
+window.refsData['https://w3c.github.io/permissions/#dom-permissiondescriptor-name'] = {"text": "name", "type": "dict-member", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dom-permissiondescriptor-name", "export": true, "normative": true, "for_": ["PermissionDescriptor"]};
+window.refsData['#dom-bluetoothpermissionresult-devices'] = {"text": "devices", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothpermissionresult-devices", "export": true, "normative": true, "for_": ["BluetoothPermissionResult"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMException'] = {"text": "DOMException", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMException", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dfn-powerful-feature'] = {"text": "powerful feature", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-powerful-feature", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dfn-permission-descriptor-type'] = {"text": "permission descriptor type", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-permission-descriptor-type", "export": true, "normative": true, "for_": ["powerful feature"]};
+window.refsData['https://w3c.github.io/permissions/#dom-permissiondescriptor'] = {"text": "PermissionDescriptor", "type": "dictionary", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dom-permissiondescriptor", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dfn-extra-permission-data-type'] = {"text": "extra permission data type", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-extra-permission-data-type", "export": true, "normative": true, "for_": ["powerful feature"]};
+window.refsData['#typedefdef-uuid'] = {"text": "UUID", "type": "typedef", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#typedefdef-uuid", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-allowedbluetoothdevice'] = {"text": "AllowedBluetoothDevice", "type": "dictionary", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dictdef-allowedbluetoothdevice", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dfn-extra-permission-data-constraints'] = {"text": "extra permission data constraints", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-extra-permission-data-constraints", "export": true, "normative": true, "for_": ["powerful feature"]};
+window.refsData['https://w3c.github.io/permissions/#dfn-permission-result-type'] = {"text": "permission result type", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-permission-result-type", "export": true, "normative": true, "for_": ["powerful feature"]};
+window.refsData['https://w3c.github.io/permissions/#dom-permissionstatus'] = {"text": "PermissionStatus", "type": "interface", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dom-permissionstatus", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-frozen-array'] = {"text": "FrozenArray", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-frozen-array", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dfn-permission-query-algorithm'] = {"text": "permission query algorithm", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-permission-query-algorithm", "export": true, "normative": true, "for_": ["powerful feature"]};
+window.refsData['#dictdef-bluetoothpermissiondescriptor'] = {"text": "BluetoothPermissionDescriptor", "type": "dictionary", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dictdef-bluetoothpermissiondescriptor", "export": true, "normative": true, "for_": []};
+window.refsData['#bluetoothpermissionresult'] = {"text": "BluetoothPermissionResult", "type": "interface", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#bluetoothpermissionresult", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dom-permissionstatus-state'] = {"text": "state", "type": "attribute", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dom-permissionstatus-state", "export": true, "normative": true, "for_": ["PermissionStatus"]};
+window.refsData['https://w3c.github.io/permissions/#dfn-permission-revocation-algorithm'] = {"text": "permission revocation algorithm", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-permission-revocation-algorithm", "export": true, "normative": true, "for_": ["powerful feature"]};
+window.refsData['https://tc39.github.io/ecma262/#current-realm'] = {"text": "current realm", "type": "dfn", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#current-realm", "export": true, "normative": true, "for_": []};
+window.refsData['#same-bluetooth-device'] = {"text": "same device", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#same-bluetooth-device", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothdevice-representeddevice-slot'] = {"text": "[[representedDevice]]", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothdevice-representeddevice-slot", "export": true, "normative": true, "for_": ["BluetoothDevice"]};
+window.refsData['#dom-bluetoothdevice-id'] = {"text": "id", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothdevice-id", "export": true, "normative": true, "for_": ["BluetoothDevice"]};
+window.refsData['#dom-bluetoothdevice-allowedservices-slot'] = {"text": "[[allowedServices]]", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothdevice-allowedservices-slot", "export": true, "normative": true, "for_": ["BluetoothDevice"]};
+window.refsData['#dom-bluetoothremotegattserver-disconnect'] = {"text": "disconnect()", "type": "method", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattserver-disconnect", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTServer"]};
+window.refsData['#eventdef-bluetoothdevice-gattserverdisconnected'] = {"text": "gattserverdisconnected", "type": "event", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#eventdef-bluetoothdevice-gattserverdisconnected", "export": true, "normative": true, "for_": ["BluetoothDevice"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task'] = {"text": "queue a task", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#global-object'] = {"text": "global object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#global-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#responsible-event-loop'] = {"text": "responsible event loop", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#responsible-event-loop", "export": true, "normative": true, "for_": ["environment settings object"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-event-fire'] = {"text": "fire an event", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-event-fire", "export": true, "normative": true, "for_": []};
+window.refsData['#valueevent'] = {"text": "ValueEvent", "type": "interface", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#valueevent", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-valueevent-value'] = {"text": "value", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-valueevent-value", "export": true, "normative": true, "for_": ["ValueEvent"]};
+window.refsData['https://dom.spec.whatwg.org/#event'] = {"text": "Event", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#event", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-valueeventinit'] = {"text": "ValueEventInit", "type": "dictionary", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dictdef-valueeventinit", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-any'] = {"text": "any", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-any", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#dictdef-eventinit'] = {"text": "EventInit", "type": "dictionary", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dictdef-eventinit", "export": true, "normative": true, "for_": []};
+window.refsData['#flags-data-type'] = {"text": "flags data type", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#flags-data-type", "export": true, "normative": true, "for_": []};
+window.refsData['#advertising-data'] = {"text": "advertising data", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#advertising-data", "export": true, "normative": true, "for_": []};
+window.refsData['#public-bluetooth-address'] = {"text": "public bluetooth address", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#public-bluetooth-address", "export": true, "normative": true, "for_": []};
+window.refsData['#static-address'] = {"text": "static address", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#static-address", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.bluetooth.org/en-us/specification/assigned-numbers/generic-access-profile#'] = {"text": "shortened local name", "type": "dfn", "spec": "bluetooth-assigned", "shortname": "bluetooth-assigned", "level": "", "status": "anchor-block", "url": "https://www.bluetooth.org/en-us/specification/assigned-numbers/generic-access-profile#", "export": true, "normative": true, "for_": []};
+window.refsData['https://encoding.spec.whatwg.org/#utf-8-decode-without-bom'] = {"text": "utf-8 decode without bom", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "1", "status": "current", "url": "https://encoding.spec.whatwg.org/#utf-8-decode-without-bom", "export": true, "normative": true, "for_": []};
+window.refsData['#gap-interoperability-requirements'] = {"text": "gap interoperability requirements", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#gap-interoperability-requirements", "export": true, "normative": true, "for_": []};
+window.refsData['#attribute'] = {"text": "attribute", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#attribute", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothdevice-name'] = {"text": "name", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothdevice-name", "export": true, "normative": true, "for_": ["BluetoothDevice"]};
+window.refsData['#bluetoothremotegattserver'] = {"text": "BluetoothRemoteGATTServer", "type": "interface", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#bluetoothremotegattserver", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothdevice-gatt'] = {"text": "gatt", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothdevice-gatt", "export": true, "normative": true, "for_": ["BluetoothDevice"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-watchadvertisementsoptions'] = {"text": "WatchAdvertisementsOptions", "type": "dictionary", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dictdef-watchadvertisementsoptions", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothdevice-watchingadvertisements'] = {"text": "watchingAdvertisements", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothdevice-watchingadvertisements", "export": true, "normative": true, "for_": ["BluetoothDevice"]};
+window.refsData['https://dom.spec.whatwg.org/#abortsignal'] = {"text": "AbortSignal", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#abortsignal", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothremotegattserver-device'] = {"text": "device", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattserver-device", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTServer"]};
+window.refsData['#dom-bluetoothremotegattserver-connected'] = {"text": "connected", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattserver-connected", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTServer"]};
+window.refsData['#dom-bluetooth-deviceinstancemap-slot'] = {"text": "[[deviceInstanceMap]]", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetooth-deviceinstancemap-slot", "export": true, "normative": true, "for_": ["Bluetooth"]};
+window.refsData['#dom-bluetoothdevice-context-slot'] = {"text": "[[context]]", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothdevice-context-slot", "export": true, "normative": true, "for_": ["BluetoothDevice"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object'] = {"text": "relevant settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothdevice-gatt-slot'] = {"text": "[[gatt]]", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothdevice-gatt-slot", "export": true, "normative": true, "for_": ["BluetoothDevice"]};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#starting-a-new-parallel-queue'] = {"text": "starting a new parallel queue", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#starting-a-new-parallel-queue", "export": true, "normative": true, "for_": []};
+window.refsData['#abort-watchadvertisements'] = {"text": "abort watchadvertisements", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#abort-watchadvertisements", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#abortsignal-add'] = {"text": "add", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#abortsignal-add", "export": true, "normative": true, "for_": ["AbortSignal"]};
+window.refsData['https://webidl.spec.whatwg.org/#aborterror'] = {"text": "AbortError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#aborterror", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothdevice-watchadvertisementsstate-slot'] = {"text": "[[watchAdvertisementsState]]", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothdevice-watchadvertisementsstate-slot", "export": true, "normative": true, "for_": ["BluetoothDevice"]};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#enqueue-the-following-steps'] = {"text": "enqueue the following steps", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#enqueue-the-following-steps", "export": true, "normative": true, "for_": ["parallel queue"]};
+window.refsData['#watch-advertisements-manager'] = {"text": "watch advertisements manager", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#watch-advertisements-manager", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#notsupportederror'] = {"text": "NotSupportedError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#notsupportederror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#invalidstateerror'] = {"text": "InvalidStateError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invalidstateerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#unknownerror'] = {"text": "UnknownError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#unknownerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#abort-when'] = {"text": "abort when", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#abort-when", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#if-aborted'] = {"text": "if aborted", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#if-aborted", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#abortcontroller'] = {"text": "AbortController", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#abortcontroller", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#map-iterate'] = {"text": "for each", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-iterate", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-document'] = {"text": "document", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-document", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/page-visibility-2/#dom-visibilitystate'] = {"text": "document visibility state", "type": "dfn", "spec": "page-visibility", "shortname": "page-visibility", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/page-visibility-2/#dom-visibilitystate", "export": true, "normative": true, "for_": []};
+window.refsData['#abort-all-active-watchadvertisements'] = {"text": "abort all active watchadvertisements", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#abort-all-active-watchadvertisements", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#fully-active'] = {"text": "fully active", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#fully-active", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['#advertising-event'] = {"text": "advertising event", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#advertising-event", "export": true, "normative": true, "for_": []};
+window.refsData['#bluetoothmanufacturerdatamap'] = {"text": "BluetoothManufacturerDataMap", "type": "interface", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#bluetoothmanufacturerdatamap", "export": true, "normative": true, "for_": []};
+window.refsData['#bluetoothservicedatamap'] = {"text": "BluetoothServiceDataMap", "type": "interface", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#bluetoothservicedatamap", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothadvertisingevent-bluetoothadvertisingevent'] = {"text": "BluetoothAdvertisingEvent(type, init)", "type": "constructor", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothadvertisingevent-bluetoothadvertisingevent", "export": true, "normative": true, "for_": ["BluetoothAdvertisingEvent"]};
+window.refsData['#dictdef-bluetoothadvertisingeventinit'] = {"text": "BluetoothAdvertisingEventInit", "type": "dictionary", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dictdef-bluetoothadvertisingeventinit", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothadvertisingevent-device'] = {"text": "device", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothadvertisingevent-device", "export": true, "normative": true, "for_": ["BluetoothAdvertisingEvent"]};
+window.refsData['#dom-bluetoothadvertisingevent-uuids'] = {"text": "uuids", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothadvertisingevent-uuids", "export": true, "normative": true, "for_": ["BluetoothAdvertisingEvent"]};
+window.refsData['#dom-bluetoothadvertisingevent-name'] = {"text": "name", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothadvertisingevent-name", "export": true, "normative": true, "for_": ["BluetoothAdvertisingEvent"]};
+window.refsData['#dom-bluetoothadvertisingevent-appearance'] = {"text": "appearance", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothadvertisingevent-appearance", "export": true, "normative": true, "for_": ["BluetoothAdvertisingEvent"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-byte'] = {"text": "byte", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-byte", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothadvertisingevent-txpower'] = {"text": "txPower", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothadvertisingevent-txpower", "export": true, "normative": true, "for_": ["BluetoothAdvertisingEvent"]};
+window.refsData['#dom-bluetoothadvertisingevent-rssi'] = {"text": "rssi", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothadvertisingevent-rssi", "export": true, "normative": true, "for_": ["BluetoothAdvertisingEvent"]};
+window.refsData['#dom-bluetoothadvertisingevent-manufacturerdata'] = {"text": "manufacturerData", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothadvertisingevent-manufacturerdata", "export": true, "normative": true, "for_": ["BluetoothAdvertisingEvent"]};
+window.refsData['#dom-bluetoothadvertisingevent-servicedata'] = {"text": "serviceData", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothadvertisingevent-servicedata", "export": true, "normative": true, "for_": ["BluetoothAdvertisingEvent"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-long'] = {"text": "unsigned long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-long", "export": true, "normative": true, "for_": []};
+window.refsData['#bluetoothadvertisingevent'] = {"text": "BluetoothAdvertisingEvent", "type": "interface", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#bluetoothadvertisingevent", "export": true, "normative": true, "for_": []};
+window.refsData['#appearance'] = {"text": "appearance", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#appearance", "export": true, "normative": true, "for_": []};
+window.refsData['https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.gap.appearance.xml#'] = {"text": "org.bluetooth.characteristic.gap.appearance", "type": "enum", "spec": "bluetooth-assigned", "shortname": "bluetooth-assigned", "level": "", "status": "anchor-block", "url": "https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.gap.appearance.xml#", "export": true, "normative": true, "for_": []};
+window.refsData['#fire-an-advertisementreceived-event'] = {"text": "fire an advertisementreceived event", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#fire-an-advertisementreceived-event", "export": true, "normative": true, "for_": []};
+window.refsData['#rssi'] = {"text": "received signal strength", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#rssi", "export": true, "normative": true, "for_": []};
+window.refsData['#ad-structure'] = {"text": "ad structure", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#ad-structure", "export": true, "normative": true, "for_": []};
+window.refsData['#local-name-data-type'] = {"text": "local name data type", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#local-name-data-type", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothdevice-allowedmanufacturerdata-slot'] = {"text": "[[allowedManufacturerData]]", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothdevice-allowedmanufacturerdata-slot", "export": true, "normative": true, "for_": ["BluetoothDevice"]};
+window.refsData['https://tc39.github.io/ecma262/#sec-arraybuffer-constructor'] = {"text": "ArrayBuffer", "type": "interface", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-arraybuffer-constructor", "export": true, "normative": true, "for_": []};
+window.refsData['#tx-power-level'] = {"text": "tx power level", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#tx-power-level", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#dom-event-istrusted'] = {"text": "isTrusted", "type": "attribute", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-event-istrusted", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['#dom-bluetoothadvertisingeventinit-uuids'] = {"text": "uuids", "type": "dict-member", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothadvertisingeventinit-uuids", "export": true, "normative": true, "for_": ["BluetoothAdvertisingEventInit"]};
+window.refsData['#dom-bluetoothadvertisingeventinit-manufacturerdata'] = {"text": "manufacturerData", "type": "dict-member", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothadvertisingeventinit-manufacturerdata", "export": true, "normative": true, "for_": ["BluetoothAdvertisingEventInit"]};
+window.refsData['#dom-bluetoothadvertisingeventinit-servicedata'] = {"text": "serviceData", "type": "dict-member", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothadvertisingeventinit-servicedata", "export": true, "normative": true, "for_": ["BluetoothAdvertisingEventInit"]};
+window.refsData['#read-only-arraybuffer'] = {"text": "read only arraybuffer", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#read-only-arraybuffer", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothmanufacturerdatamap-backingmap-slot'] = {"text": "[[BackingMap]]", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothmanufacturerdatamap-backingmap-slot", "export": true, "normative": true, "for_": ["BluetoothManufacturerDataMap"]};
+window.refsData['#dom-bluetoothservicedatamap-backingmap-slot'] = {"text": "[[BackingMap]]", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothservicedatamap-backingmap-slot", "export": true, "normative": true, "for_": ["BluetoothServiceDataMap"]};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-maplike'] = {"text": "maplike", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-maplike", "export": true, "normative": true, "for_": []};
+window.refsData['#gatt-profile-hierarchy'] = {"text": "gatt profile hierarchy", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#gatt-profile-hierarchy", "export": true, "normative": true, "for_": []};
+window.refsData['#included-service'] = {"text": "included service", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#included-service", "export": true, "normative": true, "for_": []};
+window.refsData['#gatt-client'] = {"text": "gatt client", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#gatt-client", "export": true, "normative": true, "for_": []};
+window.refsData['#gatt-procedure'] = {"text": "gatt procedures", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#gatt-procedure", "export": true, "normative": true, "for_": []};
+window.refsData['#attribute-handle'] = {"text": "attribute handle", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#attribute-handle", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothremotegattservice-getincludedservice'] = {"text": "getIncludedService(service)", "type": "method", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattservice-getincludedservice", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTService"]};
+window.refsData['#dom-bluetoothremotegattservice-isprimary'] = {"text": "isPrimary", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattservice-isprimary", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTService"]};
+window.refsData['#dom-bluetoothremotegattcharacteristic-getdescriptor'] = {"text": "getDescriptor(descriptor)", "type": "method", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattcharacteristic-getdescriptor", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTCharacteristic"]};
+window.refsData['#bluetoothcharacteristicproperties'] = {"text": "BluetoothCharacteristicProperties", "type": "interface", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#bluetoothcharacteristicproperties", "export": true, "normative": true, "for_": []};
+window.refsData['#attribute-caching'] = {"text": "attribute caching", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#attribute-caching", "export": true, "normative": true, "for_": []};
+window.refsData['#bond'] = {"text": "bond", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#bond", "export": true, "normative": true, "for_": []};
+window.refsData['#same-attribute'] = {"text": "same attribute", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#same-attribute", "export": true, "normative": true, "for_": []};
+window.refsData['#discover-characteristics-by-uuid'] = {"text": "discover characteristics by uuid", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#discover-characteristics-by-uuid", "export": true, "normative": true, "for_": []};
+window.refsData['#connection-checking-wrapper'] = {"text": "connection-checking wrapper", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#connection-checking-wrapper", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetooth-attributeinstancemap-slot'] = {"text": "[[attributeInstanceMap]]", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetooth-attributeinstancemap-slot", "export": true, "normative": true, "for_": ["Bluetooth"]};
+window.refsData['#create-a-bluetoothremotegattservice-representing'] = {"text": "create a bluetoothremotegattservice representing", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#create-a-bluetoothremotegattservice-representing", "export": true, "normative": true, "for_": []};
+window.refsData['#create-a-bluetoothremotegattcharacteristic-representing'] = {"text": "create a bluetoothremotegattcharacteristic representing", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#create-a-bluetoothremotegattcharacteristic-representing", "export": true, "normative": true, "for_": []};
+window.refsData['#create-a-bluetoothremotegattdescriptor-representing'] = {"text": "create a bluetoothremotegattdescriptor representing", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#create-a-bluetoothremotegattdescriptor-representing", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#wait-for-all'] = {"text": "waiting for all", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#wait-for-all", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothremotegattservice-representedservice-slot'] = {"text": "[[representedService]]", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattservice-representedservice-slot", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTService"]};
+window.refsData['#dom-bluetoothremotegattcharacteristic-representedcharacteristic-slot'] = {"text": "[[representedCharacteristic]]", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattcharacteristic-representedcharacteristic-slot", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTCharacteristic"]};
+window.refsData['#dom-bluetoothremotegattdescriptor-representeddescriptor-slot'] = {"text": "[[representedDescriptor]]", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattdescriptor-representeddescriptor-slot", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTDescriptor"]};
+window.refsData['https://webidl.spec.whatwg.org/#a-promise-rejected-with'] = {"text": "a promise rejected with", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#a-promise-rejected-with", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothremotegattservice-device'] = {"text": "device", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattservice-device", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTService"]};
+window.refsData['#dom-bluetoothremotegattcharacteristic-service'] = {"text": "service", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattcharacteristic-service", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTCharacteristic"]};
+window.refsData['https://webidl.spec.whatwg.org/#networkerror'] = {"text": "NetworkError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#networkerror", "export": true, "normative": true, "for_": []};
+window.refsData['#represented'] = {"text": "represented", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#represented", "export": true, "normative": true, "for_": []};
+window.refsData['#query-the-bluetooth-cache'] = {"text": "query the bluetooth cache", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#query-the-bluetooth-cache", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#upon-fulfillment'] = {"text": "upon fulfillment", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#upon-fulfillment", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothremotegattserver-getprimaryservices'] = {"text": "getPrimaryServices(service)", "type": "method", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattserver-getprimaryservices", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTServer"]};
+window.refsData['#dom-bluetoothremotegattserver-activealgorithms-slot'] = {"text": "[[activeAlgorithms]]", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattserver-activealgorithms-slot", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTServer"]};
+window.refsData['#exchange-mtu'] = {"text": "exchange mtu", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#exchange-mtu", "export": true, "normative": true, "for_": []};
+window.refsData['#br-edr-bonding-procedure'] = {"text": "br/edr bonding procedure", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#br-edr-bonding-procedure", "export": true, "normative": true, "for_": []};
+window.refsData['#le-bonding-procedure'] = {"text": "le bonding procedure", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#le-bonding-procedure", "export": true, "normative": true, "for_": []};
+window.refsData['#garbage-collect-the-connection'] = {"text": "garbage-collect the connection", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#garbage-collect-the-connection", "export": true, "normative": true, "for_": []};
+window.refsData['#clean-up-the-disconnected-device'] = {"text": "clean up the disconnected device", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#clean-up-the-disconnected-device", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-perform-steps-once-promise-is-settled'] = {"text": "react", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-perform-steps-once-promise-is-settled", "export": true, "normative": true, "for_": ["promise"]};
+window.refsData['#getgattchildren'] = {"text": "getgattchildren", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#getgattchildren", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothremotegattservice-uuid'] = {"text": "uuid", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattservice-uuid", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTService"]};
+window.refsData['#typedefdef-bluetoothcharacteristicuuid'] = {"text": "BluetoothCharacteristicUUID", "type": "typedef", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#typedefdef-bluetoothcharacteristicuuid", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothremotegattservice-getcharacteristics'] = {"text": "getCharacteristics(characteristic)", "type": "method", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattservice-getcharacteristics", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTService"]};
+window.refsData['#dom-bluetoothremotegattservice-getincludedservices'] = {"text": "getIncludedServices(service)", "type": "method", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattservice-getincludedservices", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTService"]};
+window.refsData['#dom-bluetoothuuid-getcharacteristic'] = {"text": "getCharacteristic(name)", "type": "method", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothuuid-getcharacteristic", "export": true, "normative": true, "for_": ["BluetoothUUID"]};
+window.refsData['#dom-bluetoothremotegattcharacteristic-uuid'] = {"text": "uuid", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattcharacteristic-uuid", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTCharacteristic"]};
+window.refsData['#dom-bluetoothremotegattcharacteristic-properties'] = {"text": "properties", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattcharacteristic-properties", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTCharacteristic"]};
+window.refsData['#typedefdef-bluetoothdescriptoruuid'] = {"text": "BluetoothDescriptorUUID", "type": "typedef", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#typedefdef-bluetoothdescriptoruuid", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothremotegattcharacteristic-getdescriptors'] = {"text": "getDescriptors(descriptor)", "type": "method", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattcharacteristic-getdescriptors", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTCharacteristic"]};
+window.refsData['#dom-bluetoothremotegattcharacteristic-writevaluewithresponse'] = {"text": "writeValueWithResponse(value)", "type": "method", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattcharacteristic-writevaluewithresponse", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTCharacteristic"]};
+window.refsData['#dom-bluetoothremotegattcharacteristic-writevaluewithoutresponse'] = {"text": "writeValueWithoutResponse(value)", "type": "method", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattcharacteristic-writevaluewithoutresponse", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTCharacteristic"]};
+window.refsData['#dom-bluetoothremotegattcharacteristic-stopnotifications'] = {"text": "stopNotifications()", "type": "method", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattcharacteristic-stopnotifications", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTCharacteristic"]};
+window.refsData['#create-a-bluetoothcharacteristicproperties-instance-from-the-characteristic'] = {"text": "create a bluetoothcharacteristicproperties instance from the characteristic", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#create-a-bluetoothcharacteristicproperties-instance-from-the-characteristic", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothuuid-getdescriptor'] = {"text": "getDescriptor(name)", "type": "method", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothuuid-getdescriptor", "export": true, "normative": true, "for_": ["BluetoothUUID"]};
+window.refsData['#blocklisted-for-reads'] = {"text": "blocklisted for reads", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#blocklisted-for-reads", "export": true, "normative": true, "for_": []};
+window.refsData['#characteristic-properties'] = {"text": "characteristic properties", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#characteristic-properties", "export": true, "normative": true, "for_": []};
+window.refsData['#characteristic-value-read'] = {"text": "characteristic value read", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#characteristic-value-read", "export": true, "normative": true, "for_": []};
+window.refsData['#blocklisted-for-writes'] = {"text": "blocklisted for writes", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#blocklisted-for-writes", "export": true, "normative": true, "for_": []};
+window.refsData['#long-attribute-values'] = {"text": "long attribute values", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#long-attribute-values", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#invalidmodificationerror'] = {"text": "InvalidModificationError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invalidmodificationerror", "export": true, "normative": true, "for_": []};
+window.refsData['#write-characteristic-value'] = {"text": "write characteristic value", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#write-characteristic-value", "export": true, "normative": true, "for_": []};
+window.refsData['#write-without-response'] = {"text": "write without response", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#write-without-response", "export": true, "normative": true, "for_": []};
+window.refsData['#characteristic-value-write'] = {"text": "characteristic value write", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#characteristic-value-write", "export": true, "normative": true, "for_": []};
+window.refsData['#writecharacteristicvalue'] = {"text": "writecharacteristicvalue", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#writecharacteristicvalue", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-navigator-bluetooth'] = {"text": "bluetooth", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-navigator-bluetooth", "export": true, "normative": true, "for_": ["Navigator"]};
+window.refsData['#active-notification-context-set'] = {"text": "active notification context set", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#active-notification-context-set", "export": true, "normative": true, "for_": []};
+window.refsData['#client-characteristic-configuration'] = {"text": "client characteristic configuration", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#client-characteristic-configuration", "export": true, "normative": true, "for_": []};
+window.refsData['#characteristic-descriptors'] = {"text": "characteristic descriptors", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#characteristic-descriptors", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#perform-a-microtask-checkpoint'] = {"text": "perform a microtask checkpoint", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#perform-a-microtask-checkpoint", "export": true, "normative": true, "for_": []};
+window.refsData['#characteristic-descriptor-discovery'] = {"text": "characteristic descriptor discovery", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#characteristic-descriptor-discovery", "export": true, "normative": true, "for_": []};
+window.refsData['#characteristic-extended-properties'] = {"text": "characteristic extended properties", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#characteristic-extended-properties", "export": true, "normative": true, "for_": []};
+window.refsData['#read-characteristic-descriptors'] = {"text": "read characteristic descriptors", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#read-characteristic-descriptors", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothremotegattdescriptor-characteristic'] = {"text": "characteristic", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattdescriptor-characteristic", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTDescriptor"]};
+window.refsData['#dom-bluetoothremotegattdescriptor-uuid'] = {"text": "uuid", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattdescriptor-uuid", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTDescriptor"]};
+window.refsData['#dom-bluetoothremotegattdescriptor-value'] = {"text": "value", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattdescriptor-value", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTDescriptor"]};
+window.refsData['#dom-bluetoothremotegattdescriptor-readvalue'] = {"text": "readValue()", "type": "method", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattdescriptor-readvalue", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTDescriptor"]};
+window.refsData['#dom-bluetoothremotegattdescriptor-writevalue'] = {"text": "writeValue(value)", "type": "method", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothremotegattdescriptor-writevalue", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTDescriptor"]};
+window.refsData['https://developer.bluetooth.org/gatt/descriptors/Pages/DescriptorViewer.aspx?u=org.bluetooth.descriptor.gatt.client_characteristic_configuration.xml#'] = {"text": "org.bluetooth.descriptor.gatt.client_characteristic_configuration", "type": "enum", "spec": "bluetooth-assigned", "shortname": "bluetooth-assigned", "level": "", "status": "anchor-block", "url": "https://developer.bluetooth.org/gatt/descriptors/Pages/DescriptorViewer.aspx?u=org.bluetooth.descriptor.gatt.client_characteristic_configuration.xml#", "export": true, "normative": true, "for_": []};
+window.refsData['#read-long-characteristic-descriptors'] = {"text": "read long characteristic descriptors", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#read-long-characteristic-descriptors", "export": true, "normative": true, "for_": []};
+window.refsData['#write-characteristic-descriptors'] = {"text": "write characteristic descriptors", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#write-characteristic-descriptors", "export": true, "normative": true, "for_": []};
+window.refsData['#write-long-characteristic-descriptors'] = {"text": "write long characteristic descriptors", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#write-long-characteristic-descriptors", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-tree-participate'] = {"text": "participate in a tree", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-tree-participate", "export": true, "normative": true, "for_": ["tree"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-tree-child'] = {"text": "children", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-tree-child", "export": true, "normative": true, "for_": ["tree"]};
+window.refsData['#discover-primary-service-by-service-uuid'] = {"text": "discover primary service by service uuid", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#discover-primary-service-by-service-uuid", "export": true, "normative": true, "for_": []};
+window.refsData['#discover-all-characteristic-descriptors'] = {"text": "discover all characteristic descriptors", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#discover-all-characteristic-descriptors", "export": true, "normative": true, "for_": []};
+window.refsData['#bluetooth-tree-bluetooth-tree'] = {"text": "bluetooth tree", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#bluetooth-tree-bluetooth-tree", "export": true, "normative": true, "for_": ["Bluetooth tree"]};
+window.refsData['#service-changed'] = {"text": "service changed", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#service-changed", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#dom-event-bubbles'] = {"text": "bubbles", "type": "attribute", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-event-bubbles", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['#characteristic-value-notification'] = {"text": "characteristic value notification", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#characteristic-value-notification", "export": true, "normative": true, "for_": []};
+window.refsData['#characteristic-value-indications'] = {"text": "characteristic value indications", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#characteristic-value-indications", "export": true, "normative": true, "for_": []};
+window.refsData['#primary-service-discovery'] = {"text": "primary service discovery", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#primary-service-discovery", "export": true, "normative": true, "for_": []};
+window.refsData['#relationship-discovery'] = {"text": "relationship discovery", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#relationship-discovery", "export": true, "normative": true, "for_": []};
+window.refsData['#characteristic-discovery'] = {"text": "characteristic discovery", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#characteristic-discovery", "export": true, "normative": true, "for_": []};
+window.refsData['#service-interoperability-requirements'] = {"text": "service interoperability requirements", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#service-interoperability-requirements", "export": true, "normative": true, "for_": []};
+window.refsData['#eventdef-bluetoothremotegattservice-servicechanged'] = {"text": "servicechanged", "type": "event", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#eventdef-bluetoothremotegattservice-servicechanged", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTService"]};
+window.refsData['#service-definition'] = {"text": "service definition", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#service-definition", "export": true, "normative": true, "for_": []};
+window.refsData['#eventdef-bluetoothremotegattservice-serviceremoved'] = {"text": "serviceremoved", "type": "event", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#eventdef-bluetoothremotegattservice-serviceremoved", "export": true, "normative": true, "for_": ["BluetoothRemoteGATTService"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object'] = {"text": "environment settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-global'] = {"text": "global object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-global", "export": true, "normative": true, "for_": ["environment settings object"]};
+window.refsData['#dom-characteristiceventhandlers-oncharacteristicvaluechanged'] = {"text": "oncharacteristicvaluechanged", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-characteristiceventhandlers-oncharacteristicvaluechanged", "export": true, "normative": true, "for_": ["CharacteristicEventHandlers"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-idl-attributes'] = {"text": "event handler idl attribute", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-idl-attributes", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothdeviceeventhandlers-onadvertisementreceived'] = {"text": "onadvertisementreceived", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothdeviceeventhandlers-onadvertisementreceived", "export": true, "normative": true, "for_": ["BluetoothDeviceEventHandlers"]};
+window.refsData['#dom-bluetoothdeviceeventhandlers-ongattserverdisconnected'] = {"text": "ongattserverdisconnected", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothdeviceeventhandlers-ongattserverdisconnected", "export": true, "normative": true, "for_": ["BluetoothDeviceEventHandlers"]};
+window.refsData['#dom-serviceeventhandlers-onserviceadded'] = {"text": "onserviceadded", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-serviceeventhandlers-onserviceadded", "export": true, "normative": true, "for_": ["ServiceEventHandlers"]};
+window.refsData['#dom-serviceeventhandlers-onservicechanged'] = {"text": "onservicechanged", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-serviceeventhandlers-onservicechanged", "export": true, "normative": true, "for_": ["ServiceEventHandlers"]};
+window.refsData['#dom-serviceeventhandlers-onserviceremoved'] = {"text": "onserviceremoved", "type": "attribute", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-serviceeventhandlers-onserviceremoved", "export": true, "normative": true, "for_": ["ServiceEventHandlers"]};
+window.refsData['#error-response'] = {"text": "error response", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#error-response", "export": true, "normative": true, "for_": []};
+window.refsData['#procedure-timeouts'] = {"text": "procedure times out", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#procedure-timeouts", "export": true, "normative": true, "for_": []};
+window.refsData['#profile-fundamentals'] = {"text": "profile fundamentals", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#profile-fundamentals", "export": true, "normative": true, "for_": []};
+window.refsData['#valid-uuid'] = {"text": "valid uuid", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#valid-uuid", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bluetoothuuid-canonicaluuid'] = {"text": "canonicalUUID(alias)", "type": "method", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#dom-bluetoothuuid-canonicaluuid", "export": true, "normative": true, "for_": ["BluetoothUUID"]};
+window.refsData['#uuid-alias'] = {"text": "uuid alias", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#uuid-alias", "export": true, "normative": true, "for_": []};
+window.refsData['#attribute-type'] = {"text": "attribute type", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#attribute-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#EnforceRange'] = {"text": "EnforceRange", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#EnforceRange", "export": true, "normative": true, "for_": []};
+window.refsData['#the-128-bit-uuid-represented'] = {"text": "the 128-bit uuid represented", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#the-128-bit-uuid-represented", "export": true, "normative": true, "for_": []};
+window.refsData['#resolveuuidname'] = {"text": "resolveuuidname", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#resolveuuidname", "export": true, "normative": true, "for_": []};
+window.refsData['https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.cycling_power.xml#'] = {"text": "org.bluetooth.service.cycling_power", "type": "enum", "spec": "bluetooth-assigned", "shortname": "bluetooth-assigned", "level": "", "status": "anchor-block", "url": "https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.cycling_power.xml#", "export": true, "normative": true, "for_": []};
+window.refsData['https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.ieee_11073-20601_regulatory_certification_data_list.xml#'] = {"text": "org.bluetooth.characteristic.ieee_11073-20601_regulatory_certification_data_list", "type": "enum", "spec": "bluetooth-assigned", "shortname": "bluetooth-assigned", "level": "", "status": "anchor-block", "url": "https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.ieee_11073-20601_regulatory_certification_data_list.xml#", "export": true, "normative": true, "for_": []};
+window.refsData['https://developer.bluetooth.org/gatt/descriptors/Pages/DescriptorViewer.aspx?u=org.bluetooth.descriptor.gatt.characteristic_presentation_format.xml#'] = {"text": "org.bluetooth.descriptor.gatt.characteristic_presentation_format", "type": "enum", "spec": "bluetooth-assigned", "shortname": "bluetooth-assigned", "level": "", "status": "anchor-block", "url": "https://developer.bluetooth.org/gatt/descriptors/Pages/DescriptorViewer.aspx?u=org.bluetooth.descriptor.gatt.characteristic_presentation_format.xml#", "export": true, "normative": true, "for_": []};
+window.refsData['#parsing-the-blocklist'] = {"text": "parsing the blocklist", "type": "dfn", "spec": "web-bluetooth-1", "shortname": "web-bluetooth", "level": "1", "status": "local", "url": "#parsing-the-blocklist", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/system-state.html#navigator'] = {"text": "Navigator", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/system-state.html#navigator", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-typedarray-constructors'] = {"text": "TypedArray", "type": "interface", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-typedarray-constructors", "export": true, "normative": true, "for_": []};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

@@ -490,6 +490,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -2116,8 +2153,6 @@ to join them together. <a class="issue-return" href="#issue-fcb1a084" title="Jum
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -2365,7 +2400,6 @@ to join them together. <a class="issue-return" href="#issue-fcb1a084" title="Jum
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -2792,4 +2826,304 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://svgwg.org/svg2-draft/paths.html#elementdef-path'] = {"text": "path", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/paths.html#elementdef-path", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/shapes.html#elementdef-line'] = {"text": "line", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/shapes.html#elementdef-line", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/shapes.html#elementdef-polyline'] = {"text": "polyline", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/shapes.html#elementdef-polyline", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/shapes.html#elementdef-polygon'] = {"text": "polygon", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/shapes.html#elementdef-polygon", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-marker-start'] = {"text": "marker-start", "type": "property", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#propdef-marker-start", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-marker-end'] = {"text": "marker-end", "type": "property", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#propdef-marker-end", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-marker-mid'] = {"text": "marker-mid", "type": "property", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#propdef-marker-mid", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-marker-segment'] = {"text": "marker-segment", "type": "property", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#propdef-marker-segment", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-marker-pattern'] = {"text": "marker-pattern", "type": "property", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#propdef-marker-pattern", "export": true, "normative": true, "for_": []};
+window.refsData['#elementdef-marker'] = {"text": "marker", "type": "element", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#elementdef-marker", "export": true, "normative": true, "for_": []};
+window.refsData['#element-attrdef-marker-position'] = {"text": "position", "type": "element-attr", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#element-attrdef-marker-position", "export": true, "normative": true, "for_": ["marker"]};
+window.refsData['https://svgwg.org/svg2-draft/struct.html#elementdef-use'] = {"text": "use", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-use", "export": true, "normative": true, "for_": []};
+window.refsData['#repeating-markers'] = {"text": "repeating markers", "type": "dfn", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#repeating-markers", "export": true, "normative": true, "for_": []};
+window.refsData['#positioned-markers'] = {"text": "positioned markers", "type": "dfn", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#positioned-markers", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/struct.html#container-element'] = {"text": "container element", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/struct.html#container-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/struct.html#TermDescriptiveElement'] = {"text": "descriptive element", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/struct.html#TermDescriptiveElement", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/painting.html#TermPaintServerElement'] = {"text": "paint server element", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/painting.html#TermPaintServerElement", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/shapes.html#TermShapeElement'] = {"text": "shape elements", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/shapes.html#TermShapeElement", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/struct.html#TermStructuralElement'] = {"text": "structural element", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/struct.html#TermStructuralElement", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/linking.html#elementdef-a'] = {"text": "a", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/linking.html#elementdef-a", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.fxtf.org/css-masking-1/#elementdef-clippath'] = {"text": "clippath", "type": "element", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/css-masking-1/#elementdef-clippath", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.fxtf.org/filter-effects-1/#elementdef-filter'] = {"text": "filter", "type": "element", "spec": "filter-effects-1", "shortname": "filter-effects", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/filter-effects-1/#elementdef-filter", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/embedded.html#elementdef-foreignObject'] = {"text": "foreignobject", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/embedded.html#elementdef-foreignObject", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/embedded.html#elementdef-image'] = {"text": "image", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/embedded.html#elementdef-image", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.fxtf.org/css-masking-1/#elementdef-mask'] = {"text": "mask", "type": "element", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/css-masking-1/#elementdef-mask", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/interact.html#elementdef-script'] = {"text": "script", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/interact.html#elementdef-script", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/styling.html#elementdef-style'] = {"text": "style", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/styling.html#elementdef-style", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/struct.html#elementdef-switch'] = {"text": "switch", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-switch", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/text.html#elementdef-text'] = {"text": "text", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/text.html#elementdef-text", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/linking.html#elementdef-view'] = {"text": "view", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/linking.html#elementdef-view", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/styling.html#TermPresentationAttribute'] = {"text": "presentation attributes", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/styling.html#TermPresentationAttribute", "export": true, "normative": true, "for_": []};
+window.refsData['#element-attrdef-marker-refx'] = {"text": "refx", "type": "element-attr", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#element-attrdef-marker-refx", "export": true, "normative": true, "for_": ["marker"]};
+window.refsData['#element-attrdef-marker-refy'] = {"text": "refy", "type": "element-attr", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#element-attrdef-marker-refy", "export": true, "normative": true, "for_": ["marker"]};
+window.refsData['#element-attrdef-marker-orient'] = {"text": "orient", "type": "element-attr", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#element-attrdef-marker-orient", "export": true, "normative": true, "for_": ["marker"]};
+window.refsData['#element-attrdef-marker-viewbox'] = {"text": "viewbox", "type": "element-attr", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#element-attrdef-marker-viewbox", "export": true, "normative": true, "for_": ["marker"]};
+window.refsData['#element-attrdef-marker-preserveaspectratio'] = {"text": "preserveaspectratio", "type": "element-attr", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#element-attrdef-marker-preserveaspectratio", "export": true, "normative": true, "for_": ["marker"]};
+window.refsData['#element-attrdef-marker-markerunits'] = {"text": "markerunits", "type": "element-attr", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#element-attrdef-marker-markerunits", "export": true, "normative": true, "for_": ["marker"]};
+window.refsData['#element-attrdef-marker-markerwidth'] = {"text": "markerwidth", "type": "element-attr", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#element-attrdef-marker-markerwidth", "export": true, "normative": true, "for_": ["marker"]};
+window.refsData['#element-attrdef-marker-markerheight'] = {"text": "markerheight", "type": "element-attr", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#element-attrdef-marker-markerheight", "export": true, "normative": true, "for_": ["marker"]};
+window.refsData['#element-attrdef-marker-href'] = {"text": "href", "type": "element-attr", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#element-attrdef-marker-href", "export": true, "normative": true, "for_": ["marker"]};
+window.refsData['https://svgwg.org/svg2-draft/painting.html#InterfaceSVGMarkerElement'] = {"text": "SVGMarkerElement", "type": "interface", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/painting.html#InterfaceSVGMarkerElement", "export": true, "normative": true, "for_": []};
+window.refsData['#markable-elements'] = {"text": "markable elements", "type": "dfn", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#markable-elements", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.fxtf.org/fill-stroke-3/#propdef-stroke-width'] = {"text": "stroke-width", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "current", "url": "https://drafts.fxtf.org/fill-stroke-3/#propdef-stroke-width", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-marker'] = {"text": "marker", "type": "property", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#propdef-marker", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#length-value'] = {"text": "<length>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#length-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#percentage-value'] = {"text": "<percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#percentage-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#number-value'] = {"text": "<number>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#number-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/struct.html#elementdef-symbol'] = {"text": "symbol", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-symbol", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-background-position'] = {"text": "background-position", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background-position", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#angle-value'] = {"text": "<angle>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#angle-value", "export": true, "normative": true, "for_": []};
+window.refsData['#segment-markers'] = {"text": "segment markers", "type": "dfn", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#segment-markers", "export": true, "normative": true, "for_": []};
+window.refsData['#marker-properties'] = {"text": "marker properties", "type": "dfn", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#marker-properties", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#propdef-overflow'] = {"text": "overflow", "type": "property", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#propdef-overflow", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#valdef-overflow-hidden'] = {"text": "hidden", "type": "value", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#valdef-overflow-hidden", "export": true, "normative": true, "for_": ["overflow", "overflow-x", "overflow-y"]};
+window.refsData['https://drafts.fxtf.org/fill-stroke-3/#propdef-fill'] = {"text": "fill", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "current", "url": "https://drafts.fxtf.org/fill-stroke-3/#propdef-fill", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.fxtf.org/fill-stroke-3/#propdef-stroke'] = {"text": "stroke", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "current", "url": "https://drafts.fxtf.org/fill-stroke-3/#propdef-stroke", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#propdef-display'] = {"text": "display", "type": "property", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#propdef-display", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#valdef-display-none'] = {"text": "none", "type": "value", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#valdef-display-none", "export": true, "normative": true, "for_": ["display", "<display-box>"]};
+window.refsData['#DataTypeMarkerRef'] = {"text": "<marker-ref>", "type": "type", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#DataTypeMarkerRef", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#url-value'] = {"text": "<url>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#url-value", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-child-selector'] = {"text": "<child-selector>", "type": "type", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#typedef-child-selector", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-speech-1/#valdef-voice-family-child'] = {"text": "child", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-speech-1/#valdef-voice-family-child", "export": true, "normative": true, "for_": ["voice-family"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-marker-start-none'] = {"text": "none", "type": "value", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#valdef-marker-start-none", "export": true, "normative": true, "for_": ["marker-start"]};
+window.refsData['#vertex-markers'] = {"text": "vertex markers", "type": "dfn", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#vertex-markers", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-marker-gap'] = {"text": "<marker-gap>", "type": "type", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#typedef-marker-gap", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-opt'] = {"text": "?", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-marker-ref-group'] = {"text": "<marker-ref-group>", "type": "type", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#typedef-marker-ref-group", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-zero-plus'] = {"text": "*", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-zero-plus", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-marker-pattern-none'] = {"text": "none", "type": "value", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#valdef-marker-pattern-none", "export": true, "normative": true, "for_": ["marker-pattern"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-one-plus'] = {"text": "+", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-one-plus", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-num-range'] = {"text": "{a,b}", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-num-range", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-marker-knockout-left'] = {"text": "marker-knockout-left", "type": "property", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#propdef-marker-knockout-left", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-marker-knockout-right'] = {"text": "marker-knockout-right", "type": "property", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#propdef-marker-knockout-right", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-knockout-offset'] = {"text": "<knockout-offset>", "type": "type", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#typedef-knockout-offset", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-knockout-shape'] = {"text": "<knockout-shape>", "type": "type", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#typedef-knockout-shape", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-num'] = {"text": "{a}", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-num", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/mediaqueries-5/#valdef-media-inverted-colors-inverted'] = {"text": "inverted", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-5/#valdef-media-inverted-colors-inverted", "export": true, "normative": true, "for_": ["@media/inverted-colors"]};
+window.refsData['https://drafts.csswg.org/css-images-3/#valdef-rg-ending-shape-ellipse'] = {"text": "ellipse", "type": "value", "spec": "css-images-3", "shortname": "css-images", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-images-3/#valdef-rg-ending-shape-ellipse", "export": true, "normative": true, "for_": ["<rg-ending-shape>"]};
+window.refsData['#valdef-markerunits-strokewidth'] = {"text": "strokewidth", "type": "value", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#valdef-markerunits-strokewidth", "export": true, "normative": true, "for_": ["markerUnits"]};
+window.refsData['#valdef-markerunits-userspaceonuse'] = {"text": "userspaceonuse", "type": "value", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#valdef-markerunits-userspaceonuse", "export": true, "normative": true, "for_": ["markerUnits"]};window.refsData['#propdef-marker'] = {"text": "marker", "type": "property", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#propdef-marker", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-marker-end'] = {"text": "marker-end", "type": "property", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#propdef-marker-end", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-marker-knockout-left'] = {"text": "marker-knockout-left", "type": "property", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#propdef-marker-knockout-left", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-marker-knockout-right'] = {"text": "marker-knockout-right", "type": "property", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#propdef-marker-knockout-right", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-marker-mid'] = {"text": "marker-mid", "type": "property", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#propdef-marker-mid", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-marker-pattern'] = {"text": "marker-pattern", "type": "property", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#propdef-marker-pattern", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-marker-segment'] = {"text": "marker-segment", "type": "property", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#propdef-marker-segment", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-marker-start'] = {"text": "marker-start", "type": "property", "spec": "svg-markers-1", "shortname": "svg-markers", "level": "1", "status": "local", "url": "#propdef-marker-start", "export": true, "normative": true, "for_": []};
 </script>

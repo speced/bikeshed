@@ -471,6 +471,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -2483,8 +2520,6 @@ or are impossible to define for pooled connections. <a class="issue-return" href
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -2732,7 +2767,6 @@ or are impossible to define for pooled connections. <a class="issue-return" href
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -3217,6 +3251,353 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler'] = {"text": "EventHandler", "type": "typedef", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#errorevent'] = {"text": "ErrorEvent", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#errorevent", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task'] = {"text": "queue a task", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#networking-task-source'] = {"text": "networking task source", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#networking-task-source", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-event'] = {"text": "event", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-event", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-handlers'] = {"text": "event handler", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-handlers", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-event-type'] = {"text": "event handler event type", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-event-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-throw'] = {"text": "throw", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-throw", "export": true, "normative": true, "for_": ["exception"]};
+window.refsData['#bidirectionalstream-create'] = {"text": "create", "type": "dfn", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#bidirectionalstream-create", "export": true, "normative": true, "for_": ["BidirectionalStream"]};
+window.refsData['http://www.ecma-international.org/ecma-262/6.0/index.html#sec-promise-objects'] = {"text": "fulfilled", "type": "dfn", "spec": "ecmascript-6.0", "shortname": "ecmascript-6.0", "level": "", "status": "anchor-block", "url": "http://www.ecma-international.org/ecma-262/6.0/index.html#sec-promise-objects", "export": true, "normative": true, "for_": []};
+window.refsData['https://streams.spec.whatwg.org/#readablestream'] = {"text": "ReadableStream", "type": "interface", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#readablestream", "export": true, "normative": true, "for_": []};
+window.refsData['https://streams.spec.whatwg.org/#writablestream'] = {"text": "WritableStream", "type": "interface", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#writablestream", "export": true, "normative": true, "for_": []};
+window.refsData['#unidirectionalstreamstransport'] = {"text": "UnidirectionalStreamsTransport", "type": "interface", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#unidirectionalstreamstransport", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-promise'] = {"text": "Promise", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-promise", "export": true, "normative": true, "for_": []};
+window.refsData['#sendstream'] = {"text": "SendStream", "type": "interface", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#sendstream", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-unidirectionalstreamstransport-createunidirectionalstream'] = {"text": "createUnidirectionalStream(parameters)", "type": "method", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-unidirectionalstreamstransport-createunidirectionalstream", "export": true, "normative": true, "for_": ["UnidirectionalStreamsTransport"]};
+window.refsData['#dictdef-sendstreamparameters'] = {"text": "SendStreamParameters", "type": "dictionary", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dictdef-sendstreamparameters", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-unidirectionalstreamstransport-incomingunidirectionalstreams'] = {"text": "incomingUnidirectionalStreams", "type": "attribute", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-unidirectionalstreamstransport-incomingunidirectionalstreams", "export": true, "normative": true, "for_": ["UnidirectionalStreamsTransport"]};
+window.refsData['#dom-webtransport-state'] = {"text": "state", "type": "attribute", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-webtransport-state", "export": true, "normative": true, "for_": ["WebTransport"]};
+window.refsData['https://webidl.spec.whatwg.org/#invalidstateerror'] = {"text": "InvalidStateError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invalidstateerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel'] = {"text": "in parallel", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel", "export": true, "normative": true, "for_": []};
+window.refsData['#sendstream-create'] = {"text": "create", "type": "dfn", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#sendstream-create", "export": true, "normative": true, "for_": ["SendStream"]};
+window.refsData['#receivestream'] = {"text": "ReceiveStream", "type": "interface", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#receivestream", "export": true, "normative": true, "for_": []};
+window.refsData['#webtransport-receivedstreams'] = {"text": "[[receivedstreams]]", "type": "dfn", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#webtransport-receivedstreams", "export": true, "normative": true, "for_": ["WebTransport"]};
+window.refsData['#webtransport-outgoingstreams'] = {"text": "[[outgoingstreams]]", "type": "dfn", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#webtransport-outgoingstreams", "export": true, "normative": true, "for_": ["WebTransport"]};
+window.refsData['#bidirectionalstreamstransport'] = {"text": "BidirectionalStreamsTransport", "type": "interface", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#bidirectionalstreamstransport", "export": true, "normative": true, "for_": []};
+window.refsData['#bidirectionalstream'] = {"text": "BidirectionalStream", "type": "interface", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#bidirectionalstream", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-bidirectionalstreamstransport-createbidirectionalstream'] = {"text": "createBidirectionalStream()", "type": "method", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-bidirectionalstreamstransport-createbidirectionalstream", "export": true, "normative": true, "for_": ["BidirectionalStreamsTransport"]};
+window.refsData['#dom-bidirectionalstreamstransport-incomingbidirectionalstreams'] = {"text": "incomingBidirectionalStreams", "type": "attribute", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-bidirectionalstreamstransport-incomingbidirectionalstreams", "export": true, "normative": true, "for_": ["BidirectionalStreamsTransport"]};
+window.refsData['#webtransport-receivedbidirectionalstreams'] = {"text": "[[receivedbidirectionalstreams]]", "type": "dfn", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#webtransport-receivedbidirectionalstreams", "export": true, "normative": true, "for_": ["WebTransport"]};
+window.refsData['#datagramtransport'] = {"text": "DatagramTransport", "type": "interface", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#datagramtransport", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-short'] = {"text": "unsigned short", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-short", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-datagramtransport-maxdatagramsize'] = {"text": "maxDatagramSize", "type": "attribute", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-datagramtransport-maxdatagramsize", "export": true, "normative": true, "for_": ["DatagramTransport"]};
+window.refsData['#datagramduplexstream'] = {"text": "DatagramDuplexStream", "type": "interface", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#datagramduplexstream", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-datagramtransport-datagrams'] = {"text": "datagrams", "type": "attribute", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-datagramtransport-datagrams", "export": true, "normative": true, "for_": ["DatagramTransport"]};
+window.refsData['#dom-datagramduplexstream-writable'] = {"text": "writable", "type": "attribute", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-datagramduplexstream-writable", "export": true, "normative": true, "for_": ["DatagramDuplexStream"]};
+window.refsData['https://webidl.spec.whatwg.org/#this'] = {"text": "this", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#this", "export": true, "normative": true, "for_": []};
+window.refsData['#webtransport-datagrams'] = {"text": "[[datagrams]]", "type": "dfn", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#webtransport-datagrams", "export": true, "normative": true, "for_": ["WebTransport"]};
+window.refsData['https://streams.spec.whatwg.org/#readablestream-enqueue'] = {"text": "enqueue", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#readablestream-enqueue", "export": true, "normative": true, "for_": ["ReadableStream"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-Uint8Array'] = {"text": "Uint8Array", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-Uint8Array", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#a-promise-rejected-with'] = {"text": "a promise rejected with", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#a-promise-rejected-with", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#exceptiondef-typeerror'] = {"text": "TypeError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#exceptiondef-typeerror", "export": true, "normative": true, "for_": []};
+window.refsData['#webtransport-outgoingdatagramsqueue'] = {"text": "[[outgoingdatagramsqueue]]", "type": "dfn", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#webtransport-outgoingdatagramsqueue", "export": true, "normative": true, "for_": ["WebTransport"]};
+window.refsData['#webtransport-outgoingdatagramshighwatermark'] = {"text": "[[outgoingdatagramshighwatermark]]", "type": "dfn", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#webtransport-outgoingdatagramshighwatermark", "export": true, "normative": true, "for_": ["WebTransport"]};
+window.refsData['#writedatagrams'] = {"text": "writedatagrams", "type": "dfn", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#writedatagrams", "export": true, "normative": true, "for_": []};
+window.refsData['https://streams.spec.whatwg.org/#default-writer-ready'] = {"text": "ready", "type": "attribute", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#default-writer-ready", "export": true, "normative": true, "for_": ["WritableStreamDefaultWriter"]};
+window.refsData['#webtransport'] = {"text": "WebTransport", "type": "interface", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#webtransport", "export": true, "normative": true, "for_": []};
+window.refsData['#webtransport-outgoingdatagramsexpirationduration'] = {"text": "[[outgoingdatagramsexpirationduration]]", "type": "dfn", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#webtransport-outgoingdatagramsexpirationduration", "export": true, "normative": true, "for_": ["WebTransport"]};
+window.refsData['https://infra.spec.whatwg.org/#implementation-defined'] = {"text": "implementation-defined", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#implementation-defined", "export": true, "normative": true, "for_": []};
+window.refsData['#senddatagrams'] = {"text": "senddatagrams", "type": "dfn", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#senddatagrams", "export": true, "normative": true, "for_": []};
+window.refsData['#webtransport-state'] = {"text": "[[state]]", "type": "dfn", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#webtransport-state", "export": true, "normative": true, "for_": ["WebTransport"]};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-datagramduplexstream-readable'] = {"text": "readable", "type": "attribute", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-datagramduplexstream-readable", "export": true, "normative": true, "for_": ["DatagramDuplexStream"]};
+window.refsData['https://webidl.spec.whatwg.org/#new'] = {"text": "new", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#new", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-USVString'] = {"text": "USVString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-USVString", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-webtransportoptions'] = {"text": "WebTransportOptions", "type": "dictionary", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dictdef-webtransportoptions", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-webtransportstats'] = {"text": "WebTransportStats", "type": "dictionary", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dictdef-webtransportstats", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-webtransport-getstats'] = {"text": "getStats()", "type": "method", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-webtransport-getstats", "export": true, "normative": true, "for_": ["WebTransport"]};
+window.refsData['#enumdef-webtransportstate'] = {"text": "WebTransportState", "type": "enum", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#enumdef-webtransportstate", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-webtransport-ready'] = {"text": "ready", "type": "attribute", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-webtransport-ready", "export": true, "normative": true, "for_": ["WebTransport"]};
+window.refsData['#dictdef-webtransportcloseinfo'] = {"text": "WebTransportCloseInfo", "type": "dictionary", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dictdef-webtransportcloseinfo", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-webtransport-closed'] = {"text": "closed", "type": "attribute", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-webtransport-closed", "export": true, "normative": true, "for_": ["WebTransport"]};
+window.refsData['#dom-webtransport-close'] = {"text": "close()", "type": "method", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-webtransport-close", "export": true, "normative": true, "for_": ["WebTransport"]};
+window.refsData['#dom-webtransport-onstatechange'] = {"text": "onstatechange", "type": "attribute", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-webtransport-onstatechange", "export": true, "normative": true, "for_": ["WebTransport"]};
+window.refsData['https://streams.spec.whatwg.org/#high-water-mark'] = {"text": "high water mark", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#high-water-mark", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-double'] = {"text": "double", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-double", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-connection'] = {"text": "connection", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-connection", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-webtransport-webtransport'] = {"text": "constructor(url)", "type": "constructor", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-webtransport-webtransport", "export": true, "normative": true, "for_": ["WebTransport"]};
+window.refsData['https://url.spec.whatwg.org/#concept-url'] = {"text": "url record", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#concept-url-parser'] = {"text": "url parser", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-parser", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-webtransport-webtransport-url-options-url'] = {"text": "url", "type": "argument", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-webtransport-webtransport-url-options-url", "export": true, "normative": true, "for_": ["WebTransport/WebTransport(url)", "WebTransport/WebTransport(url, options)", "WebTransport/constructor(url)", "WebTransport/constructor(url, options)"]};
+window.refsData['https://webidl.spec.whatwg.org/#syntaxerror'] = {"text": "SyntaxError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#syntaxerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#concept-url-scheme'] = {"text": "scheme", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-scheme", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['https://url.spec.whatwg.org/#concept-url-fragment'] = {"text": "fragment", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-fragment", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['#dom-webtransport-webtransport-url-options-options'] = {"text": "options", "type": "argument", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-webtransport-webtransport-url-options-options", "export": true, "normative": true, "for_": ["WebTransport/WebTransport(url)", "WebTransport/WebTransport(url, options)", "WebTransport/constructor(url)", "WebTransport/constructor(url, options)"]};
+window.refsData['#dom-webtransportoptions-allowpooling'] = {"text": "allowPooling", "type": "dict-member", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-webtransportoptions-allowpooling", "export": true, "normative": true, "for_": ["WebTransportOptions"]};
+window.refsData['#dom-webtransportoptions-servercertificatefingerprints'] = {"text": "serverCertificateFingerprints", "type": "dict-member", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-webtransportoptions-servercertificatefingerprints", "export": true, "normative": true, "for_": ["WebTransportOptions"]};
+window.refsData['#webtransport-ready'] = {"text": "[[ready]]", "type": "dfn", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#webtransport-ready", "export": true, "normative": true, "for_": ["WebTransport"]};
+window.refsData['#webtransport-closed'] = {"text": "[[closed]]", "type": "dfn", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#webtransport-closed", "export": true, "normative": true, "for_": ["WebTransport"]};
+window.refsData['#webtransport-connection'] = {"text": "[[connection]]", "type": "dfn", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#webtransport-connection", "export": true, "normative": true, "for_": ["WebTransport"]};
+window.refsData['#readdatagrams'] = {"text": "readdatagrams", "type": "dfn", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#readdatagrams", "export": true, "normative": true, "for_": []};
+window.refsData['#datagramduplexstream-create'] = {"text": "creating", "type": "dfn", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#datagramduplexstream-create", "export": true, "normative": true, "for_": ["DatagramDuplexStream"]};
+window.refsData['#datagramduplexstream-create-readable'] = {"text": "readable", "type": "dfn", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#datagramduplexstream-create-readable", "export": true, "normative": true, "for_": ["DatagramDuplexStream/create"]};
+window.refsData['#datagramduplexstream-create-writable'] = {"text": "writable", "type": "dfn", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#datagramduplexstream-create-writable", "export": true, "normative": true, "for_": ["DatagramDuplexStream/create"]};
+window.refsData['#initialize-webtransport-over-http'] = {"text": "initialize webtransport over http", "type": "dfn", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#initialize-webtransport-over-http", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#upon-fulfillment'] = {"text": "upon fulfillment", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#upon-fulfillment", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#upon-rejection'] = {"text": "upon rejection", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#upon-rejection", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#determine-the-network-partition-key'] = {"text": "determine the network partition key", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#determine-the-network-partition-key", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object'] = {"text": "relevant settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-connection-obtain'] = {"text": "obtain a connection", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-connection-obtain", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#concept-url-origin'] = {"text": "origin", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-origin", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['https://fetch.spec.whatwg.org/#obtain-a-connection-http3only'] = {"text": "http3only", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#obtain-a-connection-http3only", "export": true, "normative": true, "for_": ["obtain a connection"]};
+window.refsData['#immediate-close'] = {"text": "immediate close", "type": "dfn", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#immediate-close", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-webtransportcloseinfo-errorcode'] = {"text": "errorCode", "type": "dict-member", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-webtransportcloseinfo-errorcode", "export": true, "normative": true, "for_": ["WebTransportCloseInfo"]};
+window.refsData['#dom-webtransportcloseinfo-reason'] = {"text": "reason", "type": "dict-member", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-webtransportcloseinfo-reason", "export": true, "normative": true, "for_": ["WebTransportCloseInfo"]};
+window.refsData['https://webidl.spec.whatwg.org/#notsupportederror'] = {"text": "NotSupportedError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#notsupportederror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webrtc-pc/#dom-rtcdtlsfingerprint'] = {"text": "RTCDtlsFingerprint", "type": "dictionary", "spec": "webrtc", "shortname": "webrtc", "level": "1", "status": "current", "url": "https://w3c.github.io/webrtc-pc/#dom-rtcdtlsfingerprint", "export": true, "normative": true, "for_": []};
+window.refsData['#verify-a-certificate-fingerprint'] = {"text": "verify a certificate fingerprint", "type": "dfn", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#verify-a-certificate-fingerprint", "export": true, "normative": true, "for_": []};
+window.refsData['#custom-certificate-requirements'] = {"text": "custom certificate requirements", "type": "dfn", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#custom-certificate-requirements", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webrtc-pc/#dom-rtcdtlsfingerprint-algorithm'] = {"text": "algorithm", "type": "dict-member", "spec": "webrtc", "shortname": "webrtc", "level": "1", "status": "current", "url": "https://w3c.github.io/webrtc-pc/#dom-rtcdtlsfingerprint-algorithm", "export": true, "normative": true, "for_": ["RTCDtlsFingerprint"]};
+window.refsData['https://w3c.github.io/webrtc-pc/#dom-rtcdtlsfingerprint-value'] = {"text": "value", "type": "dict-member", "spec": "webrtc", "shortname": "webrtc", "level": "1", "status": "current", "url": "https://w3c.github.io/webrtc-pc/#dom-rtcdtlsfingerprint-value", "export": true, "normative": true, "for_": ["RTCDtlsFingerprint"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-fetch'] = {"text": "fetch", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-fetch", "export": true, "normative": true, "for_": []};
+window.refsData['#compute-a-certificate-fingerprint'] = {"text": "compute a certificate fingerprint", "type": "dfn", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#compute-a-certificate-fingerprint", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-webtransportstate-connecting'] = {"text": "\"connecting\"", "type": "enum-value", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-webtransportstate-connecting", "export": true, "normative": true, "for_": ["WebTransportState"]};
+window.refsData['#dom-webtransportstate-connected'] = {"text": "\"connected\"", "type": "enum-value", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-webtransportstate-connected", "export": true, "normative": true, "for_": ["WebTransportState"]};
+window.refsData['#dom-webtransportstate-closed'] = {"text": "\"closed\"", "type": "enum-value", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-webtransportstate-closed", "export": true, "normative": true, "for_": ["WebTransportState"]};
+window.refsData['#dom-webtransportstate-failed'] = {"text": "\"failed\"", "type": "enum-value", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-webtransportstate-failed", "export": true, "normative": true, "for_": ["WebTransportState"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-long-long'] = {"text": "unsigned long long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-long-long", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/hr-time/#dom-domhighrestimestamp'] = {"text": "DOMHighResTimeStamp", "type": "typedef", "spec": "hr-time-3", "shortname": "hr-time", "level": "3", "status": "current", "url": "https://w3c.github.io/hr-time/#dom-domhighrestimestamp", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-webtransportstats-timestamp'] = {"text": "timestamp", "type": "dict-member", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-webtransportstats-timestamp", "export": true, "normative": true, "for_": ["WebTransportStats"]};
+window.refsData['#dom-webtransportstats-bytessent'] = {"text": "bytesSent", "type": "dict-member", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-webtransportstats-bytessent", "export": true, "normative": true, "for_": ["WebTransportStats"]};
+window.refsData['#dom-webtransportstats-packetssent'] = {"text": "packetsSent", "type": "dict-member", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-webtransportstats-packetssent", "export": true, "normative": true, "for_": ["WebTransportStats"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-long'] = {"text": "unsigned long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-long", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-webtransportstats-numoutgoingstreamscreated'] = {"text": "numOutgoingStreamsCreated", "type": "dict-member", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-webtransportstats-numoutgoingstreamscreated", "export": true, "normative": true, "for_": ["WebTransportStats"]};
+window.refsData['#dom-webtransportstats-numincomingstreamscreated'] = {"text": "numIncomingStreamsCreated", "type": "dict-member", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-webtransportstats-numincomingstreamscreated", "export": true, "normative": true, "for_": ["WebTransportStats"]};
+window.refsData['#dom-webtransportstats-bytesreceived'] = {"text": "bytesReceived", "type": "dict-member", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-webtransportstats-bytesreceived", "export": true, "normative": true, "for_": ["WebTransportStats"]};
+window.refsData['#dom-webtransportstats-packetsreceived'] = {"text": "packetsReceived", "type": "dict-member", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-webtransportstats-packetsreceived", "export": true, "normative": true, "for_": ["WebTransportStats"]};
+window.refsData['#dom-webtransportstats-minrtt'] = {"text": "minRtt", "type": "dict-member", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-webtransportstats-minrtt", "export": true, "normative": true, "for_": ["WebTransportStats"]};
+window.refsData['#dom-webtransportstats-numreceiveddatagramsdropped'] = {"text": "numReceivedDatagramsDropped", "type": "dict-member", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-webtransportstats-numreceiveddatagramsdropped", "export": true, "normative": true, "for_": ["WebTransportStats"]};
+window.refsData['#dictdef-streamabortinfo'] = {"text": "StreamAbortInfo", "type": "dictionary", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dictdef-streamabortinfo", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-sendstream-writingaborted'] = {"text": "writingAborted", "type": "attribute", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-sendstream-writingaborted", "export": true, "normative": true, "for_": ["SendStream"]};
+window.refsData['#dom-sendstream-abortwriting'] = {"text": "abortWriting(abortInfo)", "type": "method", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-sendstream-abortwriting", "export": true, "normative": true, "for_": ["SendStream"]};
+window.refsData['#dom-streamabortinfo-errorcode'] = {"text": "errorCode", "type": "dict-member", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-streamabortinfo-errorcode", "export": true, "normative": true, "for_": ["StreamAbortInfo"]};
+window.refsData['https://webidl.spec.whatwg.org/#EnforceRange'] = {"text": "EnforceRange", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#EnforceRange", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-octet'] = {"text": "octet", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-octet", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-receivestream-readingaborted'] = {"text": "readingAborted", "type": "attribute", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-receivestream-readingaborted", "export": true, "normative": true, "for_": ["ReceiveStream"]};
+window.refsData['#dom-receivestream-abortreading'] = {"text": "abortReading(abortInfo)", "type": "method", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-receivestream-abortreading", "export": true, "normative": true, "for_": ["ReceiveStream"]};
+window.refsData['#dom-bidirectionalstream-writable'] = {"text": "writable", "type": "attribute", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-bidirectionalstream-writable", "export": true, "normative": true, "for_": ["BidirectionalStream"]};
+window.refsData['#dom-bidirectionalstream-readable'] = {"text": "readable", "type": "attribute", "spec": "webtransport", "shortname": "webtransport", "level": "", "status": "local", "url": "#dom-bidirectionalstream-readable", "export": true, "normative": true, "for_": ["BidirectionalStream"]};
+window.refsData['https://encoding.spec.whatwg.org/#textencoderstream'] = {"text": "TextEncoderStream", "type": "interface", "spec": "encoding", "shortname": "encoding", "level": "1", "status": "current", "url": "https://encoding.spec.whatwg.org/#textencoderstream", "export": true, "normative": true, "for_": []};
+window.refsData['https://encoding.spec.whatwg.org/#textdecoderstream'] = {"text": "TextDecoderStream", "type": "interface", "spec": "encoding", "shortname": "encoding", "level": "1", "status": "current", "url": "https://encoding.spec.whatwg.org/#textdecoderstream", "export": true, "normative": true, "for_": []};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

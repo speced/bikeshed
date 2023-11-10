@@ -514,6 +514,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -1601,8 +1638,6 @@ for their contributions to this specification.</p>
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -1850,7 +1885,6 @@ for their contributions to this specification.</p>
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -2304,6 +2338,325 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://html.spec.whatwg.org/multipage/webstorage.html#dom-localstorage'] = {"text": "localStorage", "type": "attribute", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webstorage.html#dom-localstorage", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['https://w3c.github.io/ServiceWorker/#cache'] = {"text": "Cache", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#cache", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#headers'] = {"text": "Headers", "type": "interface", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#headers", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-map-objects'] = {"text": "Map", "type": "interface", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-map-objects", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-named-properties'] = {"text": "named properties", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-named-properties", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webstorage.html#storage-2'] = {"text": "Storage", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webstorage.html#storage-2", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-windoworworkerglobalscope-kvstorage'] = {"text": "kvStorage", "type": "attribute", "spec": "kv-storage-1", "shortname": "kv-storage", "level": "1", "status": "local", "url": "#dom-windoworworkerglobalscope-kvstorage", "export": true, "normative": true, "for_": ["WindowOrWorkerGlobalScope"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#windoworworkerglobalscope'] = {"text": "WindowOrWorkerGlobalScope", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#windoworworkerglobalscope", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#SecureContext'] = {"text": "SecureContext", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SecureContext", "export": true, "normative": true, "for_": []};
+window.refsData['#KVStorageArea'] = {"text": "KVStorageArea", "type": "interface", "spec": "kv-storage-1", "shortname": "kv-storage", "level": "1", "status": "local", "url": "#KVStorageArea", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#secure-context'] = {"text": "secure context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#secure-context", "export": true, "normative": true, "for_": []};
+window.refsData['#databasename'] = {"text": "[[databasename]]", "type": "dfn", "spec": "kv-storage-1", "shortname": "kv-storage", "level": "1", "status": "local", "url": "#databasename", "export": true, "normative": true, "for_": []};
+window.refsData['#databasepromise'] = {"text": "[[databasepromise]]", "type": "dfn", "spec": "kv-storage-1", "shortname": "kv-storage", "level": "1", "status": "local", "url": "#databasepromise", "export": true, "normative": true, "for_": []};
+window.refsData['#backingstoreobject'] = {"text": "[[backingstoreobject]]", "type": "dfn", "spec": "kv-storage-1", "shortname": "kv-storage", "level": "1", "status": "local", "url": "#backingstoreobject", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#this'] = {"text": "this", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#this", "export": true, "normative": true, "for_": []};
+window.refsData['#default-kv-storage-area'] = {"text": "default kv storage area", "type": "dfn", "spec": "kv-storage-1", "shortname": "kv-storage", "level": "1", "status": "local", "url": "#default-kv-storage-area", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['#KVStorageArea-constructor'] = {"text": "constructor(name)", "type": "constructor", "spec": "kv-storage-1", "shortname": "kv-storage", "level": "1", "status": "local", "url": "#KVStorageArea-constructor", "export": true, "normative": true, "for_": ["KVStorageArea"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-promise'] = {"text": "Promise", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-promise", "export": true, "normative": true, "for_": []};
+window.refsData['#KVStorageArea-set'] = {"text": "set(key, value)", "type": "method", "spec": "kv-storage-1", "shortname": "kv-storage", "level": "1", "status": "local", "url": "#KVStorageArea-set", "export": true, "normative": true, "for_": ["KVStorageArea"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-any'] = {"text": "any", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-any", "export": true, "normative": true, "for_": []};
+window.refsData['#KVStorageArea-get'] = {"text": "get(key)", "type": "method", "spec": "kv-storage-1", "shortname": "kv-storage", "level": "1", "status": "local", "url": "#KVStorageArea-get", "export": true, "normative": true, "for_": ["KVStorageArea"]};
+window.refsData['#KVStorageArea-delete'] = {"text": "delete(key)", "type": "method", "spec": "kv-storage-1", "shortname": "kv-storage", "level": "1", "status": "local", "url": "#KVStorageArea-delete", "export": true, "normative": true, "for_": ["KVStorageArea"]};
+window.refsData['#KVStorageArea-clear'] = {"text": "clear()", "type": "method", "spec": "kv-storage-1", "shortname": "kv-storage", "level": "1", "status": "local", "url": "#KVStorageArea-clear", "export": true, "normative": true, "for_": ["KVStorageArea"]};
+window.refsData['https://webidl.spec.whatwg.org/#SameObject'] = {"text": "SameObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SameObject", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-object'] = {"text": "object", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-object", "export": true, "normative": true, "for_": []};
+window.refsData['#KVStorageArea-backingstore'] = {"text": "backingStore", "type": "attribute", "spec": "kv-storage-1", "shortname": "kv-storage", "level": "1", "status": "local", "url": "#KVStorageArea-backingstore", "export": true, "normative": true, "for_": ["KVStorageArea"]};
+window.refsData['https://w3c.github.io/IndexedDB/#idbdatabase'] = {"text": "IDBDatabase", "type": "interface", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "current", "url": "https://w3c.github.io/IndexedDB/#idbdatabase", "export": true, "normative": true, "for_": []};
+window.refsData['#performing-a-database-operation'] = {"text": "perform a database operation", "type": "dfn", "spec": "kv-storage-1", "shortname": "kv-storage", "level": "1", "status": "local", "url": "#performing-a-database-operation", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-date-objects'] = {"text": "Date", "type": "interface", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-date-objects", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-ArrayBuffer'] = {"text": "ArrayBuffer", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-ArrayBuffer", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DataView'] = {"text": "DataView", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DataView", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-typedarray-objects'] = {"text": "typed array", "type": "dfn", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-typedarray-objects", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dataerror'] = {"text": "DataError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dataerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMException'] = {"text": "DOMException", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMException", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/structured-data.html#structuredserializeforstorage'] = {"text": "StructuredSerializeForStorage", "type": "abstract-op", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/structured-data.html#structuredserializeforstorage", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#datacloneerror'] = {"text": "DataCloneError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#datacloneerror", "export": true, "normative": true, "for_": []};
+window.refsData['#allowed-as-a-key'] = {"text": "allowed as a key", "type": "dfn", "spec": "kv-storage-1", "shortname": "kv-storage", "level": "1", "status": "local", "url": "#allowed-as-a-key", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#a-promise-rejected-with'] = {"text": "a promise rejected with", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#a-promise-rejected-with", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/IndexedDB/#idbobjectstore'] = {"text": "IDBObjectStore", "type": "interface", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "current", "url": "https://w3c.github.io/IndexedDB/#idbobjectstore", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/IndexedDB/#dom-idbobjectstore-delete'] = {"text": "delete(query)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "current", "url": "https://w3c.github.io/IndexedDB/#dom-idbobjectstore-delete", "export": true, "normative": true, "for_": ["IDBObjectStore"]};
+window.refsData['https://w3c.github.io/IndexedDB/#dom-idbobjectstore-put'] = {"text": "put(value)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "current", "url": "https://w3c.github.io/IndexedDB/#dom-idbobjectstore-put", "export": true, "normative": true, "for_": ["IDBObjectStore"]};
+window.refsData['https://webidl.spec.whatwg.org/#a-new-promise'] = {"text": "a new promise", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#a-new-promise", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-realm'] = {"text": "relevant realm", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-realm", "export": true, "normative": true, "for_": []};
+window.refsData['#add-a-simple-event-listener'] = {"text": "add a simple event listener", "type": "dfn", "spec": "kv-storage-1", "shortname": "kv-storage", "level": "1", "status": "local", "url": "#add-a-simple-event-listener", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#resolve'] = {"text": "resolve", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#resolve", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#reject'] = {"text": "reject", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#reject", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/IndexedDB/#transaction-error'] = {"text": "error", "type": "dfn", "spec": "indexeddb-2", "shortname": "indexeddb", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/IndexedDB/#transaction-error", "export": true, "normative": true, "for_": ["transaction"]};
+window.refsData['https://html.spec.whatwg.org/multipage/structured-data.html#structureddeserialize'] = {"text": "StructuredDeserialize", "type": "abstract-op", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/structured-data.html#structureddeserialize", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/IndexedDB/#dom-idbobjectstore-get'] = {"text": "get(query)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "current", "url": "https://w3c.github.io/IndexedDB/#dom-idbobjectstore-get", "export": true, "normative": true, "for_": ["IDBObjectStore"]};
+window.refsData['https://w3c.github.io/IndexedDB/#request-result'] = {"text": "result", "type": "dfn", "spec": "indexeddb-2", "shortname": "indexeddb", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/IndexedDB/#request-result", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://w3c.github.io/IndexedDB/#request-error'] = {"text": "error", "type": "dfn", "spec": "indexeddb-2", "shortname": "indexeddb", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/IndexedDB/#request-error", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-perform-steps-once-promise-is-settled'] = {"text": "reacting", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-perform-steps-once-promise-is-settled", "export": true, "normative": true, "for_": ["promise"]};
+window.refsData['#deleting-the-database'] = {"text": "deleting the database", "type": "dfn", "spec": "kv-storage-1", "shortname": "kv-storage", "level": "1", "status": "local", "url": "#deleting-the-database", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#realm-record'] = {"text": "realm", "type": "dfn", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#realm-record", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/IndexedDB/#idbfactory'] = {"text": "IDBFactory", "type": "interface", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "current", "url": "https://w3c.github.io/IndexedDB/#idbfactory", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/IndexedDB/#dom-idbfactory-deletedatabase'] = {"text": "deleteDatabase(name)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "current", "url": "https://w3c.github.io/IndexedDB/#dom-idbfactory-deletedatabase", "export": true, "normative": true, "for_": ["IDBFactory"]};
+window.refsData['#current-idbfactory'] = {"text": "current idbfactory", "type": "dfn", "spec": "kv-storage-1", "shortname": "kv-storage", "level": "1", "status": "local", "url": "#current-idbfactory", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/IndexedDB/#greater-than'] = {"text": "ascending", "type": "dfn", "spec": "indexeddb-2", "shortname": "indexeddb", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/IndexedDB/#greater-than", "export": true, "normative": true, "for_": ["key"]};
+window.refsData['#key-round-trip'] = {"text": "key round-trip", "type": "dfn", "spec": "kv-storage-1", "shortname": "kv-storage", "level": "1", "status": "local", "url": "#key-round-trip", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-kvstoragearea-keys'] = {"text": "keys()", "type": "method", "spec": "kv-storage-1", "shortname": "kv-storage", "level": "1", "status": "local", "url": "#dom-kvstoragearea-keys", "export": true, "normative": true, "for_": ["KVStorageArea"]};
+window.refsData['https://webidl.spec.whatwg.org/#asynchronous-iterator-initialization-steps'] = {"text": "asynchronous iterator initialization steps", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#asynchronous-iterator-initialization-steps", "export": true, "normative": true, "for_": []};
+window.refsData['#not-yet-started'] = {"text": "not yet started", "type": "dfn", "spec": "kv-storage-1", "shortname": "kv-storage", "level": "1", "status": "local", "url": "#not-yet-started", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-get-the-next-iteration-result'] = {"text": "get the next iteration result", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-get-the-next-iteration-result", "export": true, "normative": true, "for_": []};
+window.refsData['#get-the-range-for-a-key'] = {"text": "getting the range for", "type": "dfn", "spec": "kv-storage-1", "shortname": "kv-storage", "level": "1", "status": "local", "url": "#get-the-range-for-a-key", "export": true, "normative": true, "for_": []};
+window.refsData['#kvstorageareaasynciterator-last-key'] = {"text": "last key", "type": "dfn", "spec": "kv-storage-1", "shortname": "kv-storage", "level": "1", "status": "local", "url": "#kvstorageareaasynciterator-last-key", "export": true, "normative": true, "for_": ["KVStorageAreaAsyncIterator"]};
+window.refsData['https://w3c.github.io/IndexedDB/#dom-idbobjectstore-getkey'] = {"text": "getKey(query)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "current", "url": "https://w3c.github.io/IndexedDB/#dom-idbobjectstore-getkey", "export": true, "normative": true, "for_": ["IDBObjectStore"]};
+window.refsData['https://tc39.github.io/ecma262/#sec-objectcreate'] = {"text": "ObjectCreate", "type": "abstract-op", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-objectcreate", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-properties-of-the-object-prototype-object'] = {"text": "%ObjectPrototype%", "type": "interface", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-properties-of-the-object-prototype-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-createdataproperty'] = {"text": "CreateDataProperty", "type": "abstract-op", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-createdataproperty", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-setintegritylevel'] = {"text": "SetIntegrityLevel", "type": "abstract-op", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-setintegritylevel", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/IndexedDB/#transaction-concept'] = {"text": "transaction", "type": "dfn", "spec": "indexeddb-2", "shortname": "indexeddb", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/IndexedDB/#transaction-concept", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#eventtarget'] = {"text": "EventTarget", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#eventtarget", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#current-realm'] = {"text": "current realm", "type": "dfn", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#current-realm", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-convert-ecmascript-to-idl-value'] = {"text": "converted to an idl value", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-convert-ecmascript-to-idl-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#callbackdef-eventlistener'] = {"text": "EventListener", "type": "callback", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#callbackdef-eventlistener", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#dom-eventtarget-addeventlistener'] = {"text": "addEventListener(type, callback)", "type": "method", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-eventtarget-addeventlistener", "export": true, "normative": true, "for_": ["EventTarget"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#current-global-object'] = {"text": "current global object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#current-global-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#include'] = {"text": "include", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#include", "export": true, "normative": true, "for_": ["interface"]};
+window.refsData['https://w3c.github.io/IndexedDB/#dom-windoworworkerglobalscope-indexeddb'] = {"text": "indexedDB", "type": "attribute", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "current", "url": "https://w3c.github.io/IndexedDB/#dom-windoworworkerglobalscope-indexeddb", "export": true, "normative": true, "for_": ["WindowOrWorkerGlobalScope"]};
+window.refsData['https://w3c.github.io/IndexedDB/#idbtransaction'] = {"text": "IDBTransaction", "type": "interface", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "current", "url": "https://w3c.github.io/IndexedDB/#idbtransaction", "export": true, "normative": true, "for_": []};
+window.refsData['#initialize-the-database-promise'] = {"text": "initialize the database promise", "type": "dfn", "spec": "kv-storage-1", "shortname": "kv-storage", "level": "1", "status": "local", "url": "#initialize-the-database-promise", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/IndexedDB/#dom-idbdatabase-transaction'] = {"text": "transaction(storeNames)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "current", "url": "https://w3c.github.io/IndexedDB/#dom-idbdatabase-transaction", "export": true, "normative": true, "for_": ["IDBDatabase"]};
+window.refsData['https://w3c.github.io/IndexedDB/#dom-idbtransaction-objectstore'] = {"text": "objectStore(name)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "current", "url": "https://w3c.github.io/IndexedDB/#dom-idbtransaction-objectstore", "export": true, "normative": true, "for_": ["IDBTransaction"]};
+window.refsData['https://webidl.spec.whatwg.org/#exceptiondef-typeerror'] = {"text": "TypeError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#exceptiondef-typeerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/IndexedDB/#dom-idbfactory-open'] = {"text": "open(name)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "current", "url": "https://w3c.github.io/IndexedDB/#dom-idbfactory-open", "export": true, "normative": true, "for_": ["IDBFactory"]};
+window.refsData['#check-the-database-schema'] = {"text": "check the database schema", "type": "dfn", "spec": "kv-storage-1", "shortname": "kv-storage", "level": "1", "status": "local", "url": "#check-the-database-schema", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#invalidstateerror'] = {"text": "InvalidStateError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invalidstateerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/IndexedDB/#close-a-database-connection'] = {"text": "close a database connection", "type": "dfn", "spec": "indexeddb-2", "shortname": "indexeddb", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/IndexedDB/#close-a-database-connection", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/IndexedDB/#dom-idbdatabase-close'] = {"text": "close()", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "current", "url": "https://w3c.github.io/IndexedDB/#dom-idbdatabase-close", "export": true, "normative": true, "for_": ["IDBDatabase"]};
+window.refsData['https://w3c.github.io/IndexedDB/#dom-idbdatabase-createobjectstore'] = {"text": "createObjectStore(name)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "current", "url": "https://w3c.github.io/IndexedDB/#dom-idbdatabase-createobjectstore", "export": true, "normative": true, "for_": ["IDBDatabase"]};
+window.refsData['https://w3c.github.io/IndexedDB/#connection'] = {"text": "connection", "type": "dfn", "spec": "indexeddb-2", "shortname": "indexeddb", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/IndexedDB/#connection", "export": true, "normative": true, "for_": ["database"]};
+window.refsData['https://w3c.github.io/IndexedDB/#connection-object-store-set'] = {"text": "object store set", "type": "dfn", "spec": "indexeddb-2", "shortname": "indexeddb", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/IndexedDB/#connection-object-store-set", "export": true, "normative": true, "for_": ["connection"]};
+window.refsData['https://infra.spec.whatwg.org/#list-size'] = {"text": "size", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-size", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['https://w3c.github.io/IndexedDB/#object-store-name'] = {"text": "name", "type": "dfn", "spec": "indexeddb-2", "shortname": "indexeddb", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/IndexedDB/#object-store-name", "export": true, "normative": true, "for_": ["object store"]};
+window.refsData['https://w3c.github.io/IndexedDB/#key-generator'] = {"text": "key generator", "type": "dfn", "spec": "indexeddb-2", "shortname": "indexeddb", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/IndexedDB/#key-generator", "export": true, "normative": true, "for_": ["object store"]};
+window.refsData['https://w3c.github.io/IndexedDB/#object-store-key-path'] = {"text": "key path", "type": "dfn", "spec": "indexeddb-2", "shortname": "indexeddb", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/IndexedDB/#object-store-key-path", "export": true, "normative": true, "for_": ["object store"]};
+window.refsData['https://w3c.github.io/IndexedDB/#index-concept'] = {"text": "index", "type": "dfn", "spec": "indexeddb-2", "shortname": "indexeddb", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/IndexedDB/#index-concept", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-ecmascript-data-types-and-values'] = {"text": "Type", "type": "abstract-op", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-ecmascript-data-types-and-values", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-isarray'] = {"text": "IsArray", "type": "abstract-op", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-isarray", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/IndexedDB/#convert-a-value-to-a-key'] = {"text": "convert a value to a key", "type": "dfn", "spec": "indexeddb-2", "shortname": "indexeddb", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/IndexedDB/#convert-a-value-to-a-key", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/IndexedDB/#idbkeyrange'] = {"text": "IDBKeyRange", "type": "interface", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "current", "url": "https://w3c.github.io/IndexedDB/#idbkeyrange", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/IndexedDB/#convert-a-key-to-a-value'] = {"text": "convert a key to a value", "type": "dfn", "spec": "indexeddb-2", "shortname": "indexeddb", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/IndexedDB/#convert-a-key-to-a-value", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-kvstoragearea-entries'] = {"text": "entries()", "type": "method", "spec": "kv-storage-1", "shortname": "kv-storage", "level": "1", "status": "local", "url": "#dom-kvstoragearea-entries", "export": true, "normative": true, "for_": ["KVStorageArea"]};
+window.refsData['https://w3c.github.io/IndexedDB/#dom-idbkeyrange-lowerbound'] = {"text": "lowerBound(lower)", "type": "method", "spec": "indexeddb-3", "shortname": "indexeddb", "level": "3", "status": "current", "url": "https://w3c.github.io/IndexedDB/#dom-idbkeyrange-lowerbound", "export": true, "normative": true, "for_": ["IDBKeyRange"]};
+window.refsData['https://w3c.github.io/IndexedDB/#unbounded-key-range'] = {"text": "unbounded key range", "type": "dfn", "spec": "indexeddb-2", "shortname": "indexeddb", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/IndexedDB/#unbounded-key-range", "export": true, "normative": true, "for_": []};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

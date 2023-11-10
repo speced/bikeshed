@@ -484,6 +484,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -1507,8 +1544,6 @@ A human-readable <a href="http://www.w3.org/community/about/agreements/cla-deed/
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -1756,7 +1791,6 @@ A human-readable <a href="http://www.w3.org/community/about/agreements/cla-deed/
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -2200,6 +2234,315 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://url.spec.whatwg.org/#concept-url'] = {"text": "url", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ordered-map'] = {"text": "ordered map", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ordered-map", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#string'] = {"text": "string", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#string", "export": true, "normative": true, "for_": []};
+window.refsData['#resolution-result'] = {"text": "resolution result", "type": "dfn", "spec": "import-maps-1", "shortname": "import-maps", "level": "1", "status": "local", "url": "#resolution-result", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#struct'] = {"text": "struct", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#struct", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#struct-item'] = {"text": "item", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#struct-item", "export": true, "normative": true, "for_": ["struct", "tuple"]};
+window.refsData['#specifier-map'] = {"text": "specifier map", "type": "dfn", "spec": "import-maps-1", "shortname": "import-maps", "level": "1", "status": "local", "url": "#specifier-map", "export": true, "normative": true, "for_": []};
+window.refsData['#import-map'] = {"text": "import map", "type": "dfn", "spec": "import-maps-1", "shortname": "import-maps", "level": "1", "status": "local", "url": "#import-map", "export": true, "normative": true, "for_": []};
+window.refsData['#import-map-imports'] = {"text": "imports", "type": "dfn", "spec": "import-maps-1", "shortname": "import-maps", "level": "1", "status": "local", "url": "#import-map-imports", "export": true, "normative": true, "for_": ["import map"]};
+window.refsData['#import-map-scopes'] = {"text": "scopes", "type": "dfn", "spec": "import-maps-1", "shortname": "import-maps", "level": "1", "status": "local", "url": "#import-map-scopes", "export": true, "normative": true, "for_": ["import map"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object'] = {"text": "environment settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
+window.refsData['#empty-import-map'] = {"text": "empty import map", "type": "dfn", "spec": "import-maps-1", "shortname": "import-maps", "level": "1", "status": "local", "url": "#empty-import-map", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#set-up-a-window-environment-settings-object'] = {"text": "set up a window environment settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#set-up-a-window-environment-settings-object", "export": false, "normative": true, "for_": []};
+window.refsData['#environment-settings-object-import-map'] = {"text": "import map", "type": "dfn", "spec": "import-maps-1", "shortname": "import-maps", "level": "1", "status": "local", "url": "#environment-settings-object-import-map", "export": true, "normative": true, "for_": ["environment settings object"]};
+window.refsData['#document-import-map'] = {"text": "import map", "type": "dfn", "spec": "import-maps-1", "shortname": "import-maps", "level": "1", "status": "local", "url": "#document-import-map", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#concept-document-window'] = {"text": "associated document", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#concept-document-window", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#workerglobalscope'] = {"text": "WorkerGlobalScope", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/workers.html#workerglobalscope", "export": true, "normative": true, "for_": []};
+window.refsData['#workerglobalscope-import-map'] = {"text": "import map", "type": "dfn", "spec": "import-maps-1", "shortname": "import-maps", "level": "1", "status": "local", "url": "#workerglobalscope-import-map", "export": true, "normative": true, "for_": ["WorkerGlobalScope"]};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#set-up-a-worker-environment-settings-object'] = {"text": "set up a worker environment settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/workers.html#set-up-a-worker-environment-settings-object", "export": false, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/scripting.html#htmlscriptelement'] = {"text": "HTMLScriptElement", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/scripting.html#htmlscriptelement", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/scripting.html#script'] = {"text": "script", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/scripting.html#script", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-script'] = {"text": "script", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-script", "export": true, "normative": true, "for_": []};
+window.refsData['#import-map-parse-result'] = {"text": "import map parse result", "type": "dfn", "spec": "import-maps-1", "shortname": "import-maps", "level": "1", "status": "local", "url": "#import-map-parse-result", "export": true, "normative": true, "for_": []};
+window.refsData['#register-an-import-map'] = {"text": "register an import map", "type": "dfn", "spec": "import-maps-1", "shortname": "import-maps", "level": "1", "status": "local", "url": "#register-an-import-map", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ascii-case-insensitive'] = {"text": "ascii case-insensitive", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-case-insensitive", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-node-document'] = {"text": "node document", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-node-document", "export": true, "normative": true, "for_": ["Node"]};
+window.refsData['#document-acquiring-import-maps'] = {"text": "acquiring import maps", "type": "dfn", "spec": "import-maps-1", "shortname": "import-maps", "level": "1", "status": "local", "url": "#document-acquiring-import-maps", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task'] = {"text": "queue a task", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task", "export": true, "normative": true, "for_": []};
+window.refsData['#document-pending-import-map-script'] = {"text": "pending import map script", "type": "dfn", "spec": "import-maps-1", "shortname": "import-maps", "level": "1", "status": "local", "url": "#document-pending-import-map-script", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['#fetch-an-import-map'] = {"text": "fetch an import map", "type": "dfn", "spec": "import-maps-1", "shortname": "import-maps", "level": "1", "status": "local", "url": "#fetch-an-import-map", "export": true, "normative": true, "for_": []};
+window.refsData['#create-an-import-map-parse-result'] = {"text": "create an import map parse result", "type": "dfn", "spec": "import-maps-1", "shortname": "import-maps", "level": "1", "status": "local", "url": "#create-an-import-map-parse-result", "export": true, "normative": true, "for_": []};
+window.refsData['#the-scripts-result'] = {"text": "the script's result", "type": "dfn", "spec": "import-maps-1", "shortname": "import-maps", "level": "1", "status": "local", "url": "#the-scripts-result", "export": true, "normative": true, "for_": []};
+window.refsData['#wait-for-import-maps'] = {"text": "wait for import maps", "type": "dfn", "spec": "import-maps-1", "shortname": "import-maps", "level": "1", "status": "local", "url": "#wait-for-import-maps", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/scripting.html#list-of-scripts-that-will-execute-in-order-as-soon-as-possible'] = {"text": "list of scripts that will execute in order as soon as possible", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/scripting.html#list-of-scripts-that-will-execute-in-order-as-soon-as-possible", "export": false, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#fetch-a-single-module-script'] = {"text": "fetch a single module script", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#fetch-a-single-module-script", "export": false, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request'] = {"text": "request", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-url'] = {"text": "url", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-url", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-destination'] = {"text": "destination", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-destination", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-mode'] = {"text": "mode", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-mode", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-referrer'] = {"text": "referrer", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-referrer", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-client'] = {"text": "client", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-client", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#set-up-the-module-script-request'] = {"text": "set up the module script request", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#set-up-the-module-script-request", "export": false, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-fetch'] = {"text": "fetch", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-fetch", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response'] = {"text": "response", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/urls-and-fetching.html#cors-same-origin'] = {"text": "cors-same-origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/urls-and-fetching.html#cors-same-origin", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response-type'] = {"text": "type", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response-type", "export": true, "normative": true, "for_": ["response"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response-status'] = {"text": "status", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response-status", "export": true, "normative": true, "for_": ["response"]};
+window.refsData['https://fetch.spec.whatwg.org/#ok-status'] = {"text": "ok status", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#ok-status", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-header-extract-mime-type'] = {"text": "extracting a mime type", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-header-extract-mime-type", "export": true, "normative": true, "for_": ["header list"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response-header-list'] = {"text": "header list", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response-header-list", "export": true, "normative": true, "for_": ["response"]};
+window.refsData['https://encoding.spec.whatwg.org/#utf-8-decode'] = {"text": "utf-8 decode", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "1", "status": "current", "url": "https://encoding.spec.whatwg.org/#utf-8-decode", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response-body'] = {"text": "body", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response-body", "export": true, "normative": true, "for_": ["response"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response-url'] = {"text": "url", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response-url", "export": true, "normative": true, "for_": ["response"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-global'] = {"text": "global object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-global", "export": true, "normative": true, "for_": ["environment settings object"]};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#window'] = {"text": "Window", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#spin-the-event-loop'] = {"text": "spin the event loop", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#spin-the-event-loop", "export": false, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#fetch-a-module-script-tree'] = {"text": "fetch an external module script graph", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#fetch-a-module-script-tree", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#fetch-an-import()-module-script-graph'] = {"text": "fetch an import() module script graph", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#fetch-an-import()-module-script-graph", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#fetch-a-modulepreload-module-script-graph'] = {"text": "fetch a modulepreload module script graph", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#fetch-a-modulepreload-module-script-graph", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#fetch-an-inline-module-script-graph'] = {"text": "fetch an inline module script graph", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#fetch-an-inline-module-script-graph", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#fetch-a-module-worker-script-tree'] = {"text": "fetch a module worker script graph", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#fetch-a-module-worker-script-tree", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-event-fire'] = {"text": "fire an event", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-event-fire", "export": true, "normative": true, "for_": []};
+window.refsData['#import-map-parse-result-settings-object'] = {"text": "settings object", "type": "dfn", "spec": "import-maps-1", "shortname": "import-maps", "level": "1", "status": "local", "url": "#import-map-parse-result-settings-object", "export": true, "normative": true, "for_": ["import map parse result"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object'] = {"text": "relevant settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['#import-map-parse-result-error-to-rethrow'] = {"text": "error to rethrow", "type": "dfn", "spec": "import-maps-1", "shortname": "import-maps", "level": "1", "status": "local", "url": "#import-map-parse-result-error-to-rethrow", "export": true, "normative": true, "for_": ["import map parse result"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#report-the-exception'] = {"text": "report the exception", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#report-the-exception", "export": true, "normative": true, "for_": []};
+window.refsData['#import-map-parse-result-import-map'] = {"text": "import map", "type": "dfn", "spec": "import-maps-1", "shortname": "import-maps", "level": "1", "status": "local", "url": "#import-map-parse-result-import-map", "export": true, "normative": true, "for_": ["import map parse result"]};
+window.refsData['https://html.spec.whatwg.org/multipage/scripting.html#concept-script-external'] = {"text": "from an external file", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/scripting.html#concept-script-external", "export": false, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#parse-a-json-string-to-an-infra-value'] = {"text": "parse json into infra values", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#parse-a-json-string-to-an-infra-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#exceptiondef-typeerror'] = {"text": "TypeError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#exceptiondef-typeerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#map-exists'] = {"text": "exist", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-exists", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['#sort-and-normalize-a-specifier-map'] = {"text": "sorting and normalizing a specifier map", "type": "dfn", "spec": "import-maps-1", "shortname": "import-maps", "level": "1", "status": "local", "url": "#sort-and-normalize-a-specifier-map", "export": true, "normative": true, "for_": []};
+window.refsData['#sort-and-normalize-scopes'] = {"text": "sorting and normalizing scopes", "type": "dfn", "spec": "import-maps-1", "shortname": "import-maps", "level": "1", "status": "local", "url": "#sort-and-normalize-scopes", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#map-getting-the-keys'] = {"text": "get the keys", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-getting-the-keys", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['https://infra.spec.whatwg.org/#list-contain'] = {"text": "contain", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-contain", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['https://console.spec.whatwg.org/#report-a-warning-to-the-console'] = {"text": "report a warning to the console", "type": "dfn", "spec": "console", "shortname": "console", "level": "1", "status": "current", "url": "https://console.spec.whatwg.org/#report-a-warning-to-the-console", "export": true, "normative": true, "for_": []};
+window.refsData['#parse-an-import-map-string'] = {"text": "parse an import map string", "type": "dfn", "spec": "import-maps-1", "shortname": "import-maps", "level": "1", "status": "local", "url": "#parse-an-import-map-string", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#map-iterate'] = {"text": "for each", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-iterate", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['#normalize-a-specifier-key'] = {"text": "normalizing a specifier key", "type": "dfn", "spec": "import-maps-1", "shortname": "import-maps", "level": "1", "status": "local", "url": "#normalize-a-specifier-key", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#iteration-continue'] = {"text": "continue", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#iteration-continue", "export": true, "normative": true, "for_": ["iteration"]};
+window.refsData['#parse-a-url-like-import-specifier'] = {"text": "parsing a url-like import specifier", "type": "dfn", "spec": "import-maps-1", "shortname": "import-maps", "level": "1", "status": "local", "url": "#parse-a-url-like-import-specifier", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#concept-url-serializer'] = {"text": "url serializer", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-serializer", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#map-sort-in-ascending-order'] = {"text": "sorting", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-sort-in-ascending-order", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['https://infra.spec.whatwg.org/#map-key'] = {"text": "key", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-key", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['https://infra.spec.whatwg.org/#code-unit-less-than'] = {"text": "code unit less than", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#code-unit-less-than", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#concept-url-parser'] = {"text": "url parser", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-parser", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#string-starts-with'] = {"text": "starts with", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#string-starts-with", "export": true, "normative": true, "for_": ["string"]};
+window.refsData['https://url.spec.whatwg.org/#concept-url-host'] = {"text": "host", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-host", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['#resolve-a-module-specifier'] = {"text": "resolve a module specifier", "type": "dfn", "spec": "import-maps-1", "shortname": "import-maps", "level": "1", "status": "local", "url": "#resolve-a-module-specifier", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#resolve-a-module-specifier'] = {"text": "resolve a module specifier", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#resolve-a-module-specifier", "export": false, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#current-settings-object'] = {"text": "current settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#current-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#api-base-url'] = {"text": "api base url", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#api-base-url", "export": true, "normative": true, "for_": ["environment settings object"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#settings-object'] = {"text": "settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#settings-object", "export": true, "normative": true, "for_": ["script"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-script-base-url'] = {"text": "base url", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-script-base-url", "export": true, "normative": true, "for_": ["script"]};
+window.refsData['#resolve-an-imports-match'] = {"text": "resolving an imports match", "type": "dfn", "spec": "import-maps-1", "shortname": "import-maps", "level": "1", "status": "local", "url": "#resolve-an-imports-match", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#is-special'] = {"text": "is special", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#is-special", "export": true, "normative": true, "for_": []};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*
