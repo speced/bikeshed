@@ -17,10 +17,10 @@ def verify_python_version() -> None:
         )
         sys.exit(1)
 
-    if sys.version_info < (3, 7):
+    if sys.version_info < (3, 9):
         print(
-            """Bikeshed now requires Python 3.7; you are on {}.
-    For instructions on how to set up a pyenv with 3.7, see:
+            """Bikeshed now requires Python 3.9 or higher; you are on {}.
+    For instructions on how to set up a pyenv with 3.9, see:
     https://speced.github.io/bikeshed/#installing""".format(
                 platform.python_version(),
             ),
