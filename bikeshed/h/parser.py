@@ -40,15 +40,16 @@ class ParseConfig:
 
 def nodesFromHtml(data: str, config: ParseConfig, startLine: int = 1) -> t.Generator[ParserNode, None, None]:
     i = 0
-    s = Stream(data, startLine=startLine)
+    s = Stream(data, startLine=startLine, config=config)
     dt, i = parseDoctype(s, i)
     if dt is not Failure:
         yield dt
     text = ""
     textI = 0
-    node: ParserNode | None = None
+    node: ParserNode
+    lastNode: ParserNode | None = None
     while not s.eof(i):
-        node, i = parseNode(s, i, config, lastNode=node)
+        node, i = parseNode(s, i, lastNode=lastNode)
         if node is Failure:
             text += s[i]
             i += 1
@@ -56,9 +57,16 @@ def nodesFromHtml(data: str, config: ParseConfig, startLine: int = 1) -> t.Gener
             if text:
                 startLine = s.line(textI)
                 endLine = startLine + len(text.split("\n")) - 1
-                yield Text(startLine, endLine, text)
+                node = Text(startLine, endLine, text)
+                yield node
+                lastNode = node
                 text = ""
-            yield t.cast("ParserNode", node)
+            if isinstance(node, list):
+                yield from t.cast("list[ParserNode]", node)
+                lastNode = node[-1]
+            else:
+                yield node
+                lastNode = node
             textI = i
     if text:
         startLine = s.line(textI)
@@ -69,9 +77,15 @@ def nodesFromHtml(data: str, config: ParseConfig, startLine: int = 1) -> t.Gener
 def parseNode(
     s: Stream,
     start: int,
-    config: ParseConfig,
     lastNode: ParserNode | None = None,
 ) -> Result:
+    """
+    Parses one Node from the start of the stream.
+    Might return multiple nodes, as a list.
+    Failure means the list doesn't start with anything special
+    (it'll just be text),
+    but Text *can* be validly returned sometimes as the Node.
+    """
     if s.eof(start):
         return Result.fail(start)
 
@@ -82,7 +96,7 @@ def parseNode(
             return Result(node, i)
 
     if s[start] == "<":
-        node, i = parseAngleStart(s, start, config)
+        node, i = parseAngleStart(s, start)
         if node is not Failure:
             return Result(node, i)
 
@@ -93,7 +107,7 @@ def parseNode(
         el, i = parseFencedCodeBlock(s, start)
         if el is not Failure:
             return Result(el, i)
-    if config.markdown:
+    if s.config.markdown:
         if s[start] == "`":
             el, i = parseCodeSpan(s, start)
             if el is not Failure:
@@ -105,7 +119,7 @@ def parseNode(
                 text="`",
             )
             return Result(node, start + 2)
-    if config.css:
+    if s.config.css:
         if s[start] == "'":
             el, i = parseCSSMaybe(s, start)
             if el is not Failure:
@@ -138,7 +152,7 @@ def parseNode(
             text=s[start] + "’" + s[start + 2],
         )
         return Result(node, i)
-    if isinstance(lastNode, (EndTag, RawElement, WholeElement)):
+    if isinstance(lastNode, (EndTag, RawElement)):
         match, i = s.matchRe(start, curlyAposAfterElement)
         if match is not Failure:
             node = Text(
@@ -165,7 +179,7 @@ curlyAposAfterElement = re.compile(r"'\w")
 emdashRe = re.compile(r"(?:(?<!-)(—|--))\n\s*(?=\S)")
 
 
-def parseAngleStart(s: Stream, start: int, config: ParseConfig) -> Result:
+def parseAngleStart(s: Stream, start: int) -> Result:
     # Assuming the stream starts with an <
     i = start + 1
     comment, i = parseComment(s, start)
@@ -233,7 +247,7 @@ def parseAngleStart(s: Stream, start: int, config: ParseConfig) -> Result:
     if endTag is not Failure:
         return Result(endTag, i)
 
-    if config.css:
+    if s.config.css:
         el, i = parseCSSProduction(s, start)
         if el is not Failure:
             return Result(el, i)
@@ -421,11 +435,13 @@ class Stream:
     _chars: str
     _lineBreaks: list[int]
     startLine: int
+    config: ParseConfig
 
-    def __init__(self, chars: str, startLine: int = 1) -> None:
+    def __init__(self, chars: str, config: ParseConfig, startLine: int = 1) -> None:
         self._chars = chars
         self._lineBreaks = []
         self.startLine = startLine
+        self.config = config
         for i, char in enumerate(chars):
             if char == "\n":
                 self._lineBreaks.append(i)
@@ -594,6 +610,10 @@ class Comment(ParserNode):
         return f"<!--{escapeHTML(self.data)}-->"
 
 
+# RawElement is for things like <script> or <xmp>
+# which have special parsing rules that just look
+# for the ending tag and treat the entire rest of
+# the contents as raw text, without escaping.
 @dataclass
 class RawElement(ParserNode):
     tag: str
@@ -602,16 +622,6 @@ class RawElement(ParserNode):
 
     def __str__(self) -> str:
         return f"{self.startTag}{self.data}</{self.tag}>"
-
-
-@dataclass
-class WholeElement(ParserNode):
-    tag: str
-    startTag: StartTag
-    text: str
-
-    def __str__(self) -> str:
-        return f"{self.startTag}{escapeHTML(self.text)}</{self.tag}>"
 
 
 @dataclass
@@ -722,8 +732,11 @@ def parseStartTag(s: Stream, start: int) -> Result:
             return Result(tag, i + 2)
         elif s[i + 1] == ">" and isXMLishTagname(tagname):
             tag.endLine = s.line(i + 1)
-            el = WholeElement(tag=tagname, startTag=tag, text="", line=tag.line, endLine=tag.endLine)
-            return Result(el, i + 2)
+            nodes = [
+                tag,
+                EndTag(line=tag.line, endLine=tag.endLine, tag=tag.tag),
+            ]
+            return Result(nodes, i + 2)
         else:
             m.die(f"Spurious / in <{tagname}>.", lineNum=s.loc(start))
             return Result.fail(start)
@@ -1050,29 +1063,43 @@ def parseRawPreToEnd(s: Stream, start: int) -> Result:
 def parseCSSProduction(s: Stream, start: int) -> Result:
     if s[start : start + 2] != "<<":
         return Result.fail(start)
-    i = start + 2
+    textStart = start + 2
 
-    text, i = s.skipTo(i, ">>")
+    text, textEnd = s.skipTo(textStart, ">>")
     if text is Failure:
+        m.die("Saw the start of a CSS production (like <<foo>>), but couldn't find the end.", lineNum=s.loc(start))
         return Result.fail(start)
     if "\n" in text:
+        m.die(
+            "Saw the start of a CSS production (like <<foo>>), but couldn't find the end on the same line.",
+            lineNum=s.loc(start),
+        )
         return Result.fail(start)
-    i += 2
+    if "<" in text or ">" in text:
+        m.die(
+            "It seems like you wrote a CSS production (like <<foo>>), but there's more markup inside of it, or you didn't close it properly.",
+            lineNum=s.loc(start),
+        )
+        return Result.fail(start)
+    nodeEnd = textEnd + 2
 
     startTag = StartTag(
         line=s.line(start),
         endLine=s.line(start),
         tag="fake-production-placeholder",
-        attrs={"bs-autolink-syntax": s[start:i], "class": "production", "bs-opaque": ""},
+        attrs={"bs-autolink-syntax": s[start:nodeEnd], "class": "production", "bs-opaque": ""},
     ).finalize()
-    el = WholeElement(
-        line=startTag.line,
-        tag=startTag.tag,
-        startTag=startTag,
+    contents = Text(
+        line=s.line(textStart),
+        endLine=s.line(textEnd),
         text=text,
-        endLine=s.line(i - 1),
     )
-    return Result(el, i)
+    endTag = EndTag(
+        line=s.line(textEnd),
+        endLine=s.line(nodeEnd - 1),
+        tag=startTag.tag,
+    )
+    return Result([startTag, contents, endTag], nodeEnd)
 
 
 def parseCSSMaybe(s: Stream, start: int) -> Result:
@@ -1157,19 +1184,23 @@ def parseCodeSpan(s: Stream, start: int) -> Result:
         # (So you can put ticks at the start/end of your code span.)
         text = text[1:-1]
 
-    el = WholeElement(
+    startTag = StartTag(
         line=s.line(start),
+        endLine=s.line(contentStart - 1),
         tag="code",
-        text=text,
-        startTag=StartTag(
-            line=s.line(start),
-            endLine=s.line(start),
-            tag="code",
-            attrs={"bs-autolink-syntax": s[start:i], "bs-opaque": ""},
-        ),
-        endLine=s.line(i - 1),
+        attrs={"bs-autolink-syntax": s[start:i], "bs-opaque": ""},
     )
-    return Result(el, i)
+    content = Text(
+        line=s.line(contentStart),
+        endLine=s.line(contentEnd - 1),
+        text=text,
+    )
+    endTag = EndTag(
+        line=s.line(contentEnd),
+        endLine=s.line(i - 1),
+        tag=startTag.tag,
+    )
+    return Result([startTag, content, endTag], i)
 
 
 fencedStartRe = re.compile(r"`{3,}|~{3,}")
