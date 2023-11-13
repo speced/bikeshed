@@ -684,7 +684,7 @@ def handleProfile(options: argparse.Namespace) -> None:
         )
     else:
         os.system(
-            f"time python -m cProfile -o /tmp/stat.prof -m bikeshed -f spec && gprof2dot -f pstats --skew=.0001 {root} {leaf} /tmp/stat.prof | xdot &",  # noqa: S605
+            f"time python -m cProfile -o /tmp/stat.prof -m bikeshed -f spec && snakeviz /tmp/stat.prof",  # noqa: S605
         )
 
 
