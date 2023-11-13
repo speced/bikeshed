@@ -397,11 +397,13 @@ class Result:
 
 class Stream:
     _chars: str
+    _len: int
     _lineBreaks: list[int]
     startLine: int
 
     def __init__(self, chars: str, startLine: int = 1) -> None:
         self._chars = chars
+        self._len = len(chars)
         self._lineBreaks = []
         self.startLine = startLine
         for i, char in enumerate(chars):
@@ -415,7 +417,7 @@ class Stream:
             return ""
 
     def eof(self, index: int) -> bool:
-        return index >= len(self._chars)
+        return index >= self._len
 
     def line(self, index: int) -> int:
         # Zero-based line index
