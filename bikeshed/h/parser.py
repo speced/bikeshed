@@ -57,9 +57,7 @@ def nodesFromHtml(data: str, config: ParseConfig, startLine: int = 1) -> t.Gener
             if text:
                 startLine = s.line(textI)
                 endLine = startLine + len(text.split("\n")) - 1
-                node = Text(startLine, endLine, text)
-                yield node
-                lastNode = node
+                yield Text(startLine, endLine, text)
                 text = ""
             if isinstance(node, list):
                 yield from t.cast("list[ParserNode]", node)
