@@ -1234,7 +1234,7 @@ def parseCodeSpan(s: Stream, start: int) -> Result[list[ParserNode]]:
     content = Text(
         line=s.line(contentStart),
         endLine=s.line(contentEnd - 1),
-        text=text,
+        text=escapeHTML(text),
     )
     endTag = EndTag(
         line=s.line(contentEnd),
