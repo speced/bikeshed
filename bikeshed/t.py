@@ -4,6 +4,8 @@ from __future__ import annotations
 
 # The only three things that should be available during runtime.
 from typing import TYPE_CHECKING, cast, overload
+# ...except I need these too, to declare a generic class.
+from typing import Generic, TypeVar
 
 if TYPE_CHECKING:
     from typing import (
@@ -16,7 +18,6 @@ if TYPE_CHECKING:
         Deque,
         FrozenSet,
         Generator,
-        Generic,
         Iterable,
         Iterator,
         Literal,
@@ -31,10 +32,9 @@ if TYPE_CHECKING:
         TypeAlias,
         TypedDict,
         TypeGuard,
-        TypeVar,
     )
 
-    from _typeshed import SupportsKeysAndGetItem
+    from _typeshed import SupportsKeysAndGetItem, Self
     from lxml import etree
     from typing_extensions import (
         NotRequired,
