@@ -277,6 +277,7 @@ def initialDocumentParse(text: str, config: ParseConfig, startLine: int = 1) -> 
 def strFromNodes(nodes: t.Iterable[ParserNode], withIlcc: bool = False) -> str:
     strs = []
     ilcc = constants.incrementLineCountChar
+    dlcc = constants.decrementLineCountChar
     for node in nodes:
         if isinstance(node, Comment):
             # Serialize comments as a standardized, recognizable sequence
@@ -287,10 +288,13 @@ def strFromNodes(nodes: t.Iterable[ParserNode], withIlcc: bool = False) -> str:
             continue
         s = str(node)
         if withIlcc:
-            numLines = s.count("\n")
-            diffLineNo = node.endLine - node.line
-            if diffLineNo > numLines:
-                s += ilcc * (diffLineNo - numLines)
+            outputExtraLines = s.count("\n")
+            sourceExtraLines = node.endLine - node.line
+            diff = sourceExtraLines - outputExtraLines
+            if diff > 0:
+                s += ilcc * diff
+            elif diff < 0:
+                s += dlcc * -diff
         strs.append(s)
     return "".join(strs)
 
