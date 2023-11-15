@@ -11,4 +11,5 @@ executeCode: bool = False
 macroStartChar = "\uebbb"
 macroEndChar = "\uebbc"
 incrementLineCountChar = "\uebbd"
+decrementLineCountChar = "\uebbf"
 bsComment = "<!--\uebbe-->"
