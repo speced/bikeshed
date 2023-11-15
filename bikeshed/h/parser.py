@@ -49,13 +49,13 @@ def nodesFromHtml(data: str, config: ParseConfig, startLine: int = 1) -> t.Gener
     node: ParserNode | list[ParserNode] | None
     lastNode: ParserNode | None = None
     while not s.eof(i):
-        node, i = parseNode(s, i, lastNode=lastNode).t2
+        node, i = parseNode(s, i).t2
         if node is None:
-            lastNode = None
             text += s[i]
             i += 1
         else:
             if text:
+                text = curlifyApostrophes(text, lastNode)
                 startLine = s.line(textI)
                 endLine = startLine + len(text.split("\n")) - 1
                 yield Text(startLine, endLine, text)
@@ -76,7 +76,6 @@ def nodesFromHtml(data: str, config: ParseConfig, startLine: int = 1) -> t.Gener
 def parseNode(
     s: Stream,
     start: int,
-    lastNode: ParserNode | None = None,
 ) -> Result[ParserNode | list[ParserNode]]:
     """
     Parses one Node from the start of the stream.
@@ -146,23 +145,6 @@ def parseNode(
             text=text,
         )
         return Result(node, start + 2)
-    match, i = s.matchRe(start, curlyApostropheRe).t2
-    if match is not None:
-        node = Text(
-            line=s.line(start),
-            endLine=s.line(i - 1),
-            text=s[start] + "’" + s[start + 2],
-        )
-        return Result(node, i)
-    if isinstance(lastNode, (EndTag, RawElement)):
-        match, i = s.matchRe(start, curlyAposAfterElement).t2
-        if match is not None:
-            node = Text(
-                line=s.line(start),
-                endLine=s.line(i - 1),
-                text="’" + s[start + 1],
-            )
-            return Result(node, i)
     match, i = s.matchRe(start, emdashRe).t2
     if match is not None:
         # Fix line-ending em dashes, or --, by moving the previous line up, so no space.
@@ -176,8 +158,6 @@ def parseNode(
     return Result.fail(start)
 
 
-curlyApostropheRe = re.compile(r"\w'\w")
-curlyAposAfterElement = re.compile(r"'\w")
 emdashRe = re.compile(r"(?:(?<!-)(—|--))\n\s*(?=\S)")
 
 
@@ -1416,6 +1396,14 @@ def escapeHTML(text: str) -> str:
 
 def escapeAttr(text: str) -> str:
     return text.replace("&", "&amp;").replace('"', "&quot;")
+
+
+curlyApostropheRe = re.compile(r"(\w)'(\w)")
+def curlifyApostrophes(text: str, lastNode: ParserNode | None) -> str:
+    text = re.sub(curlyApostropheRe, r"\1’\2", text)
+    if text[0] == "'" and isinstance(lastNode, (EndTag, RawElement, SelfClosedTag)):
+        text = "’" + text[1:]
+    return text
 
 
 #
