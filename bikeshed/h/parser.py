@@ -51,6 +51,7 @@ def nodesFromHtml(data: str, config: ParseConfig, startLine: int = 1) -> t.Gener
     while not s.eof(i):
         node, i = parseNode(s, i, lastNode=lastNode).t2
         if node is None:
+            lastNode = None
             text += s[i]
             i += 1
         else:
