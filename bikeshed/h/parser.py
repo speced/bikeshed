@@ -387,7 +387,8 @@ class ParseFailure(Failure):
         return f"{self.s.loc(self.index)} {self.details}"
 
 
-ResultT = t.TypeVar('ResultT')
+ResultT = t.TypeVar("ResultT")
+
 
 @dataclass
 class Result(t.Generic[ResultT]):
@@ -554,7 +555,11 @@ class Text(ParserNode):
         return self.text
 
     def curlifyApostrophes(self, lastNode: ParserNode | None) -> Text:
-        if self.text[0] == "'" and isinstance(lastNode, (EndTag, RawElement, SelfClosedTag)) and re.match(r"'\w", self.text):
+        if (
+            self.text[0] == "'"
+            and isinstance(lastNode, (EndTag, RawElement, SelfClosedTag))
+            and re.match(r"'\w", self.text)
+        ):
             self.text = "’" + self.text[1:]
         if "'" in self.text:
             self.text = re.sub(r"(\w)'(\w)", r"\1’\2", self.text)
@@ -626,13 +631,13 @@ class SelfClosedTag(ParserNode):
         return dataclasses.replace(self, **kwargs)
 
     @classmethod
-    def fromStartTag(cls, tag: StartTag) -> SelfClosedTag:
+    def fromStartTag(cls: t.Type[SelfClosedTag], tag: StartTag) -> SelfClosedTag:
         return cls(
-            line = tag.line,
-            endLine = tag.endLine,
-            tag = tag.tag,
-            attrs = tag.attrs,
-            classes = tag.classes,
+            line=tag.line,
+            endLine=tag.endLine,
+            tag=tag.tag,
+            attrs=tag.attrs,
+            classes=tag.classes,
         )
 
 
