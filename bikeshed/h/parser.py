@@ -55,14 +55,18 @@ def nodesFromHtml(data: str, config: ParseConfig, startLine: int = 1) -> t.Gener
             i += 1
         else:
             if text:
-                text = curlifyApostrophes(text, lastNode)
                 startLine = s.line(textI)
                 endLine = startLine + len(text.split("\n")) - 1
-                yield Text(startLine, endLine, text)
+                yield Text(startLine, endLine, text).curlifyApostrophes(lastNode)
                 text = ""
             if isinstance(node, list):
-                yield from node
-                lastNode = node[-1]
+                for n in node:
+                    if isinstance(n, Text):
+                        yield n.curlifyApostrophes(lastNode)
+                        lastNode = None
+                    else:
+                        yield n
+                        lastNode = n
             else:
                 yield node
                 lastNode = node
@@ -70,7 +74,7 @@ def nodesFromHtml(data: str, config: ParseConfig, startLine: int = 1) -> t.Gener
     if text:
         startLine = s.line(textI)
         endLine = startLine + len(text.split("\n")) - 1
-        yield Text(startLine, endLine, text)
+        yield Text(startLine, endLine, text).curlifyApostrophes(lastNode)
 
 
 def parseNode(
@@ -542,6 +546,13 @@ class Text(ParserNode):
 
     def __str__(self) -> str:
         return self.text
+
+    def curlifyApostrophes(self, lastNode: ParserNode | None) -> Text:
+        if self.text[0] == "'" and isinstance(lastNode, (EndTag, RawElement, SelfClosedTag)):
+            self.text = "’" + self.text[1:]
+        if "'" in self.text:
+            self.text = re.sub(r"(\w)'(\w)", r"\1’\2", self.text)
+        return self
 
 
 @dataclass
@@ -1396,14 +1407,6 @@ def escapeHTML(text: str) -> str:
 
 def escapeAttr(text: str) -> str:
     return text.replace("&", "&amp;").replace('"', "&quot;")
-
-
-curlyApostropheRe = re.compile(r"(\w)'(\w)")
-def curlifyApostrophes(text: str, lastNode: ParserNode | None) -> str:
-    text = re.sub(curlyApostropheRe, r"\1’\2", text)
-    if text[0] == "'" and isinstance(lastNode, (EndTag, RawElement, SelfClosedTag)):
-        text = "’" + text[1:]
-    return text
 
 
 #
