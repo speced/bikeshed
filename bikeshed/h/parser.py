@@ -41,7 +41,7 @@ class ParseConfig:
 def nodesFromHtml(data: str, config: ParseConfig, startLine: int = 1) -> t.Generator[ParserNode, None, None]:
     i = 0
     s = Stream(data, startLine=startLine, config=config)
-    dt, i = parseDoctype(s, i).t2
+    dt, i = parseDoctype(s, i).vi
     if dt is not None:
         yield dt
     text = ""
@@ -49,7 +49,7 @@ def nodesFromHtml(data: str, config: ParseConfig, startLine: int = 1) -> t.Gener
     node: ParserNode | list[ParserNode] | None
     lastNode: ParserNode | None = None
     while not s.eof(i):
-        node, i = parseNode(s, i).t2
+        node, i = parseNode(s, i).vi
         if node is None:
             text += s[i]
             i += 1
@@ -94,13 +94,13 @@ def parseNode(
     node: ParserNode | list[ParserNode] | None
 
     if s[start] == "&":
-        ch, i = parseCharRef(s, start).t2
+        ch, i = parseCharRef(s, start).vi
         if ch is not None:
             node = RawText(text=f"&#{ord(ch)};", line=s.line(start), endLine=s.line(i - 1))
             return Result(node, i)
 
     if s[start] == "<":
-        node, i = parseAngleStart(s, start).t2
+        node, i = parseAngleStart(s, start).vi
         if node is not None:
             return Result(node, i)
 
@@ -109,12 +109,12 @@ def parseNode(
     # the markdown and HTML parsers together.
     el: ParserNode | None
     if s[start] in ("`", "~"):
-        el, i = parseFencedCodeBlock(s, start).t2
+        el, i = parseFencedCodeBlock(s, start).vi
         if el is not None:
             return Result(el, i)
     if s.config.markdown:
         if s[start] == "`":
-            els, i = parseCodeSpan(s, start).t2
+            els, i = parseCodeSpan(s, start).vi
             if els is not None:
                 return Result(els, i)
         if s[start : start + 2] == "\\`":
@@ -126,14 +126,14 @@ def parseNode(
             return Result(node, start + 2)
     if s.config.css:
         if s[start] == "'":
-            el, i = parseCSSMaybe(s, start).t2
+            el, i = parseCSSMaybe(s, start).vi
             if el is not None:
                 return Result(el, i)
     if s[start] == "[" and s[start - 1] != "[":
-        el, i = parseMacro(s, start).t2
+        el, i = parseMacro(s, start).vi
         if el is not None:
             return Result(el, i)
-    if s[start : start + 2] == "\\[":
+    if s[start : start + 2] == r"\[":
         if s[start + 2].isalpha() or s[start + 2].isdigit():
             # an escaped macro, so handle it here
             text = "["
@@ -142,14 +142,14 @@ def parseNode(
             # biblio/autolink code handle it for now.
             # FIXME when biblio shorthands are built into
             # this parser
-            text = "\\["
+            text = r"\["
         node = RawText(
             line=s.line(start),
             endLine=s.line(start),
             text=text,
         )
         return Result(node, start + 2)
-    match, i = s.matchRe(start, emdashRe).t2
+    match, i = s.matchRe(start, emdashRe).vi
     if match is not None:
         # Fix line-ending em dashes, or --, by moving the previous line up, so no space.
         node = RawText(
@@ -168,20 +168,20 @@ emdashRe = re.compile(r"(?:(?<!-)(—|--))\n\s*(?=\S)")
 def parseAngleStart(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
     # Assuming the stream starts with an <
     i = start + 1
-    comment, i = parseComment(s, start).t2
+    comment, i = parseComment(s, start).vi
     if comment is not None:
         return Result(comment, i)
 
-    startTag, i = parseStartTag(s, start).t2
+    startTag, i = parseStartTag(s, start).vi
     if startTag is not None:
         if isinstance(startTag, SelfClosedTag):
             return Result(startTag, i)
         if startTag.tag == "pre":
-            el, endI = parseMetadataBlock(s, start).t2
+            el, endI = parseMetadataBlock(s, start).vi
             if el is not None:
                 return Result(el, endI)
             if isDatablockPre(startTag):
-                text, i = parseRawPreToEnd(s, i).t2
+                text, i = parseRawPreToEnd(s, i).vi
                 if text is None:
                     return Result.fail(start)
                 el = RawElement(
@@ -193,7 +193,7 @@ def parseAngleStart(s: Stream, start: int) -> Result[ParserNode | list[ParserNod
                 )
                 return Result(el, i)
         if startTag.tag == "script":
-            text, i = parseScriptToEnd(s, i).t2
+            text, i = parseScriptToEnd(s, i).vi
             if text is None:
                 return Result.fail(start)
             el = RawElement(
@@ -205,7 +205,7 @@ def parseAngleStart(s: Stream, start: int) -> Result[ParserNode | list[ParserNod
             )
             return Result(el, i)
         elif startTag.tag == "style":
-            text, i = parseStyleToEnd(s, i).t2
+            text, i = parseStyleToEnd(s, i).vi
             if text is None:
                 return Result.fail(start)
             el = RawElement(
@@ -217,7 +217,7 @@ def parseAngleStart(s: Stream, start: int) -> Result[ParserNode | list[ParserNod
             )
             return Result(el, i)
         elif startTag.tag == "xmp":
-            text, i = parseXmpToEnd(s, i).t2
+            text, i = parseXmpToEnd(s, i).vi
             if text is None:
                 return Result.fail(start)
             el = RawElement(
@@ -231,12 +231,12 @@ def parseAngleStart(s: Stream, start: int) -> Result[ParserNode | list[ParserNod
         else:
             return Result(startTag, i)
 
-    endTag, i = parseEndTag(s, start).t2
+    endTag, i = parseEndTag(s, start).vi
     if endTag is not None:
         return Result(endTag, i)
 
     if s.config.css:
-        els, i = parseCSSProduction(s, start).t2
+        els, i = parseCSSProduction(s, start).vi
         if els is not None:
             return Result(els, i)
 
@@ -409,10 +409,11 @@ class Result(t.Generic[ResultT]):
         return Result(None, index, ParseFailure(details, s, index))
 
     @property
-    def t2(self) -> tuple[ResultT | None, int]:
-        # By default, mask the error for simpler detection
-        # via `is None`
-        # (treating the class itself as a unique marker value)
+    def vi(self) -> tuple[ResultT | None, int]:
+        # Returns a tuple of the value and index for easy
+        # destructuring.
+        # If error, value is None for simple detection;
+        # use .vie if None is a valid value.
         if self.err:
             value = None
         else:
@@ -420,7 +421,8 @@ class Result(t.Generic[ResultT]):
         return (value, self.end)
 
     @property
-    def t3(self) -> tuple[ResultT | None, int, Failure | None]:
+    def vie(self) -> tuple[ResultT | None, int, Failure | None]:
+        # Like .vi, but returns the error as the third tuple item.
         if self.err:
             value = None
         else:
@@ -758,7 +760,7 @@ def parseStartTag(s: Stream, start: int) -> Result[StartTag | SelfClosedTag]:
     else:
         i = start + 1
 
-    tagname, i = parseTagName(s, i).t2
+    tagname, i = parseTagName(s, i).vi
     if tagname is None:
         return Result.fail(start)
 
@@ -768,11 +770,11 @@ def parseStartTag(s: Stream, start: int) -> Result[StartTag | SelfClosedTag]:
     tag = StartTag(line=s.line(start), endLine=s.line(start), tag=tagname)
 
     while True:
-        ws, i = parseWhitespace(s, i).t2
+        ws, i = parseWhitespace(s, i).vi
         if ws is None:
             break
         startAttr = i
-        attr, i = parseAttribute(s, i).t2
+        attr, i = parseAttribute(s, i).vi
         if attr is None:
             break
         attrName, attrValue = attr
@@ -845,9 +847,9 @@ def parseAttribute(s: Stream, start: int) -> Result[tuple[str, str]]:
     i = parseWhitespace(s, i).end
 
     if s[i] == '"' or s[i] == "'":
-        attrValue, i = parseQuotedAttrValue(s, i).t2
+        attrValue, i = parseQuotedAttrValue(s, i).vi
     else:
-        attrValue, i = parseUnquotedAttrValue(s, i).t2
+        attrValue, i = parseUnquotedAttrValue(s, i).vi
     if attrValue is None:
         m.die(f"Garbage after {attrName}=.", lineNum=s.loc(i))
         return Result.fail(start)
@@ -873,7 +875,7 @@ def parseQuotedAttrValue(s: Stream, start: int) -> Result[str]:
             return Result.fail(start)
         if s[i] == "&":
             startRef = i
-            ch, i = parseCharRef(s, i).t2
+            ch, i = parseCharRef(s, i).vi
             if ch is None:
                 i += 1
                 continue
@@ -900,7 +902,7 @@ def parseUnquotedAttrValue(s: Stream, start: int) -> Result[str]:
             return Result.fail(start)
         if s[i] == "&":
             startRef = i
-            ch, i = parseCharRef(s, i).t2
+            ch, i = parseCharRef(s, i).vi
             if ch is None:
                 i += 1
                 continue
@@ -1001,7 +1003,7 @@ def parseEndTag(s: Stream, start: int) -> Result[EndTag]:
     if s.eof(i):
         m.die("Hit EOF in the middle of an end tag.", lineNum=s.loc(start))
         return Result.fail(start)
-    tagname, i = parseTagName(s, i).t2
+    tagname, i = parseTagName(s, i).vi
     if tagname is None:
         m.die("Garbage in an end tag.", lineNum=s.loc(start))
         return Result.fail(start)
@@ -1126,7 +1128,7 @@ def parseCSSProduction(s: Stream, start: int) -> Result[list[ParserNode]]:
         return Result.fail(start)
     textStart = start + 2
 
-    text, textEnd = s.skipTo(textStart, ">>").t2
+    text, textEnd = s.skipTo(textStart, ">>").vi
     if text is None:
         m.die("Saw the start of a CSS production (like <<foo>>), but couldn't find the end.", lineNum=s.loc(start))
         return Result.fail(start)
@@ -1172,7 +1174,7 @@ def parseCSSMaybe(s: Stream, start: int) -> Result[RawElement]:
         return Result.fail(start)
     i = start + 2
 
-    text, i = s.skipTo(i, "''").t2
+    text, i = s.skipTo(i, "''").vi
     if text is None:
         return Result.fail(start)
     if "\n" in text:
@@ -1220,7 +1222,7 @@ def parseCodeSpan(s: Stream, start: int) -> Result[list[ParserNode]]:
         return Result.fail(start)
     if s[start] != "`":
         return Result.fail(start)
-    match, i = s.matchRe(start, codeSpanStartRe).t2
+    match, i = s.matchRe(start, codeSpanStartRe).vi
     assert match is not None
     ticks = match.group(0)
     contentStart = i
@@ -1231,7 +1233,7 @@ def parseCodeSpan(s: Stream, start: int) -> Result[list[ParserNode]]:
         endRe = codeSpanEnd2Re
     else:
         endRe = re.compile(r"([^`])(" + ticks + ")([^`]|$)")
-    match, _ = s.searchRe(i, endRe).t2
+    match, _ = s.searchRe(i, endRe).vi
     if match is None:
         # Allowed to be unmatched, they're just ticks then.
         return Result.fail(start)
@@ -1271,12 +1273,12 @@ def parseFencedCodeBlock(s: Stream, start: int) -> Result[RawElement]:
     if s.precedingTextOnLine(start).strip() != "":
         return Result.fail(start)
 
-    match, i = s.matchRe(start, fencedStartRe).t2
+    match, i = s.matchRe(start, fencedStartRe).vi
     if match is None:
         return Result.fail(start)
     openingFence = match.group(0)
 
-    infoString, i = s.skipToNextLine(i).t2
+    infoString, i = s.skipToNextLine(i).vi
     assert infoString is not None
     infoString = infoString.strip()
     if "`" in infoString:
@@ -1289,7 +1291,7 @@ def parseFencedCodeBlock(s: Stream, start: int) -> Result[RawElement]:
         # at least as long, so just search for the opening
         # fence itself, as a start.
 
-        text, i = s.skipTo(i, openingFence).t2
+        text, i = s.skipTo(i, openingFence).vi
 
         # No ending fence in the rest of the document
         if text is None:
@@ -1310,14 +1312,14 @@ def parseFencedCodeBlock(s: Stream, start: int) -> Result[RawElement]:
             # and markdown parsers.
 
             # Consume the whole fence, since it can be longer.
-            endingFence, i = s.matchRe(i, fencedStartRe).t2
+            endingFence, i = s.matchRe(i, fencedStartRe).vi
             break
 
         # Otherwise I just hit a line that happens to have
         # a fence lookalike- on it, but not closing this one.
         # Skip the fence and continue.
 
-        match, i = s.matchRe(i, fencedStartRe).t2
+        match, i = s.matchRe(i, fencedStartRe).vi
         assert match is not None
         contents += match.group(0)
 
@@ -1351,7 +1353,7 @@ def parseMacro(s: Stream, start: int) -> Result[Macro]:
 
     if s[start] != "[":
         return Result.fail(start)
-    match, i = s.matchRe(start, macroRe).t2
+    match, i = s.matchRe(start, macroRe).vi
     if match is None:
         return Result.fail(start)
     optional = match.group(2) == "?"
@@ -1377,7 +1379,7 @@ def parseMetadataBlock(s: Stream, start: int) -> Result[RawElement]:
         # Metadata blocks must have their start/end tags
         # on the left margin, completely unindented.
         return Result.fail(start)
-    startTag, i = parseStartTag(s, start).t2
+    startTag, i = parseStartTag(s, start).vi
     if startTag is None:
         return Result.fail(start)
     if isinstance(startTag, SelfClosedTag):
@@ -1390,7 +1392,7 @@ def parseMetadataBlock(s: Stream, start: int) -> Result[RawElement]:
     startTag.tag = startTag.tag.lower()
 
     # Definitely in a metadata block now
-    line, i = s.skipToNextLine(i).t2
+    line, i = s.skipToNextLine(i).vi
     assert line is not None
     if line.strip() != "":
         m.die("Significant text on the same line as the metadata start tag isn't allowed.", lineNum=s.line(start))
@@ -1400,7 +1402,7 @@ def parseMetadataBlock(s: Stream, start: int) -> Result[RawElement]:
         if s.eof(i):
             m.die("Hit EOF while trying to parse a metadata block.", lineNum=s.line(start))
             break
-        line, i = s.skipToNextLine(i).t2
+        line, i = s.skipToNextLine(i).vi
         assert line is not None
         match = endPattern.match(line)
         if not match:
