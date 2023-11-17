@@ -121,6 +121,7 @@ class Spec:
 
         try:
             inputContent = self.inputSource.read()
+            self.initMetadata(inputContent)
             self.lines = self.earlyParse(inputContent)
             if inputContent.date is not None:
                 self.mdBaseline.addParsedData("Date", inputContent.date)
@@ -133,11 +134,20 @@ class Spec:
 
         return True
 
-    def earlyParse(self, inputContent: InputSource.InputContent) -> list[l.Line]:
+    def initMetadata(self, inputContent: InputSource.InputContent) -> None:
+        # mdDefault is already set up
+        # and cli() inited the mdCommandLine
+
+        # Get the md from the doc itself
+        # TODO: currently I just leave the node in,
+        #       I should do something about that
+        # TODO: Pure textual hack, no way to, say, put a block
+        #       in a markdown code span or an <xmp> to show off.
         _, self.mdDocument = metadata.parse(lines=inputContent.lines)
 
-        # First load the metadata sources from 'local' data
+        # Combine the data so far...
         self.md = metadata.join(self.mdBaseline, self.mdDocument, self.mdCommandLine)
+
         # Using that to determine the Group and Status, load the correct defaults.include boilerplate
         self.mdDefaults = metadata.fromJson(
             data=retrieve.retrieveBoilerplateFile(self, "defaults", error=True),
@@ -145,6 +155,31 @@ class Spec:
         )
         self.md = metadata.join(self.mdBaseline, self.mdDefaults, self.mdDocument, self.mdCommandLine)
 
+        # Using all of that, load up the text macros so I can sub them into the computed-metadata file.
+        self.md.fillTextMacros(self.macros, doc=self)
+        jsonEscapedMacros = {k: json.dumps(v)[1:-1] for k, v in self.macros.items()}
+        computedMdText = h.replaceMacrosTextly(
+            retrieve.retrieveBoilerplateFile(self, "computed-metadata", error=True),
+            macros=jsonEscapedMacros,
+        )
+        self.mdOverridingDefaults = metadata.fromJson(data=computedMdText, source="computed-metadata")
+        # And create the final, complete md combo
+        self.md = metadata.join(
+            self.mdBaseline,
+            self.mdDefaults,
+            self.mdOverridingDefaults,
+            self.mdDocument,
+            self.mdCommandLine,
+        )
+        # Finally, compute the "implicit" things.
+        self.md.computeImplicitMetadata(doc=self)
+        # And compute macros again, in case the preceding steps changed them.
+        self.md.fillTextMacros(self.macros, doc=self)
+
+        self.md.validate()
+        m.retroactivelyCheckErrorLevel()
+
+    def earlyParse(self, inputContent: InputSource.InputContent) -> list[l.Line]:
         text = h.strFromNodes(h.initialDocumentParse(inputContent.content, h.ParseConfig.fromSpec(self)), withIlcc=True)
         inputContent.rawLines = [x + "\n" for x in text.split("\n")]
         return inputContent.lines
@@ -167,37 +202,10 @@ class Spec:
         if self.lineNumbers:
             self.lines = u.hackyLineNumbers(self.lines)
         self.recordDependencies(self.inputSource)
-        # Extract and process metadata
-        self.lines, self.mdDocument = metadata.parse(lines=self.lines)
-        # First load the metadata sources from 'local' data
-        self.md = metadata.join(self.mdBaseline, self.mdDocument, self.mdCommandLine)
-        # Using that to determine the Group and Status, load the correct defaults.include boilerplate
-        self.mdDefaults = metadata.fromJson(
-            data=retrieve.retrieveBoilerplateFile(self, "defaults", error=True),
-            source="defaults",
-        )
-        self.md = metadata.join(self.mdBaseline, self.mdDefaults, self.mdDocument, self.mdCommandLine)
-        # Using all of that, load up the text macros so I can sub them into the computed-metadata file.
-        self.md.fillTextMacros(self.macros, doc=self)
-        jsonEscapedMacros = {k: json.dumps(v)[1:-1] for k, v in self.macros.items()}
-        computedMdText = h.replaceMacrosTextly(
-            retrieve.retrieveBoilerplateFile(self, "computed-metadata", error=True),
-            macros=jsonEscapedMacros,
-        )
-        self.mdOverridingDefaults = metadata.fromJson(data=computedMdText, source="computed-metadata")
-        self.md = metadata.join(
-            self.mdBaseline,
-            self.mdDefaults,
-            self.mdOverridingDefaults,
-            self.mdDocument,
-            self.mdCommandLine,
-        )
-        # Finally, compute the "implicit" things.
-        self.md.computeImplicitMetadata(doc=self)
-        # And compute macros again, in case the preceding steps changed them.
-        self.md.fillTextMacros(self.macros, doc=self)
-        self.md.validate()
-        m.retroactivelyCheckErrorLevel()
+
+        # Remove the metadata
+        # FIXME: This should be done the first time I parse metadata.
+        self.lines, _ = metadata.parse(lines=self.lines)
         extensions.load(self)
 
         # Initialize things
