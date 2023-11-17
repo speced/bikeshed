@@ -8,7 +8,7 @@ import io
 import os
 import re
 import typing
-from abc import ABCMeta
+from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass, field
 
 from .. import constants, t
@@ -57,11 +57,11 @@ def nodesFromHtml(data: str, config: ParseConfig, startLine: int = 1) -> t.Gener
             if text:
                 startLine = s.line(textI)
                 endLine = startLine + len(text.split("\n")) - 1
-                yield Text(startLine, endLine, text).curlifyApostrophes(lastNode)
+                yield RawText(startLine, endLine, text).curlifyApostrophes(lastNode)
                 text = ""
             if isinstance(node, list):
                 for n in node:
-                    if isinstance(n, Text):
+                    if isinstance(n, RawText):
                         yield n.curlifyApostrophes(lastNode)
                         lastNode = None
                     else:
@@ -74,7 +74,7 @@ def nodesFromHtml(data: str, config: ParseConfig, startLine: int = 1) -> t.Gener
     if text:
         startLine = s.line(textI)
         endLine = startLine + len(text.split("\n")) - 1
-        yield Text(startLine, endLine, text).curlifyApostrophes(lastNode)
+        yield RawText(startLine, endLine, text).curlifyApostrophes(lastNode)
 
 
 def parseNode(
@@ -96,7 +96,7 @@ def parseNode(
     if s[start] == "&":
         ch, i = parseCharRef(s, start).t2
         if ch is not None:
-            node = Text(text=f"&#{ord(ch)};", line=s.line(start), endLine=s.line(i - 1))
+            node = RawText(text=f"&#{ord(ch)};", line=s.line(start), endLine=s.line(i - 1))
             return Result(node, i)
 
     if s[start] == "<":
@@ -118,7 +118,7 @@ def parseNode(
             if els is not None:
                 return Result(els, i)
         if s[start : start + 2] == "\\`":
-            node = Text(
+            node = RawText(
                 line=s.line(start),
                 endLine=s.line(start),
                 text="`",
@@ -143,7 +143,7 @@ def parseNode(
             # FIXME when biblio shorthands are built into
             # this parser
             text = "\\["
-        node = Text(
+        node = RawText(
             line=s.line(start),
             endLine=s.line(start),
             text=text,
@@ -152,7 +152,7 @@ def parseNode(
     match, i = s.matchRe(start, emdashRe).t2
     if match is not None:
         # Fix line-ending em dashes, or --, by moving the previous line up, so no space.
-        node = Text(
+        node = RawText(
             line=s.line(start),
             endLine=s.line(i),
             text="—\u200b",
@@ -548,13 +548,22 @@ class ParserNode(metaclass=ABCMeta):
 
 
 @dataclass
-class Text(ParserNode):
+class Text(ParserNode, metaclass=ABCMeta):
     text: str
+
+    @abstractmethod
+    def __str__(self) -> str:
+        pass
+
+
+@dataclass
+class RawText(Text):
+    # Raw source text, might contain HTML characters/etc
 
     def __str__(self) -> str:
         return self.text
 
-    def curlifyApostrophes(self, lastNode: ParserNode | None) -> Text:
+    def curlifyApostrophes(self, lastNode: ParserNode | None) -> RawText:
         if (
             self.text[0] == "'"
             and isinstance(lastNode, (EndTag, RawElement, SelfClosedTag))
@@ -564,6 +573,14 @@ class Text(ParserNode):
         if "'" in self.text:
             self.text = re.sub(r"(\w)'(\w)", r"\1’\2", self.text)
         return self
+
+
+@dataclass
+class SafeText(Text):
+    # "Safe" text, automatically escapes special HTML chars
+    # when stringified.
+    def __str__(self) -> str:
+        return escapeHTML(self.text)
 
 
 @dataclass
@@ -1133,7 +1150,7 @@ def parseCSSProduction(s: Stream, start: int) -> Result[list[ParserNode]]:
         tag="fake-production-placeholder",
         attrs={"bs-autolink-syntax": s[start:nodeEnd], "class": "production", "bs-opaque": ""},
     ).finalize()
-    contents = Text(
+    contents = RawText(
         line=s.line(textStart),
         endLine=s.line(textEnd),
         text=text,
@@ -1234,7 +1251,7 @@ def parseCodeSpan(s: Stream, start: int) -> Result[list[ParserNode]]:
         tag="code",
         attrs={"bs-autolink-syntax": s[start:i], "bs-opaque": ""},
     )
-    content = Text(
+    content = RawText(
         line=s.line(contentStart),
         endLine=s.line(contentEnd - 1),
         text=escapeHTML(text),
