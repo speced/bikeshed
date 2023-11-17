@@ -705,14 +705,6 @@ class Macro(ParserNode):
         me = constants.macroEndChar
         return f"{ms}{name}{'?' if optional else ''}{me}"
 
-    @staticmethod
-    def parse(text: str) -> tuple[str, int]:
-        # Looks for macros in the text and converts
-        # them into the safely-encoded form.
-        ms = constants.macroStartChar
-        me = constants.macroEndChar
-        return macroRe.subn(f"{ms}\\1\\2{me}", text)
-
 
 #
 #
@@ -781,14 +773,15 @@ def parseStartTag(s: Stream, start: int) -> Result[StartTag | SelfClosedTag]:
         if attrName in tag.attrs:
             m.die(f"Attribute {attrName} appears twice in <{tagname}>.", lineNum=s.loc(startAttr))
             return Result.fail(start)
+        if "[" in attrValue:
+            attrValue = replaceMacrosInAttr(
+                text=attrValue,
+                macros=s.config.macros,
+                s=s,
+                start=i,
+                attrName=attrName,
+            )
         tag.attrs[attrName] = attrValue
-        subbedValue, numSubs = Macro.parse(attrValue)
-        if numSubs > 0:
-            tag.attrs[attrName] = subbedValue
-            if "bs-macro-attributes" in tag.attrs:
-                tag.attrs["bs-macro-attributes"] += f",{attrName}"
-            else:
-                tag.attrs["bs-macro-attributes"] = attrName
 
     i = parseWhitespace(s, i).end
 
@@ -1364,6 +1357,23 @@ def parseMacro(s: Stream, start: int) -> Result[Macro]:
         optional=optional,
     )
     return Result(macro, i)
+
+
+def replaceMacrosInAttr(text: str, macros: dict[str, str], s: Stream, start: int, attrName: str) -> str:
+    def doRep(match: re.Match) -> str:
+        macroName = match[1].lower()
+        optional = match[2] == "?"
+        if macroName in macros:
+            return macros[macroName]
+        if optional:
+            return ""
+        m.die(
+            f"Found unmatched text macro {match[0]} in {attrName}='...'. Correct the macro, or escape it by replacing the opening [ with &#x5b;",
+            lineNum=s.loc(start + match.start()),
+        )
+        return match[0]
+
+    return macroRe.sub(doRep, text)
 
 
 metadataPreEndRe = re.compile(r"</pre>(.*)")
