@@ -20,7 +20,6 @@ from . import (
     dfns,
     extensions,
     fingerprinting,
-    func,
     h,
     headings,
     highlight,
@@ -475,11 +474,6 @@ class Spec:
                 sys.exit(0)
         except Exception as e:
             m.die(f"Something went wrong while watching the file:\n{e}")
-
-    def fixText(self, text: str) -> str:
-        textFunctor: func.Functor = func.Functor(text)
-        textFunctor = textFunctor.map(h.fixTypography)
-        return t.cast(str, textFunctor.extract())
 
     def printTargets(self) -> None:
         m.p("Exported terms:")

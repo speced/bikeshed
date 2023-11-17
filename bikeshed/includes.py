@@ -80,7 +80,6 @@ def handleBikeshedInclude(el: t.ElementT, doc: t.SpecT) -> None:
         lines = markdown.parse(lines, doc.md.indent, opaqueElements=doc.md.opaqueElements)
         text = "".join(lines)
         text = h.replaceMacros(text, macros)
-        text = doc.fixText(text)
         subtree = h.parseHTML(text)
         for childInclude in h.findAll("pre.include", h.E.div({}, *subtree)):
             childInclude.set("hash", hash)

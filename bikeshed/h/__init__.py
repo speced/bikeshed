@@ -25,7 +25,6 @@ from .dom import (
     findAll,
     firstLinkTextFromElement,
     fixSurroundingTypography,
-    fixTypography,
     fixupIDs,
     foldWhitespace,
     hasAncestor,

@@ -21,7 +21,6 @@ if t.TYPE_CHECKING:
 def boilerplateFromHtml(doc: t.SpecT, htmlString: str) -> t.NodesT:
     htmlString = h.parseText(htmlString, h.ParseConfig.fromSpec(doc))
     htmlString = h.replaceMacros(htmlString, doc.macros)
-    htmlString = doc.fixText(htmlString)
     bp = h.E.div({}, h.parseHTML(htmlString))
     conditional.processConditionals(doc, bp)
     return h.childNodes(bp, clear=True)
@@ -217,7 +216,7 @@ def addAtRisk(doc: t.SpecT) -> None:
         return
     html = "<p>The following features are at-risk, and may be dropped during the CR period:\n<ul>"
     for feature in doc.md.atRisk:
-        html += "<li>" + doc.fixText(h.parseText(feature, h.ParseConfig.fromSpec(doc)))
+        html += "<li>" + h.parseText(feature, h.ParseConfig.fromSpec(doc))
     html += (
         "</ul><p>“At-risk” is a W3C Process term-of-art, and does not necessarily imply that the feature is in danger of being dropped or delayed. "
         + "It means that the WG believes the feature may have difficulty being interoperably implemented in a timely manner, "
@@ -1042,7 +1041,6 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
             if isinstance(v, str):
                 htmlText = h.parseText(v, h.ParseConfig.fromSpec(doc))
                 htmlText = h.replaceMacros(htmlText, doc.macros)
-                htmlText = doc.fixText(htmlText)
                 parsed.append(h.parseHTML(htmlText))
             else:
                 parsed.append(v)

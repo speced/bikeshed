@@ -1371,7 +1371,7 @@ def replaceMacrosInAttr(text: str, macros: dict[str, str], s: Stream, start: int
             f"Found unmatched text macro {match[0]} in {attrName}='...'. Correct the macro, or escape it by replacing the opening [ with &#x5b;",
             lineNum=s.loc(start + match.start()),
         )
-        return match[0]
+        return t.cast("str", match[0])
 
     return macroRe.sub(doRep, text)
 
