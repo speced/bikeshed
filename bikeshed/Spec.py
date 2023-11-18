@@ -119,11 +119,9 @@ class Spec:
         self.extraScripts = stylescript.ScriptManager()
 
         try:
-            inputContent = self.inputSource.read()
-            self.initMetadata(inputContent)
-            self.lines = self.earlyParse(inputContent)
-            if inputContent.date is not None:
-                self.mdBaseline.addParsedData("Date", inputContent.date)
+            self.inputContent = self.inputSource.read()
+            if self.inputContent.date is not None:
+                self.mdBaseline.addParsedData("Date", self.inputContent.date)
         except FileNotFoundError:
             m.die(f"Couldn't find the input file at the specified location '{self.inputSource}'.")
             return False
@@ -196,11 +194,9 @@ class Spec:
         return self
 
     def assembleDocument(self) -> Spec:
-        # Textual hacks
-        u.stripBOM(self)
-        if self.lineNumbers:
-            self.lines = u.hackyLineNumbers(self.lines)
+        self.initMetadata(self.inputContent)
         self.recordDependencies(self.inputSource)
+        self.lines = self.earlyParse(self.inputContent)
 
         # Remove the metadata
         # FIXME: This should be done the first time I parse metadata.
