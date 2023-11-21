@@ -1220,7 +1220,7 @@ def parseCSSMaybe(s: Stream, start: int) -> Result[RawElement]:
         line=s.line(start),
         endLine=s.line(start),
         tag="fake-maybe-placeholder",
-        attrs={"bs-autolink-syntax": s[start:i], "bs-original-contents": text},
+        attrs={"bs-autolink-syntax": s[start:i], "bs-original-contents": escapeAttr(text)},
     ).finalize()
     el = RawElement(
         line=startTag.line,
