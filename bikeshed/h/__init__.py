@@ -59,7 +59,6 @@ from .dom import (
     removeClass,
     removeNode,
     replaceContents,
-    replaceMacros,
     replaceMacrosTextly,
     replaceNode,
     replaceWithContents,

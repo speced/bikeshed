@@ -28,53 +28,68 @@ class ParseConfig:
     markdown: bool = False
     css: bool = False
     macros: dict[str, str] = field(default_factory=dict)
+    context: str | None = None
 
     @staticmethod
-    def fromSpec(doc: t.SpecT) -> ParseConfig:
+    def fromSpec(doc: t.SpecT, context: str | None = None) -> ParseConfig:
         return ParseConfig(
             markdown="markdown" in doc.md.markupShorthands,
             css="css" in doc.md.markupShorthands,
             macros=doc.macros,
+            context=context,
         )
 
 
 def nodesFromHtml(data: str, config: ParseConfig, startLine: int = 1) -> t.Generator[ParserNode, None, None]:
-    i = 0
     s = Stream(data, startLine=startLine, config=config)
-    dt, i = parseDoctype(s, i).vi
-    if dt is not None:
-        yield dt
-    text = ""
-    textI = 0
-    node: ParserNode | list[ParserNode] | None
+    yield from nodesFromStream(s, 0)
+
+
+def nodesFromStream(s: Stream, start: int) -> t.Generator[ParserNode, None, None]:
+    i = start
+    textStart = start
     lastNode: ParserNode | None = None
-    while not s.eof(i):
-        node, i = parseNode(s, i).vi
-        if node is None:
-            text += s[i]
+    eofI = len(s)
+    while i < eofI:
+        # Early continue if the character isn't even *possible*
+        # to trigger parseNode() successfully. Keep this in sync!
+        if s[i] not in POSSIBLE_NODE_START_CHARS:
             i += 1
+            continue
+        result = parseNode(s, i)
+        if result.value is None:
+            i += 1
+            continue
+        # Found a node, so see if text needs to be emitted first.
+        if textStart != i:
+            yield makeText(s, textStart, i, lastNode)
+            lastNode = None
+        i = result.i
+        textStart = result.i
+        if isinstance(result.value, list):
+            for n in result.value:
+                if isinstance(n, RawText):
+                    yield n.curlifyApostrophes(lastNode)
+                    lastNode = None
+                else:
+                    yield n
+                    lastNode = n
         else:
-            if text:
-                startLine = s.line(textI)
-                endLine = startLine + len(text.split("\n")) - 1
-                yield RawText(startLine, endLine, text).curlifyApostrophes(lastNode)
-                text = ""
-            if isinstance(node, list):
-                for n in node:
-                    if isinstance(n, RawText):
-                        yield n.curlifyApostrophes(lastNode)
-                        lastNode = None
-                    else:
-                        yield n
-                        lastNode = n
-            else:
-                yield node
-                lastNode = node
-            textI = i
-    if text:
-        startLine = s.line(textI)
-        endLine = startLine + len(text.split("\n")) - 1
-        yield RawText(startLine, endLine, text).curlifyApostrophes(lastNode)
+            yield result.value
+            lastNode = result.value
+    if textStart != i:
+        yield makeText(s, textStart, i, lastNode)
+
+
+def makeText(s: Stream, start: int, end: int, lastNode: ParserNode | None) -> RawText:
+    return RawText(
+        line=start,
+        endLine=end - 1,
+        text=s[start:end],
+    ).curlifyApostrophes(lastNode)
+
+
+POSSIBLE_NODE_START_CHARS = "&<`~'[\\—-|"
 
 
 def parseNode(
@@ -84,9 +99,9 @@ def parseNode(
     """
     Parses one Node from the start of the stream.
     Might return multiple nodes, as a list.
-    Failure means the list doesn't start with anything special
+    Failure means the stream doesn't start with anything special
     (it'll just be text),
-    but Text *can* be validly returned sometimes as the Node.
+    but Text *can* be validly returned sometimes as the node.
     """
     if s.eof(start):
         return Result.fail(start)
@@ -129,11 +144,19 @@ def parseNode(
             el, i = parseCSSMaybe(s, start).vi
             if el is not None:
                 return Result(el, i)
-    if s[start] == "[" and s[start - 1] != "[":
-        el, i = parseMacro(s, start).vi
-        if el is not None:
-            return Result(el, i)
-    if s[start : start + 2] == r"\[":
+    if s[start : start + 2] == "[[":
+        # biblio link, for now just pass it thru
+        node = RawText(
+            line=s.line(start),
+            endLine=s.line(start),
+            text="[[",
+        )
+        return Result(node, start + 2)
+    if s[start] == "[":
+        macroRes = parseMacro(s, start)
+        if macroRes.err is None:
+            return macroRes
+    if s[start : start + 2] == "\\[":
         if s[start + 2].isalpha() or s[start + 2].isdigit():
             # an escaped macro, so handle it here
             text = "["
@@ -168,9 +191,14 @@ emdashRe = re.compile(r"(?:(?<!-)(—|--))\n\s*(?=\S)")
 def parseAngleStart(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
     # Assuming the stream starts with an <
     i = start + 1
-    comment, i = parseComment(s, start).vi
-    if comment is not None:
-        return Result(comment, i)
+    if s[i] == "!":
+        dtRes = parseDoctype(s, start)
+        if dtRes.err is None:
+            return dtRes
+        commentRes = parseComment(s, start)
+        if commentRes.err is None:
+            return commentRes
+        return Result.fail(start)
 
     startTag, i = parseStartTag(s, start).vi
     if startTag is not None:
@@ -334,7 +362,7 @@ def parseTitle(text: str, config: ParseConfig, startLine: int = 1) -> str:
     # Parses the text, but removes any tags from the content,
     # as they'll just show up as literal text in <title>.
     nodes = nodesFromHtml(text, config, startLine=startLine)
-    return strFromNodes(n for n in nodes if isinstance(n, (Text, Macro)))
+    return strFromNodes(n for n in nodes if isinstance(n, Text))
 
 
 #
@@ -387,13 +415,13 @@ class ParseFailure(Failure):
         return f"{self.s.loc(self.index)} {self.details}"
 
 
-ResultT = t.TypeVar("ResultT")
+ResultT = t.TypeVar("ResultT", covariant=True)
 
 
 @dataclass
 class Result(t.Generic[ResultT]):
     value: ResultT | None
-    end: int
+    i: int
     err: Failure | None = None
 
     @property
@@ -418,7 +446,7 @@ class Result(t.Generic[ResultT]):
             value = None
         else:
             value = self.value
-        return (value, self.end)
+        return (value, self.i)
 
     @property
     def vie(self) -> tuple[ResultT | None, int, Failure | None]:
@@ -427,7 +455,7 @@ class Result(t.Generic[ResultT]):
             value = None
         else:
             value = self.value
-        return (value, self.end, self.err)
+        return (value, self.i, self.err)
 
 
 class Stream:
@@ -436,16 +464,25 @@ class Stream:
     _lineBreaks: list[int]
     startLine: int
     config: ParseConfig
+    depth: int = 1
 
-    def __init__(self, chars: str, config: ParseConfig, startLine: int = 1) -> None:
+    def __init__(self, chars: str, config: ParseConfig, startLine: int = 1, depth: int = 1) -> None:
+        if depth > 10:
+            msg = "HTML parsing recursed more than 10 levels deep; probably an infinite loop."
+            raise RecursionError(msg)
         self._chars = chars
         self._len = len(chars)
         self._lineBreaks = []
         self.startLine = startLine
         self.config = config
+        self.depth = depth
         for i, char in enumerate(chars):
             if char == "\n":
                 self._lineBreaks.append(i)
+
+    def subStream(self, context: str, chars: str, startLine: int = 1) -> Stream:
+        newConfig = dataclasses.replace(self.config, context=context)
+        return Stream(chars, config=newConfig, startLine=startLine, depth=self.depth + 1)
 
     def __getitem__(self, key: int | slice) -> str:
         try:
@@ -455,6 +492,9 @@ class Stream:
 
     def eof(self, index: int) -> bool:
         return index >= self._len
+
+    def __len__(self) -> int:
+        return self._len
 
     def line(self, index: int) -> int:
         # Zero-based line index
@@ -469,7 +509,10 @@ class Stream:
         return index - startOfCol
 
     def loc(self, index: int) -> str:
-        return f"{self.line(index)}:{self.col(index)}"
+        rc = f"{self.line(index)}:{self.col(index)}"
+        if self.config.context is None:
+            return rc
+        return f"{rc} of {self.config.context}"
 
     def skipTo(self, start: int, text: str) -> Result[str]:
         # Skip forward until encountering `text`.
@@ -604,7 +647,8 @@ class StartTag(ParserNode):
         for k, v in sorted(self.attrs.items()):
             if k == "bs-line-number":
                 continue
-            s += f' {k}="{escapeAttr(v)}"'
+            v = v.replace('"', "&#34;")
+            s += f' {k}="{v}"'
         if self.classes:
             s += f' class="{" ".join(sorted(self.classes))}"'
         s += ">"
@@ -690,22 +734,6 @@ class RawElement(ParserNode):
         return f"{self.startTag}{self.data}</{self.tag}>"
 
 
-@dataclass
-class Macro(ParserNode):
-    name: str
-    optional: bool
-
-    def __str__(self) -> str:
-        # Use PUA characters to delimit the macro name
-        return Macro.encode(self.name, self.optional)
-
-    @staticmethod
-    def encode(name: str, optional: bool = False) -> str:
-        ms = constants.macroStartChar
-        me = constants.macroEndChar
-        return f"{ms}{name}{'?' if optional else ''}{me}"
-
-
 #
 #
 #
@@ -783,7 +811,7 @@ def parseStartTag(s: Stream, start: int) -> Result[StartTag | SelfClosedTag]:
             )
         tag.attrs[attrName] = attrValue
 
-    i = parseWhitespace(s, i).end
+    i = parseWhitespace(s, i).i
 
     if s[i] == "/":
         if s[i + 1] == ">" and tagname in ("br", "link", "meta"):
@@ -829,7 +857,7 @@ def parseAttribute(s: Stream, start: int) -> Result[tuple[str, str]]:
 
     attrName = s[start:i]
     endOfName = i
-    i = parseWhitespace(s, i).end
+    i = parseWhitespace(s, i).i
     if s[i] == "=":
         i += 1
     else:
@@ -837,7 +865,7 @@ def parseAttribute(s: Stream, start: int) -> Result[tuple[str, str]]:
 
     # Now committed to a value too
 
-    i = parseWhitespace(s, i).end
+    i = parseWhitespace(s, i).i
 
     if s[i] == '"' or s[i] == "'":
         attrValue, i = parseQuotedAttrValue(s, i).vi
@@ -872,7 +900,7 @@ def parseQuotedAttrValue(s: Stream, start: int) -> Result[str]:
             if ch is None:
                 i += 1
                 continue
-            val += s[startSeg:startRef] + ch
+            val += s[startSeg:startRef] + f"&#{ord(ch)};"
             startSeg = i
             continue
         i += 1
@@ -899,7 +927,7 @@ def parseUnquotedAttrValue(s: Stream, start: int) -> Result[str]:
             if ch is None:
                 i += 1
                 continue
-            val += s[startSeg:startRef] + ch
+            val += s[startSeg:startRef] + f"&#{ord(ch)};"
             startSeg = i
             continue
         i += 1
@@ -1336,10 +1364,10 @@ def parseFencedCodeBlock(s: Stream, start: int) -> Result[RawElement]:
     return Result(el, i)
 
 
-macroRe = re.compile(r"\[([A-Z\d-]*[A-Z][A-Z\d-]*)(\??)\]")
+macroRe = re.compile(r"([\[\\]?)\[([A-Z\d-]*[A-Z][A-Z\d-]*)(\??)\]")
 
 
-def parseMacro(s: Stream, start: int) -> Result[Macro]:
+def parseMacro(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
     # Macros all look like `[FOO]` or `[FOO?]`:
     # uppercase ASCII, possibly with a ? suffix,
     # tightly wrapped by square brackets.
@@ -1349,31 +1377,95 @@ def parseMacro(s: Stream, start: int) -> Result[Macro]:
     match, i = s.matchRe(start, macroRe).vi
     if match is None:
         return Result.fail(start)
-    optional = match.group(2) == "?"
-    macro = Macro(
-        line=s.line(start),
-        endLine=s.line(start),
-        name=match.group(1),
-        optional=optional,
-    )
-    return Result(macro, i)
+    macroName = match[2].lower()
+    optional = match[3] == "?"
+    if macroName not in s.config.macros:
+        if optional:
+            return Result([], i)
+        else:
+            m.die(
+                f"Found unmatched text macro {match[0]}. Correct the macro, or escape it by replacing the opening [ with &#91;",
+                lineNum=s.loc(i),
+            )
+            return Result(
+                RawText(
+                    line=s.line(start),
+                    endLine=s.line(i - 1),
+                    text=match[0],
+                ),
+                i,
+            )
+    macroText = s.config.macros[macroName]
+    try:
+        newStream = s.subStream(context=f"macro {match[0]}", chars=macroText)
+    except RecursionError:
+        m.die(
+            f"Macro replacement for {match[0]} recursed more than {s.depth} levels deep; probably your text macros are accidentally recursive.",
+            lineNum=s.loc(start),
+        )
+        return Result(
+            RawText(
+                line=s.line(start),
+                endLine=s.line(i - 1),
+                text=match[0],
+            ),
+            i,
+        )
+    nodes = list(nodesFromStream(newStream, 0))
+    return Result(nodes, i)
 
 
 def replaceMacrosInAttr(text: str, macros: dict[str, str], s: Stream, start: int, attrName: str) -> str:
-    def doRep(match: re.Match) -> str:
-        macroName = match[1].lower()
-        optional = match[2] == "?"
-        if macroName in macros:
-            return macros[macroName]
-        if optional:
-            return ""
-        m.die(
-            f"Found unmatched text macro {match[0]} in {attrName}='...'. Correct the macro, or escape it by replacing the opening [ with &#x5b;",
-            lineNum=s.loc(start + match.start()),
-        )
-        return t.cast("str", match[0])
+    # Since I just loop over the substituted text,
+    # rather than recursing as I go like I do for content macros,
+    # I need to protect against accidentally replacing something
+    # that wasn't originally a macro. So:
+    # * if I see an escaped macro or leave a sub failure in,
+    #   turn their brackets into HTML escapes.
+    # * wrap every substitution in magic chars, so adjacent
+    #   substitutions can't combine to form a macro,
+    #   like `[F` next to `OO]`. They're removed at the end.
 
-    return macroRe.sub(doRep, text)
+    msc = constants.macroStartChar
+    mec = constants.macroEndChar
+
+    def doRep(match: re.Match) -> str:
+        escaped = match[1] == "\\"
+        biblio = match[1] == "["
+        macroName = match[2].lower()
+        optional = match[3] == "?"
+        if escaped:
+            return msc + "&#91;" + t.cast("str", match[0][2:-1]) + "&#93;" + mec
+        if biblio:
+            return msc + "&#91;&#91;" + t.cast("str", match[0][2:-1]) + "&#93;" + mec
+        if macroName in macros:
+            return msc + macros[macroName] + mec
+        if optional:
+            return msc + mec
+        m.die(
+            f"Found unmatched text macro {match[0]} in {attrName}='...'. Correct the macro, or escape it by replacing the opening [ with &#91;.",
+            lineNum=s.loc(start),
+        )
+        return msc + "&#91;" + t.cast("str", match[0][1:-1]) + "&#93;" + mec
+
+    text, count = macroRe.subn(doRep, text)
+    if count > 0:
+        loops = 1
+        while True:
+            if loops > 10:
+                m.die(
+                    f"Macro replacement in {attrName}='...' recursed more than 10 levels deep; probably your text macros are accidentally recursive.",
+                    lineNum=s.loc(start),
+                )
+                break
+            if "[" not in text:
+                break
+            newText = macroRe.sub(doRep, text)
+            if text == newText:
+                break
+            text = newText
+            loops += 1
+    return text.replace(msc, "").replace(mec, "")
 
 
 metadataPreEndRe = re.compile(r"</pre>(.*)")

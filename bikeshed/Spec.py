@@ -158,6 +158,7 @@ class Spec:
         computedMdText = h.replaceMacrosTextly(
             retrieve.retrieveBoilerplateFile(self, "computed-metadata", error=True),
             macros=jsonEscapedMacros,
+            context="? of computed-metadata.include",
         )
         self.mdOverridingDefaults = metadata.fromJson(data=computedMdText, source="computed-metadata")
         # And create the final, complete md combo
@@ -236,7 +237,6 @@ class Spec:
         # Convert to a single string of html now, for convenience.
         self.html = "".join(x.text for x in self.lines)
         boilerplate.addHeaderFooter(self)
-        self.html = h.replaceMacros(self.html, self.macros)
 
         # Build the document
         self.document = h.parseDocument(self.html)
