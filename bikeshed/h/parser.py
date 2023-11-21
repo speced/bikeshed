@@ -83,8 +83,8 @@ def nodesFromStream(s: Stream, start: int) -> t.Generator[ParserNode, None, None
 
 def makeText(s: Stream, start: int, end: int, lastNode: ParserNode | None) -> RawText:
     return RawText(
-        line=start,
-        endLine=end - 1,
+        line=s.line(start),
+        endLine=s.line(end),
         text=s[start:end],
     ).curlifyApostrophes(lastNode)
 
@@ -111,7 +111,7 @@ def parseNode(
     if s[start] == "&":
         ch, i = parseCharRef(s, start).vi
         if ch is not None:
-            node = RawText(text=f"&#{ord(ch)};", line=s.line(start), endLine=s.line(i - 1))
+            node = RawText(text=f"&#{ord(ch)};", line=s.line(start), endLine=s.line(i))
             return Result(node, i)
 
     if s[start] == "<":
@@ -217,7 +217,7 @@ def parseAngleStart(s: Stream, start: int) -> Result[ParserNode | list[ParserNod
                     tag="pre",
                     startTag=startTag,
                     data=text,
-                    endLine=s.line(i - 1),
+                    endLine=s.line(i),
                 )
                 return Result(el, i)
         if startTag.tag == "script":
@@ -229,7 +229,7 @@ def parseAngleStart(s: Stream, start: int) -> Result[ParserNode | list[ParserNod
                 tag="script",
                 startTag=startTag,
                 data=text,
-                endLine=s.line(i - 1),
+                endLine=s.line(i),
             )
             return Result(el, i)
         elif startTag.tag == "style":
@@ -241,7 +241,7 @@ def parseAngleStart(s: Stream, start: int) -> Result[ParserNode | list[ParserNod
                 tag="style",
                 startTag=startTag,
                 data=text,
-                endLine=s.line(i - 1),
+                endLine=s.line(i),
             )
             return Result(el, i)
         elif startTag.tag == "xmp":
@@ -253,7 +253,7 @@ def parseAngleStart(s: Stream, start: int) -> Result[ParserNode | list[ParserNod
                 tag="xmp",
                 startTag=startTag,
                 data=text,
-                endLine=s.line(i - 1),
+                endLine=s.line(i),
             )
             return Result(el, i)
         else:
@@ -332,7 +332,9 @@ def linesFromNodes(nodes: t.Iterable[ParserNode]) -> list[str]:
 
 
 def debugNodes(nodes: t.Iterable[ParserNode]) -> str:
-    return "\n".join(repr(x) for x in nodes)
+    nodes = list(nodes)
+    print("\n".join(repr(x) for x in nodes))
+    return nodes
 
 
 def parseLines(textLines: list[str], config: ParseConfig, startLine: int = 1) -> list[str]:
@@ -1035,7 +1037,7 @@ def parseEndTag(s: Stream, start: int) -> Result[EndTag]:
         m.die(f"Garbage after the tagname in </{tagname}>.", lineNum=s.loc(start))
         return Result.fail(start)
     i += 1
-    return Result(EndTag(s.line(start), s.line(i - 1), tagname), i)
+    return Result(EndTag(s.line(start), s.line(i), tagname), i)
 
 
 def parseComment(s: Stream, start: int) -> Result[Comment]:
@@ -1180,7 +1182,7 @@ def parseCSSProduction(s: Stream, start: int) -> Result[list[ParserNode]]:
     )
     endTag = EndTag(
         line=s.line(textEnd),
-        endLine=s.line(nodeEnd - 1),
+        endLine=s.line(nodeEnd),
         tag=startTag.tag,
     )
     return Result([startTag, contents, endTag], nodeEnd)
@@ -1227,7 +1229,7 @@ def parseCSSMaybe(s: Stream, start: int) -> Result[RawElement]:
         tag=startTag.tag,
         startTag=startTag,
         data=rawContents,
-        endLine=s.line(i - 1),
+        endLine=s.line(i),
     )
     return Result(el, i)
 
@@ -1245,7 +1247,7 @@ def parseCodeSpan(s: Stream, start: int) -> Result[list[ParserNode]]:
         return Result.fail(start)
     match, i = s.matchRe(start, codeSpanStartRe).vi
     assert match is not None
-    ticks = match.group(0)
+    ticks = match[0]
     contentStart = i
 
     if len(ticks) == 1:
@@ -1270,18 +1272,18 @@ def parseCodeSpan(s: Stream, start: int) -> Result[list[ParserNode]]:
 
     startTag = StartTag(
         line=s.line(start),
-        endLine=s.line(contentStart - 1),
+        endLine=s.line(contentStart),
         tag="code",
-        attrs={"bs-autolink-syntax": s[start:i], "bs-opaque": ""},
+        attrs={"bs-autolink-syntax": f"{ticks}{text}{ticks}", "bs-opaque": ""},
     )
     content = RawText(
         line=s.line(contentStart),
-        endLine=s.line(contentEnd - 1),
+        endLine=s.line(contentEnd),
         text=escapeHTML(text),
     )
     endTag = EndTag(
         line=s.line(contentEnd),
-        endLine=s.line(i - 1),
+        endLine=s.line(i),
         tag=startTag.tag,
     )
     return Result([startTag, content, endTag], i)
@@ -1359,7 +1361,7 @@ def parseFencedCodeBlock(s: Stream, start: int) -> Result[RawElement]:
         tag=tag.tag,
         startTag=tag,
         data=contents,
-        endLine=s.line(i - 1),
+        endLine=s.line(i),
     )
     return Result(el, i)
 
@@ -1390,7 +1392,7 @@ def parseMacro(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
             return Result(
                 RawText(
                     line=s.line(start),
-                    endLine=s.line(i - 1),
+                    endLine=s.line(i),
                     text=match[0],
                 ),
                 i,
@@ -1406,7 +1408,7 @@ def parseMacro(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
         return Result(
             RawText(
                 line=s.line(start),
-                endLine=s.line(i - 1),
+                endLine=s.line(i),
                 text=match[0],
             ),
             i,
@@ -1511,13 +1513,12 @@ def parseMetadataBlock(s: Stream, start: int) -> Result[RawElement]:
             contents += line
             continue
         # Hit the end tag
+        # Back up one char so we're actually ending at the end
+        # of the construct, rather than on the next line.
+        i -= 1
         if match.group(1).strip() != "":
-            m.die("Significant text on the same line as the metadata end tag isn't allowed.", lineNum=s.line(i - 1))
+            m.die("Significant text on the same line as the metadata end tag isn't allowed.", lineNum=s.line(i))
         break
-    # Since we jump to next line each time, jump back one character
-    # so the newline will show up in the next node,
-    # as the parsers typically do.
-    i -= 1
 
     # Since the internals aren't parsed, call it an <xmp>
     # so it'll survive later parses if necessary.
@@ -1527,7 +1528,7 @@ def parseMetadataBlock(s: Stream, start: int) -> Result[RawElement]:
         tag="xmp",
         startTag=startTag,
         data=contents,
-        endLine=s.line(i - 1),
+        endLine=s.line(i),
     )
     return Result(el, i)
 
