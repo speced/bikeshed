@@ -407,7 +407,8 @@ class MetadataManager:
 def parsedTextFromRawLines(lines: list[str], doc: t.SpecT, indent: int, context: str) -> str:
     lines = h.parseLines(lines, h.ParseConfig.fromSpec(doc, context=context))
     lines = datablocks.transformDataBlocks(doc, lines)
-    return "\n".join(markdown.parse(lines, indent))
+    lines = markdown.parse(lines, indent)
+    return "".join(lines)
 
 
 if t.TYPE_CHECKING:
@@ -1032,6 +1033,7 @@ def parse(lines: t.Sequence[Line]) -> tuple[list[Line], MetadataManager]:
     newlines = []
     inMetadata = False
     lastKey = None
+    multilineVal = False
     endTag = None
     md = MetadataManager()
     for line in lines:
@@ -1048,16 +1050,28 @@ def parse(lines: t.Sequence[Line]) -> tuple[list[Line], MetadataManager]:
             continue
         if inMetadata:
             # Skip newlines except for multiline blocks
-            if line.text.strip() == "" and lastKey not in ("Abstract", "Status Text"):
+            if line.text.strip() == "" and not multilineVal:
                 continue
             if lastKey and (line.text.strip() == "" or re.match(r"\s+", line.text)):
                 # empty lines, or lines that start with 1+ spaces, continue previous key
                 md.addData(lastKey, line.text, lineNum=line.i)
-            elif re.match(r"([^:]+):\s*(.*)", line.text):
-                match = re.match(r"([^:]+):\s*(.*)", line.text)
+            elif re.match(r"([^:]+):(.*)", line.text):
+                match = re.match(r"([^:]+):(.*)", line.text)
                 assert match is not None
-                md.addData(match.group(1), match.group(2), lineNum=line.i)
-                lastKey = match.group(1)
+                key = match[1].strip()
+                val = match[2].strip()
+                if key in knownKeys and knownKeys[key].multiline:
+                    multilineVal = True
+                elif key[0] == "!":
+                    multilineVal = True
+                else:
+                    multilineVal = False
+                if multilineVal:
+                    # restore the newline, since later lines
+                    # will have it
+                    val += "\n"
+                md.addData(key, val, lineNum=line.i)
+                lastKey = match[1]
             else:
                 m.die(
                     f"Incorrectly formatted metadata line:\n{line.text}",
@@ -1068,7 +1082,7 @@ def parse(lines: t.Sequence[Line]) -> tuple[list[Line], MetadataManager]:
             if md.title is None:
                 match = re.match(r"\s*<h1[^>]*>(.*?)</h1>", line.text)
                 assert match is not None
-                title = match.group(1)
+                title = match[1]
                 md.addData("Title", title, lineNum=line.i)
             newlines.append(line)
         else:
@@ -1254,6 +1268,7 @@ class Metadata:
     attrName: str
     join: t.Callable[[t.Any, t.Any], t.Any]
     parse: ParseFunc
+    multiline: bool = False
 
 
 if t.TYPE_CHECKING:
@@ -1312,7 +1327,7 @@ def parseLiteralList(key: str, val: str, lineNum: str | int | None) -> list[str]
 
 
 knownKeys = {
-    "Abstract": Metadata("Abstract", "abstract", joinList, parseLiteralList),
+    "Abstract": Metadata("Abstract", "abstract", joinList, parseLiteralList, multiline=True),
     "Advisement Class": Metadata("Advisement Class", "advisementClass", joinValue, parseLiteral),
     "Assertion Class": Metadata("Assertion Class", "assertionClass", joinValue, parseLiteral),
     "Assume Explicit For": Metadata("Assume Explicit For", "assumeExplicitFor", joinValue, parseBoolean),
@@ -1323,7 +1338,7 @@ knownKeys = {
     "Can I Use Url": Metadata("Can I Use URL", "canIUseURLs", joinList, parseLiteralList),
     "Canonical Url": Metadata("Canonical URL", "canonicalURL", joinValue, parseLiteral),
     "Complain About": Metadata("Complain About", "complainAbout", joinBoolSet, parseComplainAbout),
-    "Custom Warning Text": Metadata("Custom Warning Text", "customWarningText", joinList, parseLiteralList),
+    "Custom Warning Text": Metadata("Custom Warning Text", "customWarningText", joinList, parseLiteralList, multiline=True),
     "Custom Warning Title": Metadata("Custom Warning Title", "customWarningTitle", joinValue, parseLiteral),
     "Dark Mode": Metadata("Dark Mode", "darkMode", joinValue, parseBoolean),
     "Date": Metadata("Date", "date", joinValue, parseDate),
@@ -1404,7 +1419,7 @@ knownKeys = {
     "Revision": Metadata("Revision", "level", joinValue, parseLevel),
     "Shortname": Metadata("Shortname", "displayShortname", joinValue, parseLiteral),
     "Slim Build Artifact": Metadata("Slim Build Artifact", "slimBuildArtifact", joinValue, parseBoolean),
-    "Status Text": Metadata("Status Text", "statusText", joinList, parseLiteralList),
+    "Status Text": Metadata("Status Text", "statusText", joinList, parseLiteralList, multiline=True),
     "Status": Metadata("Status", "rawStatus", joinValue, parseLiteral),
     "Test Suite": Metadata("Test Suite", "testSuite", joinValue, parseLiteral),
     "Text Macro": Metadata("Text Macro", "customTextMacros", joinList, parseTextMacro),
