@@ -89,215 +89,6 @@ def makeText(s: Stream, start: int, end: int, lastNode: ParserNode | None) -> Ra
     ).curlifyApostrophes(lastNode)
 
 
-POSSIBLE_NODE_START_CHARS = "&<`~'[\\—-|"
-
-
-def parseNode(
-    s: Stream,
-    start: int,
-) -> Result[ParserNode | list[ParserNode]]:
-    """
-    Parses one Node from the start of the stream.
-    Might return multiple nodes, as a list.
-    Failure means the stream doesn't start with anything special
-    (it'll just be text),
-    but Text *can* be validly returned sometimes as the node.
-    """
-    if s.eof(start):
-        return Result.fail(start)
-
-    node: ParserNode | list[ParserNode] | None
-
-    if s[start] == "&":
-        ch, i = parseCharRef(s, start).vi
-        if ch is not None:
-            node = RawText(text=f"&#{ord(ch)};", line=s.line(start), endLine=s.line(i))
-            return Result(node, i)
-
-    if s[start] == "<":
-        node, i = parseAngleStart(s, start).vi
-        if node is not None:
-            return Result(node, i)
-
-    # This isn't quite correct to handle here,
-    # but it'll have to wait until I munge
-    # the markdown and HTML parsers together.
-    el: ParserNode | None
-    if s[start] in ("`", "~"):
-        el, i = parseFencedCodeBlock(s, start).vi
-        if el is not None:
-            return Result(el, i)
-    if s.config.markdown:
-        if s[start] == "`":
-            els, i = parseCodeSpan(s, start).vi
-            if els is not None:
-                return Result(els, i)
-        if s[start : start + 2] == "\\`":
-            node = RawText(
-                line=s.line(start),
-                endLine=s.line(start),
-                text="`",
-            )
-            return Result(node, start + 2)
-    if s.config.css:
-        if s[start] == "'":
-            el, i = parseCSSMaybe(s, start).vi
-            if el is not None:
-                return Result(el, i)
-    if s[start : start + 2] == "[[":
-        # biblio link, for now just pass it thru
-        node = RawText(
-            line=s.line(start),
-            endLine=s.line(start),
-            text="[[",
-        )
-        return Result(node, start + 2)
-    if s[start] == "[":
-        macroRes = parseMacro(s, start)
-        if macroRes.err is None:
-            return macroRes
-    if s[start : start + 2] == "\\[":
-        if s[start + 2].isalpha() or s[start + 2].isdigit():
-            # an escaped macro, so handle it here
-            text = "["
-            endI = start + 2
-        elif s[start + 2] == "[":
-            # actually an escaped biblio, so let the
-            # biblio/autolink code handle it for now.
-            # FIXME when biblio shorthands are built into
-            # this parser
-            text = r"\[["
-            endI = start + 3
-        else:
-            # same, but actually an an escaped autolink
-            text = r"\["
-            endI = start + 2
-        node = RawText(
-            line=s.line(start),
-            endLine=s.line(start),
-            text=text,
-        )
-        return Result(node, endI)
-    match, i = s.matchRe(start, emdashRe).vi
-    if match is not None:
-        # Fix line-ending em dashes, or --, by moving the previous line up, so no space.
-        node = RawText(
-            line=s.line(start),
-            endLine=s.line(i),
-            text="—\u200b",
-        )
-        return Result(node, i)
-
-    return Result.fail(start)
-
-
-emdashRe = re.compile(r"(?:(?<!-)(—|--))\n\s*(?=\S)")
-
-
-def parseAngleStart(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
-    # Assuming the stream starts with an <
-    i = start + 1
-    if s[i] == "!":
-        dtRes = parseDoctype(s, start)
-        if dtRes.err is None:
-            return dtRes
-        commentRes = parseComment(s, start)
-        if commentRes.err is None:
-            return commentRes
-        return Result.fail(start)
-
-    startTag, i = parseStartTag(s, start).vi
-    if startTag is not None:
-        if isinstance(startTag, SelfClosedTag):
-            return Result(startTag, i)
-        if startTag.tag == "pre":
-            el, endI = parseMetadataBlock(s, start).vi
-            if el is not None:
-                return Result(el, endI)
-            if isDatablockPre(startTag):
-                text, i = parseRawPreToEnd(s, i).vi
-                if text is None:
-                    return Result.fail(start)
-                el = RawElement(
-                    line=startTag.line,
-                    tag="pre",
-                    startTag=startTag,
-                    data=text,
-                    endLine=s.line(i),
-                )
-                return Result(el, i)
-        if startTag.tag == "script":
-            text, i = parseScriptToEnd(s, i).vi
-            if text is None:
-                return Result.fail(start)
-            el = RawElement(
-                line=startTag.line,
-                tag="script",
-                startTag=startTag,
-                data=text,
-                endLine=s.line(i),
-            )
-            return Result(el, i)
-        elif startTag.tag == "style":
-            text, i = parseStyleToEnd(s, i).vi
-            if text is None:
-                return Result.fail(start)
-            el = RawElement(
-                line=startTag.line,
-                tag="style",
-                startTag=startTag,
-                data=text,
-                endLine=s.line(i),
-            )
-            return Result(el, i)
-        elif startTag.tag == "xmp":
-            text, i = parseXmpToEnd(s, i).vi
-            if text is None:
-                return Result.fail(start)
-            el = RawElement(
-                line=startTag.line,
-                tag="xmp",
-                startTag=startTag,
-                data=text,
-                endLine=s.line(i),
-            )
-            return Result(el, i)
-        else:
-            return Result(startTag, i)
-
-    endTag, i = parseEndTag(s, start).vi
-    if endTag is not None:
-        return Result(endTag, i)
-
-    if s.config.css:
-        els, i = parseCSSProduction(s, start).vi
-        if els is not None:
-            return Result(els, i)
-
-    return Result.fail(start)
-
-
-def isDatablockPre(tag: StartTag) -> bool:
-    datablockClasses = [
-        "simpledef",
-        "propdef",
-        "descdef",
-        "elementdef",
-        "argumentdef",
-        "railroad",
-        "biblio",
-        "anchors",
-        "link-defaults",
-        "ignored-specs",
-        "info",
-        "include",
-        "include-code",
-        "include-raw",
-    ]
-    tag.finalize()
-    return any(x in tag.classes for x in datablockClasses)
-
-
 def initialDocumentParse(text: str, config: ParseConfig, startLine: int = 1) -> list[ParserNode]:
     # Just do a document parse.
     # This will add `bs-line-number` attributes,
@@ -780,6 +571,215 @@ class RawElement(ParserNode):
 #
 #
 #
+
+
+POSSIBLE_NODE_START_CHARS = "&<`~'[\\—-|"
+
+
+def parseNode(
+    s: Stream,
+    start: int,
+) -> Result[ParserNode | list[ParserNode]]:
+    """
+    Parses one Node from the start of the stream.
+    Might return multiple nodes, as a list.
+    Failure means the stream doesn't start with anything special
+    (it'll just be text),
+    but Text *can* be validly returned sometimes as the node.
+    """
+    if s.eof(start):
+        return Result.fail(start)
+
+    node: ParserNode | list[ParserNode] | None
+
+    if s[start] == "&":
+        ch, i = parseCharRef(s, start).vi
+        if ch is not None:
+            node = RawText(text=f"&#{ord(ch)};", line=s.line(start), endLine=s.line(i))
+            return Result(node, i)
+
+    if s[start] == "<":
+        node, i = parseAngleStart(s, start).vi
+        if node is not None:
+            return Result(node, i)
+
+    # This isn't quite correct to handle here,
+    # but it'll have to wait until I munge
+    # the markdown and HTML parsers together.
+    el: ParserNode | None
+    if s[start] in ("`", "~"):
+        el, i = parseFencedCodeBlock(s, start).vi
+        if el is not None:
+            return Result(el, i)
+    if s.config.markdown:
+        if s[start] == "`":
+            els, i = parseCodeSpan(s, start).vi
+            if els is not None:
+                return Result(els, i)
+        if s[start : start + 2] == "\\`":
+            node = RawText(
+                line=s.line(start),
+                endLine=s.line(start),
+                text="`",
+            )
+            return Result(node, start + 2)
+    if s.config.css:
+        if s[start] == "'":
+            el, i = parseCSSMaybe(s, start).vi
+            if el is not None:
+                return Result(el, i)
+    if s[start : start + 2] == "[[":
+        # biblio link, for now just pass it thru
+        node = RawText(
+            line=s.line(start),
+            endLine=s.line(start),
+            text="[[",
+        )
+        return Result(node, start + 2)
+    if s[start] == "[":
+        macroRes = parseMacro(s, start)
+        if macroRes.err is None:
+            return macroRes
+    if s[start : start + 2] == "\\[":
+        if s[start + 2].isalpha() or s[start + 2].isdigit():
+            # an escaped macro, so handle it here
+            text = "["
+            endI = start + 2
+        elif s[start + 2] == "[":
+            # actually an escaped biblio, so let the
+            # biblio/autolink code handle it for now.
+            # FIXME when biblio shorthands are built into
+            # this parser
+            text = r"\[["
+            endI = start + 3
+        else:
+            # same, but actually an an escaped autolink
+            text = r"\["
+            endI = start + 2
+        node = RawText(
+            line=s.line(start),
+            endLine=s.line(start),
+            text=text,
+        )
+        return Result(node, endI)
+    match, i = s.matchRe(start, emdashRe).vi
+    if match is not None:
+        # Fix line-ending em dashes, or --, by moving the previous line up, so no space.
+        node = RawText(
+            line=s.line(start),
+            endLine=s.line(i),
+            text="—\u200b",
+        )
+        return Result(node, i)
+
+    return Result.fail(start)
+
+
+emdashRe = re.compile(r"(?:(?<!-)(—|--))\n\s*(?=\S)")
+
+
+def parseAngleStart(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
+    # Assuming the stream starts with an <
+    i = start + 1
+    if s[i] == "!":
+        dtRes = parseDoctype(s, start)
+        if dtRes.err is None:
+            return dtRes
+        commentRes = parseComment(s, start)
+        if commentRes.err is None:
+            return commentRes
+        return Result.fail(start)
+
+    startTag, i = parseStartTag(s, start).vi
+    if startTag is not None:
+        if isinstance(startTag, SelfClosedTag):
+            return Result(startTag, i)
+        if startTag.tag == "pre":
+            el, endI = parseMetadataBlock(s, start).vi
+            if el is not None:
+                return Result(el, endI)
+            if isDatablockPre(startTag):
+                text, i = parseRawPreToEnd(s, i).vi
+                if text is None:
+                    return Result.fail(start)
+                el = RawElement(
+                    line=startTag.line,
+                    tag="pre",
+                    startTag=startTag,
+                    data=text,
+                    endLine=s.line(i),
+                )
+                return Result(el, i)
+        if startTag.tag == "script":
+            text, i = parseScriptToEnd(s, i).vi
+            if text is None:
+                return Result.fail(start)
+            el = RawElement(
+                line=startTag.line,
+                tag="script",
+                startTag=startTag,
+                data=text,
+                endLine=s.line(i),
+            )
+            return Result(el, i)
+        elif startTag.tag == "style":
+            text, i = parseStyleToEnd(s, i).vi
+            if text is None:
+                return Result.fail(start)
+            el = RawElement(
+                line=startTag.line,
+                tag="style",
+                startTag=startTag,
+                data=text,
+                endLine=s.line(i),
+            )
+            return Result(el, i)
+        elif startTag.tag == "xmp":
+            text, i = parseXmpToEnd(s, i).vi
+            if text is None:
+                return Result.fail(start)
+            el = RawElement(
+                line=startTag.line,
+                tag="xmp",
+                startTag=startTag,
+                data=text,
+                endLine=s.line(i),
+            )
+            return Result(el, i)
+        else:
+            return Result(startTag, i)
+
+    endTag, i = parseEndTag(s, start).vi
+    if endTag is not None:
+        return Result(endTag, i)
+
+    if s.config.css:
+        els, i = parseCSSProduction(s, start).vi
+        if els is not None:
+            return Result(els, i)
+
+    return Result.fail(start)
+
+
+def isDatablockPre(tag: StartTag) -> bool:
+    datablockClasses = [
+        "simpledef",
+        "propdef",
+        "descdef",
+        "elementdef",
+        "argumentdef",
+        "railroad",
+        "biblio",
+        "anchors",
+        "link-defaults",
+        "ignored-specs",
+        "info",
+        "include",
+        "include-code",
+        "include-raw",
+    ]
+    tag.finalize()
+    return any(x in tag.classes for x in datablockClasses)
 
 
 def parseStartTag(s: Stream, start: int) -> Result[StartTag | SelfClosedTag]:
