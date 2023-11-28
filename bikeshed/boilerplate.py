@@ -1043,7 +1043,7 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
             if isinstance(v, str):
                 if v == "":
                     continue
-                htmlText = h.parseText(v, h.ParseConfig.fromSpec(doc, context=f"{k} metadata"))
+                htmlText = h.parseText(v, h.ParseConfig.fromSpec(doc, context=f"!{k} metadata"))
                 parsed.append(h.parseHTML(htmlText))
             else:
                 parsed.append(v)
