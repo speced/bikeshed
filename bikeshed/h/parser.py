@@ -160,18 +160,24 @@ def parseNode(
         if s[start + 2].isalpha() or s[start + 2].isdigit():
             # an escaped macro, so handle it here
             text = "["
-        else:
-            # actually an escaped biblio or autolink, so let the
+            endI = start+2
+        elif s[start+2] == "[":
+            # actually an escaped biblio, so let the
             # biblio/autolink code handle it for now.
             # FIXME when biblio shorthands are built into
             # this parser
+            text = r"\[["
+            endI = start+3
+        else:
+            # same, but actually an an escaped autolink
             text = r"\["
+            endI = start+2
         node = RawText(
             line=s.line(start),
             endLine=s.line(start),
             text=text,
         )
-        return Result(node, start + 2)
+        return Result(node, endI)
     match, i = s.matchRe(start, emdashRe).vi
     if match is not None:
         # Fix line-ending em dashes, or --, by moving the previous line up, so no space.
