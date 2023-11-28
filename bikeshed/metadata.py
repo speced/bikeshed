@@ -404,7 +404,7 @@ class MetadataManager:
 def parsedTextFromRawLines(lines: list[str], doc: t.SpecT, indent: int, context: str) -> str:
     if len(lines) == 0:
         return ""
-    lines = [line.rstrip()+"\n" for line in lines]
+    lines = [line.rstrip() + "\n" for line in lines]
     lines = h.parseLines(lines, h.ParseConfig.fromSpec(doc, context=context))
     lines = datablocks.transformDataBlocks(doc, lines)
     lines = markdown.parse(lines, indent)
@@ -1334,7 +1334,13 @@ knownKeys = {
     "Can I Use Url": Metadata("Can I Use URL", "canIUseURLs", joinList, parseLiteralList),
     "Canonical Url": Metadata("Canonical URL", "canonicalURL", joinValue, parseLiteral),
     "Complain About": Metadata("Complain About", "complainAbout", joinBoolSet, parseComplainAbout),
-    "Custom Warning Text": Metadata("Custom Warning Text", "customWarningText", joinList, parseLiteralList, multiline=True),
+    "Custom Warning Text": Metadata(
+        "Custom Warning Text",
+        "customWarningText",
+        joinList,
+        parseLiteralList,
+        multiline=True,
+    ),
     "Custom Warning Title": Metadata("Custom Warning Title", "customWarningTitle", joinValue, parseLiteral),
     "Dark Mode": Metadata("Dark Mode", "darkMode", joinValue, parseBoolean),
     "Date": Metadata("Date", "date", joinValue, parseDate),

@@ -160,18 +160,18 @@ def parseNode(
         if s[start + 2].isalpha() or s[start + 2].isdigit():
             # an escaped macro, so handle it here
             text = "["
-            endI = start+2
-        elif s[start+2] == "[":
+            endI = start + 2
+        elif s[start + 2] == "[":
             # actually an escaped biblio, so let the
             # biblio/autolink code handle it for now.
             # FIXME when biblio shorthands are built into
             # this parser
             text = r"\[["
-            endI = start+3
+            endI = start + 3
         else:
             # same, but actually an an escaped autolink
             text = r"\["
-            endI = start+2
+            endI = start + 2
         node = RawText(
             line=s.line(start),
             endLine=s.line(start),
@@ -337,9 +337,9 @@ def linesFromNodes(nodes: t.Iterable[ParserNode]) -> list[str]:
     return strFromNodes(nodes).split("\n")
 
 
-def debugNodes(nodes: t.Iterable[ParserNode]) -> str:
+def debugNodes(nodes: t.Iterable[ParserNode]) -> list[ParserNode]:
     nodes = list(nodes)
-    print("\n".join(repr(x) for x in nodes))
+    print("\n".join(repr(x) for x in nodes))  # noqa: T201
     return nodes
 
 
