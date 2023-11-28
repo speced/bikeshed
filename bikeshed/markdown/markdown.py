@@ -460,8 +460,6 @@ def parseTokens(tokens: list[TokenT], numSpacesForIndentation: int) -> list[l.Li
             lines += parseBlockquote(stream)
         else:
             line = stream.currline()
-            if not line.text.endswith("\n"):
-                line.text += "\n"
             lines.append(line)
             stream.advance()
 

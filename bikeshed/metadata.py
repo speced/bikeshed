@@ -149,10 +149,7 @@ class MetadataManager:
 
     def addData(self, key: str, val: str, lineNum: str | int | None = None) -> MetadataManager:
         key = key.strip()
-        if key in ["Abstract"]:
-            val = val.strip("\n")
-        else:
-            val = val.strip()
+        val = val.strip()
 
         if key.startswith("!"):
             self.allData[key].append(val)
@@ -405,6 +402,9 @@ class MetadataManager:
 
 
 def parsedTextFromRawLines(lines: list[str], doc: t.SpecT, indent: int, context: str) -> str:
+    if len(lines) == 0:
+        return ""
+    lines = [line.rstrip()+"\n" for line in lines]
     lines = h.parseLines(lines, h.ParseConfig.fromSpec(doc, context=context))
     lines = datablocks.transformDataBlocks(doc, lines)
     lines = markdown.parse(lines, indent)
@@ -1066,10 +1066,6 @@ def parse(lines: t.Sequence[Line]) -> tuple[list[Line], MetadataManager]:
                     multilineVal = True
                 else:
                     multilineVal = False
-                if multilineVal:
-                    # restore the newline, since later lines
-                    # will have it
-                    val += "\n"
                 md.addData(key, val, lineNum=line.i)
                 lastKey = match[1]
             else:
