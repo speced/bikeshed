@@ -459,7 +459,8 @@ def parseTokens(tokens: list[TokenT], numSpacesForIndentation: int) -> list[l.Li
         elif stream.currtype() == "blockquote":
             lines += parseBlockquote(stream)
         else:
-            lines.append(stream.currline())
+            line = stream.currline()
+            lines.append(line)
             stream.advance()
 
     # for line in lines:

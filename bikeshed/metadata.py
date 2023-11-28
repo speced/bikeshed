@@ -149,10 +149,7 @@ class MetadataManager:
 
     def addData(self, key: str, val: str, lineNum: str | int | None = None) -> MetadataManager:
         key = key.strip()
-        if key in ["Abstract"]:
-            val = val.strip("\n")
-        else:
-            val = val.strip()
+        val = val.strip()
 
         if key.startswith("!"):
             self.allData[key].append(val)
@@ -278,15 +275,20 @@ class MetadataManager:
     def fillTextMacros(self, macros: t.DefaultDict[str, str], doc: t.SpecT) -> None:
         # Fills up a set of text macros based on metadata.
         if self.title:
-            macros["title"] = h.parseTitle(self.title, h.ParseConfig.fromSpec(doc))
+            macros["title"] = h.parseTitle(self.title, h.ParseConfig.fromSpec(doc, context="Title metadata"))
         if self.h1:
-            macros["spectitle"] = h.parseText(self.h1, h.ParseConfig.fromSpec(doc))
+            macros["spectitle"] = h.parseText(self.h1, h.ParseConfig.fromSpec(doc, context="H1 metadata"))
         elif self.title:
-            macros["spectitle"] = h.parseText(self.title, h.ParseConfig.fromSpec(doc))
+            macros["spectitle"] = h.parseText(self.title, h.ParseConfig.fromSpec(doc, context="Title metadata"))
         if self.displayShortname:
             macros["shortname"] = self.displayShortname
         if self.statusText:
-            macros["statustext"] = parsedTextFromRawLines(self.statusText, doc=doc, indent=self.indent)
+            macros["statustext"] = parsedTextFromRawLines(
+                self.statusText,
+                doc=doc,
+                indent=self.indent,
+                context="Status Text metadata",
+            )
         else:
             macros["statustext"] = ""
         macros["level"] = str(self.level)
@@ -313,7 +315,12 @@ class MetadataManager:
         if self.TR:
             macros["latest"] = self.TR
         if self.abstract:
-            macros["abstract"] = parsedTextFromRawLines(self.abstract, doc=doc, indent=self.indent)
+            macros["abstract"] = parsedTextFromRawLines(
+                self.abstract,
+                doc=doc,
+                indent=self.indent,
+                context="Abstract metadata",
+            )
         elif self.noAbstract:
             macros["abstract"] = ""
         macros["year"] = str(self.date.year)
@@ -378,18 +385,30 @@ class MetadataManager:
             macros["w3c-stylesheet-url"] = f"https://www.w3.org/StyleSheets/TR/2021/W3C-{shortStatus}"
             macros["w3c-status-url"] = f"https://www.w3.org/standards/types#{shortStatus}"
         if self.customWarningText is not None:
-            macros["customwarningtext"] = parsedTextFromRawLines(self.customWarningText, doc=doc, indent=self.indent)
+            macros["customwarningtext"] = parsedTextFromRawLines(
+                self.customWarningText,
+                doc=doc,
+                indent=self.indent,
+                context="Custom Warning Text metadata",
+            )
         if self.customWarningTitle is not None:
-            macros["customwarningtitle"] = h.parseText(self.customWarningTitle, h.ParseConfig.fromSpec(doc))
+            macros["customwarningtitle"] = h.parseText(
+                self.customWarningTitle,
+                h.ParseConfig.fromSpec(doc, context="Custom Warning Title metadata"),
+            )
         # Custom macros
         for name, text in self.customTextMacros:
-            macros[name.lower()] = h.parseText(text, h.ParseConfig.fromSpec(doc))
+            macros[name.lower()] = text
 
 
-def parsedTextFromRawLines(lines: list[str], doc: t.SpecT, indent: int) -> str:
-    lines = h.parseLines(lines, h.ParseConfig.fromSpec(doc))
+def parsedTextFromRawLines(lines: list[str], doc: t.SpecT, indent: int, context: str) -> str:
+    if len(lines) == 0:
+        return ""
+    lines = [line.rstrip() + "\n" for line in lines]
+    lines = h.parseLines(lines, h.ParseConfig.fromSpec(doc, context=context))
     lines = datablocks.transformDataBlocks(doc, lines)
-    return "\n".join(markdown.parse(lines, indent))
+    lines = markdown.parse(lines, indent)
+    return "".join(lines)
 
 
 if t.TYPE_CHECKING:
@@ -1014,6 +1033,7 @@ def parse(lines: t.Sequence[Line]) -> tuple[list[Line], MetadataManager]:
     newlines = []
     inMetadata = False
     lastKey = None
+    multilineVal = False
     endTag = None
     md = MetadataManager()
     for line in lines:
@@ -1030,16 +1050,24 @@ def parse(lines: t.Sequence[Line]) -> tuple[list[Line], MetadataManager]:
             continue
         if inMetadata:
             # Skip newlines except for multiline blocks
-            if line.text.strip() == "" and lastKey not in ("Abstract", "Status Text"):
+            if line.text.strip() == "" and not multilineVal:
                 continue
             if lastKey and (line.text.strip() == "" or re.match(r"\s+", line.text)):
                 # empty lines, or lines that start with 1+ spaces, continue previous key
                 md.addData(lastKey, line.text, lineNum=line.i)
-            elif re.match(r"([^:]+):\s*(.*)", line.text):
-                match = re.match(r"([^:]+):\s*(.*)", line.text)
+            elif re.match(r"([^:]+):(.*)", line.text):
+                match = re.match(r"([^:]+):(.*)", line.text)
                 assert match is not None
-                md.addData(match.group(1), match.group(2), lineNum=line.i)
-                lastKey = match.group(1)
+                key = match[1].strip()
+                val = match[2].strip()
+                if key in knownKeys and knownKeys[key].multiline:
+                    multilineVal = True
+                elif key[0] == "!":
+                    multilineVal = True
+                else:
+                    multilineVal = False
+                md.addData(key, val, lineNum=line.i)
+                lastKey = match[1]
             else:
                 m.die(
                     f"Incorrectly formatted metadata line:\n{line.text}",
@@ -1050,7 +1078,7 @@ def parse(lines: t.Sequence[Line]) -> tuple[list[Line], MetadataManager]:
             if md.title is None:
                 match = re.match(r"\s*<h1[^>]*>(.*?)</h1>", line.text)
                 assert match is not None
-                title = match.group(1)
+                title = match[1]
                 md.addData("Title", title, lineNum=line.i)
             newlines.append(line)
         else:
@@ -1236,6 +1264,7 @@ class Metadata:
     attrName: str
     join: t.Callable[[t.Any, t.Any], t.Any]
     parse: ParseFunc
+    multiline: bool = False
 
 
 if t.TYPE_CHECKING:
@@ -1294,7 +1323,7 @@ def parseLiteralList(key: str, val: str, lineNum: str | int | None) -> list[str]
 
 
 knownKeys = {
-    "Abstract": Metadata("Abstract", "abstract", joinList, parseLiteralList),
+    "Abstract": Metadata("Abstract", "abstract", joinList, parseLiteralList, multiline=True),
     "Advisement Class": Metadata("Advisement Class", "advisementClass", joinValue, parseLiteral),
     "Assertion Class": Metadata("Assertion Class", "assertionClass", joinValue, parseLiteral),
     "Assume Explicit For": Metadata("Assume Explicit For", "assumeExplicitFor", joinValue, parseBoolean),
@@ -1305,7 +1334,13 @@ knownKeys = {
     "Can I Use Url": Metadata("Can I Use URL", "canIUseURLs", joinList, parseLiteralList),
     "Canonical Url": Metadata("Canonical URL", "canonicalURL", joinValue, parseLiteral),
     "Complain About": Metadata("Complain About", "complainAbout", joinBoolSet, parseComplainAbout),
-    "Custom Warning Text": Metadata("Custom Warning Text", "customWarningText", joinList, parseLiteralList),
+    "Custom Warning Text": Metadata(
+        "Custom Warning Text",
+        "customWarningText",
+        joinList,
+        parseLiteralList,
+        multiline=True,
+    ),
     "Custom Warning Title": Metadata("Custom Warning Title", "customWarningTitle", joinValue, parseLiteral),
     "Dark Mode": Metadata("Dark Mode", "darkMode", joinValue, parseBoolean),
     "Date": Metadata("Date", "date", joinValue, parseDate),
@@ -1386,7 +1421,7 @@ knownKeys = {
     "Revision": Metadata("Revision", "level", joinValue, parseLevel),
     "Shortname": Metadata("Shortname", "displayShortname", joinValue, parseLiteral),
     "Slim Build Artifact": Metadata("Slim Build Artifact", "slimBuildArtifact", joinValue, parseBoolean),
-    "Status Text": Metadata("Status Text", "statusText", joinList, parseLiteralList),
+    "Status Text": Metadata("Status Text", "statusText", joinList, parseLiteralList, multiline=True),
     "Status": Metadata("Status", "rawStatus", joinValue, parseLiteral),
     "Test Suite": Metadata("Test Suite", "testSuite", joinValue, parseLiteral),
     "Text Macro": Metadata("Text Macro", "customTextMacros", joinList, parseTextMacro),

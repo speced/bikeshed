@@ -18,10 +18,8 @@ if t.TYPE_CHECKING:
     MetadataValueT: t.TypeAlias = str | t.NodesT | None
 
 
-def boilerplateFromHtml(doc: t.SpecT, htmlString: str) -> t.NodesT:
-    htmlString = h.parseText(htmlString, h.ParseConfig.fromSpec(doc))
-    htmlString = h.replaceMacros(htmlString, doc.macros)
-    htmlString = doc.fixText(htmlString)
+def boilerplateFromHtml(doc: t.SpecT, htmlString: str, filename: str) -> t.NodesT:
+    htmlString = h.parseText(htmlString, h.ParseConfig.fromSpec(doc, context=filename))
     bp = h.E.div({}, h.parseHTML(htmlString))
     conditional.processConditionals(doc, bp)
     return h.childNodes(bp, clear=True)
@@ -31,7 +29,7 @@ def loadBoilerplate(doc: t.SpecT, filename: str, bpname: str | None = None) -> N
     if bpname is None:
         bpname = filename
     html = retrieve.retrieveBoilerplateFile(doc, filename)
-    el = boilerplateFromHtml(doc, html)
+    el = boilerplateFromHtml(doc, html, filename)
     fillWith(bpname, el, doc=doc)
 
 
@@ -124,7 +122,11 @@ def addHeaderFooter(doc: t.SpecT) -> None:
     footer = retrieve.retrieveBoilerplateFile(doc, "footer") if "footer" in doc.md.boilerplate else ""
 
     doc.html = "\n".join(
-        [h.parseText(header, h.ParseConfig.fromSpec(doc)), doc.html, h.parseText(footer, h.ParseConfig.fromSpec(doc))],
+        [
+            h.parseText(header, h.ParseConfig.fromSpec(doc, context="header.include")),
+            doc.html,
+            h.parseText(footer, h.ParseConfig.fromSpec(doc, context="footer.include")),
+        ],
     )
 
 
@@ -217,14 +219,13 @@ def addAtRisk(doc: t.SpecT) -> None:
         return
     html = "<p>The following features are at-risk, and may be dropped during the CR period:\n<ul>"
     for feature in doc.md.atRisk:
-        html += "<li>" + doc.fixText(h.parseText(feature, h.ParseConfig.fromSpec(doc)))
+        html += "<li>" + h.parseText(feature, h.ParseConfig.fromSpec(doc, context="At Risk metadata"))
     html += (
         "</ul><p>“At-risk” is a W3C Process term-of-art, and does not necessarily imply that the feature is in danger of being dropped or delayed. "
         + "It means that the WG believes the feature may have difficulty being interoperably implemented in a timely manner, "
         + "and marking it as such allows the WG to drop the feature if necessary when transitioning to the Proposed Rec stage, "
         + "without having to publish a new Candidate Rec without the feature first."
     )
-    html = h.replaceMacros(html, doc.macros)
     frag = h.parseHTML(html)
     fillWith("at-risk", frag, doc=doc)
 
@@ -1040,9 +1041,9 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
         parsed: list[t.NodesT] = []
         for v in vs:
             if isinstance(v, str):
-                htmlText = h.parseText(v, h.ParseConfig.fromSpec(doc))
-                htmlText = h.replaceMacros(htmlText, doc.macros)
-                htmlText = doc.fixText(htmlText)
+                if v == "":
+                    continue
+                htmlText = h.parseText(v, h.ParseConfig.fromSpec(doc, context=f"!{k} metadata"))
                 parsed.append(h.parseHTML(htmlText))
             else:
                 parsed.append(v)

@@ -8,7 +8,7 @@ import io
 import os
 import re
 import typing
-from abc import ABCMeta
+from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass, field
 
 from .. import constants, t
@@ -28,53 +28,68 @@ class ParseConfig:
     markdown: bool = False
     css: bool = False
     macros: dict[str, str] = field(default_factory=dict)
+    context: str | None = None
 
     @staticmethod
-    def fromSpec(doc: t.SpecT) -> ParseConfig:
+    def fromSpec(doc: t.SpecT, context: str | None = None) -> ParseConfig:
         return ParseConfig(
             markdown="markdown" in doc.md.markupShorthands,
             css="css" in doc.md.markupShorthands,
             macros=doc.macros,
+            context=context,
         )
 
 
 def nodesFromHtml(data: str, config: ParseConfig, startLine: int = 1) -> t.Generator[ParserNode, None, None]:
-    i = 0
     s = Stream(data, startLine=startLine, config=config)
-    dt, i = parseDoctype(s, i).t2
-    if dt is not None:
-        yield dt
-    text = ""
-    textI = 0
-    node: ParserNode | list[ParserNode] | None
+    yield from nodesFromStream(s, 0)
+
+
+def nodesFromStream(s: Stream, start: int) -> t.Generator[ParserNode, None, None]:
+    i = start
+    textStart = start
     lastNode: ParserNode | None = None
-    while not s.eof(i):
-        node, i = parseNode(s, i).t2
-        if node is None:
-            text += s[i]
+    eofI = len(s)
+    while i < eofI:
+        # Early continue if the character isn't even *possible*
+        # to trigger parseNode() successfully. Keep this in sync!
+        if s[i] not in POSSIBLE_NODE_START_CHARS:
             i += 1
+            continue
+        result = parseNode(s, i)
+        if result.value is None:
+            i += 1
+            continue
+        # Found a node, so see if text needs to be emitted first.
+        if textStart != i:
+            yield makeText(s, textStart, i, lastNode)
+            lastNode = None
+        i = result.i
+        textStart = result.i
+        if isinstance(result.value, list):
+            for n in result.value:
+                if isinstance(n, RawText):
+                    yield n.curlifyApostrophes(lastNode)
+                    lastNode = None
+                else:
+                    yield n
+                    lastNode = n
         else:
-            if text:
-                startLine = s.line(textI)
-                endLine = startLine + len(text.split("\n")) - 1
-                yield Text(startLine, endLine, text).curlifyApostrophes(lastNode)
-                text = ""
-            if isinstance(node, list):
-                for n in node:
-                    if isinstance(n, Text):
-                        yield n.curlifyApostrophes(lastNode)
-                        lastNode = None
-                    else:
-                        yield n
-                        lastNode = n
-            else:
-                yield node
-                lastNode = node
-            textI = i
-    if text:
-        startLine = s.line(textI)
-        endLine = startLine + len(text.split("\n")) - 1
-        yield Text(startLine, endLine, text).curlifyApostrophes(lastNode)
+            yield result.value
+            lastNode = result.value
+    if textStart != i:
+        yield makeText(s, textStart, i, lastNode)
+
+
+def makeText(s: Stream, start: int, end: int, lastNode: ParserNode | None) -> RawText:
+    return RawText(
+        line=s.line(start),
+        endLine=s.line(end),
+        text=s[start:end],
+    ).curlifyApostrophes(lastNode)
+
+
+POSSIBLE_NODE_START_CHARS = "&<`~'[\\—-|"
 
 
 def parseNode(
@@ -84,9 +99,9 @@ def parseNode(
     """
     Parses one Node from the start of the stream.
     Might return multiple nodes, as a list.
-    Failure means the list doesn't start with anything special
+    Failure means the stream doesn't start with anything special
     (it'll just be text),
-    but Text *can* be validly returned sometimes as the Node.
+    but Text *can* be validly returned sometimes as the node.
     """
     if s.eof(start):
         return Result.fail(start)
@@ -94,13 +109,13 @@ def parseNode(
     node: ParserNode | list[ParserNode] | None
 
     if s[start] == "&":
-        ch, i = parseCharRef(s, start).t2
+        ch, i = parseCharRef(s, start).vi
         if ch is not None:
-            node = Text(text=f"&#{ord(ch)};", line=s.line(start), endLine=s.line(i - 1))
+            node = RawText(text=f"&#{ord(ch)};", line=s.line(start), endLine=s.line(i))
             return Result(node, i)
 
     if s[start] == "<":
-        node, i = parseAngleStart(s, start).t2
+        node, i = parseAngleStart(s, start).vi
         if node is not None:
             return Result(node, i)
 
@@ -109,16 +124,16 @@ def parseNode(
     # the markdown and HTML parsers together.
     el: ParserNode | None
     if s[start] in ("`", "~"):
-        el, i = parseFencedCodeBlock(s, start).t2
+        el, i = parseFencedCodeBlock(s, start).vi
         if el is not None:
             return Result(el, i)
     if s.config.markdown:
         if s[start] == "`":
-            els, i = parseCodeSpan(s, start).t2
+            els, i = parseCodeSpan(s, start).vi
             if els is not None:
                 return Result(els, i)
         if s[start : start + 2] == "\\`":
-            node = Text(
+            node = RawText(
                 line=s.line(start),
                 endLine=s.line(start),
                 text="`",
@@ -126,33 +141,47 @@ def parseNode(
             return Result(node, start + 2)
     if s.config.css:
         if s[start] == "'":
-            el, i = parseCSSMaybe(s, start).t2
+            el, i = parseCSSMaybe(s, start).vi
             if el is not None:
                 return Result(el, i)
-    if s[start] == "[" and s[start - 1] != "[":
-        el, i = parseMacro(s, start).t2
-        if el is not None:
-            return Result(el, i)
+    if s[start : start + 2] == "[[":
+        # biblio link, for now just pass it thru
+        node = RawText(
+            line=s.line(start),
+            endLine=s.line(start),
+            text="[[",
+        )
+        return Result(node, start + 2)
+    if s[start] == "[":
+        macroRes = parseMacro(s, start)
+        if macroRes.err is None:
+            return macroRes
     if s[start : start + 2] == "\\[":
         if s[start + 2].isalpha() or s[start + 2].isdigit():
             # an escaped macro, so handle it here
             text = "["
-        else:
-            # actually an escaped biblio or autolink, so let the
+            endI = start + 2
+        elif s[start + 2] == "[":
+            # actually an escaped biblio, so let the
             # biblio/autolink code handle it for now.
             # FIXME when biblio shorthands are built into
             # this parser
-            text = "\\["
-        node = Text(
+            text = r"\[["
+            endI = start + 3
+        else:
+            # same, but actually an an escaped autolink
+            text = r"\["
+            endI = start + 2
+        node = RawText(
             line=s.line(start),
             endLine=s.line(start),
             text=text,
         )
-        return Result(node, start + 2)
-    match, i = s.matchRe(start, emdashRe).t2
+        return Result(node, endI)
+    match, i = s.matchRe(start, emdashRe).vi
     if match is not None:
         # Fix line-ending em dashes, or --, by moving the previous line up, so no space.
-        node = Text(
+        node = RawText(
             line=s.line(start),
             endLine=s.line(i),
             text="—\u200b",
@@ -168,20 +197,25 @@ emdashRe = re.compile(r"(?:(?<!-)(—|--))\n\s*(?=\S)")
 def parseAngleStart(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
     # Assuming the stream starts with an <
     i = start + 1
-    comment, i = parseComment(s, start).t2
-    if comment is not None:
-        return Result(comment, i)
+    if s[i] == "!":
+        dtRes = parseDoctype(s, start)
+        if dtRes.err is None:
+            return dtRes
+        commentRes = parseComment(s, start)
+        if commentRes.err is None:
+            return commentRes
+        return Result.fail(start)
 
-    startTag, i = parseStartTag(s, start).t2
+    startTag, i = parseStartTag(s, start).vi
     if startTag is not None:
         if isinstance(startTag, SelfClosedTag):
             return Result(startTag, i)
         if startTag.tag == "pre":
-            el, endI = parseMetadataBlock(s, start).t2
+            el, endI = parseMetadataBlock(s, start).vi
             if el is not None:
                 return Result(el, endI)
             if isDatablockPre(startTag):
-                text, i = parseRawPreToEnd(s, i).t2
+                text, i = parseRawPreToEnd(s, i).vi
                 if text is None:
                     return Result.fail(start)
                 el = RawElement(
@@ -189,11 +223,11 @@ def parseAngleStart(s: Stream, start: int) -> Result[ParserNode | list[ParserNod
                     tag="pre",
                     startTag=startTag,
                     data=text,
-                    endLine=s.line(i - 1),
+                    endLine=s.line(i),
                 )
                 return Result(el, i)
         if startTag.tag == "script":
-            text, i = parseScriptToEnd(s, i).t2
+            text, i = parseScriptToEnd(s, i).vi
             if text is None:
                 return Result.fail(start)
             el = RawElement(
@@ -201,11 +235,11 @@ def parseAngleStart(s: Stream, start: int) -> Result[ParserNode | list[ParserNod
                 tag="script",
                 startTag=startTag,
                 data=text,
-                endLine=s.line(i - 1),
+                endLine=s.line(i),
             )
             return Result(el, i)
         elif startTag.tag == "style":
-            text, i = parseStyleToEnd(s, i).t2
+            text, i = parseStyleToEnd(s, i).vi
             if text is None:
                 return Result.fail(start)
             el = RawElement(
@@ -213,11 +247,11 @@ def parseAngleStart(s: Stream, start: int) -> Result[ParserNode | list[ParserNod
                 tag="style",
                 startTag=startTag,
                 data=text,
-                endLine=s.line(i - 1),
+                endLine=s.line(i),
             )
             return Result(el, i)
         elif startTag.tag == "xmp":
-            text, i = parseXmpToEnd(s, i).t2
+            text, i = parseXmpToEnd(s, i).vi
             if text is None:
                 return Result.fail(start)
             el = RawElement(
@@ -225,18 +259,18 @@ def parseAngleStart(s: Stream, start: int) -> Result[ParserNode | list[ParserNod
                 tag="xmp",
                 startTag=startTag,
                 data=text,
-                endLine=s.line(i - 1),
+                endLine=s.line(i),
             )
             return Result(el, i)
         else:
             return Result(startTag, i)
 
-    endTag, i = parseEndTag(s, start).t2
+    endTag, i = parseEndTag(s, start).vi
     if endTag is not None:
         return Result(endTag, i)
 
     if s.config.css:
-        els, i = parseCSSProduction(s, start).t2
+        els, i = parseCSSProduction(s, start).vi
         if els is not None:
             return Result(els, i)
 
@@ -303,8 +337,10 @@ def linesFromNodes(nodes: t.Iterable[ParserNode]) -> list[str]:
     return strFromNodes(nodes).split("\n")
 
 
-def debugNodes(nodes: t.Iterable[ParserNode]) -> str:
-    return "\n".join(repr(x) for x in nodes)
+def debugNodes(nodes: t.Iterable[ParserNode]) -> list[ParserNode]:
+    nodes = list(nodes)
+    print("\n".join(repr(x) for x in nodes))  # noqa: T201
+    return nodes
 
 
 def parseLines(textLines: list[str], config: ParseConfig, startLine: int = 1) -> list[str]:
@@ -334,7 +370,7 @@ def parseTitle(text: str, config: ParseConfig, startLine: int = 1) -> str:
     # Parses the text, but removes any tags from the content,
     # as they'll just show up as literal text in <title>.
     nodes = nodesFromHtml(text, config, startLine=startLine)
-    return strFromNodes(n for n in nodes if isinstance(n, (Text, Macro)))
+    return strFromNodes(n for n in nodes if isinstance(n, Text))
 
 
 #
@@ -387,13 +423,13 @@ class ParseFailure(Failure):
         return f"{self.s.loc(self.index)} {self.details}"
 
 
-ResultT = t.TypeVar("ResultT")
+ResultT = t.TypeVar("ResultT", covariant=True)
 
 
 @dataclass
 class Result(t.Generic[ResultT]):
     value: ResultT | None
-    end: int
+    i: int
     err: Failure | None = None
 
     @property
@@ -409,23 +445,25 @@ class Result(t.Generic[ResultT]):
         return Result(None, index, ParseFailure(details, s, index))
 
     @property
-    def t2(self) -> tuple[ResultT | None, int]:
-        # By default, mask the error for simpler detection
-        # via `is None`
-        # (treating the class itself as a unique marker value)
+    def vi(self) -> tuple[ResultT | None, int]:
+        # Returns a tuple of the value and index for easy
+        # destructuring.
+        # If error, value is None for simple detection;
+        # use .vie if None is a valid value.
         if self.err:
             value = None
         else:
             value = self.value
-        return (value, self.end)
+        return (value, self.i)
 
     @property
-    def t3(self) -> tuple[ResultT | None, int, Failure | None]:
+    def vie(self) -> tuple[ResultT | None, int, Failure | None]:
+        # Like .vi, but returns the error as the third tuple item.
         if self.err:
             value = None
         else:
             value = self.value
-        return (value, self.end, self.err)
+        return (value, self.i, self.err)
 
 
 class Stream:
@@ -434,16 +472,25 @@ class Stream:
     _lineBreaks: list[int]
     startLine: int
     config: ParseConfig
+    depth: int = 1
 
-    def __init__(self, chars: str, config: ParseConfig, startLine: int = 1) -> None:
+    def __init__(self, chars: str, config: ParseConfig, startLine: int = 1, depth: int = 1) -> None:
+        if depth > 10:
+            msg = "HTML parsing recursed more than 10 levels deep; probably an infinite loop."
+            raise RecursionError(msg)
         self._chars = chars
         self._len = len(chars)
         self._lineBreaks = []
         self.startLine = startLine
         self.config = config
+        self.depth = depth
         for i, char in enumerate(chars):
             if char == "\n":
                 self._lineBreaks.append(i)
+
+    def subStream(self, context: str, chars: str, startLine: int = 1) -> Stream:
+        newConfig = dataclasses.replace(self.config, context=context)
+        return Stream(chars, config=newConfig, startLine=startLine, depth=self.depth + 1)
 
     def __getitem__(self, key: int | slice) -> str:
         try:
@@ -453,6 +500,9 @@ class Stream:
 
     def eof(self, index: int) -> bool:
         return index >= self._len
+
+    def __len__(self) -> int:
+        return self._len
 
     def line(self, index: int) -> int:
         # Zero-based line index
@@ -467,7 +517,10 @@ class Stream:
         return index - startOfCol
 
     def loc(self, index: int) -> str:
-        return f"{self.line(index)}:{self.col(index)}"
+        rc = f"{self.line(index)}:{self.col(index)}"
+        if self.config.context is None:
+            return rc
+        return f"{rc} of {self.config.context}"
 
     def skipTo(self, start: int, text: str) -> Result[str]:
         # Skip forward until encountering `text`.
@@ -548,13 +601,22 @@ class ParserNode(metaclass=ABCMeta):
 
 
 @dataclass
-class Text(ParserNode):
+class Text(ParserNode, metaclass=ABCMeta):
     text: str
+
+    @abstractmethod
+    def __str__(self) -> str:
+        pass
+
+
+@dataclass
+class RawText(Text):
+    # Raw source text, might contain HTML characters/etc
 
     def __str__(self) -> str:
         return self.text
 
-    def curlifyApostrophes(self, lastNode: ParserNode | None) -> Text:
+    def curlifyApostrophes(self, lastNode: ParserNode | None) -> RawText:
         if (
             self.text[0] == "'"
             and isinstance(lastNode, (EndTag, RawElement, SelfClosedTag))
@@ -564,6 +626,14 @@ class Text(ParserNode):
         if "'" in self.text:
             self.text = re.sub(r"(\w)'(\w)", r"\1’\2", self.text)
         return self
+
+
+@dataclass
+class SafeText(Text):
+    # "Safe" text, automatically escapes special HTML chars
+    # when stringified.
+    def __str__(self) -> str:
+        return escapeHTML(self.text)
 
 
 @dataclass
@@ -585,7 +655,8 @@ class StartTag(ParserNode):
         for k, v in sorted(self.attrs.items()):
             if k == "bs-line-number":
                 continue
-            s += f' {k}="{escapeAttr(v)}"'
+            v = v.replace('"', "&#34;")
+            s += f' {k}="{v}"'
         if self.classes:
             s += f' class="{" ".join(sorted(self.classes))}"'
         s += ">"
@@ -671,30 +742,6 @@ class RawElement(ParserNode):
         return f"{self.startTag}{self.data}</{self.tag}>"
 
 
-@dataclass
-class Macro(ParserNode):
-    name: str
-    optional: bool
-
-    def __str__(self) -> str:
-        # Use PUA characters to delimit the macro name
-        return Macro.encode(self.name, self.optional)
-
-    @staticmethod
-    def encode(name: str, optional: bool = False) -> str:
-        ms = constants.macroStartChar
-        me = constants.macroEndChar
-        return f"{ms}{name}{'?' if optional else ''}{me}"
-
-    @staticmethod
-    def parse(text: str) -> tuple[str, int]:
-        # Looks for macros in the text and converts
-        # them into the safely-encoded form.
-        ms = constants.macroStartChar
-        me = constants.macroEndChar
-        return macroRe.subn(f"{ms}\\1\\2{me}", text)
-
-
 #
 #
 #
@@ -741,7 +788,7 @@ def parseStartTag(s: Stream, start: int) -> Result[StartTag | SelfClosedTag]:
     else:
         i = start + 1
 
-    tagname, i = parseTagName(s, i).t2
+    tagname, i = parseTagName(s, i).vi
     if tagname is None:
         return Result.fail(start)
 
@@ -751,27 +798,28 @@ def parseStartTag(s: Stream, start: int) -> Result[StartTag | SelfClosedTag]:
     tag = StartTag(line=s.line(start), endLine=s.line(start), tag=tagname)
 
     while True:
-        ws, i = parseWhitespace(s, i).t2
+        ws, i = parseWhitespace(s, i).vi
         if ws is None:
             break
         startAttr = i
-        attr, i = parseAttribute(s, i).t2
+        attr, i = parseAttribute(s, i).vi
         if attr is None:
             break
         attrName, attrValue = attr
         if attrName in tag.attrs:
             m.die(f"Attribute {attrName} appears twice in <{tagname}>.", lineNum=s.loc(startAttr))
             return Result.fail(start)
+        if "[" in attrValue:
+            attrValue = replaceMacrosInAttr(
+                text=attrValue,
+                macros=s.config.macros,
+                s=s,
+                start=i,
+                attrName=attrName,
+            )
         tag.attrs[attrName] = attrValue
-        subbedValue, numSubs = Macro.parse(attrValue)
-        if numSubs > 0:
-            tag.attrs[attrName] = subbedValue
-            if "bs-macro-attributes" in tag.attrs:
-                tag.attrs["bs-macro-attributes"] += f",{attrName}"
-            else:
-                tag.attrs["bs-macro-attributes"] = attrName
 
-    i = parseWhitespace(s, i).end
+    i = parseWhitespace(s, i).i
 
     if s[i] == "/":
         if s[i + 1] == ">" and tagname in ("br", "link", "meta"):
@@ -817,7 +865,7 @@ def parseAttribute(s: Stream, start: int) -> Result[tuple[str, str]]:
 
     attrName = s[start:i]
     endOfName = i
-    i = parseWhitespace(s, i).end
+    i = parseWhitespace(s, i).i
     if s[i] == "=":
         i += 1
     else:
@@ -825,12 +873,12 @@ def parseAttribute(s: Stream, start: int) -> Result[tuple[str, str]]:
 
     # Now committed to a value too
 
-    i = parseWhitespace(s, i).end
+    i = parseWhitespace(s, i).i
 
     if s[i] == '"' or s[i] == "'":
-        attrValue, i = parseQuotedAttrValue(s, i).t2
+        attrValue, i = parseQuotedAttrValue(s, i).vi
     else:
-        attrValue, i = parseUnquotedAttrValue(s, i).t2
+        attrValue, i = parseUnquotedAttrValue(s, i).vi
     if attrValue is None:
         m.die(f"Garbage after {attrName}=.", lineNum=s.loc(i))
         return Result.fail(start)
@@ -856,11 +904,11 @@ def parseQuotedAttrValue(s: Stream, start: int) -> Result[str]:
             return Result.fail(start)
         if s[i] == "&":
             startRef = i
-            ch, i = parseCharRef(s, i).t2
+            ch, i = parseCharRef(s, i).vi
             if ch is None:
                 i += 1
                 continue
-            val += s[startSeg:startRef] + ch
+            val += s[startSeg:startRef] + f"&#{ord(ch)};"
             startSeg = i
             continue
         i += 1
@@ -883,11 +931,11 @@ def parseUnquotedAttrValue(s: Stream, start: int) -> Result[str]:
             return Result.fail(start)
         if s[i] == "&":
             startRef = i
-            ch, i = parseCharRef(s, i).t2
+            ch, i = parseCharRef(s, i).vi
             if ch is None:
                 i += 1
                 continue
-            val += s[startSeg:startRef] + ch
+            val += s[startSeg:startRef] + f"&#{ord(ch)};"
             startSeg = i
             continue
         i += 1
@@ -984,7 +1032,7 @@ def parseEndTag(s: Stream, start: int) -> Result[EndTag]:
     if s.eof(i):
         m.die("Hit EOF in the middle of an end tag.", lineNum=s.loc(start))
         return Result.fail(start)
-    tagname, i = parseTagName(s, i).t2
+    tagname, i = parseTagName(s, i).vi
     if tagname is None:
         m.die("Garbage in an end tag.", lineNum=s.loc(start))
         return Result.fail(start)
@@ -995,7 +1043,7 @@ def parseEndTag(s: Stream, start: int) -> Result[EndTag]:
         m.die(f"Garbage after the tagname in </{tagname}>.", lineNum=s.loc(start))
         return Result.fail(start)
     i += 1
-    return Result(EndTag(s.line(start), s.line(i - 1), tagname), i)
+    return Result(EndTag(s.line(start), s.line(i), tagname), i)
 
 
 def parseComment(s: Stream, start: int) -> Result[Comment]:
@@ -1109,7 +1157,7 @@ def parseCSSProduction(s: Stream, start: int) -> Result[list[ParserNode]]:
         return Result.fail(start)
     textStart = start + 2
 
-    text, textEnd = s.skipTo(textStart, ">>").t2
+    text, textEnd = s.skipTo(textStart, ">>").vi
     if text is None:
         m.die("Saw the start of a CSS production (like <<foo>>), but couldn't find the end.", lineNum=s.loc(start))
         return Result.fail(start)
@@ -1133,14 +1181,14 @@ def parseCSSProduction(s: Stream, start: int) -> Result[list[ParserNode]]:
         tag="fake-production-placeholder",
         attrs={"bs-autolink-syntax": s[start:nodeEnd], "class": "production", "bs-opaque": ""},
     ).finalize()
-    contents = Text(
+    contents = RawText(
         line=s.line(textStart),
         endLine=s.line(textEnd),
         text=text,
     )
     endTag = EndTag(
         line=s.line(textEnd),
-        endLine=s.line(nodeEnd - 1),
+        endLine=s.line(nodeEnd),
         tag=startTag.tag,
     )
     return Result([startTag, contents, endTag], nodeEnd)
@@ -1155,7 +1203,7 @@ def parseCSSMaybe(s: Stream, start: int) -> Result[RawElement]:
         return Result.fail(start)
     i = start + 2
 
-    text, i = s.skipTo(i, "''").t2
+    text, i = s.skipTo(i, "''").vi
     if text is None:
         return Result.fail(start)
     if "\n" in text:
@@ -1180,14 +1228,14 @@ def parseCSSMaybe(s: Stream, start: int) -> Result[RawElement]:
         line=s.line(start),
         endLine=s.line(start),
         tag="fake-maybe-placeholder",
-        attrs={"bs-autolink-syntax": s[start:i], "bs-original-contents": text},
+        attrs={"bs-autolink-syntax": s[start:i], "bs-original-contents": escapeAttr(text)},
     ).finalize()
     el = RawElement(
         line=startTag.line,
         tag=startTag.tag,
         startTag=startTag,
         data=rawContents,
-        endLine=s.line(i - 1),
+        endLine=s.line(i),
     )
     return Result(el, i)
 
@@ -1203,9 +1251,9 @@ def parseCodeSpan(s: Stream, start: int) -> Result[list[ParserNode]]:
         return Result.fail(start)
     if s[start] != "`":
         return Result.fail(start)
-    match, i = s.matchRe(start, codeSpanStartRe).t2
+    match, i = s.matchRe(start, codeSpanStartRe).vi
     assert match is not None
-    ticks = match.group(0)
+    ticks = match[0]
     contentStart = i
 
     if len(ticks) == 1:
@@ -1214,7 +1262,7 @@ def parseCodeSpan(s: Stream, start: int) -> Result[list[ParserNode]]:
         endRe = codeSpanEnd2Re
     else:
         endRe = re.compile(r"([^`])(" + ticks + ")([^`]|$)")
-    match, _ = s.searchRe(i, endRe).t2
+    match, _ = s.searchRe(i, endRe).vi
     if match is None:
         # Allowed to be unmatched, they're just ticks then.
         return Result.fail(start)
@@ -1230,18 +1278,18 @@ def parseCodeSpan(s: Stream, start: int) -> Result[list[ParserNode]]:
 
     startTag = StartTag(
         line=s.line(start),
-        endLine=s.line(contentStart - 1),
+        endLine=s.line(contentStart),
         tag="code",
-        attrs={"bs-autolink-syntax": s[start:i], "bs-opaque": ""},
+        attrs={"bs-autolink-syntax": f"{ticks}{text}{ticks}", "bs-opaque": ""},
     )
-    content = Text(
+    content = RawText(
         line=s.line(contentStart),
-        endLine=s.line(contentEnd - 1),
+        endLine=s.line(contentEnd),
         text=escapeHTML(text),
     )
     endTag = EndTag(
         line=s.line(contentEnd),
-        endLine=s.line(i - 1),
+        endLine=s.line(i),
         tag=startTag.tag,
     )
     return Result([startTag, content, endTag], i)
@@ -1254,12 +1302,12 @@ def parseFencedCodeBlock(s: Stream, start: int) -> Result[RawElement]:
     if s.precedingTextOnLine(start).strip() != "":
         return Result.fail(start)
 
-    match, i = s.matchRe(start, fencedStartRe).t2
+    match, i = s.matchRe(start, fencedStartRe).vi
     if match is None:
         return Result.fail(start)
     openingFence = match.group(0)
 
-    infoString, i = s.skipToNextLine(i).t2
+    infoString, i = s.skipToNextLine(i).vi
     assert infoString is not None
     infoString = infoString.strip()
     if "`" in infoString:
@@ -1272,7 +1320,7 @@ def parseFencedCodeBlock(s: Stream, start: int) -> Result[RawElement]:
         # at least as long, so just search for the opening
         # fence itself, as a start.
 
-        text, i = s.skipTo(i, openingFence).t2
+        text, i = s.skipTo(i, openingFence).vi
 
         # No ending fence in the rest of the document
         if text is None:
@@ -1293,14 +1341,14 @@ def parseFencedCodeBlock(s: Stream, start: int) -> Result[RawElement]:
             # and markdown parsers.
 
             # Consume the whole fence, since it can be longer.
-            endingFence, i = s.matchRe(i, fencedStartRe).t2
+            endingFence, i = s.matchRe(i, fencedStartRe).vi
             break
 
         # Otherwise I just hit a line that happens to have
         # a fence lookalike- on it, but not closing this one.
         # Skip the fence and continue.
 
-        match, i = s.matchRe(i, fencedStartRe).t2
+        match, i = s.matchRe(i, fencedStartRe).vi
         assert match is not None
         contents += match.group(0)
 
@@ -1319,32 +1367,113 @@ def parseFencedCodeBlock(s: Stream, start: int) -> Result[RawElement]:
         tag=tag.tag,
         startTag=tag,
         data=contents,
-        endLine=s.line(i - 1),
+        endLine=s.line(i),
     )
     return Result(el, i)
 
 
-macroRe = re.compile(r"\[([A-Z\d-]*[A-Z][A-Z\d-]*)(\??)\]")
+macroRe = re.compile(r"([\[\\]?)\[([A-Z\d-]*[A-Z][A-Z\d-]*)(\??)\]")
 
 
-def parseMacro(s: Stream, start: int) -> Result[Macro]:
+def parseMacro(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
     # Macros all look like `[FOO]` or `[FOO?]`:
     # uppercase ASCII, possibly with a ? suffix,
     # tightly wrapped by square brackets.
 
     if s[start] != "[":
         return Result.fail(start)
-    match, i = s.matchRe(start, macroRe).t2
+    match, i = s.matchRe(start, macroRe).vi
     if match is None:
         return Result.fail(start)
-    optional = match.group(2) == "?"
-    macro = Macro(
-        line=s.line(start),
-        endLine=s.line(start),
-        name=match.group(1),
-        optional=optional,
-    )
-    return Result(macro, i)
+    macroName = match[2].lower()
+    optional = match[3] == "?"
+    if macroName not in s.config.macros:
+        if optional:
+            return Result([], i)
+        else:
+            m.die(
+                f"Found unmatched text macro {match[0]}. Correct the macro, or escape it by replacing the opening [ with &#91;",
+                lineNum=s.loc(i),
+            )
+            return Result(
+                RawText(
+                    line=s.line(start),
+                    endLine=s.line(i),
+                    text=match[0],
+                ),
+                i,
+            )
+    macroText = s.config.macros[macroName]
+    try:
+        newStream = s.subStream(context=f"macro {match[0]}", chars=macroText)
+    except RecursionError:
+        m.die(
+            f"Macro replacement for {match[0]} recursed more than {s.depth} levels deep; probably your text macros are accidentally recursive.",
+            lineNum=s.loc(start),
+        )
+        return Result(
+            RawText(
+                line=s.line(start),
+                endLine=s.line(i),
+                text=match[0],
+            ),
+            i,
+        )
+    nodes = list(nodesFromStream(newStream, 0))
+    return Result(nodes, i)
+
+
+def replaceMacrosInAttr(text: str, macros: dict[str, str], s: Stream, start: int, attrName: str) -> str:
+    # Since I just loop over the substituted text,
+    # rather than recursing as I go like I do for content macros,
+    # I need to protect against accidentally replacing something
+    # that wasn't originally a macro. So:
+    # * if I see an escaped macro or leave a sub failure in,
+    #   turn their brackets into HTML escapes.
+    # * wrap every substitution in magic chars, so adjacent
+    #   substitutions can't combine to form a macro,
+    #   like `[F` next to `OO]`. They're removed at the end.
+
+    msc = constants.macroStartChar
+    mec = constants.macroEndChar
+
+    def doRep(match: re.Match) -> str:
+        escaped = match[1] == "\\"
+        biblio = match[1] == "["
+        macroName = match[2].lower()
+        optional = match[3] == "?"
+        if escaped:
+            return msc + "&#91;" + t.cast("str", match[0][2:-1]) + "&#93;" + mec
+        if biblio:
+            return msc + "&#91;&#91;" + t.cast("str", match[0][2:-1]) + "&#93;" + mec
+        if macroName in macros:
+            return msc + macros[macroName] + mec
+        if optional:
+            return msc + mec
+        m.die(
+            f"Found unmatched text macro {match[0]} in {attrName}='...'. Correct the macro, or escape it by replacing the opening [ with &#91;.",
+            lineNum=s.loc(start),
+        )
+        return msc + "&#91;" + t.cast("str", match[0][1:-1]) + "&#93;" + mec
+
+    text, count = macroRe.subn(doRep, text)
+    if count > 0:
+        loops = 1
+        while True:
+            if loops > 10:
+                m.die(
+                    f"Macro replacement in {attrName}='...' recursed more than 10 levels deep; probably your text macros are accidentally recursive.",
+                    lineNum=s.loc(start),
+                )
+                break
+            if "[" not in text:
+                break
+            newText = macroRe.sub(doRep, text)
+            if text == newText:
+                break
+            text = newText
+            loops += 1
+    return text.replace(msc, "").replace(mec, "")
 
 
 metadataPreEndRe = re.compile(r"</pre>(.*)")
@@ -1360,7 +1489,7 @@ def parseMetadataBlock(s: Stream, start: int) -> Result[RawElement]:
         # Metadata blocks must have their start/end tags
         # on the left margin, completely unindented.
         return Result.fail(start)
-    startTag, i = parseStartTag(s, start).t2
+    startTag, i = parseStartTag(s, start).vi
     if startTag is None:
         return Result.fail(start)
     if isinstance(startTag, SelfClosedTag):
@@ -1373,7 +1502,7 @@ def parseMetadataBlock(s: Stream, start: int) -> Result[RawElement]:
     startTag.tag = startTag.tag.lower()
 
     # Definitely in a metadata block now
-    line, i = s.skipToNextLine(i).t2
+    line, i = s.skipToNextLine(i).vi
     assert line is not None
     if line.strip() != "":
         m.die("Significant text on the same line as the metadata start tag isn't allowed.", lineNum=s.line(start))
@@ -1383,20 +1512,19 @@ def parseMetadataBlock(s: Stream, start: int) -> Result[RawElement]:
         if s.eof(i):
             m.die("Hit EOF while trying to parse a metadata block.", lineNum=s.line(start))
             break
-        line, i = s.skipToNextLine(i).t2
+        line, i = s.skipToNextLine(i).vi
         assert line is not None
         match = endPattern.match(line)
         if not match:
             contents += line
             continue
         # Hit the end tag
+        # Back up one char so we're actually ending at the end
+        # of the construct, rather than on the next line.
+        i -= 1
         if match.group(1).strip() != "":
-            m.die("Significant text on the same line as the metadata end tag isn't allowed.", lineNum=s.line(i - 1))
+            m.die("Significant text on the same line as the metadata end tag isn't allowed.", lineNum=s.line(i))
         break
-    # Since we jump to next line each time, jump back one character
-    # so the newline will show up in the next node,
-    # as the parsers typically do.
-    i -= 1
 
     # Since the internals aren't parsed, call it an <xmp>
     # so it'll survive later parses if necessary.
@@ -1406,7 +1534,7 @@ def parseMetadataBlock(s: Stream, start: int) -> Result[RawElement]:
         tag="xmp",
         startTag=startTag,
         data=contents,
-        endLine=s.line(i - 1),
+        endLine=s.line(i),
     )
     return Result(el, i)
 
