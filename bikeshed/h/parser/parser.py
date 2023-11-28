@@ -11,8 +11,8 @@ import typing
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass, field
 
-from .. import constants, t
-from .. import messages as m
+from ... import constants, t
+from ... import messages as m
 
 
 def test() -> None:
