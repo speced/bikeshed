@@ -1,19 +1,4 @@
-from .parser import (
-    Comment,
-    Doctype,
-    EndTag,
-    Failure,
-    ParseConfig,
-    ParseFailure,
-    ParserNode,
-    RawElement,
-    RawText,
-    Result,
-    SafeText,
-    SelfClosedTag,
-    StartTag,
-    Stream,
-    Text,
+from .main import (
     initialDocumentParse,
     linesFromNodes,
     nodesFromHtml,
@@ -22,4 +7,23 @@ from .parser import (
     parseText,
     parseTitle,
     strFromNodes,
+)
+from .nodes import (
+    Comment,
+    Doctype,
+    EndTag,
+    ParserNode,
+    RawElement,
+    RawText,
+    SafeText,
+    SelfClosedTag,
+    StartTag,
+    Text,
+)
+from .stream import (
+    Failure,
+    ParseConfig,
+    ParseFailure,
+    Result,
+    Stream,
 )
