@@ -180,6 +180,9 @@ class Spec:
     def earlyParse(self, inputContent: InputSource.InputContent) -> list[l.Line]:
         text = h.strFromNodes(h.initialDocumentParse(inputContent.content, h.ParseConfig.fromSpec(self)), withIlcc=True)
         inputContent.rawLines = [x + "\n" for x in text.split("\n")]
+        print("**** raw lines ****")
+        print("\n".join(repr(x) for x in inputContent.rawLines))
+        print("\n".join(repr(x) for x in inputContent.lines))
         return inputContent.lines
 
     def checkValidity(self) -> bool:

@@ -12,6 +12,7 @@ from ... import t
 class ParserNode(metaclass=ABCMeta):
     line: int
     endLine: int
+    context: str | None = None
 
 
 @dataclass
@@ -31,15 +32,17 @@ class RawText(Text):
         return self.text
 
     def curlifyApostrophes(self, lastNode: ParserNode | None) -> RawText:
-        if (
-            self.text[0] == "'"
-            and isinstance(lastNode, (EndTag, RawElement, SelfClosedTag))
-            and re.match(r"'\w", self.text)
-        ):
-            self.text = "’" + self.text[1:]
+        if re.match(r"'\w", self.text):
+            if isinstance(lastNode, (EndTag, RawElement, SelfClosedTag)):
+                self.text = "’" + self.text[1:]
+            elif isinstance(lastNode, RawText) and re.match(r"\w", lastNode.text[-1]):
+                self.text = "’" + self.text[1:]
         if "'" in self.text:
             self.text = re.sub(r"(\w)'(\w)", r"\1’\2", self.text)
         return self
+
+    def mismatchedLineCount(self):
+        return self.text.count("\n") != (self.endLine - self.line)
 
 
 @dataclass

@@ -24,14 +24,6 @@ from .parser import POSSIBLE_NODE_START_CHARS, nodesFromStream
 from .stream import Failure, ParseConfig, ParseFailure, Result, Stream
 
 
-def test() -> None:
-    import json
-
-    with io.open(os.path.abspath("test.txt"), "r") as fh:
-        vals = "\n".join(x for x in json.load(fh).values())
-        list(nodesFromHtml(vals, ParseConfig()))
-
-
 def nodesFromHtml(data: str, config: ParseConfig, startLine: int = 1) -> t.Generator[ParserNode, None, None]:
     s = Stream(data, startLine=startLine, config=config)
     yield from nodesFromStream(s, 0)
@@ -78,7 +70,9 @@ def linesFromNodes(nodes: t.Iterable[ParserNode]) -> list[str]:
 
 def debugNodes(nodes: t.Iterable[ParserNode]) -> list[ParserNode]:
     nodes = list(nodes)
-    print("\n".join(repr(x) for x in nodes))  # noqa: T201
+    for node in nodes:
+        print(repr(node))  # noqa: T201
+        print(repr(strFromNodes([node], withIlcc=True)))  # noqa: T201
     return nodes
 
 

@@ -22,50 +22,82 @@ from .stream import Result, Stream
 
 
 def nodesFromStream(s: Stream, start: int) -> t.Generator[ParserNode, None, None]:
-    i = start
-    textStart = start
     lastNode: ParserNode | None = None
-    eofI = len(s)
-    while i < eofI:
-        # Early continue if the character isn't even *possible*
-        # to trigger parseNode() successfully. Keep this in sync!
-        if s[i] not in POSSIBLE_NODE_START_CHARS:
-            i += 1
-            continue
-        result = parseNode(s, i)
-        if result.value is None:
-            i += 1
-            continue
-        # Found a node, so see if text needs to be emitted first.
-        if textStart != i:
-            yield makeText(s, textStart, i, lastNode)
-            lastNode = None
-        i = result.i
-        textStart = result.i
-        if isinstance(result.value, list):
-            for n in result.value:
-                if isinstance(n, RawText):
-                    yield n.curlifyApostrophes(lastNode)
-                    lastNode = None
-                else:
-                    yield n
-                    lastNode = n
+    heldLast = False
+    for node in generateNodes(s, start):
+        if isinstance(node, RawText):
+            node.curlifyApostrophes(lastNode)
+            if node.mismatchedLineCount() or (heldLast and lastNode.context != node.context):
+                if heldLast:
+                    yield lastNode
+                yield node
+                lastNode = node
+                heldLast = False
+                continue
+            if heldLast and isinstance(lastNode, RawText):
+                lastNode.text += node.text
+                lastNode.endLine = node.endLine - node.line
+            else:
+                lastNode = node
+                heldLast = True
         else:
-            yield result.value
-            lastNode = result.value
-    if textStart != i:
-        yield makeText(s, textStart, i, lastNode)
+            if heldLast:
+                yield lastNode
+            yield node
+            lastNode = node
+            heldLast = False
+    if heldLast:
+        yield lastNode
 
 
-def makeText(s: Stream, start: int, end: int, lastNode: ParserNode | None) -> RawText:
-    return RawText(
+def generateNodes(s: Stream, start: int) -> t.Generator[ParserNode, None, None]:
+    i = start
+    end = len(s)
+    context = s.config.context
+    while i < end:
+        nodes, i = parseAnything(s, i).vi
+        if nodes is None:
+            return
+        elif isinstance(nodes, list):
+            for node in nodes:
+                if context is not None:
+                    node.context = context
+                yield node
+        else:
+            if context is not None:
+                nodes.context = context
+            yield nodes
+
+
+POSSIBLE_NODE_START_CHARS = "&<`'~[\\—-|"
+
+
+def parseAnything(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
+    """
+    Either returns ParserNode(s) a la parseNode(),
+    or returns a RawText node up to the next POSSIBLE_NODE_START_CHAR
+    (possibly starting with such a char).
+    (It does not parse the next node,
+    but if the possible start char it ends at
+    does not, in fact, start a node,
+    it can return multiple RawTexts in a row.)
+    """
+    if s.eof(start):
+        return Result.fail(start)
+    if s[start] in POSSIBLE_NODE_START_CHARS:
+        res = parseNode(s, start)
+        if res.err is None:
+            return res
+    i = start + 1
+    end = len(s)
+    while s[i] not in POSSIBLE_NODE_START_CHARS and i < end:
+        i += 1
+    node = RawText(
         line=s.line(start),
-        endLine=s.line(end),
-        text=s[start:end],
-    ).curlifyApostrophes(lastNode)
-
-
-POSSIBLE_NODE_START_CHARS = "&<`~'[\\—-|"
+        endLine=s.line(i),
+        text=s[start:i],
+    )
+    return Result(node, i)
 
 
 def parseNode(
@@ -896,8 +928,9 @@ def parseMacro(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
                 i,
             )
     macroText = s.config.macros[macroName]
+    context = f"macro {match[0]}"
     try:
-        newStream = s.subStream(context=f"macro {match[0]}", chars=macroText)
+        newStream = s.subStream(context=context, chars=macroText)
     except RecursionError:
         m.die(
             f"Macro replacement for {match[0]} recursed more than {s.depth} levels deep; probably your text macros are accidentally recursive.",
@@ -1029,3 +1062,27 @@ def parseMetadataBlock(s: Stream, start: int) -> Result[RawElement]:
         endLine=s.line(i),
     )
     return Result(el, i)
+
+
+########################
+# Markdown
+########################
+
+"""
+def parseMarkdownLink(s: Stream, start: int) -> Result[ParserNode]:
+    if s[start] != "[":
+        return Result.fail(start)
+    if s[start - 1] == "[":
+        return Result.fail(start)
+
+    i = start + 1
+
+    nodes, i = parseUntil(s, i, markdownLinkStopper).vi
+    if nodes is None:
+        return Result.fail(start)
+    return Result.fail(start)
+
+
+def markdownLinkStopper(s: Stream, start: int) -> bool:
+    return True
+"""
