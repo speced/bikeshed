@@ -806,6 +806,13 @@ def hasOnlyChild(el: t.ElementT, wsAllowed: bool = True) -> t.ElementT | None:
     return single
 
 
+def isOnlyChild(el: t.ElementT, wsAllowed: bool = True) -> bool:
+    parent = parentElement(el)
+    if parent is None:
+        return True
+    return hasOnlyChild(parent, wsAllowed) is not None
+
+
 def fixSurroundingTypography(el: t.ElementT) -> t.ElementT:
     # Applies some of the fixTypography changes to the content surrounding an element.
     # Used when a shorthand prevented fixTypography from firing previously.

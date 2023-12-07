@@ -42,6 +42,7 @@ from .dom import (
     isEmpty,
     isNormative,
     isOddNode,
+    isOnlyChild,
     linkTextsFromElement,
     moveContents,
     nextSiblingElement,
