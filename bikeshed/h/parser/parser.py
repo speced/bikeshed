@@ -29,6 +29,7 @@ def nodesFromStream(s: Stream, start: int) -> t.Generator[ParserNode, None, None
             node.curlifyApostrophes(lastNode)
             if node.needsLCCs():
                 if heldLast:
+                    assert lastNode is not None
                     yield lastNode
                 yield node
                 lastNode = node
@@ -42,30 +43,27 @@ def nodesFromStream(s: Stream, start: int) -> t.Generator[ParserNode, None, None
                 heldLast = True
         else:
             if heldLast:
+                assert lastNode is not None
                 yield lastNode
             yield node
             lastNode = node
             heldLast = False
     if heldLast:
+        assert lastNode is not None
         yield lastNode
 
 
 def generateNodes(s: Stream, start: int) -> t.Generator[ParserNode, None, None]:
     i = start
     end = len(s)
-    context = s.config.context
     while i < end:
         nodes, i = parseAnything(s, i).vi
         if nodes is None:
             return
         elif isinstance(nodes, list):
             for node in nodes:
-                if context is not None:
-                    node.context = context
                 yield node
         else:
-            if context is not None:
-                nodes.context = context
             yield nodes
 
 

@@ -14,8 +14,9 @@ class ParserNode(metaclass=ABCMeta):
     endLine: int
 
     @property
-    def height(self):
+    def height(self) -> int:
         return self.endLine - self.line
+
 
 @dataclass
 class Text(ParserNode, metaclass=ABCMeta):
@@ -43,7 +44,7 @@ class RawText(Text):
             self.text = re.sub(r"(\w)'(\w)", r"\1’\2", self.text)
         return self
 
-    def needsLCCs(self):
+    def needsLCCs(self) -> bool:
         """
         Whether or not the node will eventally insert an ILCC or DLCC
         to fix the line count when serializing to a string.
