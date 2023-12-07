@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from enum import Enum
 
 from ... import constants, t
 from ... import messages as m
@@ -115,7 +116,7 @@ def parseNode(
     node: ParserNode | list[ParserNode] | None
 
     if s[start] == "&":
-        ch, i = parseCharRef(s, start).vi
+        ch, i = parseCharRef(s, start, context=CharRefContext.NON_ATTR).vi
         if ch is not None:
             node = RawText(text=f"&#{ord(ch)};", line=s.line(start), endLine=s.line(i))
             return Result(node, i)
@@ -426,7 +427,7 @@ def parseQuotedAttrValue(s: Stream, start: int) -> Result[str]:
             return Result.fail(start)
         if s[i] == "&":
             startRef = i
-            ch, i = parseCharRef(s, i).vi
+            ch, i = parseCharRef(s, i, context=CharRefContext.ATTR).vi
             if ch is None:
                 i += 1
                 continue
@@ -453,7 +454,7 @@ def parseUnquotedAttrValue(s: Stream, start: int) -> Result[str]:
             return Result.fail(start)
         if s[i] == "&":
             startRef = i
-            ch, i = parseCharRef(s, i).vi
+            ch, i = parseCharRef(s, i, context=CharRefContext.ATTR).vi
             if ch is None:
                 i += 1
                 continue
@@ -468,7 +469,12 @@ def parseUnquotedAttrValue(s: Stream, start: int) -> Result[str]:
     return Result(val, i)
 
 
-def parseCharRef(s: Stream, start: int) -> Result[str]:
+class CharRefContext(Enum):
+    ATTR = "attr"
+    NON_ATTR = "non-attr"
+
+
+def parseCharRef(s: Stream, start: int, context: CharRefContext) -> Result[str]:
     if s[start] != "&":
         return Result.fail(start)
     i = start + 1
@@ -477,6 +483,11 @@ def parseCharRef(s: Stream, start: int) -> Result[str]:
         i += 1
         while preds.isASCIIAlphanum(s[i]):
             i += 1
+        if s[i] == "=" and context == CharRefContext.ATTR:
+            # HTML allows you to write <a href="?foo&bar=baz">
+            # without escaping the ampersand, even if it matches
+            # a named charRef so long as there's an `=` after it.
+            return Result.fail(start)
         if s[i] != ";":
             m.die(f"Character reference '{s[start:i]}' didn't end in ;.", lineNum=s.loc(start))
             return Result.fail(start)
