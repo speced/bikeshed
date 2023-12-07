@@ -1,4 +1,5 @@
 from .main import (
+    debugNodes,
     initialDocumentParse,
     linesFromNodes,
     nodesFromHtml,

@@ -78,6 +78,7 @@ from .dom import (
 )
 from .parser import (
     ParseConfig,
+    debugNodes,
     initialDocumentParse,
     parseLines,
     parseText,
