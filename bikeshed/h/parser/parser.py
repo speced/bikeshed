@@ -431,7 +431,7 @@ def parseQuotedAttrValue(s: Stream, start: int) -> Result[str]:
             if ch is None:
                 i += 1
                 continue
-            val += s[startSeg:startRef] + f"&#{ord(ch)};"
+            val += s[startSeg:startRef] + printChAsHexRef(ch)
             startSeg = i
             continue
         i += 1
@@ -458,7 +458,7 @@ def parseUnquotedAttrValue(s: Stream, start: int) -> Result[str]:
             if ch is None:
                 i += 1
                 continue
-            val += s[startSeg:startRef] + f"&#{ord(ch)};"
+            val += s[startSeg:startRef] + printChAsHexRef(ch)
             startSeg = i
             continue
         i += 1
@@ -467,6 +467,17 @@ def parseUnquotedAttrValue(s: Stream, start: int) -> Result[str]:
         return Result.fail(start)
     val += s[startSeg:i]
     return Result(val, i)
+
+
+def printChAsHexRef(ch: str) -> str:
+    """
+    Turns a character reference value,
+    aka a value from preds.charRefs,
+    back into a hex char ref for normalization purposes.
+    Sometimes outputs as two refs,
+    since a few of the values are two characters.
+    """
+    return "".join(f"&#{ord(x)};" for x in ch)
 
 
 class CharRefContext(Enum):
