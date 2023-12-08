@@ -129,12 +129,13 @@ def textContent(el: t.ElementT, exact: bool = False) -> str:
 
 
 def textContentIgnoringDecorative(el: t.ElementT) -> str:
-    str = el.text or ""
-    for child in childElements(el):
-        if child.get("data-deco") is None:
-            str += textContentIgnoringDecorative(child)
-        str += child.tail or ""
-    return str
+    s = ""
+    for child in childNodes(el):
+        if isinstance(child, str):
+            s += child
+        elif child.get("data-deco") is None:
+            s += textContentIgnoringDecorative(child)
+    return s
 
 
 def innerHTML(el: t.ElementT | None) -> str:
@@ -159,11 +160,13 @@ def printNodeTree(node: t.NodeT | str) -> str:
     # Debugging tool
     if isinstance(node, str):
         return "#text: " + repr(node)
+    if isOddNode(node):
+        return outerHTML(node)
     if isinstance(node, list):
         s = "[]"
     else:
         s = f"{serializeTag(node)}"
-    linesPerChild = [printNodeTree(child).split("\n") for child in childNodes(node)]
+    linesPerChild = [printNodeTree(child).split("\n") for child in childNodes(node, skipOddNodes=False)]
     if linesPerChild:
         for childLines in linesPerChild[:-1]:
             childLines[0] = " ├" + childLines[0]
