@@ -129,12 +129,14 @@ def textContent(el: t.ElementT, exact: bool = False) -> str:
 
 
 def textContentIgnoringDecorative(el: t.ElementT) -> str:
-    str = el.text or ""
-    for child in childElements(el):
-        if child.get("data-deco") is None:
-            str += textContentIgnoringDecorative(child)
-        str += child.tail or ""
-    return str
+    s = el.text or ""
+    for child in childNodes(el):
+        if isinstance(child, str):
+            s += child
+        elif child.get("data-deco") is None:
+            s += textContentIgnoringDecorative(child)
+        print(repr(s))
+    return s
 
 
 def innerHTML(el: t.ElementT | None) -> str:
