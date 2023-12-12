@@ -46,7 +46,7 @@ def addSyntaxHighlighting(doc: t.SpecT) -> None:
     for el in h.findAll("xmp, pre, code", doc):
         # Find whether to highlight, and what the lang is
         lang = determineHighlightLang(doc, el)
-        if lang is False:
+        if lang is False: # or lang is None:
             # Element was already highlighted, but needs styles
             highlightingOccurred = True
         elif lang:
