@@ -108,7 +108,7 @@ class Script:
         text = f"/* Boilerplate: script-{self.name} */\n"
         if self.data:
             for dataName, dataJSON in self.data.items():
-                text += f"let {dataName} = {json.dumps(dataJSON)};\n"
+                text += f"let {dataName} = {json.dumps(dataJSON, sort_keys=True, indent=1)};\n"
             text += "\n"
         text += self.text
         if not text.endswith("\n"):
