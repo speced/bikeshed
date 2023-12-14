@@ -71,6 +71,7 @@ from .dom import (
     tagName,
     textContent,
     textContentIgnoringDecorative,
+    transferAttributes,
     treeAttr,
     unescape,
     unfixTypography,

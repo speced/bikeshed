@@ -424,6 +424,12 @@ def replaceNode(node: t.ElementT, *replacements: t.NodesT) -> t.NodesT | None:
     return None
 
 
+def transferAttributes(source: t.ElementT, target: t.ElementT) -> t.ElementT:
+    for k, v in source.attrib.items():
+        target.set(k, v)
+    return target
+
+
 def appendContents(el: t.ElementT, container: t.ElementT | t.Iterable[t.NodesT]) -> t.ElementT:
     # Accepts either an iterable *or* a container element
     if isElement(container):

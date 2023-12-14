@@ -265,12 +265,11 @@ def transformShorthandElements(doc: t.SpecT) -> None:
             # Move the linking attributes from <l> to the <a>
             attrTarget: t.ElementT | None
             if result.tag == "a":
-                attrTarget = result
+                h.transferAttributes(el, result)
             else:
                 attrTarget = h.find("a", result)
-            if attrTarget is not None:
-                for k, v in el.attrib.items():
-                    attrTarget.set(k, v)
+                if attrTarget is not None:
+                    h.transferAttributes(el, attrTarget)
             return True
         return False
 
@@ -279,6 +278,8 @@ def transformShorthandElements(doc: t.SpecT) -> None:
         # are already specially handled by fixAwkwardCSSShorthands().
         child = h.hasOnlyChild(el)
         if child is not None and child.get("bs-autolink-syntax") is not None:
+            h.replaceNode(el, child)
+            h.transferAttributes(el, child)
             continue
 
         text = h.textContent(el)
