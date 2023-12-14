@@ -834,7 +834,8 @@ def decorateAutolink(doc: t.SpecT, el: t.ElementT, linkType: str, linkText: str,
                 assert titleText is not None
                 doc.typeExpansions[linkText] = titleText
         if titleText:
-            el.set("title", titleText)
+            script = doc.extraScripts.setFile("link-titles", "link-titles.js")
+            script.getData("linkTitleData", {})[ref.url] = titleText
 
 
 def removeMultipleLinks(doc: t.SpecT) -> None:
