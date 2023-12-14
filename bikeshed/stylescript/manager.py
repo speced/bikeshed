@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import json
 import re
 
 from .. import config, h, t
@@ -15,17 +16,21 @@ class ScriptManager:
         for sc in self.scripts:
             if sc.name == name:
                 sc.text = text
-                return
-        self.scripts.append(Script(name, text))
+                return sc
+        script = Script(name, text, {})
+        self.scripts.append(script)
+        return script
 
     def setFile(self, name: str, localPath: str) -> None:
-        with open(config.scriptPath(localPath), "r", encoding="utf-8") as fh:
-            self.set(name, fh.read())
+        if not self.has(name):
+            with open(config.scriptPath(localPath), "r", encoding="utf-8") as fh:
+                self.set(name, fh.read())
+        return self.get(name)
 
     def setDefault(self, name: str, text: str) -> Script:
         if self.has(name):
             return self.get(name)
-        script = Script(name, text)
+        script = Script(name, text, {})
         self.scripts.append(script)
         return script
 
@@ -83,17 +88,32 @@ class StyleManager:
     def has(self, name: str) -> bool:
         return any(x.name == name for x in self.styles)
 
+if t.TYPE_CHECKING:
+    ScriptDataT = t.TypeVar("ScriptDataT", bound=t.JSONT)
 
 @dataclasses.dataclass
 class Script:
     name: str
     text: str
+    data: dict[str, t.JSONT] | None
+
+    def getData(self, dataName: str, default: ScriptDataT) -> ScriptDataT:
+        if self.data is None:
+            self.data = {}
+        if dataName not in self.data:
+            self.data[dataName] = default
+        return self.data[dataName]
 
     def toElement(self) -> t.ElementT:
-        text = self.text
-        if not self.text.endswith("\n"):
+        text = f"/* Boilerplate: script-{self.name} */\n"
+        if self.data:
+            for dataName, dataJSON in self.data.items():
+                text += f"let {dataName} = {json.dumps(dataJSON)};\n"
             text += "\n"
-        return h.E.script(f"/* Boilerplate: script-{self.name} */\n{text}")
+        text += self.text
+        if not text.endswith("\n"):
+            text += "\n"
+        return h.E.script(text)
 
 
 @dataclasses.dataclass
