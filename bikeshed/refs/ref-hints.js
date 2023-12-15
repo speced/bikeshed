@@ -48,7 +48,7 @@ function genRefHint(link, ref) {
     return hintPanel;
 }
 function genAllRefHints() {
-    for(const refData of Object.values(window.refsData)) {
+    for(const refData of Object.values(refsData)) {
         const refUrl = refData.url;
         const links = document.querySelectorAll(`a[href="${refUrl}"]`);
         if (links.length == 0) {

@@ -202,7 +202,7 @@ function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
 }
 
 function genAllDfnPanels() {
-    for(const panelData of Object.values(window.dfnpanelData)) {
+    for(const panelData of Object.values(dfnPanelData)) {
         const dfnID = panelData.dfnID;
         const dfn = document.getElementById(dfnID);
         if(!dfn) {
