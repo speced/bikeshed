@@ -55,8 +55,8 @@ function genAllRefHints() {
             console.log(`Can't find link href="${refUrl}".`, refData);
             continue;
         }
-        for (let i = 0; i < links.length; i++) {
-            const link = links[i];
+        for(const link of links) {
+            if(link.classList.contains("dfn-link")) continue;
             const hint = genRefHint(link, refData);
             append(document.body, hint);
             insertLinkPopupAction(hint)
