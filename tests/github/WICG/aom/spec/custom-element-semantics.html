@@ -76,7 +76,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -450,6 +449,11 @@ figcaption:not(.no-marker)::before {
     }
 }
 </style>
+<style>/* Boilerplate: style-idl-highlighting */
+pre.idl.highlight {
+    background: var(--borderedblock-bg, var(--def-bg));
+}
+</style>
 <style>/* Boilerplate: style-issues */
 a[href].issue-return {
     float: right;
@@ -507,7 +511,6 @@ a[href].issue-return {
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -567,7 +570,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -624,7 +626,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -1185,426 +1186,8 @@ dictionary ElementDefinitionOptions {
 <a data-link-type="idl-name" href="#dictdef-elementinternals"><c- n>ElementInternals</c-></a> <c- b>includes</c-> <a data-link-type="idl-name" href="https://www.w3.org/TR/wai-aria-1.2/#idl-def-ariaattributes"><c- n>AriaAttributes</c-></a>;
 
 </pre>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['d1d71328'] = {"dfnID": "d1d71328", "url": "https://www.w3.org/TR/wai-aria-1.2/#idl-def-accessibilityrole", "dfnText": "AccessibilityRole", "refSections": [{"refs": [{"id": "ref-for-idl-def-accessibilityrole"}, {"id": "ref-for-idl-def-accessibilityrole\u2460"}, {"id": "ref-for-idl-def-accessibilityrole\u2461"}, {"id": "ref-for-idl-def-accessibilityrole\u2462"}], "title": "1.2. Changes to custom element definition"}], "external": true};
-window.dfnpanelData['87f26218'] = {"dfnID": "87f26218", "url": "https://www.w3.org/TR/wai-aria-1.2/#idl-def-ariaattributes", "dfnText": "AriaAttributes", "refSections": [{"refs": [{"id": "ref-for-idl-def-ariaattributes"}, {"id": "ref-for-idl-def-ariaattributes\u2460"}, {"id": "ref-for-idl-def-ariaattributes\u2461"}, {"id": "ref-for-idl-def-ariaattributes\u2462"}], "title": "1.2. Changes to custom element definition"}], "external": true};
-window.dfnpanelData['5889f566'] = {"dfnID": "5889f566", "url": "https://www.w3.org/TR/core-aam-1.1/#dfn-accessibility-tree", "dfnText": "accessibility tree", "refSections": [{"refs": [{"id": "ref-for-dfn-accessibility-tree"}], "title": "1.1.1. Defining custom element semantics as part of the custom element definition"}], "external": true};
-window.dfnpanelData['81c9c6df'] = {"dfnID": "81c9c6df", "url": "https://www.w3.org/TR/core-aam-1.1/#dfn-accessible-object", "dfnText": "accessible object", "refSections": [{"refs": [{"id": "ref-for-dfn-accessible-object"}, {"id": "ref-for-dfn-accessible-object\u2460"}], "title": "1.1.1. Defining custom element semantics as part of the custom element definition"}, {"refs": [{"id": "ref-for-dfn-accessible-object\u2461"}], "title": "1.1.2. Defining per-instance custom element semantics"}], "external": true};
-window.dfnpanelData['8d038082'] = {"dfnID": "8d038082", "url": "https://www.w3.org/TR/core-aam-1.1/#mapping_general", "dfnText": "mapped", "refSections": [{"refs": [{"id": "ref-for-mapping_general"}], "title": "1.1.1. Defining custom element semantics as part of the custom element definition"}, {"refs": [{"id": "ref-for-mapping_general\u2460"}], "title": "1.1.2. Defining per-instance custom element semantics"}, {"refs": [{"id": "ref-for-mapping_general\u2461"}], "title": "2.2.1. Rules for exposing semantics of custom elements"}], "external": true};
-window.dfnpanelData['c553243d'] = {"dfnID": "c553243d", "url": "https://www.w3.org/TR/core-aam-1.1/#mapping_role", "dfnText": "mapped role", "refSections": [{"refs": [{"id": "ref-for-mapping_role"}], "title": "1.1.1. Defining custom element semantics as part of the custom element definition"}], "external": true};
-window.dfnpanelData['296f3551'] = {"dfnID": "296f3551", "url": "https://dom.spec.whatwg.org/#element", "dfnText": "Element", "refSections": [{"refs": [{"id": "ref-for-element"}], "title": "2.1. Introduction"}], "external": true};
-window.dfnpanelData['8d9266ec'] = {"dfnID": "8d9266ec", "url": "https://dom.spec.whatwg.org/#concept-element-custom", "dfnText": "custom", "refSections": [{"refs": [{"id": "ref-for-concept-element-custom"}], "title": "2.2.1. Rules for exposing semantics of custom elements"}], "external": true};
-window.dfnpanelData['df3de473'] = {"dfnID": "df3de473", "url": "https://html.spec.whatwg.org/multipage/custom-elements.html#customelementregistry", "dfnText": "CustomElementRegistry", "refSections": [{"refs": [{"id": "ref-for-customelementregistry"}, {"id": "ref-for-customelementregistry\u2460"}], "title": "1.2. Changes to custom element definition"}], "external": true};
-window.dfnpanelData['7e4580af'] = {"dfnID": "7e4580af", "url": "https://html.spec.whatwg.org/multipage/custom-elements.html#elementdefinitionoptions", "dfnText": "ElementDefinitionOptions", "refSections": [{"refs": [{"id": "ref-for-elementdefinitionoptions"}, {"id": "ref-for-elementdefinitionoptions\u2460"}], "title": "1.1.1. Defining custom element semantics as part of the custom element definition"}, {"refs": [{"id": "ref-for-elementdefinitionoptions\u2461"}, {"id": "ref-for-elementdefinitionoptions\u2462"}], "title": "1.2. Changes to custom element definition"}, {"refs": [{"id": "ref-for-elementdefinitionoptions\u2463"}], "title": "2. ARIA semantic precedence between ElementDefinitionOptions, ElementInternals and ARIA properties"}], "external": true};
-window.dfnpanelData['b6fb7a51'] = {"dfnID": "b6fb7a51", "url": "https://html.spec.whatwg.org/multipage/custom-elements.html#custom-element", "dfnText": "custom element", "refSections": [{"refs": [{"id": "ref-for-custom-element"}], "title": "1. Defining custom element semantics"}, {"refs": [{"id": "ref-for-custom-element\u2460"}], "title": "1.1.2. Defining per-instance custom element semantics"}, {"refs": [{"id": "ref-for-custom-element\u2461"}], "title": "2.2.1. Rules for exposing semantics of custom elements"}], "external": true};
-window.dfnpanelData['bc8115d9'] = {"dfnID": "bc8115d9", "url": "https://html.spec.whatwg.org/multipage/custom-elements.html#custom-element-definition", "dfnText": "custom element definition", "refSections": [{"refs": [{"id": "ref-for-custom-element-definition"}], "title": "1.1. Introduction"}, {"refs": [{"id": "ref-for-custom-element-definition\u2460"}], "title": "1.1.1. Defining custom element semantics as part of the custom element definition"}, {"refs": [{"id": "ref-for-custom-element-definition\u2461"}, {"id": "ref-for-custom-element-definition\u2462"}, {"id": "ref-for-custom-element-definition\u2463"}], "title": "1.2. Changes to custom element definition"}, {"refs": [{"id": "ref-for-custom-element-definition\u2464"}], "title": "2.1. Introduction"}, {"refs": [{"id": "ref-for-custom-element-definition\u2465"}], "title": "2.2.1. Rules for exposing semantics of custom elements"}], "external": true};
-window.dfnpanelData['31559e1b'] = {"dfnID": "31559e1b", "url": "https://html.spec.whatwg.org/multipage/custom-elements.html#dom-customelementregistry-define", "dfnText": "define(name, constructor, options)", "refSections": [{"refs": [{"id": "ref-for-dom-customelementregistry-define"}], "title": "1.1.1. Defining custom element semantics as part of the custom element definition"}, {"refs": [{"id": "ref-for-dom-customelementregistry-define\u2460"}, {"id": "ref-for-dom-customelementregistry-define\u2461"}], "title": "1.2. Changes to custom element definition"}, {"refs": [{"id": "ref-for-dom-customelementregistry-define\u2462"}], "title": "2.1. Introduction"}], "external": true};
-window.dfnpanelData['8ed014b2'] = {"dfnID": "8ed014b2", "url": "https://html.spec.whatwg.org/multipage/custom-elements.html#custom-element-definition", "dfnText": "defined", "refSections": [{"refs": [{"id": "ref-for-custom-element-definition"}], "title": "1.1. Introduction"}, {"refs": [{"id": "ref-for-custom-element-definition\u2460"}], "title": "1.1.1. Defining custom element semantics as part of the custom element definition"}, {"refs": [{"id": "ref-for-custom-element-definition\u2461"}, {"id": "ref-for-custom-element-definition\u2462"}, {"id": "ref-for-custom-element-definition\u2463"}], "title": "1.2. Changes to custom element definition"}, {"refs": [{"id": "ref-for-custom-element-definition\u2464"}], "title": "2.1. Introduction"}, {"refs": [{"id": "ref-for-custom-element-definition\u2465"}], "title": "2.2.1. Rules for exposing semantics of custom elements"}], "external": true};
-window.dfnpanelData['e5507bd4'] = {"dfnID": "e5507bd4", "url": "https://www.w3.org/TR/html-aam-1.0/#details-id-17", "dfnText": "role of button", "refSections": [{"refs": [{"id": "ref-for-details-id-17"}], "title": "1.1.1. Defining custom element semantics as part of the custom element definition"}], "external": true};
-window.dfnpanelData['3fca5a9e'] = {"dfnID": "3fca5a9e", "url": "https://infra.spec.whatwg.org/#ordered-map", "dfnText": "map", "refSections": [{"refs": [{"id": "ref-for-ordered-map"}], "title": "1.1.1. Defining custom element semantics as part of the custom element definition"}, {"refs": [{"id": "ref-for-ordered-map\u2460"}], "title": "1.1.2. Defining per-instance custom element semantics"}], "external": true};
-window.dfnpanelData['8855a9aa'] = {"dfnID": "8855a9aa", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "dfnText": "DOMString", "refSections": [{"refs": [{"id": "ref-for-idl-DOMString"}], "title": "1.2. Changes to custom element definition"}], "external": true};
-window.dfnpanelData['semantic-properties'] = {"dfnID": "semantic-properties", "url": "#semantic-properties", "dfnText": "semantic properties", "refSections": [{"refs": [{"id": "ref-for-semantic-properties"}], "title": "1.2. Changes to custom element definition"}], "external": false};
-window.dfnpanelData['dictdef-elementinternals'] = {"dfnID": "dictdef-elementinternals", "url": "#dictdef-elementinternals", "dfnText": "ElementInternals", "refSections": [{"refs": [{"id": "ref-for-dictdef-elementinternals"}, {"id": "ref-for-dictdef-elementinternals\u2460"}, {"id": "ref-for-dictdef-elementinternals\u2461"}, {"id": "ref-for-dictdef-elementinternals\u2462"}], "title": "1.1.2. Defining per-instance custom element semantics"}, {"refs": [{"id": "ref-for-dictdef-elementinternals\u2463"}, {"id": "ref-for-dictdef-elementinternals\u2464"}], "title": "1.2. Changes to custom element definition"}, {"refs": [{"id": "ref-for-dictdef-elementinternals\u2465"}], "title": "2. ARIA semantic precedence between ElementDefinitionOptions, ElementInternals and ARIA properties"}, {"refs": [{"id": "ref-for-dictdef-elementinternals\u2466"}, {"id": "ref-for-dictdef-elementinternals\u2467"}, {"id": "ref-for-dictdef-elementinternals\u2468"}, {"id": "ref-for-dictdef-elementinternals\u2460\u24ea"}], "title": "2.1. Introduction"}, {"refs": [{"id": "ref-for-dictdef-elementinternals\u2460\u2460"}, {"id": "ref-for-dictdef-elementinternals\u2460\u2461"}], "title": "2.2.1. Rules for exposing semantics of custom elements"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -1798,235 +1381,653 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"d1d71328": {"dfnID":"d1d71328","dfnText":"AccessibilityRole","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-def-accessibilityrole"},{"id":"ref-for-idl-def-accessibilityrole\u2460"},{"id":"ref-for-idl-def-accessibilityrole\u2461"},{"id":"ref-for-idl-def-accessibilityrole\u2462"}],"title":"1.2. Changes to custom element definition"}],"url":"https://www.w3.org/TR/wai-aria-1.2/#idl-def-accessibilityrole"},
+"87f26218": {"dfnID":"87f26218","dfnText":"AriaAttributes","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-def-ariaattributes"},{"id":"ref-for-idl-def-ariaattributes\u2460"},{"id":"ref-for-idl-def-ariaattributes\u2461"},{"id":"ref-for-idl-def-ariaattributes\u2462"}],"title":"1.2. Changes to custom element definition"}],"url":"https://www.w3.org/TR/wai-aria-1.2/#idl-def-ariaattributes"},
+"5889f566": {"dfnID":"5889f566","dfnText":"accessibility tree","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-accessibility-tree"}],"title":"1.1.1. Defining custom element semantics as part of the custom element definition"}],"url":"https://www.w3.org/TR/core-aam-1.1/#dfn-accessibility-tree"},
+"81c9c6df": {"dfnID":"81c9c6df","dfnText":"accessible object","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-accessible-object"},{"id":"ref-for-dfn-accessible-object\u2460"}],"title":"1.1.1. Defining custom element semantics as part of the custom element definition"},{"refs":[{"id":"ref-for-dfn-accessible-object\u2461"}],"title":"1.1.2. Defining per-instance custom element semantics"}],"url":"https://www.w3.org/TR/core-aam-1.1/#dfn-accessible-object"},
+"8d038082": {"dfnID":"8d038082","dfnText":"mapped","external":true,"refSections":[{"refs":[{"id":"ref-for-mapping_general"}],"title":"1.1.1. Defining custom element semantics as part of the custom element definition"},{"refs":[{"id":"ref-for-mapping_general\u2460"}],"title":"1.1.2. Defining per-instance custom element semantics"},{"refs":[{"id":"ref-for-mapping_general\u2461"}],"title":"2.2.1. Rules for exposing semantics of custom elements"}],"url":"https://www.w3.org/TR/core-aam-1.1/#mapping_general"},
+"c553243d": {"dfnID":"c553243d","dfnText":"mapped role","external":true,"refSections":[{"refs":[{"id":"ref-for-mapping_role"}],"title":"1.1.1. Defining custom element semantics as part of the custom element definition"}],"url":"https://www.w3.org/TR/core-aam-1.1/#mapping_role"},
+"296f3551": {"dfnID":"296f3551","dfnText":"Element","external":true,"refSections":[{"refs":[{"id":"ref-for-element"}],"title":"2.1. Introduction"}],"url":"https://dom.spec.whatwg.org/#element"},
+"8d9266ec": {"dfnID":"8d9266ec","dfnText":"custom","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-element-custom"}],"title":"2.2.1. Rules for exposing semantics of custom elements"}],"url":"https://dom.spec.whatwg.org/#concept-element-custom"},
+"df3de473": {"dfnID":"df3de473","dfnText":"CustomElementRegistry","external":true,"refSections":[{"refs":[{"id":"ref-for-customelementregistry"},{"id":"ref-for-customelementregistry\u2460"}],"title":"1.2. Changes to custom element definition"}],"url":"https://html.spec.whatwg.org/multipage/custom-elements.html#customelementregistry"},
+"7e4580af": {"dfnID":"7e4580af","dfnText":"ElementDefinitionOptions","external":true,"refSections":[{"refs":[{"id":"ref-for-elementdefinitionoptions"},{"id":"ref-for-elementdefinitionoptions\u2460"}],"title":"1.1.1. Defining custom element semantics as part of the custom element definition"},{"refs":[{"id":"ref-for-elementdefinitionoptions\u2461"},{"id":"ref-for-elementdefinitionoptions\u2462"}],"title":"1.2. Changes to custom element definition"},{"refs":[{"id":"ref-for-elementdefinitionoptions\u2463"}],"title":"2. ARIA semantic precedence between ElementDefinitionOptions, ElementInternals and ARIA properties"}],"url":"https://html.spec.whatwg.org/multipage/custom-elements.html#elementdefinitionoptions"},
+"b6fb7a51": {"dfnID":"b6fb7a51","dfnText":"custom element","external":true,"refSections":[{"refs":[{"id":"ref-for-custom-element"}],"title":"1. Defining custom element semantics"},{"refs":[{"id":"ref-for-custom-element\u2460"}],"title":"1.1.2. Defining per-instance custom element semantics"},{"refs":[{"id":"ref-for-custom-element\u2461"}],"title":"2.2.1. Rules for exposing semantics of custom elements"}],"url":"https://html.spec.whatwg.org/multipage/custom-elements.html#custom-element"},
+"bc8115d9": {"dfnID":"bc8115d9","dfnText":"custom element definition","external":true,"refSections":[{"refs":[{"id":"ref-for-custom-element-definition"}],"title":"1.1. Introduction"},{"refs":[{"id":"ref-for-custom-element-definition\u2460"}],"title":"1.1.1. Defining custom element semantics as part of the custom element definition"},{"refs":[{"id":"ref-for-custom-element-definition\u2461"},{"id":"ref-for-custom-element-definition\u2462"},{"id":"ref-for-custom-element-definition\u2463"}],"title":"1.2. Changes to custom element definition"},{"refs":[{"id":"ref-for-custom-element-definition\u2464"}],"title":"2.1. Introduction"},{"refs":[{"id":"ref-for-custom-element-definition\u2465"}],"title":"2.2.1. Rules for exposing semantics of custom elements"}],"url":"https://html.spec.whatwg.org/multipage/custom-elements.html#custom-element-definition"},
+"31559e1b": {"dfnID":"31559e1b","dfnText":"define(name, constructor, options)","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-customelementregistry-define"}],"title":"1.1.1. Defining custom element semantics as part of the custom element definition"},{"refs":[{"id":"ref-for-dom-customelementregistry-define\u2460"},{"id":"ref-for-dom-customelementregistry-define\u2461"}],"title":"1.2. Changes to custom element definition"},{"refs":[{"id":"ref-for-dom-customelementregistry-define\u2462"}],"title":"2.1. Introduction"}],"url":"https://html.spec.whatwg.org/multipage/custom-elements.html#dom-customelementregistry-define"},
+"8ed014b2": {"dfnID":"8ed014b2","dfnText":"defined","external":true,"refSections":[{"refs":[{"id":"ref-for-custom-element-definition"}],"title":"1.1. Introduction"},{"refs":[{"id":"ref-for-custom-element-definition\u2460"}],"title":"1.1.1. Defining custom element semantics as part of the custom element definition"},{"refs":[{"id":"ref-for-custom-element-definition\u2461"},{"id":"ref-for-custom-element-definition\u2462"},{"id":"ref-for-custom-element-definition\u2463"}],"title":"1.2. Changes to custom element definition"},{"refs":[{"id":"ref-for-custom-element-definition\u2464"}],"title":"2.1. Introduction"},{"refs":[{"id":"ref-for-custom-element-definition\u2465"}],"title":"2.2.1. Rules for exposing semantics of custom elements"}],"url":"https://html.spec.whatwg.org/multipage/custom-elements.html#custom-element-definition"},
+"e5507bd4": {"dfnID":"e5507bd4","dfnText":"role of button","external":true,"refSections":[{"refs":[{"id":"ref-for-details-id-17"}],"title":"1.1.1. Defining custom element semantics as part of the custom element definition"}],"url":"https://www.w3.org/TR/html-aam-1.0/#details-id-17"},
+"3fca5a9e": {"dfnID":"3fca5a9e","dfnText":"map","external":true,"refSections":[{"refs":[{"id":"ref-for-ordered-map"}],"title":"1.1.1. Defining custom element semantics as part of the custom element definition"},{"refs":[{"id":"ref-for-ordered-map\u2460"}],"title":"1.1.2. Defining per-instance custom element semantics"}],"url":"https://infra.spec.whatwg.org/#ordered-map"},
+"8855a9aa": {"dfnID":"8855a9aa","dfnText":"DOMString","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-DOMString"}],"title":"1.2. Changes to custom element definition"}],"url":"https://webidl.spec.whatwg.org/#idl-DOMString"},
+"semantic-properties": {"dfnID":"semantic-properties","dfnText":"semantic properties","external":false,"refSections":[{"refs":[{"id":"ref-for-semantic-properties"}],"title":"1.2. Changes to custom element definition"}],"url":"#semantic-properties"},
+"dictdef-elementinternals": {"dfnID":"dictdef-elementinternals","dfnText":"ElementInternals","external":false,"refSections":[{"refs":[{"id":"ref-for-dictdef-elementinternals"},{"id":"ref-for-dictdef-elementinternals\u2460"},{"id":"ref-for-dictdef-elementinternals\u2461"},{"id":"ref-for-dictdef-elementinternals\u2462"}],"title":"1.1.2. Defining per-instance custom element semantics"},{"refs":[{"id":"ref-for-dictdef-elementinternals\u2463"},{"id":"ref-for-dictdef-elementinternals\u2464"}],"title":"1.2. Changes to custom element definition"},{"refs":[{"id":"ref-for-dictdef-elementinternals\u2465"}],"title":"2. ARIA semantic precedence between ElementDefinitionOptions, ElementInternals and ARIA properties"},{"refs":[{"id":"ref-for-dictdef-elementinternals\u2466"},{"id":"ref-for-dictdef-elementinternals\u2467"},{"id":"ref-for-dictdef-elementinternals\u2468"},{"id":"ref-for-dictdef-elementinternals\u2460\u24ea"}],"title":"2.1. Introduction"},{"refs":[{"id":"ref-for-dictdef-elementinternals\u2460\u2460"},{"id":"ref-for-dictdef-elementinternals\u2460\u2461"}],"title":"2.2.1. Rules for exposing semantics of custom elements"}],"url":"#dictdef-elementinternals"},
+};
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+const typeFormatters = {
+    'dfn': (text) => `[=${text}=]`,
+    'abstract-op': (text) => `[\$${text}\$]`,
+    'value': (text) => `''${text}''`,
+    'http-header': (text) => `[:${text}:]`,
+    'idl': (text) => `{{${text}}}`,
+    'interface': 'idl',
+    'constructor': 'idl',
+    'method': 'idl',
+    'argument': 'idl',
+    'attribute': 'idl',
+    'callback': 'idl',
+    'dictionary': 'idl',
+    'dict-member': 'idl',
+    'enum': 'idl',
+    'enum-value': 'idl',
+    'exception': 'idl',
+    'const': 'idl',
+    'typedef': 'idl',
+    'stringifier': 'idl',
+    'serializer': 'idl',
+    'iterator': 'idl',
+    'maplike': 'idl',
+    'setlike': 'idl',
+    'extended-attribute': 'idl',
+    'event': 'idl',
+    'element': (element) => `<{${element}}>`,
+    'element-state': 'element',
+    'element-attr': 'element',
+    'attr-value': 'element',
+    'scheme': 'dfn',
+    'permission': 'dfn',
+    'grammar': (text) => `${text} (within a <pre class=prod>)`,
+    'type': (text)=> `<<${text}>>`,
+    'property': (text) => `'${text}'`,
+    'descriptor': 'property',
+    'function': 'value',
+    'at-rule': 'value',
+    'selector': 'value',
+};
+const typesUsingFor = new Set(
+    [
+        "descriptor",
+        "value",
+        "element-attr",
+        "attr-value",
+        "element-state",
+        "method",
+        "constructor",
+        "argument",
+        "attribute",
+        "const",
+        "dict-member",
+        "event",
+        "enum-value",
+        "stringifier",
+        "serializer",
+        "iterator",
+        "maplike",
+        "setlike",
+        "state",
+        "mode",
+        "context",
+        "facet",
+    ],
+)
+const typesNotUsingFor = new Set(
+    [
+        "property",
+        "element",
+        "interface",
+        "namespace",
+        "callback",
+        "dictionary",
+        "enum",
+        "exception",
+        "typedef",
+        "http-header",
+        "permission",
+    ],
+)
+function linkFormatterFromType(type) {
+    const fnOrType = typeFormatters[type];
+    if(typeof fnOrType === 'string') {
+        // follow the alias
+        return linkFormatterFromType(fnOrType);
+    }
+    return fnOrType;
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!typesUsingFor.has(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!typesNotUsingFor.has(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
+
+function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+    dfnPanel.forDfn = dfn;
+    if(!dfn) { console.log(dfnPanel); }
+    return dfnPanel;
+}
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        const panel = genDfnPanel({ ...panelData, dfn });
+        append(document.body, panel);
+        insertDfnPopupAction(panel)
+    }
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+})
+
+function hideAllDfnPanels() {
+    // Turn off any currently "on" or "activated" panels.
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
+}
+
+function showDfnPanel(dfnPanel) {
+    hideAllDfnPanels(); // Only display one at this time.
+
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "true");
+
+    dfnPanel.classList.add("on");
+    positionDfnPanel(dfnPanel);
+
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    // Increment tabindex for each anchor and button tags in panel
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.style.position = "absolute"; // unfix it
+    dfnPanel.classList.remove("on");
+    dfnPanel.classList.remove("activated");
+}
+
+function toggleDfnPanel(dfnPanel) {
+    if(dfnPanel.classList.contains("on")) {
+        hideDfnPanel(dfnPanel);
+    } else {
+        showDfnPanel(dfnPanel);
+    }
+}
+
+function insertDfnPopupAction(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        showDfnPanel(dfnPanel);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfnPanel);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel(dfnPanel, dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    })
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
 }
 </script>
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
+let refsData = {
+"https://html.spec.whatwg.org/multipage/custom-elements.html#custom-element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"custom element","type":"dfn","url":"https://html.spec.whatwg.org/multipage/custom-elements.html#custom-element"},
+"https://html.spec.whatwg.org/multipage/custom-elements.html#custom-element-definition": {"export":true,"for_":[],"level":"","normative":true,"shortname":"html","spec":"html","status":"anchor-block","text":"custom element definition","type":"dfn","url":"https://html.spec.whatwg.org/multipage/custom-elements.html#custom-element-definition"},
+"https://html.spec.whatwg.org/multipage/custom-elements.html#elementdefinitionoptions": {"export":true,"for_":[],"level":"","normative":true,"shortname":"html","spec":"html","status":"anchor-block","text":"ElementDefinitionOptions","type":"interface","url":"https://html.spec.whatwg.org/multipage/custom-elements.html#elementdefinitionoptions"},
+"https://html.spec.whatwg.org/multipage/custom-elements.html#dom-customelementregistry-define": {"export":true,"for_":["CustomElementRegistry"],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"define(name, constructor, options)","type":"method","url":"https://html.spec.whatwg.org/multipage/custom-elements.html#dom-customelementregistry-define"},
+"https://infra.spec.whatwg.org/#ordered-map": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"map","type":"dfn","url":"https://infra.spec.whatwg.org/#ordered-map"},
+"https://www.w3.org/TR/core-aam-1.1/#dfn-accessible-object": {"export":true,"for_":[],"level":"","normative":true,"shortname":"core-aam","spec":"core-aam","status":"anchor-block","text":"accessible object","type":"dfn","url":"https://www.w3.org/TR/core-aam-1.1/#dfn-accessible-object"},
+"https://www.w3.org/TR/core-aam-1.1/#mapping_general": {"export":true,"for_":[],"level":"","normative":true,"shortname":"core-aam","spec":"core-aam","status":"anchor-block","text":"mapped","type":"dfn","url":"https://www.w3.org/TR/core-aam-1.1/#mapping_general"},
+"https://www.w3.org/TR/core-aam-1.1/#dfn-accessibility-tree": {"export":true,"for_":[],"level":"","normative":true,"shortname":"core-aam","spec":"core-aam","status":"anchor-block","text":"accessibility tree","type":"dfn","url":"https://www.w3.org/TR/core-aam-1.1/#dfn-accessibility-tree"},
+"https://www.w3.org/TR/core-aam-1.1/#mapping_role": {"export":true,"for_":[],"level":"","normative":true,"shortname":"core-aam","spec":"core-aam","status":"anchor-block","text":"mapped role","type":"dfn","url":"https://www.w3.org/TR/core-aam-1.1/#mapping_role"},
+"https://www.w3.org/TR/html-aam-1.0/#details-id-17": {"export":true,"for_":[],"level":"","normative":true,"shortname":"html-aam","spec":"html-aam","status":"anchor-block","text":"role of button","type":"dfn","url":"https://www.w3.org/TR/html-aam-1.0/#details-id-17"},
+"#dictdef-elementinternals": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"aom-aria","spec":"aom-aria-1","status":"local","text":"ElementInternals","type":"dictionary","url":"#dictdef-elementinternals"},
+"https://www.w3.org/TR/wai-aria-1.2/#idl-def-accessibilityrole": {"export":true,"for_":[],"level":"","normative":true,"shortname":"aria","spec":"aria","status":"anchor-block","text":"AccessibilityRole","type":"interface","url":"https://www.w3.org/TR/wai-aria-1.2/#idl-def-accessibilityrole"},
+"https://www.w3.org/TR/wai-aria-1.2/#idl-def-ariaattributes": {"export":true,"for_":[],"level":"","normative":true,"shortname":"aria","spec":"aria","status":"anchor-block","text":"AriaAttributes","type":"interface","url":"https://www.w3.org/TR/wai-aria-1.2/#idl-def-ariaattributes"},
+"https://webidl.spec.whatwg.org/#idl-DOMString": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"DOMString","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-DOMString"},
+"https://html.spec.whatwg.org/multipage/custom-elements.html#customelementregistry": {"export":true,"for_":[],"level":"","normative":true,"shortname":"html","spec":"html","status":"anchor-block","text":"CustomElementRegistry","type":"interface","url":"https://html.spec.whatwg.org/multipage/custom-elements.html#customelementregistry"},
+"#semantic-properties": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"aom-aria","spec":"aom-aria-1","status":"local","text":"semantic properties","type":"dfn","url":"#semantic-properties"},
+"https://dom.spec.whatwg.org/#element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"Element","type":"interface","url":"https://dom.spec.whatwg.org/#element"},
+"https://dom.spec.whatwg.org/#concept-element-custom": {"export":true,"for_":["Element"],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"custom","type":"dfn","url":"https://dom.spec.whatwg.org/#concept-element-custom"},
+};
+
+function genRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "DFN: "),
+                mk.code({ class: "dfn-text" }, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    const forListElements = forList.length === 0 ? '' : mk.li({},
+        mk.b({}, "For: "),
+        mk.ul({},
+            ...forList.map(forItem =>
                 mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
-            mk.b({}, "For: "),
-            mk.ul({},
-                ...forList.map(forItem =>
-                    mk.li({},
-                        mk.span({}, `${forItem}`)
-                    ),
+                    mk.span({}, `${forItem}`)
                 ),
             ),
-        );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+        ),
+    );
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
-    }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    return hintPanel;
+}
+function genAllRefHints() {
+    for(const refData of Object.values(refsData)) {
+        const refUrl = refData.url;
+        const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+        if (links.length == 0) {
+            console.log(`Can't find link href="${refUrl}".`, refData);
+            continue;
+        }
+        for(const link of links) {
+            if(link.classList.contains("dfn-link")) continue;
+            const hint = genRefHint(link, refData);
+            append(document.body, hint);
+            insertLinkPopupAction(hint)
         }
     }
+}
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+function hideAllRefHints() {
+    queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    refHint.style.position = "absolute"; // unfix it
+    refHint.classList.remove("on");
+    const teardown = refHint.teardownEventListeners;
+    if (teardown) {
+        refHint.teardownEventListeners = undefined;
+        teardown();
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+function showRefHint(refHint) {
+    hideAllRefHints(); // Only display one at this time.
+
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "true");
+    refHint.classList.add("on");
+    positionRefHint(refHint);
+    setupRefHintEventListeners(refHint);
+}
+
+function setupRefHintEventListeners(refHint) {
+    if (refHint.teardownEventListeners) return;
+    const link = refHint.forLink;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
 
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
 
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+function insertLinkPopupAction(refHint) {
+    const link = refHint.forLink;
+    // link.setAttribute('role', 'button');
+    link.setAttribute('aria-expanded', 'false')
+    link.classList.add('has-ref-hint');
+    link.addEventListener('mouseover', (event) => {
+        showRefHint(refHint);
     });
+    link.addEventListener('focus', (event) => {
+        showRefHint(refHint);
+    })
+}
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+document.addEventListener("DOMContentLoaded", () => {
+    genAllRefHints();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['https://html.spec.whatwg.org/multipage/custom-elements.html#custom-element'] = {"text": "custom element", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/custom-elements.html#custom-element", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/custom-elements.html#custom-element-definition'] = {"text": "custom element definition", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/custom-elements.html#custom-element-definition", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/custom-elements.html#elementdefinitionoptions'] = {"text": "ElementDefinitionOptions", "type": "interface", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/custom-elements.html#elementdefinitionoptions", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/custom-elements.html#dom-customelementregistry-define'] = {"text": "define(name, constructor, options)", "type": "method", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/custom-elements.html#dom-customelementregistry-define", "export": true, "normative": true, "for_": ["CustomElementRegistry"]};
-window.refsData['https://infra.spec.whatwg.org/#ordered-map'] = {"text": "map", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ordered-map", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/core-aam-1.1/#dfn-accessible-object'] = {"text": "accessible object", "type": "dfn", "spec": "core-aam", "shortname": "core-aam", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/core-aam-1.1/#dfn-accessible-object", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/core-aam-1.1/#mapping_general'] = {"text": "mapped", "type": "dfn", "spec": "core-aam", "shortname": "core-aam", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/core-aam-1.1/#mapping_general", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/core-aam-1.1/#dfn-accessibility-tree'] = {"text": "accessibility tree", "type": "dfn", "spec": "core-aam", "shortname": "core-aam", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/core-aam-1.1/#dfn-accessibility-tree", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/core-aam-1.1/#mapping_role'] = {"text": "mapped role", "type": "dfn", "spec": "core-aam", "shortname": "core-aam", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/core-aam-1.1/#mapping_role", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/html-aam-1.0/#details-id-17'] = {"text": "role of button", "type": "dfn", "spec": "html-aam", "shortname": "html-aam", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/html-aam-1.0/#details-id-17", "export": true, "normative": true, "for_": []};
-window.refsData['#dictdef-elementinternals'] = {"text": "ElementInternals", "type": "dictionary", "spec": "aom-aria-1", "shortname": "aom-aria", "level": "1", "status": "local", "url": "#dictdef-elementinternals", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/wai-aria-1.2/#idl-def-accessibilityrole'] = {"text": "AccessibilityRole", "type": "interface", "spec": "aria", "shortname": "aria", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/wai-aria-1.2/#idl-def-accessibilityrole", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/wai-aria-1.2/#idl-def-ariaattributes'] = {"text": "AriaAttributes", "type": "interface", "spec": "aria", "shortname": "aria", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/wai-aria-1.2/#idl-def-ariaattributes", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/custom-elements.html#customelementregistry'] = {"text": "CustomElementRegistry", "type": "interface", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/custom-elements.html#customelementregistry", "export": true, "normative": true, "for_": []};
-window.refsData['#semantic-properties'] = {"text": "semantic properties", "type": "dfn", "spec": "aom-aria-1", "shortname": "aom-aria", "level": "1", "status": "local", "url": "#semantic-properties", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#element'] = {"text": "Element", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#element", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#concept-element-custom'] = {"text": "custom", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-element-custom", "export": true, "normative": true, "for_": ["Element"]};
 </script>

@@ -79,7 +79,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -730,7 +729,6 @@ a[href].issue-return {
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -790,7 +788,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -847,7 +844,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -2479,450 +2475,8 @@ border-clip-top: 3fr 10px 2fr 10px 1fr 10px 10px 10px 1fr 10px 2fr 10px 3fr;
     </div>
    </div>
   </details>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['1548047a'] = {"dfnID": "1548047a", "url": "https://drafts.csswg.org/css-color-5/#typedef-color", "dfnText": "<color>", "refSections": [{"refs": [{"id": "ref-for-typedef-color"}, {"id": "ref-for-typedef-color\u2460"}], "title": "3.1. Line Colors: the border-color properties"}], "external": true};
-window.dfnpanelData['cacb54e0'] = {"dfnID": "cacb54e0", "url": "https://drafts.csswg.org/css-easing-2/#funcdef-cubic-bezier-easing-function-cubic-bezier", "dfnText": "cubic-bezier()", "refSections": [{"refs": [{"id": "ref-for-funcdef-cubic-bezier-easing-function-cubic-bezier"}], "title": "4.2. \nCorner Shaping: the corner-shape property"}], "external": true};
-window.dfnpanelData['baca35b9'] = {"dfnID": "baca35b9", "url": "https://drafts.csswg.org/css-grid-2/#typedef-flex", "dfnText": "<flex>", "refSections": [{"refs": [{"id": "ref-for-typedef-flex"}], "title": "5.2. \nThe border-clip properties"}], "external": true};
-window.dfnpanelData['cc878a3a'] = {"dfnID": "cc878a3a", "url": "https://drafts.csswg.org/css-grid-2/#valdef-flex-fr", "dfnText": "fr", "refSections": [{"refs": [{"id": "ref-for-valdef-flex-fr"}], "title": "5.2. \nThe border-clip properties"}], "external": true};
-window.dfnpanelData['911f092b'] = {"dfnID": "911f092b", "url": "https://drafts.csswg.org/css-tables-3/#propdef-border-collapse", "dfnText": "border-collapse", "refSections": [{"refs": [{"id": "ref-for-propdef-border-collapse"}], "title": "4.1. \nCorner Sizing: the 'border-radius property"}, {"refs": [{"id": "ref-for-propdef-border-collapse\u2460"}], "title": "4.2. \nCorner Shaping: the corner-shape property"}, {"refs": [{"id": "ref-for-propdef-border-collapse\u2461"}], "title": "5.1. \nPartial Borders: the border-limit property"}], "external": true};
-window.dfnpanelData['968cbf52'] = {"dfnID": "968cbf52", "url": "https://drafts.csswg.org/css-text-4/#valdef-text-space-collapse-collapse", "dfnText": "collapse", "refSections": [{"refs": [{"id": "ref-for-valdef-text-space-collapse-collapse"}], "title": "4.1. \nCorner Sizing: the 'border-radius property"}, {"refs": [{"id": "ref-for-valdef-text-space-collapse-collapse\u2460"}], "title": "4.2. \nCorner Shaping: the corner-shape property"}, {"refs": [{"id": "ref-for-valdef-text-space-collapse-collapse\u2461"}], "title": "5.1. \nPartial Borders: the border-limit property"}], "external": true};
-window.dfnpanelData['08eba280'] = {"dfnID": "08eba280", "url": "https://drafts.csswg.org/css-values-4/#mult-req", "dfnText": "!", "refSections": [{"refs": [{"id": "ref-for-mult-req"}, {"id": "ref-for-mult-req\u2460"}], "title": "2.1.1. \nBackground Positioning Longhands: the background-position-x, background-position-y, background-position-inline, and background-position-block properties"}], "external": true};
-window.dfnpanelData['68487d22'] = {"dfnID": "68487d22", "url": "https://drafts.csswg.org/css-values-4/#mult-comma", "dfnText": "#", "refSections": [{"refs": [{"id": "ref-for-mult-comma"}], "title": "2.1. \nBackground Positioning: the background-position shorthand property"}, {"refs": [{"id": "ref-for-mult-comma\u2460"}, {"id": "ref-for-mult-comma\u2461"}, {"id": "ref-for-mult-comma\u2462"}, {"id": "ref-for-mult-comma\u2463"}], "title": "2.1.1. \nBackground Positioning Longhands: the background-position-x, background-position-y, background-position-inline, and background-position-block properties"}, {"refs": [{"id": "ref-for-mult-comma\u2464"}], "title": "2.2. \nPainting Area: the background-clip property"}, {"refs": [{"id": "ref-for-mult-comma\u2465"}, {"id": "ref-for-mult-comma\u2466"}], "title": "3.1. Line Colors: the border-color properties"}], "external": true};
-window.dfnpanelData['f0809abc'] = {"dfnID": "f0809abc", "url": "https://drafts.csswg.org/css-values-4/#comb-all", "dfnText": "&&", "refSections": [{"refs": [{"id": "ref-for-comb-all"}], "title": "2.1. \nBackground Positioning: the background-position shorthand property"}], "external": true};
-window.dfnpanelData['bedd9d42'] = {"dfnID": "bedd9d42", "url": "https://drafts.csswg.org/css-values-4/#mult-one-plus", "dfnText": "+", "refSections": [{"refs": [{"id": "ref-for-mult-one-plus"}], "title": "5.2. \nThe border-clip properties"}], "external": true};
-window.dfnpanelData['18222566'] = {"dfnID": "18222566", "url": "https://drafts.csswg.org/css-values-4/#typedef-length-percentage", "dfnText": "<length-percentage>", "refSections": [{"refs": [{"id": "ref-for-typedef-length-percentage"}, {"id": "ref-for-typedef-length-percentage\u2460"}, {"id": "ref-for-typedef-length-percentage\u2461"}, {"id": "ref-for-typedef-length-percentage\u2462"}, {"id": "ref-for-typedef-length-percentage\u2463"}, {"id": "ref-for-typedef-length-percentage\u2464"}, {"id": "ref-for-typedef-length-percentage\u2465"}], "title": "2.1. \nBackground Positioning: the background-position shorthand property"}, {"refs": [{"id": "ref-for-typedef-length-percentage\u2466"}, {"id": "ref-for-typedef-length-percentage\u2467"}, {"id": "ref-for-typedef-length-percentage\u2468"}, {"id": "ref-for-typedef-length-percentage\u2460\u24ea"}, {"id": "ref-for-typedef-length-percentage\u2460\u2460"}, {"id": "ref-for-typedef-length-percentage\u2460\u2461"}, {"id": "ref-for-typedef-length-percentage\u2460\u2462"}, {"id": "ref-for-typedef-length-percentage\u2460\u2463"}], "title": "2.1.1. \nBackground Positioning Longhands: the background-position-x, background-position-y, background-position-inline, and background-position-block properties"}, {"refs": [{"id": "ref-for-typedef-length-percentage\u2460\u2464"}, {"id": "ref-for-typedef-length-percentage\u2460\u2465"}], "title": "4.1. \nCorner Sizing: the 'border-radius property"}, {"refs": [{"id": "ref-for-typedef-length-percentage\u2460\u2466"}, {"id": "ref-for-typedef-length-percentage\u2460\u2467"}], "title": "5.1. \nPartial Borders: the border-limit property"}, {"refs": [{"id": "ref-for-typedef-length-percentage\u2460\u2468"}, {"id": "ref-for-typedef-length-percentage\u2461\u24ea"}], "title": "5.2. \nThe border-clip properties"}], "external": true};
-window.dfnpanelData['537cf076'] = {"dfnID": "537cf076", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "dfnText": "?", "refSections": [{"refs": [{"id": "ref-for-mult-opt"}, {"id": "ref-for-mult-opt\u2460"}, {"id": "ref-for-mult-opt\u2461"}, {"id": "ref-for-mult-opt\u2462"}], "title": "2.1. \nBackground Positioning: the background-position shorthand property"}, {"refs": [{"id": "ref-for-mult-opt\u2463"}, {"id": "ref-for-mult-opt\u2464"}, {"id": "ref-for-mult-opt\u2465"}, {"id": "ref-for-mult-opt\u2466"}, {"id": "ref-for-mult-opt\u2467"}, {"id": "ref-for-mult-opt\u2468"}, {"id": "ref-for-mult-opt\u2460\u24ea"}, {"id": "ref-for-mult-opt\u2460\u2460"}], "title": "2.1.1. \nBackground Positioning Longhands: the background-position-x, background-position-y, background-position-inline, and background-position-block properties"}, {"refs": [{"id": "ref-for-mult-opt\u2460\u2461"}], "title": "4.1. \nCorner Sizing: the 'border-radius property"}, {"refs": [{"id": "ref-for-mult-opt\u2460\u2462"}], "title": "5.1. \nPartial Borders: the border-limit property"}], "external": true};
-window.dfnpanelData['938ba280'] = {"dfnID": "938ba280", "url": "https://drafts.csswg.org/css-values-4/#mult-num-range", "dfnText": "{a,b}", "refSections": [{"refs": [{"id": "ref-for-mult-num-range"}, {"id": "ref-for-mult-num-range\u2460"}], "title": "4.1. \nCorner Sizing: the 'border-radius property"}, {"refs": [{"id": "ref-for-mult-num-range\u2461"}], "title": "4.2. \nCorner Shaping: the corner-shape property"}], "external": true};
-window.dfnpanelData['6ec67710'] = {"dfnID": "6ec67710", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "dfnText": "|", "refSections": [{"refs": [{"id": "ref-for-comb-one"}, {"id": "ref-for-comb-one\u2460"}, {"id": "ref-for-comb-one\u2461"}, {"id": "ref-for-comb-one\u2462"}, {"id": "ref-for-comb-one\u2463"}, {"id": "ref-for-comb-one\u2464"}, {"id": "ref-for-comb-one\u2465"}, {"id": "ref-for-comb-one\u2466"}, {"id": "ref-for-comb-one\u2467"}, {"id": "ref-for-comb-one\u2468"}, {"id": "ref-for-comb-one\u2460\u24ea"}, {"id": "ref-for-comb-one\u2460\u2460"}, {"id": "ref-for-comb-one\u2460\u2461"}, {"id": "ref-for-comb-one\u2460\u2462"}, {"id": "ref-for-comb-one\u2460\u2463"}, {"id": "ref-for-comb-one\u2460\u2464"}, {"id": "ref-for-comb-one\u2460\u2465"}, {"id": "ref-for-comb-one\u2460\u2466"}, {"id": "ref-for-comb-one\u2460\u2467"}, {"id": "ref-for-comb-one\u2460\u2468"}, {"id": "ref-for-comb-one\u2461\u24ea"}, {"id": "ref-for-comb-one\u2461\u2460"}, {"id": "ref-for-comb-one\u2461\u2461"}, {"id": "ref-for-comb-one\u2461\u2462"}, {"id": "ref-for-comb-one\u2461\u2463"}, {"id": "ref-for-comb-one\u2461\u2464"}, {"id": "ref-for-comb-one\u2461\u2465"}, {"id": "ref-for-comb-one\u2461\u2466"}, {"id": "ref-for-comb-one\u2461\u2467"}, {"id": "ref-for-comb-one\u2461\u2468"}, {"id": "ref-for-comb-one\u2462\u24ea"}, {"id": "ref-for-comb-one\u2462\u2460"}], "title": "2.1. \nBackground Positioning: the background-position shorthand property"}, {"refs": [{"id": "ref-for-comb-one\u2462\u2461"}, {"id": "ref-for-comb-one\u2462\u2462"}, {"id": "ref-for-comb-one\u2462\u2463"}, {"id": "ref-for-comb-one\u2462\u2464"}, {"id": "ref-for-comb-one\u2462\u2465"}, {"id": "ref-for-comb-one\u2462\u2466"}, {"id": "ref-for-comb-one\u2462\u2467"}, {"id": "ref-for-comb-one\u2462\u2468"}, {"id": "ref-for-comb-one\u2463\u24ea"}, {"id": "ref-for-comb-one\u2463\u2460"}, {"id": "ref-for-comb-one\u2463\u2461"}, {"id": "ref-for-comb-one\u2463\u2462"}], "title": "2.1.1. \nBackground Positioning Longhands: the background-position-x, background-position-y, background-position-inline, and background-position-block properties"}, {"refs": [{"id": "ref-for-comb-one\u2463\u2463"}, {"id": "ref-for-comb-one\u2463\u2464"}], "title": "2.2. \nPainting Area: the background-clip property"}, {"refs": [{"id": "ref-for-comb-one\u2463\u2465"}], "title": "4.2. \nCorner Shaping: the corner-shape property"}, {"refs": [{"id": "ref-for-comb-one\u2463\u2466"}, {"id": "ref-for-comb-one\u2463\u2467"}, {"id": "ref-for-comb-one\u2463\u2468"}, {"id": "ref-for-comb-one\u2464\u24ea"}, {"id": "ref-for-comb-one\u2464\u2460"}, {"id": "ref-for-comb-one\u2464\u2461"}], "title": "5.1. \nPartial Borders: the border-limit property"}, {"refs": [{"id": "ref-for-comb-one\u2464\u2462"}, {"id": "ref-for-comb-one\u2464\u2463"}], "title": "5.2. \nThe border-clip properties"}], "external": true};
-window.dfnpanelData['8a82fda1'] = {"dfnID": "8a82fda1", "url": "https://drafts.csswg.org/css-values-4/#comb-any", "dfnText": "||", "refSections": [{"refs": [{"id": "ref-for-comb-any"}], "title": "4.3. \nCorner Shape and Size: the corners shorthand"}], "external": true};
-window.dfnpanelData['342bb58f'] = {"dfnID": "342bb58f", "url": "https://drafts.csswg.org/css-backgrounds-3/#typedef-box", "dfnText": "<box>", "refSections": [{"refs": [{"id": "ref-for-typedef-box"}, {"id": "ref-for-typedef-box\u2460"}], "title": "2.2. \nPainting Area: the background-clip property"}], "external": true};
-window.dfnpanelData['b16da9c9'] = {"dfnID": "b16da9c9", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background-repeat", "dfnText": "background-repeat", "refSections": [{"refs": [{"id": "ref-for-propdef-background-repeat"}], "title": "Unnumbered Section"}, {"refs": [{"id": "ref-for-propdef-background-repeat\u2460"}], "title": "6.1. \nAdditions Since Level 3"}], "external": true};
-window.dfnpanelData['42871fa3'] = {"dfnID": "42871fa3", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-style", "dfnText": "border-style", "refSections": [{"refs": [{"id": "ref-for-propdef-border-style"}], "title": "2.2. \nPainting Area: the background-clip property"}, {"refs": [{"id": "ref-for-propdef-border-style\u2460"}, {"id": "ref-for-propdef-border-style\u2461"}], "title": "3.1. Line Colors: the border-color properties"}], "external": true};
-window.dfnpanelData['c9ecad15'] = {"dfnID": "c9ecad15", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-width", "dfnText": "border-width", "refSections": [{"refs": [{"id": "ref-for-propdef-border-width"}], "title": "2.2. \nPainting Area: the background-clip property"}], "external": true};
-window.dfnpanelData['30ae4883'] = {"dfnID": "30ae4883", "url": "https://drafts.csswg.org/css-backgrounds-3/#valdef-background-position-center", "dfnText": "center", "refSections": [{"refs": [{"id": "ref-for-valdef-background-position-center"}], "title": "2.1. \nBackground Positioning: the background-position shorthand property"}], "external": true};
-window.dfnpanelData['propdef-background-position'] = {"dfnID": "propdef-background-position", "url": "#propdef-background-position", "dfnText": "background-position", "refSections": [{"refs": [{"id": "ref-for-propdef-background-position\u2460"}], "title": "2.1. \nBackground Positioning: the background-position shorthand property"}, {"refs": [{"id": "ref-for-propdef-background-position\u2461"}], "title": "6.1. \nAdditions Since Level 3"}], "external": false};
-window.dfnpanelData['typedef-position'] = {"dfnID": "typedef-position", "url": "#typedef-position", "dfnText": "<position>", "refSections": [{"refs": [{"id": "ref-for-typedef-position"}], "title": "2.1. \nBackground Positioning: the background-position shorthand property"}], "external": false};
-window.dfnpanelData['propdef-background-position-x'] = {"dfnID": "propdef-background-position-x", "url": "#propdef-background-position-x", "dfnText": "background-position-x", "refSections": [{"refs": [{"id": "ref-for-propdef-background-position-x"}], "title": "2.1. \nBackground Positioning: the background-position shorthand property"}, {"refs": [{"id": "ref-for-propdef-background-position-x\u2460"}], "title": "2.1.1. \nBackground Positioning Longhands: the background-position-x, background-position-y, background-position-inline, and background-position-block properties"}], "external": false};
-window.dfnpanelData['propdef-background-position-y'] = {"dfnID": "propdef-background-position-y", "url": "#propdef-background-position-y", "dfnText": "background-position-y", "refSections": [{"refs": [{"id": "ref-for-propdef-background-position-y"}], "title": "2.1. \nBackground Positioning: the background-position shorthand property"}, {"refs": [{"id": "ref-for-propdef-background-position-y\u2460"}], "title": "2.1.1. \nBackground Positioning Longhands: the background-position-x, background-position-y, background-position-inline, and background-position-block properties"}], "external": false};
-window.dfnpanelData['propdef-background-position-inline'] = {"dfnID": "propdef-background-position-inline", "url": "#propdef-background-position-inline", "dfnText": "background-position-inline", "refSections": [{"refs": [{"id": "ref-for-propdef-background-position-inline"}], "title": "2.1. \nBackground Positioning: the background-position shorthand property"}, {"refs": [{"id": "ref-for-propdef-background-position-inline\u2460"}], "title": "2.1.1. \nBackground Positioning Longhands: the background-position-x, background-position-y, background-position-inline, and background-position-block properties"}], "external": false};
-window.dfnpanelData['propdef-background-position-block'] = {"dfnID": "propdef-background-position-block", "url": "#propdef-background-position-block", "dfnText": "background-position-block", "refSections": [{"refs": [{"id": "ref-for-propdef-background-position-block"}], "title": "2.1. \nBackground Positioning: the background-position shorthand property"}, {"refs": [{"id": "ref-for-propdef-background-position-block\u2460"}], "title": "2.1.1. \nBackground Positioning Longhands: the background-position-x, background-position-y, background-position-inline, and background-position-block properties"}], "external": false};
-window.dfnpanelData['propdef-background-clip'] = {"dfnID": "propdef-background-clip", "url": "#propdef-background-clip", "dfnText": "background-clip", "refSections": [{"refs": [{"id": "ref-for-propdef-background-clip"}], "title": "2.2. \nPainting Area: the background-clip property"}], "external": false};
-window.dfnpanelData['typedef-bg-clip'] = {"dfnID": "typedef-bg-clip", "url": "#typedef-bg-clip", "dfnText": "<bg-clip>", "refSections": [{"refs": [{"id": "ref-for-typedef-bg-clip"}], "title": "2.2. \nPainting Area: the background-clip property"}], "external": false};
-window.dfnpanelData['valdef-background-clip-text'] = {"dfnID": "valdef-background-clip-text", "url": "#valdef-background-clip-text", "dfnText": "text", "refSections": [{"refs": [{"id": "ref-for-valdef-background-clip-text"}], "title": "2.2. \nPainting Area: the background-clip property"}], "external": false};
-window.dfnpanelData['propdef-border-color'] = {"dfnID": "propdef-border-color", "url": "#propdef-border-color", "dfnText": "border-color", "refSections": [{"refs": [{"id": "ref-for-propdef-border-color"}], "title": "2.2. \nPainting Area: the background-clip property"}, {"refs": [{"id": "ref-for-propdef-border-color\u2460"}, {"id": "ref-for-propdef-border-color\u2461"}], "title": "3.1. Line Colors: the border-color properties"}], "external": false};
-window.dfnpanelData['propdef-border-radius'] = {"dfnID": "propdef-border-radius", "url": "#propdef-border-radius", "dfnText": "border-radius", "refSections": [{"refs": [{"id": "ref-for-propdef-border-radius"}], "title": "4.2. \nCorner Shaping: the corner-shape property"}, {"refs": [{"id": "ref-for-propdef-border-radius\u2460"}, {"id": "ref-for-propdef-border-radius\u2461"}, {"id": "ref-for-propdef-border-radius\u2462"}], "title": "4.3. \nCorner Shape and Size: the corners shorthand"}], "external": false};
-window.dfnpanelData['propdef-corner-shape'] = {"dfnID": "propdef-corner-shape", "url": "#propdef-corner-shape", "dfnText": "corner-shape", "refSections": [{"refs": [{"id": "ref-for-propdef-corner-shape\u2460"}, {"id": "ref-for-propdef-corner-shape\u2461"}], "title": "4.2. \nCorner Shaping: the corner-shape property"}, {"refs": [{"id": "ref-for-propdef-corner-shape\u2462"}, {"id": "ref-for-propdef-corner-shape\u2463"}, {"id": "ref-for-propdef-corner-shape\u2464"}], "title": "4.3. \nCorner Shape and Size: the corners shorthand"}, {"refs": [{"id": "ref-for-propdef-corner-shape\u2465"}], "title": "6.1. \nAdditions Since Level 3"}], "external": false};
-window.dfnpanelData['valdef-corner-shape-round'] = {"dfnID": "valdef-corner-shape-round", "url": "#valdef-corner-shape-round", "dfnText": "round", "refSections": [{"refs": [{"id": "ref-for-valdef-corner-shape-round"}], "title": "4.2. \nCorner Shaping: the corner-shape property"}], "external": false};
-window.dfnpanelData['valdef-corner-shape-angle'] = {"dfnID": "valdef-corner-shape-angle", "url": "#valdef-corner-shape-angle", "dfnText": "angle", "refSections": [{"refs": [{"id": "ref-for-valdef-corner-shape-angle"}], "title": "4.2. \nCorner Shaping: the corner-shape property"}], "external": false};
-window.dfnpanelData['propdef-corners'] = {"dfnID": "propdef-corners", "url": "#propdef-corners", "dfnText": "corners", "refSections": [{"refs": [{"id": "ref-for-propdef-corners"}, {"id": "ref-for-propdef-corners\u2460"}, {"id": "ref-for-propdef-corners\u2461"}], "title": "4.3. \nCorner Shape and Size: the corners shorthand"}], "external": false};
-window.dfnpanelData['propdef-border-limit'] = {"dfnID": "propdef-border-limit", "url": "#propdef-border-limit", "dfnText": "border-limit", "refSections": [{"refs": [{"id": "ref-for-propdef-border-limit"}], "title": "5.1. \nPartial Borders: the border-limit property"}], "external": false};
-window.dfnpanelData['valdef-border-limit-sides'] = {"dfnID": "valdef-border-limit-sides", "url": "#valdef-border-limit-sides", "dfnText": "sides", "refSections": [{"refs": [{"id": "ref-for-valdef-border-limit-sides"}], "title": "5.1. \nPartial Borders: the border-limit property"}], "external": false};
-window.dfnpanelData['valdef-border-limit-corners'] = {"dfnID": "valdef-border-limit-corners", "url": "#valdef-border-limit-corners", "dfnText": "corners", "refSections": [{"refs": [{"id": "ref-for-valdef-border-limit-corners"}, {"id": "ref-for-valdef-border-limit-corners\u2460"}, {"id": "ref-for-valdef-border-limit-corners\u2461"}], "title": "5.1. \nPartial Borders: the border-limit property"}], "external": false};
-window.dfnpanelData['valdef-border-limit-left'] = {"dfnID": "valdef-border-limit-left", "url": "#valdef-border-limit-left", "dfnText": "left", "refSections": [{"refs": [{"id": "ref-for-valdef-border-limit-left"}], "title": "2.1.1. \nBackground Positioning Longhands: the background-position-x, background-position-y, background-position-inline, and background-position-block properties"}, {"refs": [{"id": "ref-for-valdef-border-limit-left\u2460"}], "title": "5.1. \nPartial Borders: the border-limit property"}], "external": false};
-window.dfnpanelData['valdef-border-limit-right'] = {"dfnID": "valdef-border-limit-right", "url": "#valdef-border-limit-right", "dfnText": "right", "refSections": [{"refs": [{"id": "ref-for-valdef-border-limit-right"}], "title": "5.1. \nPartial Borders: the border-limit property"}], "external": false};
-window.dfnpanelData['valdef-border-limit-top'] = {"dfnID": "valdef-border-limit-top", "url": "#valdef-border-limit-top", "dfnText": "top", "refSections": [{"refs": [{"id": "ref-for-valdef-border-limit-top"}], "title": "2.1.1. \nBackground Positioning Longhands: the background-position-x, background-position-y, background-position-inline, and background-position-block properties"}, {"refs": [{"id": "ref-for-valdef-border-limit-top\u2460"}], "title": "5.1. \nPartial Borders: the border-limit property"}], "external": false};
-window.dfnpanelData['valdef-border-limit-bottom'] = {"dfnID": "valdef-border-limit-bottom", "url": "#valdef-border-limit-bottom", "dfnText": "bottom", "refSections": [{"refs": [{"id": "ref-for-valdef-border-limit-bottom"}], "title": "5.1. \nPartial Borders: the border-limit property"}], "external": false};
-window.dfnpanelData['propdef-border-clip'] = {"dfnID": "propdef-border-clip", "url": "#propdef-border-clip", "dfnText": "border-clip", "refSections": [{"refs": [{"id": "ref-for-propdef-border-clip\u2460"}, {"id": "ref-for-propdef-border-clip\u2461"}], "title": "5.2. \nThe border-clip properties"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -3116,13 +2670,457 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"1548047a": {"dfnID":"1548047a","dfnText":"<color>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-color"},{"id":"ref-for-typedef-color\u2460"}],"title":"3.1. Line Colors: the border-color properties"}],"url":"https://drafts.csswg.org/css-color-5/#typedef-color"},
+"cacb54e0": {"dfnID":"cacb54e0","dfnText":"cubic-bezier()","external":true,"refSections":[{"refs":[{"id":"ref-for-funcdef-cubic-bezier-easing-function-cubic-bezier"}],"title":"4.2. \nCorner Shaping: the corner-shape property"}],"url":"https://drafts.csswg.org/css-easing-2/#funcdef-cubic-bezier-easing-function-cubic-bezier"},
+"baca35b9": {"dfnID":"baca35b9","dfnText":"<flex>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-flex"}],"title":"5.2. \nThe border-clip properties"}],"url":"https://drafts.csswg.org/css-grid-2/#typedef-flex"},
+"cc878a3a": {"dfnID":"cc878a3a","dfnText":"fr","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-flex-fr"}],"title":"5.2. \nThe border-clip properties"}],"url":"https://drafts.csswg.org/css-grid-2/#valdef-flex-fr"},
+"911f092b": {"dfnID":"911f092b","dfnText":"border-collapse","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-border-collapse"}],"title":"4.1. \nCorner Sizing: the 'border-radius property"},{"refs":[{"id":"ref-for-propdef-border-collapse\u2460"}],"title":"4.2. \nCorner Shaping: the corner-shape property"},{"refs":[{"id":"ref-for-propdef-border-collapse\u2461"}],"title":"5.1. \nPartial Borders: the border-limit property"}],"url":"https://drafts.csswg.org/css-tables-3/#propdef-border-collapse"},
+"968cbf52": {"dfnID":"968cbf52","dfnText":"collapse","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-text-space-collapse-collapse"}],"title":"4.1. \nCorner Sizing: the 'border-radius property"},{"refs":[{"id":"ref-for-valdef-text-space-collapse-collapse\u2460"}],"title":"4.2. \nCorner Shaping: the corner-shape property"},{"refs":[{"id":"ref-for-valdef-text-space-collapse-collapse\u2461"}],"title":"5.1. \nPartial Borders: the border-limit property"}],"url":"https://drafts.csswg.org/css-text-4/#valdef-text-space-collapse-collapse"},
+"08eba280": {"dfnID":"08eba280","dfnText":"!","external":true,"refSections":[{"refs":[{"id":"ref-for-mult-req"},{"id":"ref-for-mult-req\u2460"}],"title":"2.1.1. \nBackground Positioning Longhands: the background-position-x, background-position-y, background-position-inline, and background-position-block properties"}],"url":"https://drafts.csswg.org/css-values-4/#mult-req"},
+"68487d22": {"dfnID":"68487d22","dfnText":"#","external":true,"refSections":[{"refs":[{"id":"ref-for-mult-comma"}],"title":"2.1. \nBackground Positioning: the background-position shorthand property"},{"refs":[{"id":"ref-for-mult-comma\u2460"},{"id":"ref-for-mult-comma\u2461"},{"id":"ref-for-mult-comma\u2462"},{"id":"ref-for-mult-comma\u2463"}],"title":"2.1.1. \nBackground Positioning Longhands: the background-position-x, background-position-y, background-position-inline, and background-position-block properties"},{"refs":[{"id":"ref-for-mult-comma\u2464"}],"title":"2.2. \nPainting Area: the background-clip property"},{"refs":[{"id":"ref-for-mult-comma\u2465"},{"id":"ref-for-mult-comma\u2466"}],"title":"3.1. Line Colors: the border-color properties"}],"url":"https://drafts.csswg.org/css-values-4/#mult-comma"},
+"f0809abc": {"dfnID":"f0809abc","dfnText":"&&","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-all"}],"title":"2.1. \nBackground Positioning: the background-position shorthand property"}],"url":"https://drafts.csswg.org/css-values-4/#comb-all"},
+"bedd9d42": {"dfnID":"bedd9d42","dfnText":"+","external":true,"refSections":[{"refs":[{"id":"ref-for-mult-one-plus"}],"title":"5.2. \nThe border-clip properties"}],"url":"https://drafts.csswg.org/css-values-4/#mult-one-plus"},
+"18222566": {"dfnID":"18222566","dfnText":"<length-percentage>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-length-percentage"},{"id":"ref-for-typedef-length-percentage\u2460"},{"id":"ref-for-typedef-length-percentage\u2461"},{"id":"ref-for-typedef-length-percentage\u2462"},{"id":"ref-for-typedef-length-percentage\u2463"},{"id":"ref-for-typedef-length-percentage\u2464"},{"id":"ref-for-typedef-length-percentage\u2465"}],"title":"2.1. \nBackground Positioning: the background-position shorthand property"},{"refs":[{"id":"ref-for-typedef-length-percentage\u2466"},{"id":"ref-for-typedef-length-percentage\u2467"},{"id":"ref-for-typedef-length-percentage\u2468"},{"id":"ref-for-typedef-length-percentage\u2460\u24ea"},{"id":"ref-for-typedef-length-percentage\u2460\u2460"},{"id":"ref-for-typedef-length-percentage\u2460\u2461"},{"id":"ref-for-typedef-length-percentage\u2460\u2462"},{"id":"ref-for-typedef-length-percentage\u2460\u2463"}],"title":"2.1.1. \nBackground Positioning Longhands: the background-position-x, background-position-y, background-position-inline, and background-position-block properties"},{"refs":[{"id":"ref-for-typedef-length-percentage\u2460\u2464"},{"id":"ref-for-typedef-length-percentage\u2460\u2465"}],"title":"4.1. \nCorner Sizing: the 'border-radius property"},{"refs":[{"id":"ref-for-typedef-length-percentage\u2460\u2466"},{"id":"ref-for-typedef-length-percentage\u2460\u2467"}],"title":"5.1. \nPartial Borders: the border-limit property"},{"refs":[{"id":"ref-for-typedef-length-percentage\u2460\u2468"},{"id":"ref-for-typedef-length-percentage\u2461\u24ea"}],"title":"5.2. \nThe border-clip properties"}],"url":"https://drafts.csswg.org/css-values-4/#typedef-length-percentage"},
+"537cf076": {"dfnID":"537cf076","dfnText":"?","external":true,"refSections":[{"refs":[{"id":"ref-for-mult-opt"},{"id":"ref-for-mult-opt\u2460"},{"id":"ref-for-mult-opt\u2461"},{"id":"ref-for-mult-opt\u2462"}],"title":"2.1. \nBackground Positioning: the background-position shorthand property"},{"refs":[{"id":"ref-for-mult-opt\u2463"},{"id":"ref-for-mult-opt\u2464"},{"id":"ref-for-mult-opt\u2465"},{"id":"ref-for-mult-opt\u2466"},{"id":"ref-for-mult-opt\u2467"},{"id":"ref-for-mult-opt\u2468"},{"id":"ref-for-mult-opt\u2460\u24ea"},{"id":"ref-for-mult-opt\u2460\u2460"}],"title":"2.1.1. \nBackground Positioning Longhands: the background-position-x, background-position-y, background-position-inline, and background-position-block properties"},{"refs":[{"id":"ref-for-mult-opt\u2460\u2461"}],"title":"4.1. \nCorner Sizing: the 'border-radius property"},{"refs":[{"id":"ref-for-mult-opt\u2460\u2462"}],"title":"5.1. \nPartial Borders: the border-limit property"}],"url":"https://drafts.csswg.org/css-values-4/#mult-opt"},
+"938ba280": {"dfnID":"938ba280","dfnText":"{a,b}","external":true,"refSections":[{"refs":[{"id":"ref-for-mult-num-range"},{"id":"ref-for-mult-num-range\u2460"}],"title":"4.1. \nCorner Sizing: the 'border-radius property"},{"refs":[{"id":"ref-for-mult-num-range\u2461"}],"title":"4.2. \nCorner Shaping: the corner-shape property"}],"url":"https://drafts.csswg.org/css-values-4/#mult-num-range"},
+"6ec67710": {"dfnID":"6ec67710","dfnText":"|","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-one"},{"id":"ref-for-comb-one\u2460"},{"id":"ref-for-comb-one\u2461"},{"id":"ref-for-comb-one\u2462"},{"id":"ref-for-comb-one\u2463"},{"id":"ref-for-comb-one\u2464"},{"id":"ref-for-comb-one\u2465"},{"id":"ref-for-comb-one\u2466"},{"id":"ref-for-comb-one\u2467"},{"id":"ref-for-comb-one\u2468"},{"id":"ref-for-comb-one\u2460\u24ea"},{"id":"ref-for-comb-one\u2460\u2460"},{"id":"ref-for-comb-one\u2460\u2461"},{"id":"ref-for-comb-one\u2460\u2462"},{"id":"ref-for-comb-one\u2460\u2463"},{"id":"ref-for-comb-one\u2460\u2464"},{"id":"ref-for-comb-one\u2460\u2465"},{"id":"ref-for-comb-one\u2460\u2466"},{"id":"ref-for-comb-one\u2460\u2467"},{"id":"ref-for-comb-one\u2460\u2468"},{"id":"ref-for-comb-one\u2461\u24ea"},{"id":"ref-for-comb-one\u2461\u2460"},{"id":"ref-for-comb-one\u2461\u2461"},{"id":"ref-for-comb-one\u2461\u2462"},{"id":"ref-for-comb-one\u2461\u2463"},{"id":"ref-for-comb-one\u2461\u2464"},{"id":"ref-for-comb-one\u2461\u2465"},{"id":"ref-for-comb-one\u2461\u2466"},{"id":"ref-for-comb-one\u2461\u2467"},{"id":"ref-for-comb-one\u2461\u2468"},{"id":"ref-for-comb-one\u2462\u24ea"},{"id":"ref-for-comb-one\u2462\u2460"}],"title":"2.1. \nBackground Positioning: the background-position shorthand property"},{"refs":[{"id":"ref-for-comb-one\u2462\u2461"},{"id":"ref-for-comb-one\u2462\u2462"},{"id":"ref-for-comb-one\u2462\u2463"},{"id":"ref-for-comb-one\u2462\u2464"},{"id":"ref-for-comb-one\u2462\u2465"},{"id":"ref-for-comb-one\u2462\u2466"},{"id":"ref-for-comb-one\u2462\u2467"},{"id":"ref-for-comb-one\u2462\u2468"},{"id":"ref-for-comb-one\u2463\u24ea"},{"id":"ref-for-comb-one\u2463\u2460"},{"id":"ref-for-comb-one\u2463\u2461"},{"id":"ref-for-comb-one\u2463\u2462"}],"title":"2.1.1. \nBackground Positioning Longhands: the background-position-x, background-position-y, background-position-inline, and background-position-block properties"},{"refs":[{"id":"ref-for-comb-one\u2463\u2463"},{"id":"ref-for-comb-one\u2463\u2464"}],"title":"2.2. \nPainting Area: the background-clip property"},{"refs":[{"id":"ref-for-comb-one\u2463\u2465"}],"title":"4.2. \nCorner Shaping: the corner-shape property"},{"refs":[{"id":"ref-for-comb-one\u2463\u2466"},{"id":"ref-for-comb-one\u2463\u2467"},{"id":"ref-for-comb-one\u2463\u2468"},{"id":"ref-for-comb-one\u2464\u24ea"},{"id":"ref-for-comb-one\u2464\u2460"},{"id":"ref-for-comb-one\u2464\u2461"}],"title":"5.1. \nPartial Borders: the border-limit property"},{"refs":[{"id":"ref-for-comb-one\u2464\u2462"},{"id":"ref-for-comb-one\u2464\u2463"}],"title":"5.2. \nThe border-clip properties"}],"url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"8a82fda1": {"dfnID":"8a82fda1","dfnText":"||","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-any"}],"title":"4.3. \nCorner Shape and Size: the corners shorthand"}],"url":"https://drafts.csswg.org/css-values-4/#comb-any"},
+"342bb58f": {"dfnID":"342bb58f","dfnText":"<box>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-box"},{"id":"ref-for-typedef-box\u2460"}],"title":"2.2. \nPainting Area: the background-clip property"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#typedef-box"},
+"b16da9c9": {"dfnID":"b16da9c9","dfnText":"background-repeat","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-background-repeat"}],"title":"Unnumbered Section"},{"refs":[{"id":"ref-for-propdef-background-repeat\u2460"}],"title":"6.1. \nAdditions Since Level 3"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-background-repeat"},
+"42871fa3": {"dfnID":"42871fa3","dfnText":"border-style","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-border-style"}],"title":"2.2. \nPainting Area: the background-clip property"},{"refs":[{"id":"ref-for-propdef-border-style\u2460"},{"id":"ref-for-propdef-border-style\u2461"}],"title":"3.1. Line Colors: the border-color properties"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-border-style"},
+"c9ecad15": {"dfnID":"c9ecad15","dfnText":"border-width","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-border-width"}],"title":"2.2. \nPainting Area: the background-clip property"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-border-width"},
+"30ae4883": {"dfnID":"30ae4883","dfnText":"center","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-background-position-center"}],"title":"2.1. \nBackground Positioning: the background-position shorthand property"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#valdef-background-position-center"},
+"propdef-background-position": {"dfnID":"propdef-background-position","dfnText":"background-position","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-background-position\u2460"}],"title":"2.1. \nBackground Positioning: the background-position shorthand property"},{"refs":[{"id":"ref-for-propdef-background-position\u2461"}],"title":"6.1. \nAdditions Since Level 3"}],"url":"#propdef-background-position"},
+"typedef-position": {"dfnID":"typedef-position","dfnText":"<position>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-position"}],"title":"2.1. \nBackground Positioning: the background-position shorthand property"}],"url":"#typedef-position"},
+"propdef-background-position-x": {"dfnID":"propdef-background-position-x","dfnText":"background-position-x","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-background-position-x"}],"title":"2.1. \nBackground Positioning: the background-position shorthand property"},{"refs":[{"id":"ref-for-propdef-background-position-x\u2460"}],"title":"2.1.1. \nBackground Positioning Longhands: the background-position-x, background-position-y, background-position-inline, and background-position-block properties"}],"url":"#propdef-background-position-x"},
+"propdef-background-position-y": {"dfnID":"propdef-background-position-y","dfnText":"background-position-y","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-background-position-y"}],"title":"2.1. \nBackground Positioning: the background-position shorthand property"},{"refs":[{"id":"ref-for-propdef-background-position-y\u2460"}],"title":"2.1.1. \nBackground Positioning Longhands: the background-position-x, background-position-y, background-position-inline, and background-position-block properties"}],"url":"#propdef-background-position-y"},
+"propdef-background-position-inline": {"dfnID":"propdef-background-position-inline","dfnText":"background-position-inline","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-background-position-inline"}],"title":"2.1. \nBackground Positioning: the background-position shorthand property"},{"refs":[{"id":"ref-for-propdef-background-position-inline\u2460"}],"title":"2.1.1. \nBackground Positioning Longhands: the background-position-x, background-position-y, background-position-inline, and background-position-block properties"}],"url":"#propdef-background-position-inline"},
+"propdef-background-position-block": {"dfnID":"propdef-background-position-block","dfnText":"background-position-block","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-background-position-block"}],"title":"2.1. \nBackground Positioning: the background-position shorthand property"},{"refs":[{"id":"ref-for-propdef-background-position-block\u2460"}],"title":"2.1.1. \nBackground Positioning Longhands: the background-position-x, background-position-y, background-position-inline, and background-position-block properties"}],"url":"#propdef-background-position-block"},
+"propdef-background-clip": {"dfnID":"propdef-background-clip","dfnText":"background-clip","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-background-clip"}],"title":"2.2. \nPainting Area: the background-clip property"}],"url":"#propdef-background-clip"},
+"typedef-bg-clip": {"dfnID":"typedef-bg-clip","dfnText":"<bg-clip>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-bg-clip"}],"title":"2.2. \nPainting Area: the background-clip property"}],"url":"#typedef-bg-clip"},
+"valdef-background-clip-text": {"dfnID":"valdef-background-clip-text","dfnText":"text","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-background-clip-text"}],"title":"2.2. \nPainting Area: the background-clip property"}],"url":"#valdef-background-clip-text"},
+"propdef-border-color": {"dfnID":"propdef-border-color","dfnText":"border-color","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-border-color"}],"title":"2.2. \nPainting Area: the background-clip property"},{"refs":[{"id":"ref-for-propdef-border-color\u2460"},{"id":"ref-for-propdef-border-color\u2461"}],"title":"3.1. Line Colors: the border-color properties"}],"url":"#propdef-border-color"},
+"propdef-border-radius": {"dfnID":"propdef-border-radius","dfnText":"border-radius","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-border-radius"}],"title":"4.2. \nCorner Shaping: the corner-shape property"},{"refs":[{"id":"ref-for-propdef-border-radius\u2460"},{"id":"ref-for-propdef-border-radius\u2461"},{"id":"ref-for-propdef-border-radius\u2462"}],"title":"4.3. \nCorner Shape and Size: the corners shorthand"}],"url":"#propdef-border-radius"},
+"propdef-corner-shape": {"dfnID":"propdef-corner-shape","dfnText":"corner-shape","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-corner-shape\u2460"},{"id":"ref-for-propdef-corner-shape\u2461"}],"title":"4.2. \nCorner Shaping: the corner-shape property"},{"refs":[{"id":"ref-for-propdef-corner-shape\u2462"},{"id":"ref-for-propdef-corner-shape\u2463"},{"id":"ref-for-propdef-corner-shape\u2464"}],"title":"4.3. \nCorner Shape and Size: the corners shorthand"},{"refs":[{"id":"ref-for-propdef-corner-shape\u2465"}],"title":"6.1. \nAdditions Since Level 3"}],"url":"#propdef-corner-shape"},
+"valdef-corner-shape-round": {"dfnID":"valdef-corner-shape-round","dfnText":"round","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-corner-shape-round"}],"title":"4.2. \nCorner Shaping: the corner-shape property"}],"url":"#valdef-corner-shape-round"},
+"valdef-corner-shape-angle": {"dfnID":"valdef-corner-shape-angle","dfnText":"angle","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-corner-shape-angle"}],"title":"4.2. \nCorner Shaping: the corner-shape property"}],"url":"#valdef-corner-shape-angle"},
+"propdef-corners": {"dfnID":"propdef-corners","dfnText":"corners","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-corners"},{"id":"ref-for-propdef-corners\u2460"},{"id":"ref-for-propdef-corners\u2461"}],"title":"4.3. \nCorner Shape and Size: the corners shorthand"}],"url":"#propdef-corners"},
+"propdef-border-limit": {"dfnID":"propdef-border-limit","dfnText":"border-limit","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-border-limit"}],"title":"5.1. \nPartial Borders: the border-limit property"}],"url":"#propdef-border-limit"},
+"valdef-border-limit-sides": {"dfnID":"valdef-border-limit-sides","dfnText":"sides","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-border-limit-sides"}],"title":"5.1. \nPartial Borders: the border-limit property"}],"url":"#valdef-border-limit-sides"},
+"valdef-border-limit-corners": {"dfnID":"valdef-border-limit-corners","dfnText":"corners","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-border-limit-corners"},{"id":"ref-for-valdef-border-limit-corners\u2460"},{"id":"ref-for-valdef-border-limit-corners\u2461"}],"title":"5.1. \nPartial Borders: the border-limit property"}],"url":"#valdef-border-limit-corners"},
+"valdef-border-limit-left": {"dfnID":"valdef-border-limit-left","dfnText":"left","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-border-limit-left"}],"title":"2.1.1. \nBackground Positioning Longhands: the background-position-x, background-position-y, background-position-inline, and background-position-block properties"},{"refs":[{"id":"ref-for-valdef-border-limit-left\u2460"}],"title":"5.1. \nPartial Borders: the border-limit property"}],"url":"#valdef-border-limit-left"},
+"valdef-border-limit-right": {"dfnID":"valdef-border-limit-right","dfnText":"right","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-border-limit-right"}],"title":"5.1. \nPartial Borders: the border-limit property"}],"url":"#valdef-border-limit-right"},
+"valdef-border-limit-top": {"dfnID":"valdef-border-limit-top","dfnText":"top","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-border-limit-top"}],"title":"2.1.1. \nBackground Positioning Longhands: the background-position-x, background-position-y, background-position-inline, and background-position-block properties"},{"refs":[{"id":"ref-for-valdef-border-limit-top\u2460"}],"title":"5.1. \nPartial Borders: the border-limit property"}],"url":"#valdef-border-limit-top"},
+"valdef-border-limit-bottom": {"dfnID":"valdef-border-limit-bottom","dfnText":"bottom","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-border-limit-bottom"}],"title":"5.1. \nPartial Borders: the border-limit property"}],"url":"#valdef-border-limit-bottom"},
+"propdef-border-clip": {"dfnID":"propdef-border-clip","dfnText":"border-clip","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-border-clip\u2460"},{"id":"ref-for-propdef-border-clip\u2461"}],"title":"5.2. \nThe border-clip properties"}],"url":"#propdef-border-clip"},
+};
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+const typeFormatters = {
+    'dfn': (text) => `[=${text}=]`,
+    'abstract-op': (text) => `[\$${text}\$]`,
+    'value': (text) => `''${text}''`,
+    'http-header': (text) => `[:${text}:]`,
+    'idl': (text) => `{{${text}}}`,
+    'interface': 'idl',
+    'constructor': 'idl',
+    'method': 'idl',
+    'argument': 'idl',
+    'attribute': 'idl',
+    'callback': 'idl',
+    'dictionary': 'idl',
+    'dict-member': 'idl',
+    'enum': 'idl',
+    'enum-value': 'idl',
+    'exception': 'idl',
+    'const': 'idl',
+    'typedef': 'idl',
+    'stringifier': 'idl',
+    'serializer': 'idl',
+    'iterator': 'idl',
+    'maplike': 'idl',
+    'setlike': 'idl',
+    'extended-attribute': 'idl',
+    'event': 'idl',
+    'element': (element) => `<{${element}}>`,
+    'element-state': 'element',
+    'element-attr': 'element',
+    'attr-value': 'element',
+    'scheme': 'dfn',
+    'permission': 'dfn',
+    'grammar': (text) => `${text} (within a <pre class=prod>)`,
+    'type': (text)=> `<<${text}>>`,
+    'property': (text) => `'${text}'`,
+    'descriptor': 'property',
+    'function': 'value',
+    'at-rule': 'value',
+    'selector': 'value',
+};
+const typesUsingFor = new Set(
+    [
+        "descriptor",
+        "value",
+        "element-attr",
+        "attr-value",
+        "element-state",
+        "method",
+        "constructor",
+        "argument",
+        "attribute",
+        "const",
+        "dict-member",
+        "event",
+        "enum-value",
+        "stringifier",
+        "serializer",
+        "iterator",
+        "maplike",
+        "setlike",
+        "state",
+        "mode",
+        "context",
+        "facet",
+    ],
+)
+const typesNotUsingFor = new Set(
+    [
+        "property",
+        "element",
+        "interface",
+        "namespace",
+        "callback",
+        "dictionary",
+        "enum",
+        "exception",
+        "typedef",
+        "http-header",
+        "permission",
+    ],
+)
+function linkFormatterFromType(type) {
+    const fnOrType = typeFormatters[type];
+    if(typeof fnOrType === 'string') {
+        // follow the alias
+        return linkFormatterFromType(fnOrType);
+    }
+    return fnOrType;
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!typesUsingFor.has(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!typesNotUsingFor.has(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
+
+function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+    dfnPanel.forDfn = dfn;
+    if(!dfn) { console.log(dfnPanel); }
+    return dfnPanel;
+}
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        const panel = genDfnPanel({ ...panelData, dfn });
+        append(document.body, panel);
+        insertDfnPopupAction(panel)
+    }
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+})
+
+function hideAllDfnPanels() {
+    // Turn off any currently "on" or "activated" panels.
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
+}
+
+function showDfnPanel(dfnPanel) {
+    hideAllDfnPanels(); // Only display one at this time.
+
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "true");
+
+    dfnPanel.classList.add("on");
+    positionDfnPanel(dfnPanel);
+
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    // Increment tabindex for each anchor and button tags in panel
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.style.position = "absolute"; // unfix it
+    dfnPanel.classList.remove("on");
+    dfnPanel.classList.remove("activated");
+}
+
+function toggleDfnPanel(dfnPanel) {
+    if(dfnPanel.classList.contains("on")) {
+        hideDfnPanel(dfnPanel);
+    } else {
+        showDfnPanel(dfnPanel);
+    }
+}
+
+function insertDfnPopupAction(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        showDfnPanel(dfnPanel);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfnPanel);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel(dfnPanel, dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    })
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
 }
 </script>
 <script>/* Boilerplate: script-link-titles */
+"use strict";
+{
 let linkTitleData = {
- "https://drafts.csswg.org/css-backgrounds-3/#typedef-box": "Expands to: border-box | content-box | fill-box | margin-box | padding-box | stroke-box | svg viewport origin box | view-box",
- "https://drafts.csswg.org/css-color-5/#typedef-color": "Expands to: aliceblue | antiquewhite | aqua | aquamarine | azure | beige | bisque | black | blanchedalmond | blue | blueviolet | brown | burlywood | cadetblue | chartreuse | chocolate | coral | cornflowerblue | cornsilk | crimson | currentcolor | cyan | darkblue | darkcyan | darkgoldenrod | darkgray | darkgreen | darkgrey | darkkhaki | darkmagenta | darkolivegreen | darkorange | darkorchid | darkred | darksalmon | darkseagreen | darkslateblue | darkslategray | darkslategrey | darkturquoise | darkviolet | deeppink | deepskyblue | dimgray | dimgrey | dodgerblue | firebrick | floralwhite | forestgreen | fuchsia | gainsboro | ghostwhite | gold | goldenrod | gray | green | greenyellow | grey | honeydew | hotpink | indianred | indigo | ivory | khaki | lavender | lavenderblush | lawngreen | lemonchiffon | lightblue | lightcoral | lightcyan | lightgoldenrodyellow | lightgray | lightgreen | lightgrey | lightpink | lightsalmon | lightseagreen | lightskyblue | lightslategray | lightslategrey | lightsteelblue | lightyellow | lime | limegreen | linen | magenta | maroon | mediumaquamarine | mediumblue | mediumorchid | mediumpurple | mediumseagreen | mediumslateblue | mediumspringgreen | mediumturquoise | mediumvioletred | midnightblue | mintcream | mistyrose | moccasin | navajowhite | navy | none | oldlace | olive | olivedrab | orange | orangered | orchid | palegoldenrod | palegreen | paleturquoise | palevioletred | papayawhip | peachpuff | peru | pink | plum | powderblue | purple | rebeccapurple | red | rosybrown | royalblue | saddlebrown | salmon | sandybrown | seagreen | seashell | sienna | silver | skyblue | slateblue | slategray | slategrey | snow | springgreen | steelblue | tan | teal | thistle | tomato | transparent | turquoise | violet | wheat | white | whitesmoke | yellow | yellowgreen",
- "https://drafts.csswg.org/css-grid-2/#typedef-flex": "Expands to: fr"
+"https://drafts.csswg.org/css-backgrounds-3/#typedef-box": "Expands to: border-box | content-box | fill-box | margin-box | padding-box | stroke-box | svg viewport origin box | view-box",
+"https://drafts.csswg.org/css-color-5/#typedef-color": "Expands to: aliceblue | antiquewhite | aqua | aquamarine | azure | beige | bisque | black | blanchedalmond | blue | blueviolet | brown | burlywood | cadetblue | chartreuse | chocolate | coral | cornflowerblue | cornsilk | crimson | currentcolor | cyan | darkblue | darkcyan | darkgoldenrod | darkgray | darkgreen | darkgrey | darkkhaki | darkmagenta | darkolivegreen | darkorange | darkorchid | darkred | darksalmon | darkseagreen | darkslateblue | darkslategray | darkslategrey | darkturquoise | darkviolet | deeppink | deepskyblue | dimgray | dimgrey | dodgerblue | firebrick | floralwhite | forestgreen | fuchsia | gainsboro | ghostwhite | gold | goldenrod | gray | green | greenyellow | grey | honeydew | hotpink | indianred | indigo | ivory | khaki | lavender | lavenderblush | lawngreen | lemonchiffon | lightblue | lightcoral | lightcyan | lightgoldenrodyellow | lightgray | lightgreen | lightgrey | lightpink | lightsalmon | lightseagreen | lightskyblue | lightslategray | lightslategrey | lightsteelblue | lightyellow | lime | limegreen | linen | magenta | maroon | mediumaquamarine | mediumblue | mediumorchid | mediumpurple | mediumseagreen | mediumslateblue | mediumspringgreen | mediumturquoise | mediumvioletred | midnightblue | mintcream | mistyrose | moccasin | navajowhite | navy | none | oldlace | olive | olivedrab | orange | orangered | orchid | palegoldenrod | palegreen | paleturquoise | palevioletred | papayawhip | peachpuff | peru | pink | plum | powderblue | purple | rebeccapurple | red | rosybrown | royalblue | saddlebrown | salmon | sandybrown | seagreen | seashell | sienna | silver | skyblue | slateblue | slategray | slategrey | snow | springgreen | steelblue | tan | teal | thistle | tomato | transparent | turquoise | violet | wheat | white | whitesmoke | yellow | yellowgreen",
+"https://drafts.csswg.org/css-grid-2/#typedef-flex": "Expands to: fr",
 };
 
 function setTypeTitles() {
@@ -3134,11 +3132,11 @@ function setTypeTitles() {
 }
 
 document.addEventListener("DOMContentLoaded", setTypeTitles);
+}
 </script>
 <script>/* Boilerplate: script-position-annos */
 "use strict";
 {
-
 function repositionAnnoPanels(){
     const panels = [...document.querySelectorAll("[data-anno-for]")];
     const main = document.querySelector("main");
@@ -3182,274 +3180,263 @@ window.addEventListener("resize", repositionAnnoPanels);
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
+let refsData = {
+"#propdef-corner-shape": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-4","status":"local","text":"corner-shape","type":"property","url":"#propdef-corner-shape"},
+"#propdef-border-clip": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-4","status":"local","text":"border-clip","type":"property","url":"#propdef-border-clip"},
+"#propdef-background-position": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-4","status":"local","text":"background-position","type":"property","url":"#propdef-background-position"},
+"https://drafts.csswg.org/css-backgrounds-3/#propdef-background-repeat": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"current","text":"background-repeat","type":"property","url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-background-repeat"},
+"#typedef-position": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-4","status":"local","text":"<position>","type":"type","url":"#typedef-position"},
+"https://drafts.csswg.org/css-values-4/#mult-comma": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"#","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#mult-comma"},
+"https://drafts.csswg.org/css-values-4/#comb-one": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"|","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"https://drafts.csswg.org/css-values-4/#typedef-length-percentage": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<length-percentage>","type":"type","url":"https://drafts.csswg.org/css-values-4/#typedef-length-percentage"},
+"https://drafts.csswg.org/css-values-4/#mult-opt": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"?","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#mult-opt"},
+"https://drafts.csswg.org/css-values-4/#comb-all": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"&&","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-all"},
+"https://drafts.csswg.org/css-backgrounds-3/#valdef-background-position-center": {"export":true,"for_":["background-position"],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"current","text":"center","type":"value","url":"https://drafts.csswg.org/css-backgrounds-3/#valdef-background-position-center"},
+"#propdef-background-position-inline": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-4","status":"local","text":"background-position-inline","type":"property","url":"#propdef-background-position-inline"},
+"#propdef-background-position-block": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-4","status":"local","text":"background-position-block","type":"property","url":"#propdef-background-position-block"},
+"#propdef-background-position-x": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-4","status":"local","text":"background-position-x","type":"property","url":"#propdef-background-position-x"},
+"#propdef-background-position-y": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-4","status":"local","text":"background-position-y","type":"property","url":"#propdef-background-position-y"},
+"https://drafts.csswg.org/css-values-4/#mult-req": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"!","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#mult-req"},
+"#valdef-border-limit-left": {"export":true,"for_":["border-limit"],"level":"4","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-4","status":"local","text":"left","type":"value","url":"#valdef-border-limit-left"},
+"#valdef-border-limit-top": {"export":true,"for_":["border-limit"],"level":"4","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-4","status":"local","text":"top","type":"value","url":"#valdef-border-limit-top"},
+"#propdef-background-clip": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-4","status":"local","text":"background-clip","type":"property","url":"#propdef-background-clip"},
+"#typedef-bg-clip": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-4","status":"local","text":"<bg-clip>","type":"type","url":"#typedef-bg-clip"},
+"https://drafts.csswg.org/css-backgrounds-3/#typedef-box": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"current","text":"<box>","type":"type","url":"https://drafts.csswg.org/css-backgrounds-3/#typedef-box"},
+"#valdef-background-clip-text": {"export":true,"for_":["<bg-clip>","background-clip"],"level":"4","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-4","status":"local","text":"text","type":"value","url":"#valdef-background-clip-text"},
+"https://drafts.csswg.org/css-backgrounds-3/#propdef-border-width": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"current","text":"border-width","type":"property","url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-border-width"},
+"https://drafts.csswg.org/css-backgrounds-3/#propdef-border-style": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"current","text":"border-style","type":"property","url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-border-style"},
+"#propdef-border-color": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-4","status":"local","text":"border-color","type":"property","url":"#propdef-border-color"},
+"https://drafts.csswg.org/css-color-5/#typedef-color": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-color","spec":"css-color-5","status":"current","text":"<color>","type":"type","url":"https://drafts.csswg.org/css-color-5/#typedef-color"},
+"https://drafts.csswg.org/css-values-4/#mult-num-range": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"{a,b}","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#mult-num-range"},
+"https://drafts.csswg.org/css-tables-3/#propdef-border-collapse": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-tables","spec":"css-tables-3","status":"current","text":"border-collapse","type":"property","url":"https://drafts.csswg.org/css-tables-3/#propdef-border-collapse"},
+"https://drafts.csswg.org/css-text-4/#valdef-text-space-collapse-collapse": {"export":true,"for_":["text-space-collapse"],"level":"4","normative":true,"shortname":"css-text","spec":"css-text-4","status":"current","text":"collapse","type":"value","url":"https://drafts.csswg.org/css-text-4/#valdef-text-space-collapse-collapse"},
+"#valdef-corner-shape-round": {"export":true,"for_":["corner-shape"],"level":"4","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-4","status":"local","text":"round","type":"value","url":"#valdef-corner-shape-round"},
+"#valdef-corner-shape-angle": {"export":true,"for_":["corner-shape"],"level":"4","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-4","status":"local","text":"angle","type":"value","url":"#valdef-corner-shape-angle"},
+"#propdef-border-radius": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-4","status":"local","text":"border-radius","type":"property","url":"#propdef-border-radius"},
+"https://drafts.csswg.org/css-easing-2/#funcdef-cubic-bezier-easing-function-cubic-bezier": {"export":true,"for_":["<cubic-bezier-easing-function>"],"level":"2","normative":true,"shortname":"css-easing","spec":"css-easing-2","status":"current","text":"cubic-bezier()","type":"function","url":"https://drafts.csswg.org/css-easing-2/#funcdef-cubic-bezier-easing-function-cubic-bezier"},
+"#propdef-corners": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-4","status":"local","text":"corners","type":"property","url":"#propdef-corners"},
+"https://drafts.csswg.org/css-values-4/#comb-any": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"||","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-any"},
+"#propdef-border-limit": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-4","status":"local","text":"border-limit","type":"property","url":"#propdef-border-limit"},
+"#valdef-border-limit-sides": {"export":true,"for_":["border-limit"],"level":"4","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-4","status":"local","text":"sides","type":"value","url":"#valdef-border-limit-sides"},
+"#valdef-border-limit-corners": {"export":true,"for_":["border-limit"],"level":"4","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-4","status":"local","text":"corners","type":"value","url":"#valdef-border-limit-corners"},
+"#valdef-border-limit-right": {"export":true,"for_":["border-limit"],"level":"4","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-4","status":"local","text":"right","type":"value","url":"#valdef-border-limit-right"},
+"#valdef-border-limit-bottom": {"export":true,"for_":["border-limit"],"level":"4","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-4","status":"local","text":"bottom","type":"value","url":"#valdef-border-limit-bottom"},
+"https://drafts.csswg.org/css-grid-2/#typedef-flex": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-grid","spec":"css-grid-2","status":"current","text":"<flex>","type":"type","url":"https://drafts.csswg.org/css-grid-2/#typedef-flex"},
+"https://drafts.csswg.org/css-values-4/#mult-one-plus": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"+","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#mult-one-plus"},
+"https://drafts.csswg.org/css-grid-2/#valdef-flex-fr": {"export":true,"for_":["<flex>"],"level":"2","normative":true,"shortname":"css-grid","spec":"css-grid-2","status":"current","text":"fr","type":"value","url":"https://drafts.csswg.org/css-grid-2/#valdef-flex-fr"},
+"#propdef-border-bottom-color": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-4","status":"local","text":"border-bottom-color","type":"property","url":"#propdef-border-bottom-color"},
+"#propdef-border-clip-bottom": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-4","status":"local","text":"border-clip-bottom","type":"property","url":"#propdef-border-clip-bottom"},
+"#propdef-border-clip-left": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-4","status":"local","text":"border-clip-left","type":"property","url":"#propdef-border-clip-left"},
+"#propdef-border-clip-right": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-4","status":"local","text":"border-clip-right","type":"property","url":"#propdef-border-clip-right"},
+"#propdef-border-clip-top": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-4","status":"local","text":"border-clip-top","type":"property","url":"#propdef-border-clip-top"},
+"#propdef-border-left-color": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-4","status":"local","text":"border-left-color","type":"property","url":"#propdef-border-left-color"},
+"#propdef-border-right-color": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-4","status":"local","text":"border-right-color","type":"property","url":"#propdef-border-right-color"},
+"#propdef-border-top-color": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-4","status":"local","text":"border-top-color","type":"property","url":"#propdef-border-top-color"},
+};
+
+function genRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "DFN: "),
+                mk.code({ class: "dfn-text" }, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    const forListElements = forList.length === 0 ? '' : mk.li({},
+        mk.b({}, "For: "),
+        mk.ul({},
+            ...forList.map(forItem =>
                 mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
-            mk.b({}, "For: "),
-            mk.ul({},
-                ...forList.map(forItem =>
-                    mk.li({},
-                        mk.span({}, `${forItem}`)
-                    ),
+                    mk.span({}, `${forItem}`)
                 ),
             ),
-        );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+        ),
+    );
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
-    }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    return hintPanel;
+}
+function genAllRefHints() {
+    for(const refData of Object.values(refsData)) {
+        const refUrl = refData.url;
+        const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+        if (links.length == 0) {
+            console.log(`Can't find link href="${refUrl}".`, refData);
+            continue;
+        }
+        for(const link of links) {
+            if(link.classList.contains("dfn-link")) continue;
+            const hint = genRefHint(link, refData);
+            append(document.body, hint);
+            insertLinkPopupAction(hint)
         }
     }
+}
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+function hideAllRefHints() {
+    queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    refHint.style.position = "absolute"; // unfix it
+    refHint.classList.remove("on");
+    const teardown = refHint.teardownEventListeners;
+    if (teardown) {
+        refHint.teardownEventListeners = undefined;
+        teardown();
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+function showRefHint(refHint) {
+    hideAllRefHints(); // Only display one at this time.
+
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "true");
+    refHint.classList.add("on");
+    positionRefHint(refHint);
+    setupRefHintEventListeners(refHint);
+}
+
+function setupRefHintEventListeners(refHint) {
+    if (refHint.teardownEventListeners) return;
+    const link = refHint.forLink;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
 
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
 
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+function insertLinkPopupAction(refHint) {
+    const link = refHint.forLink;
+    // link.setAttribute('role', 'button');
+    link.setAttribute('aria-expanded', 'false')
+    link.classList.add('has-ref-hint');
+    link.addEventListener('mouseover', (event) => {
+        showRefHint(refHint);
     });
+    link.addEventListener('focus', (event) => {
+        showRefHint(refHint);
+    })
+}
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+document.addEventListener("DOMContentLoaded", () => {
+    genAllRefHints();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['#propdef-corner-shape'] = {"text": "corner-shape", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-corner-shape", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-border-clip'] = {"text": "border-clip", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-border-clip", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-background-position'] = {"text": "background-position", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-background-position", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-background-repeat'] = {"text": "background-repeat", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background-repeat", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-position'] = {"text": "<position>", "type": "type", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#typedef-position", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#mult-comma'] = {"text": "#", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-comma", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#typedef-length-percentage'] = {"text": "<length-percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#typedef-length-percentage", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#mult-opt'] = {"text": "?", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-all'] = {"text": "&&", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-all", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#valdef-background-position-center'] = {"text": "center", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#valdef-background-position-center", "export": true, "normative": true, "for_": ["background-position"]};
-window.refsData['#propdef-background-position-inline'] = {"text": "background-position-inline", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-background-position-inline", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-background-position-block'] = {"text": "background-position-block", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-background-position-block", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-background-position-x'] = {"text": "background-position-x", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-background-position-x", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-background-position-y'] = {"text": "background-position-y", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-background-position-y", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#mult-req'] = {"text": "!", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-req", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-border-limit-left'] = {"text": "left", "type": "value", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#valdef-border-limit-left", "export": true, "normative": true, "for_": ["border-limit"]};
-window.refsData['#valdef-border-limit-top'] = {"text": "top", "type": "value", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#valdef-border-limit-top", "export": true, "normative": true, "for_": ["border-limit"]};
-window.refsData['#propdef-background-clip'] = {"text": "background-clip", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-background-clip", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-bg-clip'] = {"text": "<bg-clip>", "type": "type", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#typedef-bg-clip", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#typedef-box'] = {"text": "<box>", "type": "type", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#typedef-box", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-background-clip-text'] = {"text": "text", "type": "value", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#valdef-background-clip-text", "export": true, "normative": true, "for_": ["<bg-clip>", "background-clip"]};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border-width'] = {"text": "border-width", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-width", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border-style'] = {"text": "border-style", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-style", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-border-color'] = {"text": "border-color", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-border-color", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-color-5/#typedef-color'] = {"text": "<color>", "type": "type", "spec": "css-color-5", "shortname": "css-color", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-color-5/#typedef-color", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#mult-num-range'] = {"text": "{a,b}", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-num-range", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-tables-3/#propdef-border-collapse'] = {"text": "border-collapse", "type": "property", "spec": "css-tables-3", "shortname": "css-tables", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-tables-3/#propdef-border-collapse", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-text-4/#valdef-text-space-collapse-collapse'] = {"text": "collapse", "type": "value", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#valdef-text-space-collapse-collapse", "export": true, "normative": true, "for_": ["text-space-collapse"]};
-window.refsData['#valdef-corner-shape-round'] = {"text": "round", "type": "value", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#valdef-corner-shape-round", "export": true, "normative": true, "for_": ["corner-shape"]};
-window.refsData['#valdef-corner-shape-angle'] = {"text": "angle", "type": "value", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#valdef-corner-shape-angle", "export": true, "normative": true, "for_": ["corner-shape"]};
-window.refsData['#propdef-border-radius'] = {"text": "border-radius", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-border-radius", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-easing-2/#funcdef-cubic-bezier-easing-function-cubic-bezier'] = {"text": "cubic-bezier()", "type": "function", "spec": "css-easing-2", "shortname": "css-easing", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-easing-2/#funcdef-cubic-bezier-easing-function-cubic-bezier", "export": true, "normative": true, "for_": ["<cubic-bezier-easing-function>"]};
-window.refsData['#propdef-corners'] = {"text": "corners", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-corners", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-any'] = {"text": "||", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-any", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-border-limit'] = {"text": "border-limit", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-border-limit", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-border-limit-sides'] = {"text": "sides", "type": "value", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#valdef-border-limit-sides", "export": true, "normative": true, "for_": ["border-limit"]};
-window.refsData['#valdef-border-limit-corners'] = {"text": "corners", "type": "value", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#valdef-border-limit-corners", "export": true, "normative": true, "for_": ["border-limit"]};
-window.refsData['#valdef-border-limit-right'] = {"text": "right", "type": "value", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#valdef-border-limit-right", "export": true, "normative": true, "for_": ["border-limit"]};
-window.refsData['#valdef-border-limit-bottom'] = {"text": "bottom", "type": "value", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#valdef-border-limit-bottom", "export": true, "normative": true, "for_": ["border-limit"]};
-window.refsData['https://drafts.csswg.org/css-grid-2/#typedef-flex'] = {"text": "<flex>", "type": "type", "spec": "css-grid-2", "shortname": "css-grid", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-grid-2/#typedef-flex", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#mult-one-plus'] = {"text": "+", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-one-plus", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-grid-2/#valdef-flex-fr'] = {"text": "fr", "type": "value", "spec": "css-grid-2", "shortname": "css-grid", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-grid-2/#valdef-flex-fr", "export": true, "normative": true, "for_": ["<flex>"]};window.refsData['#propdef-background-clip'] = {"text": "background-clip", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-background-clip", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-background-position'] = {"text": "background-position", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-background-position", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-background-position-block'] = {"text": "background-position-block", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-background-position-block", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-background-position-inline'] = {"text": "background-position-inline", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-background-position-inline", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-background-position-x'] = {"text": "background-position-x", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-background-position-x", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-background-position-y'] = {"text": "background-position-y", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-background-position-y", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-border-bottom-color'] = {"text": "border-bottom-color", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-border-bottom-color", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-border-clip'] = {"text": "border-clip", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-border-clip", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-border-clip-bottom'] = {"text": "border-clip-bottom", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-border-clip-bottom", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-border-clip-left'] = {"text": "border-clip-left", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-border-clip-left", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-border-clip-right'] = {"text": "border-clip-right", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-border-clip-right", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-border-clip-top'] = {"text": "border-clip-top", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-border-clip-top", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-border-color'] = {"text": "border-color", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-border-color", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-border-left-color'] = {"text": "border-left-color", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-border-left-color", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-border-limit'] = {"text": "border-limit", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-border-limit", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-border-radius'] = {"text": "border-radius", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-border-radius", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-border-right-color'] = {"text": "border-right-color", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-border-right-color", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-border-top-color'] = {"text": "border-top-color", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-border-top-color", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-corner-shape'] = {"text": "corner-shape", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-corner-shape", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-corners'] = {"text": "corners", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-corners", "export": true, "normative": true, "for_": []};
 </script>

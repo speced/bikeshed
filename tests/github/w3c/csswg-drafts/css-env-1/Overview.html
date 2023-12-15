@@ -79,7 +79,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -730,7 +729,6 @@ a[href].issue-return {
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -1437,423 +1435,8 @@ then this is unnecessary. <a class="issue-return" href="#issue-66b99b40" title="
     </div>
    </div>
   </details>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['8ca0c013'] = {"dfnID": "8ca0c013", "url": "https://drafts.csswg.org/css-cascade-5/#shorthand-property", "dfnText": "shorthand property", "refSections": [{"refs": [{"id": "ref-for-shorthand-property"}, {"id": "ref-for-shorthand-property\u2460"}], "title": "3.1. Environment Variables in Shorthand Properties"}], "external": true};
-window.dfnpanelData['5f1b7f60'] = {"dfnID": "5f1b7f60", "url": "https://drafts.csswg.org/css-conditional-3/#at-ruledef-media", "dfnText": "@media", "refSections": [{"refs": [{"id": "ref-for-at-ruledef-media"}], "title": "1. Introduction"}], "external": true};
-window.dfnpanelData['8144e597'] = {"dfnID": "8144e597", "url": "https://drafts.csswg.org/css-syntax-3/#typedef-declaration-value", "dfnText": "<declaration-value>", "refSections": [{"refs": [{"id": "ref-for-typedef-declaration-value"}], "title": "2. Environment Variables"}, {"refs": [{"id": "ref-for-typedef-declaration-value\u2460"}], "title": "3. Using Environment Variables: the env() notation"}], "external": true};
-window.dfnpanelData['762610c7'] = {"dfnID": "762610c7", "url": "https://drafts.csswg.org/css-syntax-3/#at-rule", "dfnText": "at-rule", "refSections": [{"refs": [{"id": "ref-for-at-rule"}], "title": "3. Using Environment Variables: the env() notation"}], "external": true};
-window.dfnpanelData['9f9120ff'] = {"dfnID": "9f9120ff", "url": "https://drafts.csswg.org/css-values-4/#comb-comma", "dfnText": ",", "refSections": [{"refs": [{"id": "ref-for-comb-comma"}], "title": "3. Using Environment Variables: the env() notation"}], "external": true};
-window.dfnpanelData['e274345c'] = {"dfnID": "e274345c", "url": "https://drafts.csswg.org/css-values-4/#identifier-value", "dfnText": "<custom-ident>", "refSections": [{"refs": [{"id": "ref-for-identifier-value"}], "title": "3. Using Environment Variables: the env() notation"}], "external": true};
-window.dfnpanelData['fb030e6c'] = {"dfnID": "fb030e6c", "url": "https://drafts.csswg.org/css-values-4/#length-value", "dfnText": "<length>", "refSections": [{"refs": [{"id": "ref-for-length-value"}, {"id": "ref-for-length-value\u2460"}, {"id": "ref-for-length-value\u2461"}, {"id": "ref-for-length-value\u2462"}], "title": "2.1. Safe area inset variables"}], "external": true};
-window.dfnpanelData['537cf076'] = {"dfnID": "537cf076", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "dfnText": "?", "refSections": [{"refs": [{"id": "ref-for-mult-opt"}], "title": "3. Using Environment Variables: the env() notation"}], "external": true};
-window.dfnpanelData['df63af51'] = {"dfnID": "df63af51", "url": "https://drafts.csswg.org/css-variables-1/#invalid-at-computed-value-time", "dfnText": "invalid at computed-value time", "refSections": [{"refs": [{"id": "ref-for-invalid-at-computed-value-time"}], "title": "3. Using Environment Variables: the env() notation"}], "external": true};
-window.dfnpanelData['e55dd7f2'] = {"dfnID": "e55dd7f2", "url": "https://drafts.csswg.org/css-variables-2/#typedef-custom-property-name", "dfnText": "<custom-property-name>", "refSections": [{"refs": [{"id": "ref-for-typedef-custom-property-name"}], "title": "2. Environment Variables"}], "external": true};
-window.dfnpanelData['198f1537'] = {"dfnID": "198f1537", "url": "https://drafts.csswg.org/css-variables-2/#custom-property", "dfnText": "custom property", "refSections": [{"refs": [{"id": "ref-for-custom-property"}, {"id": "ref-for-custom-property\u2460"}, {"id": "ref-for-custom-property\u2461"}], "title": "1. Introduction"}, {"refs": [{"id": "ref-for-custom-property\u2462"}], "title": "2. Environment Variables"}, {"refs": [{"id": "ref-for-custom-property\u2463"}], "title": "3. Using Environment Variables: the env() notation"}], "external": true};
-window.dfnpanelData['dbba942a'] = {"dfnID": "dbba942a", "url": "https://drafts.csswg.org/css-variables-2/#funcdef-var", "dfnText": "var()", "refSections": [{"refs": [{"id": "ref-for-funcdef-var"}], "title": "Unnumbered Section"}, {"refs": [{"id": "ref-for-funcdef-var\u2460"}, {"id": "ref-for-funcdef-var\u2461"}, {"id": "ref-for-funcdef-var\u2462"}, {"id": "ref-for-funcdef-var\u2463"}], "title": "1. Introduction"}, {"refs": [{"id": "ref-for-funcdef-var\u2464"}, {"id": "ref-for-funcdef-var\u2465"}, {"id": "ref-for-funcdef-var\u2466"}], "title": "3. Using Environment Variables: the env() notation"}, {"refs": [{"id": "ref-for-funcdef-var\u2467"}], "title": "3.1. Environment Variables in Shorthand Properties"}], "external": true};
-window.dfnpanelData['85394472'] = {"dfnID": "85394472", "url": "https://dom.spec.whatwg.org/#document", "dfnText": "Document", "refSections": [{"refs": [{"id": "ref-for-document"}], "title": "2. Environment Variables"}], "external": true};
-window.dfnpanelData['css-environment-variable'] = {"dfnID": "css-environment-variable", "url": "#css-environment-variable", "dfnText": "environment variable", "refSections": [{"refs": [{"id": "ref-for-css-environment-variable\u2460"}, {"id": "ref-for-css-environment-variable\u2461"}, {"id": "ref-for-css-environment-variable\u2462"}, {"id": "ref-for-css-environment-variable\u2463"}], "title": "1. Introduction"}, {"refs": [{"id": "ref-for-css-environment-variable\u2464"}, {"id": "ref-for-css-environment-variable\u2465"}, {"id": "ref-for-css-environment-variable\u2466"}, {"id": "ref-for-css-environment-variable\u2467"}, {"id": "ref-for-css-environment-variable\u2468"}], "title": "2. Environment Variables"}, {"refs": [{"id": "ref-for-css-environment-variable\u2460\u24ea"}], "title": "2.1. Safe area inset variables"}, {"refs": [{"id": "ref-for-css-environment-variable\u2460\u2460"}, {"id": "ref-for-css-environment-variable\u2460\u2461"}, {"id": "ref-for-css-environment-variable\u2460\u2462"}, {"id": "ref-for-css-environment-variable\u2460\u2463"}, {"id": "ref-for-css-environment-variable\u2460\u2464"}], "title": "3. Using Environment Variables: the env() notation"}], "external": false};
-window.dfnpanelData['funcdef-env'] = {"dfnID": "funcdef-env", "url": "#funcdef-env", "dfnText": "env()", "refSections": [{"refs": [{"id": "ref-for-funcdef-env\u2460"}, {"id": "ref-for-funcdef-env\u2461"}], "title": "1. Introduction"}, {"refs": [{"id": "ref-for-funcdef-env\u2462"}, {"id": "ref-for-funcdef-env\u2463"}, {"id": "ref-for-funcdef-env\u2464"}, {"id": "ref-for-funcdef-env\u2465"}, {"id": "ref-for-funcdef-env\u2466"}, {"id": "ref-for-funcdef-env\u2467"}, {"id": "ref-for-funcdef-env\u2468"}, {"id": "ref-for-funcdef-env\u2460\u24ea"}, {"id": "ref-for-funcdef-env\u2460\u2460"}, {"id": "ref-for-funcdef-env\u2460\u2461"}, {"id": "ref-for-funcdef-env\u2460\u2462"}, {"id": "ref-for-funcdef-env\u2460\u2463"}, {"id": "ref-for-funcdef-env\u2460\u2464"}, {"id": "ref-for-funcdef-env\u2460\u2465"}, {"id": "ref-for-funcdef-env\u2460\u2466"}, {"id": "ref-for-funcdef-env\u2460\u2467"}, {"id": "ref-for-funcdef-env\u2460\u2468"}], "title": "3. Using Environment Variables: the env() notation"}, {"refs": [{"id": "ref-for-funcdef-env\u2461\u24ea"}, {"id": "ref-for-funcdef-env\u2461\u2460"}, {"id": "ref-for-funcdef-env\u2461\u2461"}], "title": "3.1. Environment Variables in Shorthand Properties"}], "external": false};
-window.dfnpanelData['substitute-an-env'] = {"dfnID": "substitute-an-env", "url": "#substitute-an-env", "dfnText": "substitute an env()", "refSections": [{"refs": [{"id": "ref-for-substitute-an-env"}, {"id": "ref-for-substitute-an-env\u2460"}, {"id": "ref-for-substitute-an-env\u2461"}], "title": "3. Using Environment Variables: the env() notation"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -2047,11 +1630,428 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"8ca0c013": {"dfnID":"8ca0c013","dfnText":"shorthand property","external":true,"refSections":[{"refs":[{"id":"ref-for-shorthand-property"},{"id":"ref-for-shorthand-property\u2460"}],"title":"3.1. Environment Variables in Shorthand Properties"}],"url":"https://drafts.csswg.org/css-cascade-5/#shorthand-property"},
+"5f1b7f60": {"dfnID":"5f1b7f60","dfnText":"@media","external":true,"refSections":[{"refs":[{"id":"ref-for-at-ruledef-media"}],"title":"1. Introduction"}],"url":"https://drafts.csswg.org/css-conditional-3/#at-ruledef-media"},
+"8144e597": {"dfnID":"8144e597","dfnText":"<declaration-value>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-declaration-value"}],"title":"2. Environment Variables"},{"refs":[{"id":"ref-for-typedef-declaration-value\u2460"}],"title":"3. Using Environment Variables: the env() notation"}],"url":"https://drafts.csswg.org/css-syntax-3/#typedef-declaration-value"},
+"762610c7": {"dfnID":"762610c7","dfnText":"at-rule","external":true,"refSections":[{"refs":[{"id":"ref-for-at-rule"}],"title":"3. Using Environment Variables: the env() notation"}],"url":"https://drafts.csswg.org/css-syntax-3/#at-rule"},
+"9f9120ff": {"dfnID":"9f9120ff","dfnText":",","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-comma"}],"title":"3. Using Environment Variables: the env() notation"}],"url":"https://drafts.csswg.org/css-values-4/#comb-comma"},
+"e274345c": {"dfnID":"e274345c","dfnText":"<custom-ident>","external":true,"refSections":[{"refs":[{"id":"ref-for-identifier-value"}],"title":"3. Using Environment Variables: the env() notation"}],"url":"https://drafts.csswg.org/css-values-4/#identifier-value"},
+"fb030e6c": {"dfnID":"fb030e6c","dfnText":"<length>","external":true,"refSections":[{"refs":[{"id":"ref-for-length-value"},{"id":"ref-for-length-value\u2460"},{"id":"ref-for-length-value\u2461"},{"id":"ref-for-length-value\u2462"}],"title":"2.1. Safe area inset variables"}],"url":"https://drafts.csswg.org/css-values-4/#length-value"},
+"537cf076": {"dfnID":"537cf076","dfnText":"?","external":true,"refSections":[{"refs":[{"id":"ref-for-mult-opt"}],"title":"3. Using Environment Variables: the env() notation"}],"url":"https://drafts.csswg.org/css-values-4/#mult-opt"},
+"df63af51": {"dfnID":"df63af51","dfnText":"invalid at computed-value time","external":true,"refSections":[{"refs":[{"id":"ref-for-invalid-at-computed-value-time"}],"title":"3. Using Environment Variables: the env() notation"}],"url":"https://drafts.csswg.org/css-variables-1/#invalid-at-computed-value-time"},
+"e55dd7f2": {"dfnID":"e55dd7f2","dfnText":"<custom-property-name>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-custom-property-name"}],"title":"2. Environment Variables"}],"url":"https://drafts.csswg.org/css-variables-2/#typedef-custom-property-name"},
+"198f1537": {"dfnID":"198f1537","dfnText":"custom property","external":true,"refSections":[{"refs":[{"id":"ref-for-custom-property"},{"id":"ref-for-custom-property\u2460"},{"id":"ref-for-custom-property\u2461"}],"title":"1. Introduction"},{"refs":[{"id":"ref-for-custom-property\u2462"}],"title":"2. Environment Variables"},{"refs":[{"id":"ref-for-custom-property\u2463"}],"title":"3. Using Environment Variables: the env() notation"}],"url":"https://drafts.csswg.org/css-variables-2/#custom-property"},
+"dbba942a": {"dfnID":"dbba942a","dfnText":"var()","external":true,"refSections":[{"refs":[{"id":"ref-for-funcdef-var"}],"title":"Unnumbered Section"},{"refs":[{"id":"ref-for-funcdef-var\u2460"},{"id":"ref-for-funcdef-var\u2461"},{"id":"ref-for-funcdef-var\u2462"},{"id":"ref-for-funcdef-var\u2463"}],"title":"1. Introduction"},{"refs":[{"id":"ref-for-funcdef-var\u2464"},{"id":"ref-for-funcdef-var\u2465"},{"id":"ref-for-funcdef-var\u2466"}],"title":"3. Using Environment Variables: the env() notation"},{"refs":[{"id":"ref-for-funcdef-var\u2467"}],"title":"3.1. Environment Variables in Shorthand Properties"}],"url":"https://drafts.csswg.org/css-variables-2/#funcdef-var"},
+"85394472": {"dfnID":"85394472","dfnText":"Document","external":true,"refSections":[{"refs":[{"id":"ref-for-document"}],"title":"2. Environment Variables"}],"url":"https://dom.spec.whatwg.org/#document"},
+"css-environment-variable": {"dfnID":"css-environment-variable","dfnText":"environment variable","external":false,"refSections":[{"refs":[{"id":"ref-for-css-environment-variable\u2460"},{"id":"ref-for-css-environment-variable\u2461"},{"id":"ref-for-css-environment-variable\u2462"},{"id":"ref-for-css-environment-variable\u2463"}],"title":"1. Introduction"},{"refs":[{"id":"ref-for-css-environment-variable\u2464"},{"id":"ref-for-css-environment-variable\u2465"},{"id":"ref-for-css-environment-variable\u2466"},{"id":"ref-for-css-environment-variable\u2467"},{"id":"ref-for-css-environment-variable\u2468"}],"title":"2. Environment Variables"},{"refs":[{"id":"ref-for-css-environment-variable\u2460\u24ea"}],"title":"2.1. Safe area inset variables"},{"refs":[{"id":"ref-for-css-environment-variable\u2460\u2460"},{"id":"ref-for-css-environment-variable\u2460\u2461"},{"id":"ref-for-css-environment-variable\u2460\u2462"},{"id":"ref-for-css-environment-variable\u2460\u2463"},{"id":"ref-for-css-environment-variable\u2460\u2464"}],"title":"3. Using Environment Variables: the env() notation"}],"url":"#css-environment-variable"},
+"funcdef-env": {"dfnID":"funcdef-env","dfnText":"env()","external":false,"refSections":[{"refs":[{"id":"ref-for-funcdef-env\u2460"},{"id":"ref-for-funcdef-env\u2461"}],"title":"1. Introduction"},{"refs":[{"id":"ref-for-funcdef-env\u2462"},{"id":"ref-for-funcdef-env\u2463"},{"id":"ref-for-funcdef-env\u2464"},{"id":"ref-for-funcdef-env\u2465"},{"id":"ref-for-funcdef-env\u2466"},{"id":"ref-for-funcdef-env\u2467"},{"id":"ref-for-funcdef-env\u2468"},{"id":"ref-for-funcdef-env\u2460\u24ea"},{"id":"ref-for-funcdef-env\u2460\u2460"},{"id":"ref-for-funcdef-env\u2460\u2461"},{"id":"ref-for-funcdef-env\u2460\u2462"},{"id":"ref-for-funcdef-env\u2460\u2463"},{"id":"ref-for-funcdef-env\u2460\u2464"},{"id":"ref-for-funcdef-env\u2460\u2465"},{"id":"ref-for-funcdef-env\u2460\u2466"},{"id":"ref-for-funcdef-env\u2460\u2467"},{"id":"ref-for-funcdef-env\u2460\u2468"}],"title":"3. Using Environment Variables: the env() notation"},{"refs":[{"id":"ref-for-funcdef-env\u2461\u24ea"},{"id":"ref-for-funcdef-env\u2461\u2460"},{"id":"ref-for-funcdef-env\u2461\u2461"}],"title":"3.1. Environment Variables in Shorthand Properties"}],"url":"#funcdef-env"},
+"substitute-an-env": {"dfnID":"substitute-an-env","dfnText":"substitute an env()","external":false,"refSections":[{"refs":[{"id":"ref-for-substitute-an-env"},{"id":"ref-for-substitute-an-env\u2460"},{"id":"ref-for-substitute-an-env\u2461"}],"title":"3. Using Environment Variables: the env() notation"}],"url":"#substitute-an-env"},
+};
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+const typeFormatters = {
+    'dfn': (text) => `[=${text}=]`,
+    'abstract-op': (text) => `[\$${text}\$]`,
+    'value': (text) => `''${text}''`,
+    'http-header': (text) => `[:${text}:]`,
+    'idl': (text) => `{{${text}}}`,
+    'interface': 'idl',
+    'constructor': 'idl',
+    'method': 'idl',
+    'argument': 'idl',
+    'attribute': 'idl',
+    'callback': 'idl',
+    'dictionary': 'idl',
+    'dict-member': 'idl',
+    'enum': 'idl',
+    'enum-value': 'idl',
+    'exception': 'idl',
+    'const': 'idl',
+    'typedef': 'idl',
+    'stringifier': 'idl',
+    'serializer': 'idl',
+    'iterator': 'idl',
+    'maplike': 'idl',
+    'setlike': 'idl',
+    'extended-attribute': 'idl',
+    'event': 'idl',
+    'element': (element) => `<{${element}}>`,
+    'element-state': 'element',
+    'element-attr': 'element',
+    'attr-value': 'element',
+    'scheme': 'dfn',
+    'permission': 'dfn',
+    'grammar': (text) => `${text} (within a <pre class=prod>)`,
+    'type': (text)=> `<<${text}>>`,
+    'property': (text) => `'${text}'`,
+    'descriptor': 'property',
+    'function': 'value',
+    'at-rule': 'value',
+    'selector': 'value',
+};
+const typesUsingFor = new Set(
+    [
+        "descriptor",
+        "value",
+        "element-attr",
+        "attr-value",
+        "element-state",
+        "method",
+        "constructor",
+        "argument",
+        "attribute",
+        "const",
+        "dict-member",
+        "event",
+        "enum-value",
+        "stringifier",
+        "serializer",
+        "iterator",
+        "maplike",
+        "setlike",
+        "state",
+        "mode",
+        "context",
+        "facet",
+    ],
+)
+const typesNotUsingFor = new Set(
+    [
+        "property",
+        "element",
+        "interface",
+        "namespace",
+        "callback",
+        "dictionary",
+        "enum",
+        "exception",
+        "typedef",
+        "http-header",
+        "permission",
+    ],
+)
+function linkFormatterFromType(type) {
+    const fnOrType = typeFormatters[type];
+    if(typeof fnOrType === 'string') {
+        // follow the alias
+        return linkFormatterFromType(fnOrType);
+    }
+    return fnOrType;
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!typesUsingFor.has(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!typesNotUsingFor.has(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
+
+function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+    dfnPanel.forDfn = dfn;
+    if(!dfn) { console.log(dfnPanel); }
+    return dfnPanel;
+}
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        const panel = genDfnPanel({ ...panelData, dfn });
+        append(document.body, panel);
+        insertDfnPopupAction(panel)
+    }
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+})
+
+function hideAllDfnPanels() {
+    // Turn off any currently "on" or "activated" panels.
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
+}
+
+function showDfnPanel(dfnPanel) {
+    hideAllDfnPanels(); // Only display one at this time.
+
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "true");
+
+    dfnPanel.classList.add("on");
+    positionDfnPanel(dfnPanel);
+
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    // Increment tabindex for each anchor and button tags in panel
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.style.position = "absolute"; // unfix it
+    dfnPanel.classList.remove("on");
+    dfnPanel.classList.remove("activated");
+}
+
+function toggleDfnPanel(dfnPanel) {
+    if(dfnPanel.classList.contains("on")) {
+        hideDfnPanel(dfnPanel);
+    } else {
+        showDfnPanel(dfnPanel);
+    }
+}
+
+function insertDfnPopupAction(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        showDfnPanel(dfnPanel);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfnPanel);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel(dfnPanel, dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    })
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
 }
 </script>
 <script>/* Boilerplate: script-link-titles */
+"use strict";
+{
 let linkTitleData = {
- "https://drafts.csswg.org/css-values-4/#length-value": "Expands to: advance measure | cap | ch | cm | dvb | dvh | dvi | dvmax | dvmin | dvw | em | ex | ic | in | lh | lvb | lvh | lvi | lvmax | lvmin | lvw | mm | pc | pt | px | q | rcap | rch | rem | rex | ric | rlh | svb | svh | svi | svmax | svmin | svw | vb | vh | vi | vmax | vmin | vw"
+"https://drafts.csswg.org/css-values-4/#length-value": "Expands to: advance measure | cap | ch | cm | dvb | dvh | dvi | dvmax | dvmin | dvw | em | ex | ic | in | lh | lvb | lvh | lvi | lvmax | lvmin | lvw | mm | pc | pt | px | q | rcap | rch | rem | rex | ric | rlh | svb | svh | svi | svmax | svmin | svw | vb | vh | vi | vmax | vmin | vw",
 };
 
 function setTypeTitles() {
@@ -2063,11 +2063,11 @@ function setTypeTitles() {
 }
 
 document.addEventListener("DOMContentLoaded", setTypeTitles);
+}
 </script>
 <script>/* Boilerplate: script-position-annos */
 "use strict";
 {
-
 function repositionAnnoPanels(){
     const panels = [...document.querySelectorAll("[data-anno-for]")];
     const main = document.querySelector("main");
@@ -2111,228 +2111,228 @@ window.addEventListener("resize", repositionAnnoPanels);
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
+let refsData = {
+"#css-environment-variable": {"export":true,"for_":["CSS"],"level":"1","normative":true,"shortname":"css-env","spec":"css-env-1","status":"local","text":"environment variable","type":"dfn","url":"#css-environment-variable"},
+"#funcdef-env": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-env","spec":"css-env-1","status":"local","text":"env()","type":"function","url":"#funcdef-env"},
+"https://drafts.csswg.org/css-variables-2/#funcdef-var": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-variables","spec":"css-variables-2","status":"current","text":"var()","type":"function","url":"https://drafts.csswg.org/css-variables-2/#funcdef-var"},
+"https://drafts.csswg.org/css-variables-2/#custom-property": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-variables","spec":"css-variables-2","status":"current","text":"custom property","type":"dfn","url":"https://drafts.csswg.org/css-variables-2/#custom-property"},
+"https://drafts.csswg.org/css-conditional-3/#at-ruledef-media": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-conditional","spec":"css-conditional-3","status":"current","text":"@media","type":"at-rule","url":"https://drafts.csswg.org/css-conditional-3/#at-ruledef-media"},
+"https://drafts.csswg.org/css-syntax-3/#typedef-declaration-value": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-syntax","spec":"css-syntax-3","status":"current","text":"<declaration-value>","type":"type","url":"https://drafts.csswg.org/css-syntax-3/#typedef-declaration-value"},
+"https://drafts.csswg.org/css-variables-2/#typedef-custom-property-name": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-variables","spec":"css-variables-2","status":"current","text":"<custom-property-name>","type":"type","url":"https://drafts.csswg.org/css-variables-2/#typedef-custom-property-name"},
+"https://dom.spec.whatwg.org/#document": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"Document","type":"interface","url":"https://dom.spec.whatwg.org/#document"},
+"https://drafts.csswg.org/css-values-4/#length-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<length>","type":"type","url":"https://drafts.csswg.org/css-values-4/#length-value"},
+"https://drafts.csswg.org/css-values-4/#identifier-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<custom-ident>","type":"type","url":"https://drafts.csswg.org/css-values-4/#identifier-value"},
+"https://drafts.csswg.org/css-values-4/#comb-comma": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":",","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-comma"},
+"https://drafts.csswg.org/css-values-4/#mult-opt": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"?","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#mult-opt"},
+"https://drafts.csswg.org/css-syntax-3/#at-rule": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-syntax","spec":"css-syntax-3","status":"current","text":"at-rule","type":"dfn","url":"https://drafts.csswg.org/css-syntax-3/#at-rule"},
+"#substitute-an-env": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-env","spec":"css-env-1","status":"local","text":"substitute","type":"dfn","url":"#substitute-an-env"},
+"https://drafts.csswg.org/css-variables-1/#invalid-at-computed-value-time": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-variables","spec":"css-variables-1","status":"current","text":"invalid at computed-value time","type":"dfn","url":"https://drafts.csswg.org/css-variables-1/#invalid-at-computed-value-time"},
+"https://drafts.csswg.org/css-cascade-5/#shorthand-property": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-cascade","spec":"css-cascade-5","status":"current","text":"shorthand property","type":"dfn","url":"https://drafts.csswg.org/css-cascade-5/#shorthand-property"},
+};
+
+function genRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "DFN: "),
+                mk.code({ class: "dfn-text" }, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    const forListElements = forList.length === 0 ? '' : mk.li({},
+        mk.b({}, "For: "),
+        mk.ul({},
+            ...forList.map(forItem =>
                 mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
-            mk.b({}, "For: "),
-            mk.ul({},
-                ...forList.map(forItem =>
-                    mk.li({},
-                        mk.span({}, `${forItem}`)
-                    ),
+                    mk.span({}, `${forItem}`)
                 ),
             ),
-        );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+        ),
+    );
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
-    }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    return hintPanel;
+}
+function genAllRefHints() {
+    for(const refData of Object.values(refsData)) {
+        const refUrl = refData.url;
+        const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+        if (links.length == 0) {
+            console.log(`Can't find link href="${refUrl}".`, refData);
+            continue;
+        }
+        for(const link of links) {
+            if(link.classList.contains("dfn-link")) continue;
+            const hint = genRefHint(link, refData);
+            append(document.body, hint);
+            insertLinkPopupAction(hint)
         }
     }
+}
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+function hideAllRefHints() {
+    queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    refHint.style.position = "absolute"; // unfix it
+    refHint.classList.remove("on");
+    const teardown = refHint.teardownEventListeners;
+    if (teardown) {
+        refHint.teardownEventListeners = undefined;
+        teardown();
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+function showRefHint(refHint) {
+    hideAllRefHints(); // Only display one at this time.
+
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "true");
+    refHint.classList.add("on");
+    positionRefHint(refHint);
+    setupRefHintEventListeners(refHint);
+}
+
+function setupRefHintEventListeners(refHint) {
+    if (refHint.teardownEventListeners) return;
+    const link = refHint.forLink;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
 
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
 
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+function insertLinkPopupAction(refHint) {
+    const link = refHint.forLink;
+    // link.setAttribute('role', 'button');
+    link.setAttribute('aria-expanded', 'false')
+    link.classList.add('has-ref-hint');
+    link.addEventListener('mouseover', (event) => {
+        showRefHint(refHint);
     });
+    link.addEventListener('focus', (event) => {
+        showRefHint(refHint);
+    })
+}
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+document.addEventListener("DOMContentLoaded", () => {
+    genAllRefHints();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['#css-environment-variable'] = {"text": "environment variable", "type": "dfn", "spec": "css-env-1", "shortname": "css-env", "level": "1", "status": "local", "url": "#css-environment-variable", "export": true, "normative": true, "for_": ["CSS"]};
-window.refsData['#funcdef-env'] = {"text": "env()", "type": "function", "spec": "css-env-1", "shortname": "css-env", "level": "1", "status": "local", "url": "#funcdef-env", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-variables-2/#funcdef-var'] = {"text": "var()", "type": "function", "spec": "css-variables-2", "shortname": "css-variables", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-variables-2/#funcdef-var", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-variables-2/#custom-property'] = {"text": "custom property", "type": "dfn", "spec": "css-variables-2", "shortname": "css-variables", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-variables-2/#custom-property", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-conditional-3/#at-ruledef-media'] = {"text": "@media", "type": "at-rule", "spec": "css-conditional-3", "shortname": "css-conditional", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-conditional-3/#at-ruledef-media", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-syntax-3/#typedef-declaration-value'] = {"text": "<declaration-value>", "type": "type", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#typedef-declaration-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-variables-2/#typedef-custom-property-name'] = {"text": "<custom-property-name>", "type": "type", "spec": "css-variables-2", "shortname": "css-variables", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-variables-2/#typedef-custom-property-name", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#length-value'] = {"text": "<length>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#length-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#identifier-value'] = {"text": "<custom-ident>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#identifier-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-comma'] = {"text": ",", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-comma", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#mult-opt'] = {"text": "?", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-syntax-3/#at-rule'] = {"text": "at-rule", "type": "dfn", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#at-rule", "export": true, "normative": true, "for_": []};
-window.refsData['#substitute-an-env'] = {"text": "substitute", "type": "dfn", "spec": "css-env-1", "shortname": "css-env", "level": "1", "status": "local", "url": "#substitute-an-env", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-variables-1/#invalid-at-computed-value-time'] = {"text": "invalid at computed-value time", "type": "dfn", "spec": "css-variables-1", "shortname": "css-variables", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-variables-1/#invalid-at-computed-value-time", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-cascade-5/#shorthand-property'] = {"text": "shorthand property", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#shorthand-property", "export": true, "normative": true, "for_": []};
 </script>

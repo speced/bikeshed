@@ -79,7 +79,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -453,6 +452,11 @@ figcaption:not(.no-marker)::before {
     }
 }
 </style>
+<style>/* Boilerplate: style-idl-highlighting */
+pre.idl.highlight {
+    background: var(--borderedblock-bg, var(--def-bg));
+}
+</style>
 <style>/* Boilerplate: style-issues */
 a[href].issue-return {
     float: right;
@@ -510,7 +514,6 @@ a[href].issue-return {
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -570,7 +573,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -627,7 +629,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -1791,458 +1792,8 @@ return the result of the following steps:</p>
 };
 
 </pre>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['de6d76c2'] = {"dfnID": "de6d76c2", "url": "https://drafts.csswg.org/css-cascade-6/#cascade", "dfnText": "cascade", "refSections": [{"refs": [{"id": "ref-for-cascade"}], "title": "3.4. Mixing Nesting Rules and Declarations"}], "external": true};
-window.dfnpanelData['73ea1d43'] = {"dfnID": "73ea1d43", "url": "https://drafts.csswg.org/css-color-4/#propdef-color", "dfnText": "color", "refSections": [{"refs": [{"id": "ref-for-propdef-color"}], "title": "2. Nesting Selector: the & selector"}, {"refs": [{"id": "ref-for-propdef-color\u2460"}, {"id": "ref-for-propdef-color\u2461"}, {"id": "ref-for-propdef-color\u2462"}, {"id": "ref-for-propdef-color\u2463"}], "title": "3.4. Mixing Nesting Rules and Declarations"}], "external": true};
-window.dfnpanelData['84252421'] = {"dfnID": "84252421", "url": "https://drafts.csswg.org/css-syntax-3/#typedef-declaration-list", "dfnText": "<declaration-list>", "refSections": [{"refs": [{"id": "ref-for-typedef-declaration-list"}], "title": "3.2. The Nesting At-Rule: @nest"}], "external": true};
-window.dfnpanelData['5fced98b'] = {"dfnID": "5fced98b", "url": "https://drafts.csswg.org/cssom-1/#cssomstring", "dfnText": "CSSOMString", "refSections": [{"refs": [{"id": "ref-for-cssomstring"}], "title": "4.1. Modifications to CSSStyleRule"}, {"refs": [{"id": "ref-for-cssomstring\u2460"}, {"id": "ref-for-cssomstring\u2461"}], "title": "4.2. The CSSNestingRule Interface"}], "external": true};
-window.dfnpanelData['ebaeb088'] = {"dfnID": "ebaeb088", "url": "https://drafts.csswg.org/cssom-1/#cssrule", "dfnText": "CSSRule", "refSections": [{"refs": [{"id": "ref-for-cssrule"}], "title": "4.2. The CSSNestingRule Interface"}], "external": true};
-window.dfnpanelData['0771d3e5'] = {"dfnID": "0771d3e5", "url": "https://drafts.csswg.org/cssom-1/#cssrulelist", "dfnText": "CSSRuleList", "refSections": [{"refs": [{"id": "ref-for-cssrulelist"}, {"id": "ref-for-cssrulelist\u2460"}], "title": "4.1. Modifications to CSSStyleRule"}, {"refs": [{"id": "ref-for-cssrulelist\u2461"}, {"id": "ref-for-cssrulelist\u2462"}], "title": "4.2. The CSSNestingRule Interface"}], "external": true};
-window.dfnpanelData['a82a20ef'] = {"dfnID": "a82a20ef", "url": "https://drafts.csswg.org/cssom-1/#cssstyledeclaration", "dfnText": "CSSStyleDeclaration", "refSections": [{"refs": [{"id": "ref-for-cssstyledeclaration"}, {"id": "ref-for-cssstyledeclaration\u2460"}], "title": "4.2. The CSSNestingRule Interface"}], "external": true};
-window.dfnpanelData['6052f41c'] = {"dfnID": "6052f41c", "url": "https://drafts.csswg.org/cssom-1/#cssstylerule", "dfnText": "CSSStyleRule", "refSections": [{"refs": [{"id": "ref-for-cssstylerule"}, {"id": "ref-for-cssstylerule\u2460"}], "title": "4.1. Modifications to CSSStyleRule"}], "external": true};
-window.dfnpanelData['4e49866c'] = {"dfnID": "4e49866c", "url": "https://drafts.csswg.org/cssom-1/#concept-css-rule-child-css-rules", "dfnText": "child css rules", "refSections": [{"refs": [{"id": "ref-for-concept-css-rule-child-css-rules"}, {"id": "ref-for-concept-css-rule-child-css-rules\u2460"}, {"id": "ref-for-concept-css-rule-child-css-rules\u2461"}], "title": "4.1. Modifications to CSSStyleRule"}, {"refs": [{"id": "ref-for-concept-css-rule-child-css-rules\u2462"}, {"id": "ref-for-concept-css-rule-child-css-rules\u2463"}, {"id": "ref-for-concept-css-rule-child-css-rules\u2464"}], "title": "4.2. The CSSNestingRule Interface"}], "external": true};
-window.dfnpanelData['29c3f2fe'] = {"dfnID": "29c3f2fe", "url": "https://drafts.csswg.org/cssom-1/#cssstyledeclaration-computed-flag", "dfnText": "computed flag", "refSections": [{"refs": [{"id": "ref-for-cssstyledeclaration-computed-flag"}], "title": "4.2. The CSSNestingRule Interface"}], "external": true};
-window.dfnpanelData['b13bfb39'] = {"dfnID": "b13bfb39", "url": "https://drafts.csswg.org/cssom-1/#dom-cssstyledeclaration-csstext", "dfnText": "cssText", "refSections": [{"refs": [{"id": "ref-for-dom-cssstyledeclaration-csstext"}], "title": "4.2. The CSSNestingRule Interface"}], "external": true};
-window.dfnpanelData['e4ffca7f'] = {"dfnID": "e4ffca7f", "url": "https://drafts.csswg.org/cssom-1/#cssstyledeclaration-declarations", "dfnText": "declarations", "refSections": [{"refs": [{"id": "ref-for-cssstyledeclaration-declarations"}], "title": "4.2. The CSSNestingRule Interface"}], "external": true};
-window.dfnpanelData['5170ff4d'] = {"dfnID": "5170ff4d", "url": "https://drafts.csswg.org/cssom-1/#insert-a-css-rule", "dfnText": "insert a css rule", "refSections": [{"refs": [{"id": "ref-for-insert-a-css-rule"}], "title": "4.1. Modifications to CSSStyleRule"}, {"refs": [{"id": "ref-for-insert-a-css-rule\u2460"}], "title": "4.2. The CSSNestingRule Interface"}], "external": true};
-window.dfnpanelData['eab73120'] = {"dfnID": "eab73120", "url": "https://drafts.csswg.org/cssom-1/#cssstyledeclaration-owner-node", "dfnText": "owner node", "refSections": [{"refs": [{"id": "ref-for-cssstyledeclaration-owner-node"}], "title": "4.2. The CSSNestingRule Interface"}], "external": true};
-window.dfnpanelData['8056dead'] = {"dfnID": "8056dead", "url": "https://drafts.csswg.org/cssom-1/#cssstyledeclaration-parent-css-rule", "dfnText": "parent css rule", "refSections": [{"refs": [{"id": "ref-for-cssstyledeclaration-parent-css-rule"}], "title": "4.2. The CSSNestingRule Interface"}], "external": true};
-window.dfnpanelData['64f679ea'] = {"dfnID": "64f679ea", "url": "https://drafts.csswg.org/cssom-1/#parse-a-group-of-selectors", "dfnText": "parse a group of selectors", "refSections": [{"refs": [{"id": "ref-for-parse-a-group-of-selectors"}], "title": "4.2. The CSSNestingRule Interface"}], "external": true};
-window.dfnpanelData['9528bc47'] = {"dfnID": "9528bc47", "url": "https://drafts.csswg.org/cssom-1/#remove-a-css-rule", "dfnText": "remove a css rule", "refSections": [{"refs": [{"id": "ref-for-remove-a-css-rule"}], "title": "4.1. Modifications to CSSStyleRule"}, {"refs": [{"id": "ref-for-remove-a-css-rule\u2460"}], "title": "4.2. The CSSNestingRule Interface"}], "external": true};
-window.dfnpanelData['fd9b8dfa'] = {"dfnID": "fd9b8dfa", "url": "https://drafts.csswg.org/cssom-1/#dom-cssstylerule-selectortext", "dfnText": "selectorText", "refSections": [{"refs": [{"id": "ref-for-dom-cssstylerule-selectortext"}], "title": "4.2. The CSSNestingRule Interface"}], "external": true};
-window.dfnpanelData['2c2c4b46'] = {"dfnID": "2c2c4b46", "url": "https://drafts.csswg.org/cssom-1/#serialize-a-css-declaration-block", "dfnText": "serialize a css declaration block", "refSections": [{"refs": [{"id": "ref-for-serialize-a-css-declaration-block"}], "title": "4.2. The CSSNestingRule Interface"}], "external": true};
-window.dfnpanelData['8c57eaed'] = {"dfnID": "8c57eaed", "url": "https://drafts.csswg.org/cssom-1/#serialize-a-css-rule", "dfnText": "serialize a css rule", "refSections": [{"refs": [{"id": "ref-for-serialize-a-css-rule"}], "title": "4.2. The CSSNestingRule Interface"}], "external": true};
-window.dfnpanelData['ee5366e9'] = {"dfnID": "ee5366e9", "url": "https://drafts.csswg.org/cssom-1/#serialize-a-group-of-selectors", "dfnText": "serialize a group of selectors", "refSections": [{"refs": [{"id": "ref-for-serialize-a-group-of-selectors"}, {"id": "ref-for-serialize-a-group-of-selectors\u2460"}], "title": "4.2. The CSSNestingRule Interface"}], "external": true};
-window.dfnpanelData['c475bc01'] = {"dfnID": "c475bc01", "url": "https://drafts.csswg.org/cssom-1/#concept-declarations-specified-order", "dfnText": "specified order", "refSections": [{"refs": [{"id": "ref-for-concept-declarations-specified-order"}], "title": "4.2. The CSSNestingRule Interface"}], "external": true};
-window.dfnpanelData['b4d48921'] = {"dfnID": "b4d48921", "url": "https://drafts.csswg.org/selectors-4/#matches-pseudo", "dfnText": ":is()", "refSections": [{"refs": [{"id": "ref-for-matches-pseudo"}], "title": "2. Nesting Selector: the & selector"}], "external": true};
-window.dfnpanelData['d4c9ac12'] = {"dfnID": "d4c9ac12", "url": "https://drafts.csswg.org/selectors-4/#where-pseudo", "dfnText": ":where()", "refSections": [{"refs": [{"id": "ref-for-where-pseudo"}], "title": "3.4. Mixing Nesting Rules and Declarations"}], "external": true};
-window.dfnpanelData['832ba741'] = {"dfnID": "832ba741", "url": "https://drafts.csswg.org/selectors-4/#complex", "dfnText": "complex selector", "refSections": [{"refs": [{"id": "ref-for-complex"}], "title": "3.1. Direct Nesting"}, {"refs": [{"id": "ref-for-complex\u2460"}], "title": "3.2. The Nesting At-Rule: @nest"}], "external": true};
-window.dfnpanelData['24408a11'] = {"dfnID": "24408a11", "url": "https://drafts.csswg.org/selectors-4/#compound", "dfnText": "compound selector", "refSections": [{"refs": [{"id": "ref-for-compound"}, {"id": "ref-for-compound\u2460"}, {"id": "ref-for-compound\u2461"}], "title": "2. Nesting Selector: the & selector"}, {"refs": [{"id": "ref-for-compound\u2462"}], "title": "3.1. Direct Nesting"}], "external": true};
-window.dfnpanelData['069e89f6'] = {"dfnID": "069e89f6", "url": "https://drafts.csswg.org/selectors-4/#selector-list", "dfnText": "selector list", "refSections": [{"refs": [{"id": "ref-for-selector-list"}, {"id": "ref-for-selector-list\u2460"}], "title": "4.2. The CSSNestingRule Interface"}], "external": true};
-window.dfnpanelData['2fd70eda'] = {"dfnID": "2fd70eda", "url": "https://drafts.csswg.org/selectors-4/#simple", "dfnText": "simple selector", "refSections": [{"refs": [{"id": "ref-for-simple"}], "title": "3.1. Direct Nesting"}], "external": true};
-window.dfnpanelData['bb2056aa'] = {"dfnID": "bb2056aa", "url": "https://drafts.csswg.org/selectors-4/#specificity", "dfnText": "specificity", "refSections": [{"refs": [{"id": "ref-for-specificity"}], "title": "2. Nesting Selector: the & selector"}], "external": true};
-window.dfnpanelData['32c45571'] = {"dfnID": "32c45571", "url": "https://drafts.csswg.org/selectors-4/#type-selector", "dfnText": "type selector", "refSections": [{"refs": [{"id": "ref-for-type-selector"}], "title": "2. Nesting Selector: the & selector"}], "external": true};
-window.dfnpanelData['889e932f'] = {"dfnID": "889e932f", "url": "https://webidl.spec.whatwg.org/#Exposed", "dfnText": "Exposed", "refSections": [{"refs": [{"id": "ref-for-Exposed"}], "title": "4.2. The CSSNestingRule Interface"}], "external": true};
-window.dfnpanelData['21ecf38f'] = {"dfnID": "21ecf38f", "url": "https://webidl.spec.whatwg.org/#PutForwards", "dfnText": "PutForwards", "refSections": [{"refs": [{"id": "ref-for-PutForwards"}], "title": "4.2. The CSSNestingRule Interface"}], "external": true};
-window.dfnpanelData['a5c91173'] = {"dfnID": "a5c91173", "url": "https://webidl.spec.whatwg.org/#SameObject", "dfnText": "SameObject", "refSections": [{"refs": [{"id": "ref-for-SameObject"}], "title": "4.1. Modifications to CSSStyleRule"}, {"refs": [{"id": "ref-for-SameObject\u2460"}, {"id": "ref-for-SameObject\u2461"}], "title": "4.2. The CSSNestingRule Interface"}], "external": true};
-window.dfnpanelData['5f90bbfb'] = {"dfnID": "5f90bbfb", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "dfnText": "undefined", "refSections": [{"refs": [{"id": "ref-for-idl-undefined"}], "title": "4.1. Modifications to CSSStyleRule"}, {"refs": [{"id": "ref-for-idl-undefined\u2460"}], "title": "4.2. The CSSNestingRule Interface"}], "external": true};
-window.dfnpanelData['e97a9688'] = {"dfnID": "e97a9688", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-long", "dfnText": "unsigned long", "refSections": [{"refs": [{"id": "ref-for-idl-unsigned-long"}, {"id": "ref-for-idl-unsigned-long\u2460"}, {"id": "ref-for-idl-unsigned-long\u2461"}], "title": "4.1. Modifications to CSSStyleRule"}, {"refs": [{"id": "ref-for-idl-unsigned-long\u2462"}, {"id": "ref-for-idl-unsigned-long\u2463"}, {"id": "ref-for-idl-unsigned-long\u2464"}], "title": "4.2. The CSSNestingRule Interface"}], "external": true};
-window.dfnpanelData['nesting-selector'] = {"dfnID": "nesting-selector", "url": "#nesting-selector", "dfnText": "nesting selector", "refSections": [{"refs": [{"id": "ref-for-nesting-selector"}, {"id": "ref-for-nesting-selector\u2460"}, {"id": "ref-for-nesting-selector\u2461"}, {"id": "ref-for-nesting-selector\u2462"}], "title": "2. Nesting Selector: the & selector"}, {"refs": [{"id": "ref-for-nesting-selector\u2463"}], "title": "3.1. Direct Nesting"}, {"refs": [{"id": "ref-for-nesting-selector\u2464"}], "title": "3.2. The Nesting At-Rule: @nest"}, {"refs": [{"id": "ref-for-nesting-selector\u2465"}], "title": "3.3. Nesting Conditional Rules"}, {"refs": [{"id": "ref-for-nesting-selector\u2466"}], "title": "3.4. Mixing Nesting Rules and Declarations"}], "external": false};
-window.dfnpanelData['selectordef-'] = {"dfnID": "selectordef-", "url": "#selectordef-", "dfnText": "&", "refSections": [{"refs": [{"id": "ref-for-selectordef-"}, {"id": "ref-for-selectordef-\u2460"}], "title": "2. Nesting Selector: the & selector"}], "external": false};
-window.dfnpanelData['nested-style-rule'] = {"dfnID": "nested-style-rule", "url": "#nested-style-rule", "dfnText": "nesting style rules", "refSections": [{"refs": [{"id": "ref-for-nested-style-rule"}, {"id": "ref-for-nested-style-rule\u2460"}], "title": "2. Nesting Selector: the & selector"}, {"refs": [{"id": "ref-for-nested-style-rule\u2461"}, {"id": "ref-for-nested-style-rule\u2462"}, {"id": "ref-for-nested-style-rule\u2463"}], "title": "3.4. Mixing Nesting Rules and Declarations"}], "external": false};
-window.dfnpanelData['direct-nesting'] = {"dfnID": "direct-nesting", "url": "#direct-nesting", "dfnText": "directly nested", "refSections": [{"refs": [{"id": "ref-for-direct-nesting"}], "title": "3. Nesting Style Rules"}, {"refs": [{"id": "ref-for-direct-nesting\u2460"}], "title": "3.2. The Nesting At-Rule: @nest"}], "external": false};
-window.dfnpanelData['nest-prefixed'] = {"dfnID": "nest-prefixed", "url": "#nest-prefixed", "dfnText": "nest-prefixed", "refSections": [{"refs": [{"id": "ref-for-nest-prefixed"}, {"id": "ref-for-nest-prefixed\u2460"}, {"id": "ref-for-nest-prefixed\u2461"}], "title": "3.1. Direct Nesting"}], "external": false};
-window.dfnpanelData['at-ruledef-nest'] = {"dfnID": "at-ruledef-nest", "url": "#at-ruledef-nest", "dfnText": "@nest", "refSections": [{"refs": [{"id": "ref-for-at-ruledef-nest"}], "title": "3. Nesting Style Rules"}, {"refs": [{"id": "ref-for-at-ruledef-nest\u2460"}, {"id": "ref-for-at-ruledef-nest\u2461"}, {"id": "ref-for-at-ruledef-nest\u2462"}, {"id": "ref-for-at-ruledef-nest\u2463"}], "title": "3.2. The Nesting At-Rule: @nest"}, {"refs": [{"id": "ref-for-at-ruledef-nest\u2464"}], "title": "3.3. Nesting Conditional Rules"}, {"refs": [{"id": "ref-for-at-ruledef-nest\u2465"}], "title": "4.2. The CSSNestingRule Interface"}], "external": false};
-window.dfnpanelData['nest-containing'] = {"dfnID": "nest-containing", "url": "#nest-containing", "dfnText": "nest-containing", "refSections": [{"refs": [{"id": "ref-for-nest-containing"}, {"id": "ref-for-nest-containing\u2460"}], "title": "3.2. The Nesting At-Rule: @nest"}], "external": false};
-window.dfnpanelData['dom-cssstylerule-cssrules'] = {"dfnID": "dom-cssstylerule-cssrules", "url": "#dom-cssstylerule-cssrules", "dfnText": "cssRules", "refSections": [{"refs": [{"id": "ref-for-dom-cssstylerule-cssrules"}], "title": "4.1. Modifications to CSSStyleRule"}, {"refs": [{"id": "ref-for-dom-cssstylerule-cssrules\u2460"}], "title": "4.2. The CSSNestingRule Interface"}], "external": false};
-window.dfnpanelData['dom-cssstylerule-insertrule'] = {"dfnID": "dom-cssstylerule-insertrule", "url": "#dom-cssstylerule-insertrule", "dfnText": "insertRule(rule, index)", "refSections": [{"refs": [{"id": "ref-for-dom-cssstylerule-insertrule"}], "title": "4.1. Modifications to CSSStyleRule"}], "external": false};
-window.dfnpanelData['dom-cssstylerule-deleterule'] = {"dfnID": "dom-cssstylerule-deleterule", "url": "#dom-cssstylerule-deleterule", "dfnText": "deleteRule(index)", "refSections": [{"refs": [{"id": "ref-for-dom-cssstylerule-deleterule"}], "title": "4.1. Modifications to CSSStyleRule"}], "external": false};
-window.dfnpanelData['cssnestingrule'] = {"dfnID": "cssnestingrule", "url": "#cssnestingrule", "dfnText": "CSSNestingRule", "refSections": [{"refs": [{"id": "ref-for-cssnestingrule"}, {"id": "ref-for-cssnestingrule\u2460"}, {"id": "ref-for-cssnestingrule\u2461"}], "title": "4.2. The CSSNestingRule Interface"}], "external": false};
-window.dfnpanelData['dom-cssnestingrule-selectortext'] = {"dfnID": "dom-cssnestingrule-selectortext", "url": "#dom-cssnestingrule-selectortext", "dfnText": "selectorText", "refSections": [{"refs": [{"id": "ref-for-dom-cssnestingrule-selectortext"}], "title": "4.2. The CSSNestingRule Interface"}], "external": false};
-window.dfnpanelData['dom-cssnestingrule-style'] = {"dfnID": "dom-cssnestingrule-style", "url": "#dom-cssnestingrule-style", "dfnText": "style", "refSections": [{"refs": [{"id": "ref-for-dom-cssnestingrule-style"}], "title": "4.2. The CSSNestingRule Interface"}], "external": false};
-window.dfnpanelData['dom-cssnestingrule-cssrules'] = {"dfnID": "dom-cssnestingrule-cssrules", "url": "#dom-cssnestingrule-cssrules", "dfnText": "cssRules", "refSections": [{"refs": [{"id": "ref-for-dom-cssnestingrule-cssrules"}], "title": "4.2. The CSSNestingRule Interface"}], "external": false};
-window.dfnpanelData['dom-cssnestingrule-insertrule'] = {"dfnID": "dom-cssnestingrule-insertrule", "url": "#dom-cssnestingrule-insertrule", "dfnText": "insertRule(rule, index)", "refSections": [{"refs": [{"id": "ref-for-dom-cssnestingrule-insertrule"}], "title": "4.2. The CSSNestingRule Interface"}], "external": false};
-window.dfnpanelData['dom-cssnestingrule-deleterule'] = {"dfnID": "dom-cssnestingrule-deleterule", "url": "#dom-cssnestingrule-deleterule", "dfnText": "deleteRule(index)", "refSections": [{"refs": [{"id": "ref-for-dom-cssnestingrule-deleterule"}], "title": "4.2. The CSSNestingRule Interface"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -2436,268 +1987,718 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"de6d76c2": {"dfnID":"de6d76c2","dfnText":"cascade","external":true,"refSections":[{"refs":[{"id":"ref-for-cascade"}],"title":"3.4. Mixing Nesting Rules and Declarations"}],"url":"https://drafts.csswg.org/css-cascade-6/#cascade"},
+"73ea1d43": {"dfnID":"73ea1d43","dfnText":"color","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-color"}],"title":"2. Nesting Selector: the & selector"},{"refs":[{"id":"ref-for-propdef-color\u2460"},{"id":"ref-for-propdef-color\u2461"},{"id":"ref-for-propdef-color\u2462"},{"id":"ref-for-propdef-color\u2463"}],"title":"3.4. Mixing Nesting Rules and Declarations"}],"url":"https://drafts.csswg.org/css-color-4/#propdef-color"},
+"84252421": {"dfnID":"84252421","dfnText":"<declaration-list>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-declaration-list"}],"title":"3.2. The Nesting At-Rule: @nest"}],"url":"https://drafts.csswg.org/css-syntax-3/#typedef-declaration-list"},
+"5fced98b": {"dfnID":"5fced98b","dfnText":"CSSOMString","external":true,"refSections":[{"refs":[{"id":"ref-for-cssomstring"}],"title":"4.1. Modifications to CSSStyleRule"},{"refs":[{"id":"ref-for-cssomstring\u2460"},{"id":"ref-for-cssomstring\u2461"}],"title":"4.2. The CSSNestingRule Interface"}],"url":"https://drafts.csswg.org/cssom-1/#cssomstring"},
+"ebaeb088": {"dfnID":"ebaeb088","dfnText":"CSSRule","external":true,"refSections":[{"refs":[{"id":"ref-for-cssrule"}],"title":"4.2. The CSSNestingRule Interface"}],"url":"https://drafts.csswg.org/cssom-1/#cssrule"},
+"0771d3e5": {"dfnID":"0771d3e5","dfnText":"CSSRuleList","external":true,"refSections":[{"refs":[{"id":"ref-for-cssrulelist"},{"id":"ref-for-cssrulelist\u2460"}],"title":"4.1. Modifications to CSSStyleRule"},{"refs":[{"id":"ref-for-cssrulelist\u2461"},{"id":"ref-for-cssrulelist\u2462"}],"title":"4.2. The CSSNestingRule Interface"}],"url":"https://drafts.csswg.org/cssom-1/#cssrulelist"},
+"a82a20ef": {"dfnID":"a82a20ef","dfnText":"CSSStyleDeclaration","external":true,"refSections":[{"refs":[{"id":"ref-for-cssstyledeclaration"},{"id":"ref-for-cssstyledeclaration\u2460"}],"title":"4.2. The CSSNestingRule Interface"}],"url":"https://drafts.csswg.org/cssom-1/#cssstyledeclaration"},
+"6052f41c": {"dfnID":"6052f41c","dfnText":"CSSStyleRule","external":true,"refSections":[{"refs":[{"id":"ref-for-cssstylerule"},{"id":"ref-for-cssstylerule\u2460"}],"title":"4.1. Modifications to CSSStyleRule"}],"url":"https://drafts.csswg.org/cssom-1/#cssstylerule"},
+"4e49866c": {"dfnID":"4e49866c","dfnText":"child css rules","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-css-rule-child-css-rules"},{"id":"ref-for-concept-css-rule-child-css-rules\u2460"},{"id":"ref-for-concept-css-rule-child-css-rules\u2461"}],"title":"4.1. Modifications to CSSStyleRule"},{"refs":[{"id":"ref-for-concept-css-rule-child-css-rules\u2462"},{"id":"ref-for-concept-css-rule-child-css-rules\u2463"},{"id":"ref-for-concept-css-rule-child-css-rules\u2464"}],"title":"4.2. The CSSNestingRule Interface"}],"url":"https://drafts.csswg.org/cssom-1/#concept-css-rule-child-css-rules"},
+"29c3f2fe": {"dfnID":"29c3f2fe","dfnText":"computed flag","external":true,"refSections":[{"refs":[{"id":"ref-for-cssstyledeclaration-computed-flag"}],"title":"4.2. The CSSNestingRule Interface"}],"url":"https://drafts.csswg.org/cssom-1/#cssstyledeclaration-computed-flag"},
+"b13bfb39": {"dfnID":"b13bfb39","dfnText":"cssText","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-cssstyledeclaration-csstext"}],"title":"4.2. The CSSNestingRule Interface"}],"url":"https://drafts.csswg.org/cssom-1/#dom-cssstyledeclaration-csstext"},
+"e4ffca7f": {"dfnID":"e4ffca7f","dfnText":"declarations","external":true,"refSections":[{"refs":[{"id":"ref-for-cssstyledeclaration-declarations"}],"title":"4.2. The CSSNestingRule Interface"}],"url":"https://drafts.csswg.org/cssom-1/#cssstyledeclaration-declarations"},
+"5170ff4d": {"dfnID":"5170ff4d","dfnText":"insert a css rule","external":true,"refSections":[{"refs":[{"id":"ref-for-insert-a-css-rule"}],"title":"4.1. Modifications to CSSStyleRule"},{"refs":[{"id":"ref-for-insert-a-css-rule\u2460"}],"title":"4.2. The CSSNestingRule Interface"}],"url":"https://drafts.csswg.org/cssom-1/#insert-a-css-rule"},
+"eab73120": {"dfnID":"eab73120","dfnText":"owner node","external":true,"refSections":[{"refs":[{"id":"ref-for-cssstyledeclaration-owner-node"}],"title":"4.2. The CSSNestingRule Interface"}],"url":"https://drafts.csswg.org/cssom-1/#cssstyledeclaration-owner-node"},
+"8056dead": {"dfnID":"8056dead","dfnText":"parent css rule","external":true,"refSections":[{"refs":[{"id":"ref-for-cssstyledeclaration-parent-css-rule"}],"title":"4.2. The CSSNestingRule Interface"}],"url":"https://drafts.csswg.org/cssom-1/#cssstyledeclaration-parent-css-rule"},
+"64f679ea": {"dfnID":"64f679ea","dfnText":"parse a group of selectors","external":true,"refSections":[{"refs":[{"id":"ref-for-parse-a-group-of-selectors"}],"title":"4.2. The CSSNestingRule Interface"}],"url":"https://drafts.csswg.org/cssom-1/#parse-a-group-of-selectors"},
+"9528bc47": {"dfnID":"9528bc47","dfnText":"remove a css rule","external":true,"refSections":[{"refs":[{"id":"ref-for-remove-a-css-rule"}],"title":"4.1. Modifications to CSSStyleRule"},{"refs":[{"id":"ref-for-remove-a-css-rule\u2460"}],"title":"4.2. The CSSNestingRule Interface"}],"url":"https://drafts.csswg.org/cssom-1/#remove-a-css-rule"},
+"fd9b8dfa": {"dfnID":"fd9b8dfa","dfnText":"selectorText","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-cssstylerule-selectortext"}],"title":"4.2. The CSSNestingRule Interface"}],"url":"https://drafts.csswg.org/cssom-1/#dom-cssstylerule-selectortext"},
+"2c2c4b46": {"dfnID":"2c2c4b46","dfnText":"serialize a css declaration block","external":true,"refSections":[{"refs":[{"id":"ref-for-serialize-a-css-declaration-block"}],"title":"4.2. The CSSNestingRule Interface"}],"url":"https://drafts.csswg.org/cssom-1/#serialize-a-css-declaration-block"},
+"8c57eaed": {"dfnID":"8c57eaed","dfnText":"serialize a css rule","external":true,"refSections":[{"refs":[{"id":"ref-for-serialize-a-css-rule"}],"title":"4.2. The CSSNestingRule Interface"}],"url":"https://drafts.csswg.org/cssom-1/#serialize-a-css-rule"},
+"ee5366e9": {"dfnID":"ee5366e9","dfnText":"serialize a group of selectors","external":true,"refSections":[{"refs":[{"id":"ref-for-serialize-a-group-of-selectors"},{"id":"ref-for-serialize-a-group-of-selectors\u2460"}],"title":"4.2. The CSSNestingRule Interface"}],"url":"https://drafts.csswg.org/cssom-1/#serialize-a-group-of-selectors"},
+"c475bc01": {"dfnID":"c475bc01","dfnText":"specified order","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-declarations-specified-order"}],"title":"4.2. The CSSNestingRule Interface"}],"url":"https://drafts.csswg.org/cssom-1/#concept-declarations-specified-order"},
+"b4d48921": {"dfnID":"b4d48921","dfnText":":is()","external":true,"refSections":[{"refs":[{"id":"ref-for-matches-pseudo"}],"title":"2. Nesting Selector: the & selector"}],"url":"https://drafts.csswg.org/selectors-4/#matches-pseudo"},
+"d4c9ac12": {"dfnID":"d4c9ac12","dfnText":":where()","external":true,"refSections":[{"refs":[{"id":"ref-for-where-pseudo"}],"title":"3.4. Mixing Nesting Rules and Declarations"}],"url":"https://drafts.csswg.org/selectors-4/#where-pseudo"},
+"832ba741": {"dfnID":"832ba741","dfnText":"complex selector","external":true,"refSections":[{"refs":[{"id":"ref-for-complex"}],"title":"3.1. Direct Nesting"},{"refs":[{"id":"ref-for-complex\u2460"}],"title":"3.2. The Nesting At-Rule: @nest"}],"url":"https://drafts.csswg.org/selectors-4/#complex"},
+"24408a11": {"dfnID":"24408a11","dfnText":"compound selector","external":true,"refSections":[{"refs":[{"id":"ref-for-compound"},{"id":"ref-for-compound\u2460"},{"id":"ref-for-compound\u2461"}],"title":"2. Nesting Selector: the & selector"},{"refs":[{"id":"ref-for-compound\u2462"}],"title":"3.1. Direct Nesting"}],"url":"https://drafts.csswg.org/selectors-4/#compound"},
+"069e89f6": {"dfnID":"069e89f6","dfnText":"selector list","external":true,"refSections":[{"refs":[{"id":"ref-for-selector-list"},{"id":"ref-for-selector-list\u2460"}],"title":"4.2. The CSSNestingRule Interface"}],"url":"https://drafts.csswg.org/selectors-4/#selector-list"},
+"2fd70eda": {"dfnID":"2fd70eda","dfnText":"simple selector","external":true,"refSections":[{"refs":[{"id":"ref-for-simple"}],"title":"3.1. Direct Nesting"}],"url":"https://drafts.csswg.org/selectors-4/#simple"},
+"bb2056aa": {"dfnID":"bb2056aa","dfnText":"specificity","external":true,"refSections":[{"refs":[{"id":"ref-for-specificity"}],"title":"2. Nesting Selector: the & selector"}],"url":"https://drafts.csswg.org/selectors-4/#specificity"},
+"32c45571": {"dfnID":"32c45571","dfnText":"type selector","external":true,"refSections":[{"refs":[{"id":"ref-for-type-selector"}],"title":"2. Nesting Selector: the & selector"}],"url":"https://drafts.csswg.org/selectors-4/#type-selector"},
+"889e932f": {"dfnID":"889e932f","dfnText":"Exposed","external":true,"refSections":[{"refs":[{"id":"ref-for-Exposed"}],"title":"4.2. The CSSNestingRule Interface"}],"url":"https://webidl.spec.whatwg.org/#Exposed"},
+"21ecf38f": {"dfnID":"21ecf38f","dfnText":"PutForwards","external":true,"refSections":[{"refs":[{"id":"ref-for-PutForwards"}],"title":"4.2. The CSSNestingRule Interface"}],"url":"https://webidl.spec.whatwg.org/#PutForwards"},
+"a5c91173": {"dfnID":"a5c91173","dfnText":"SameObject","external":true,"refSections":[{"refs":[{"id":"ref-for-SameObject"}],"title":"4.1. Modifications to CSSStyleRule"},{"refs":[{"id":"ref-for-SameObject\u2460"},{"id":"ref-for-SameObject\u2461"}],"title":"4.2. The CSSNestingRule Interface"}],"url":"https://webidl.spec.whatwg.org/#SameObject"},
+"5f90bbfb": {"dfnID":"5f90bbfb","dfnText":"undefined","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-undefined"}],"title":"4.1. Modifications to CSSStyleRule"},{"refs":[{"id":"ref-for-idl-undefined\u2460"}],"title":"4.2. The CSSNestingRule Interface"}],"url":"https://webidl.spec.whatwg.org/#idl-undefined"},
+"e97a9688": {"dfnID":"e97a9688","dfnText":"unsigned long","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-unsigned-long"},{"id":"ref-for-idl-unsigned-long\u2460"},{"id":"ref-for-idl-unsigned-long\u2461"}],"title":"4.1. Modifications to CSSStyleRule"},{"refs":[{"id":"ref-for-idl-unsigned-long\u2462"},{"id":"ref-for-idl-unsigned-long\u2463"},{"id":"ref-for-idl-unsigned-long\u2464"}],"title":"4.2. The CSSNestingRule Interface"}],"url":"https://webidl.spec.whatwg.org/#idl-unsigned-long"},
+"nesting-selector": {"dfnID":"nesting-selector","dfnText":"nesting selector","external":false,"refSections":[{"refs":[{"id":"ref-for-nesting-selector"},{"id":"ref-for-nesting-selector\u2460"},{"id":"ref-for-nesting-selector\u2461"},{"id":"ref-for-nesting-selector\u2462"}],"title":"2. Nesting Selector: the & selector"},{"refs":[{"id":"ref-for-nesting-selector\u2463"}],"title":"3.1. Direct Nesting"},{"refs":[{"id":"ref-for-nesting-selector\u2464"}],"title":"3.2. The Nesting At-Rule: @nest"},{"refs":[{"id":"ref-for-nesting-selector\u2465"}],"title":"3.3. Nesting Conditional Rules"},{"refs":[{"id":"ref-for-nesting-selector\u2466"}],"title":"3.4. Mixing Nesting Rules and Declarations"}],"url":"#nesting-selector"},
+"selectordef-": {"dfnID":"selectordef-","dfnText":"&","external":false,"refSections":[{"refs":[{"id":"ref-for-selectordef-"},{"id":"ref-for-selectordef-\u2460"}],"title":"2. Nesting Selector: the & selector"}],"url":"#selectordef-"},
+"nested-style-rule": {"dfnID":"nested-style-rule","dfnText":"nesting style rules","external":false,"refSections":[{"refs":[{"id":"ref-for-nested-style-rule"},{"id":"ref-for-nested-style-rule\u2460"}],"title":"2. Nesting Selector: the & selector"},{"refs":[{"id":"ref-for-nested-style-rule\u2461"},{"id":"ref-for-nested-style-rule\u2462"},{"id":"ref-for-nested-style-rule\u2463"}],"title":"3.4. Mixing Nesting Rules and Declarations"}],"url":"#nested-style-rule"},
+"direct-nesting": {"dfnID":"direct-nesting","dfnText":"directly nested","external":false,"refSections":[{"refs":[{"id":"ref-for-direct-nesting"}],"title":"3. Nesting Style Rules"},{"refs":[{"id":"ref-for-direct-nesting\u2460"}],"title":"3.2. The Nesting At-Rule: @nest"}],"url":"#direct-nesting"},
+"nest-prefixed": {"dfnID":"nest-prefixed","dfnText":"nest-prefixed","external":false,"refSections":[{"refs":[{"id":"ref-for-nest-prefixed"},{"id":"ref-for-nest-prefixed\u2460"},{"id":"ref-for-nest-prefixed\u2461"}],"title":"3.1. Direct Nesting"}],"url":"#nest-prefixed"},
+"at-ruledef-nest": {"dfnID":"at-ruledef-nest","dfnText":"@nest","external":false,"refSections":[{"refs":[{"id":"ref-for-at-ruledef-nest"}],"title":"3. Nesting Style Rules"},{"refs":[{"id":"ref-for-at-ruledef-nest\u2460"},{"id":"ref-for-at-ruledef-nest\u2461"},{"id":"ref-for-at-ruledef-nest\u2462"},{"id":"ref-for-at-ruledef-nest\u2463"}],"title":"3.2. The Nesting At-Rule: @nest"},{"refs":[{"id":"ref-for-at-ruledef-nest\u2464"}],"title":"3.3. Nesting Conditional Rules"},{"refs":[{"id":"ref-for-at-ruledef-nest\u2465"}],"title":"4.2. The CSSNestingRule Interface"}],"url":"#at-ruledef-nest"},
+"nest-containing": {"dfnID":"nest-containing","dfnText":"nest-containing","external":false,"refSections":[{"refs":[{"id":"ref-for-nest-containing"},{"id":"ref-for-nest-containing\u2460"}],"title":"3.2. The Nesting At-Rule: @nest"}],"url":"#nest-containing"},
+"dom-cssstylerule-cssrules": {"dfnID":"dom-cssstylerule-cssrules","dfnText":"cssRules","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-cssstylerule-cssrules"}],"title":"4.1. Modifications to CSSStyleRule"},{"refs":[{"id":"ref-for-dom-cssstylerule-cssrules\u2460"}],"title":"4.2. The CSSNestingRule Interface"}],"url":"#dom-cssstylerule-cssrules"},
+"dom-cssstylerule-insertrule": {"dfnID":"dom-cssstylerule-insertrule","dfnText":"insertRule(rule, index)","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-cssstylerule-insertrule"}],"title":"4.1. Modifications to CSSStyleRule"}],"url":"#dom-cssstylerule-insertrule"},
+"dom-cssstylerule-deleterule": {"dfnID":"dom-cssstylerule-deleterule","dfnText":"deleteRule(index)","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-cssstylerule-deleterule"}],"title":"4.1. Modifications to CSSStyleRule"}],"url":"#dom-cssstylerule-deleterule"},
+"cssnestingrule": {"dfnID":"cssnestingrule","dfnText":"CSSNestingRule","external":false,"refSections":[{"refs":[{"id":"ref-for-cssnestingrule"},{"id":"ref-for-cssnestingrule\u2460"},{"id":"ref-for-cssnestingrule\u2461"}],"title":"4.2. The CSSNestingRule Interface"}],"url":"#cssnestingrule"},
+"dom-cssnestingrule-selectortext": {"dfnID":"dom-cssnestingrule-selectortext","dfnText":"selectorText","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-cssnestingrule-selectortext"}],"title":"4.2. The CSSNestingRule Interface"}],"url":"#dom-cssnestingrule-selectortext"},
+"dom-cssnestingrule-style": {"dfnID":"dom-cssnestingrule-style","dfnText":"style","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-cssnestingrule-style"}],"title":"4.2. The CSSNestingRule Interface"}],"url":"#dom-cssnestingrule-style"},
+"dom-cssnestingrule-cssrules": {"dfnID":"dom-cssnestingrule-cssrules","dfnText":"cssRules","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-cssnestingrule-cssrules"}],"title":"4.2. The CSSNestingRule Interface"}],"url":"#dom-cssnestingrule-cssrules"},
+"dom-cssnestingrule-insertrule": {"dfnID":"dom-cssnestingrule-insertrule","dfnText":"insertRule(rule, index)","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-cssnestingrule-insertrule"}],"title":"4.2. The CSSNestingRule Interface"}],"url":"#dom-cssnestingrule-insertrule"},
+"dom-cssnestingrule-deleterule": {"dfnID":"dom-cssnestingrule-deleterule","dfnText":"deleteRule(index)","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-cssnestingrule-deleterule"}],"title":"4.2. The CSSNestingRule Interface"}],"url":"#dom-cssnestingrule-deleterule"},
+};
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+const typeFormatters = {
+    'dfn': (text) => `[=${text}=]`,
+    'abstract-op': (text) => `[\$${text}\$]`,
+    'value': (text) => `''${text}''`,
+    'http-header': (text) => `[:${text}:]`,
+    'idl': (text) => `{{${text}}}`,
+    'interface': 'idl',
+    'constructor': 'idl',
+    'method': 'idl',
+    'argument': 'idl',
+    'attribute': 'idl',
+    'callback': 'idl',
+    'dictionary': 'idl',
+    'dict-member': 'idl',
+    'enum': 'idl',
+    'enum-value': 'idl',
+    'exception': 'idl',
+    'const': 'idl',
+    'typedef': 'idl',
+    'stringifier': 'idl',
+    'serializer': 'idl',
+    'iterator': 'idl',
+    'maplike': 'idl',
+    'setlike': 'idl',
+    'extended-attribute': 'idl',
+    'event': 'idl',
+    'element': (element) => `<{${element}}>`,
+    'element-state': 'element',
+    'element-attr': 'element',
+    'attr-value': 'element',
+    'scheme': 'dfn',
+    'permission': 'dfn',
+    'grammar': (text) => `${text} (within a <pre class=prod>)`,
+    'type': (text)=> `<<${text}>>`,
+    'property': (text) => `'${text}'`,
+    'descriptor': 'property',
+    'function': 'value',
+    'at-rule': 'value',
+    'selector': 'value',
+};
+const typesUsingFor = new Set(
+    [
+        "descriptor",
+        "value",
+        "element-attr",
+        "attr-value",
+        "element-state",
+        "method",
+        "constructor",
+        "argument",
+        "attribute",
+        "const",
+        "dict-member",
+        "event",
+        "enum-value",
+        "stringifier",
+        "serializer",
+        "iterator",
+        "maplike",
+        "setlike",
+        "state",
+        "mode",
+        "context",
+        "facet",
+    ],
+)
+const typesNotUsingFor = new Set(
+    [
+        "property",
+        "element",
+        "interface",
+        "namespace",
+        "callback",
+        "dictionary",
+        "enum",
+        "exception",
+        "typedef",
+        "http-header",
+        "permission",
+    ],
+)
+function linkFormatterFromType(type) {
+    const fnOrType = typeFormatters[type];
+    if(typeof fnOrType === 'string') {
+        // follow the alias
+        return linkFormatterFromType(fnOrType);
+    }
+    return fnOrType;
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!typesUsingFor.has(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!typesNotUsingFor.has(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
+
+function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+    dfnPanel.forDfn = dfn;
+    if(!dfn) { console.log(dfnPanel); }
+    return dfnPanel;
+}
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        const panel = genDfnPanel({ ...panelData, dfn });
+        append(document.body, panel);
+        insertDfnPopupAction(panel)
+    }
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+})
+
+function hideAllDfnPanels() {
+    // Turn off any currently "on" or "activated" panels.
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
+}
+
+function showDfnPanel(dfnPanel) {
+    hideAllDfnPanels(); // Only display one at this time.
+
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "true");
+
+    dfnPanel.classList.add("on");
+    positionDfnPanel(dfnPanel);
+
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    // Increment tabindex for each anchor and button tags in panel
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.style.position = "absolute"; // unfix it
+    dfnPanel.classList.remove("on");
+    dfnPanel.classList.remove("activated");
+}
+
+function toggleDfnPanel(dfnPanel) {
+    if(dfnPanel.classList.contains("on")) {
+        hideDfnPanel(dfnPanel);
+    } else {
+        showDfnPanel(dfnPanel);
+    }
+}
+
+function insertDfnPopupAction(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        showDfnPanel(dfnPanel);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfnPanel);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel(dfnPanel, dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    })
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
 }
 </script>
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
+let refsData = {
+"#selectordef-": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-nesting","spec":"css-nesting-1","status":"local","text":"&","type":"selector","url":"#selectordef-"},
+"#nested-style-rule": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-nesting","spec":"css-nesting-1","status":"local","text":"nested style rule","type":"dfn","url":"#nested-style-rule"},
+"#nesting-selector": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-nesting","spec":"css-nesting-1","status":"local","text":"nesting selector","type":"dfn","url":"#nesting-selector"},
+"https://drafts.csswg.org/selectors-4/#matches-pseudo": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"selectors","spec":"selectors-4","status":"current","text":":is()","type":"selector","url":"https://drafts.csswg.org/selectors-4/#matches-pseudo"},
+"https://drafts.csswg.org/selectors-4/#specificity": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"selectors","spec":"selectors-4","status":"current","text":"specificity","type":"dfn","url":"https://drafts.csswg.org/selectors-4/#specificity"},
+"https://drafts.csswg.org/css-color-4/#propdef-color": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-color","spec":"css-color-4","status":"current","text":"color","type":"property","url":"https://drafts.csswg.org/css-color-4/#propdef-color"},
+"https://drafts.csswg.org/selectors-4/#compound": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"selectors","spec":"selectors-4","status":"current","text":"compound selector","type":"dfn","url":"https://drafts.csswg.org/selectors-4/#compound"},
+"https://drafts.csswg.org/selectors-4/#type-selector": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"selectors","spec":"selectors-4","status":"current","text":"type selector","type":"dfn","url":"https://drafts.csswg.org/selectors-4/#type-selector"},
+"#direct-nesting": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-nesting","spec":"css-nesting-1","status":"local","text":"direct nesting","type":"dfn","url":"#direct-nesting"},
+"#at-ruledef-nest": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-nesting","spec":"css-nesting-1","status":"local","text":"@nest","type":"at-rule","url":"#at-ruledef-nest"},
+"#nest-prefixed": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-nesting","spec":"css-nesting-1","status":"local","text":"nest-prefixed","type":"dfn","url":"#nest-prefixed"},
+"https://drafts.csswg.org/selectors-4/#simple": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"selectors","spec":"selectors-4","status":"current","text":"simple selector","type":"dfn","url":"https://drafts.csswg.org/selectors-4/#simple"},
+"https://drafts.csswg.org/selectors-4/#complex": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"selectors","spec":"selectors-4","status":"current","text":"complex selector","type":"dfn","url":"https://drafts.csswg.org/selectors-4/#complex"},
+"https://drafts.csswg.org/css-syntax-3/#typedef-declaration-list": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-syntax","spec":"css-syntax-3","status":"current","text":"<declaration-list>","type":"type","url":"https://drafts.csswg.org/css-syntax-3/#typedef-declaration-list"},
+"#nest-containing": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-nesting","spec":"css-nesting-1","status":"local","text":"nest-containing","type":"dfn","url":"#nest-containing"},
+"https://drafts.csswg.org/css-cascade-6/#cascade": {"export":true,"for_":[],"level":"6","normative":true,"shortname":"css-cascade","spec":"css-cascade-6","status":"current","text":"cascade","type":"dfn","url":"https://drafts.csswg.org/css-cascade-6/#cascade"},
+"https://drafts.csswg.org/selectors-4/#where-pseudo": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"selectors","spec":"selectors-4","status":"current","text":":where()","type":"selector","url":"https://drafts.csswg.org/selectors-4/#where-pseudo"},
+"https://drafts.csswg.org/cssom-1/#cssstylerule": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"CSSStyleRule","type":"interface","url":"https://drafts.csswg.org/cssom-1/#cssstylerule"},
+"https://webidl.spec.whatwg.org/#SameObject": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"SameObject","type":"extended-attribute","url":"https://webidl.spec.whatwg.org/#SameObject"},
+"https://drafts.csswg.org/cssom-1/#cssrulelist": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"CSSRuleList","type":"interface","url":"https://drafts.csswg.org/cssom-1/#cssrulelist"},
+"#dom-cssstylerule-cssrules": {"export":true,"for_":["CSSStyleRule"],"level":"1","normative":true,"shortname":"css-nesting","spec":"css-nesting-1","status":"local","text":"cssRules","type":"attribute","url":"#dom-cssstylerule-cssrules"},
+"https://webidl.spec.whatwg.org/#idl-unsigned-long": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"unsigned long","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-unsigned-long"},
+"#dom-cssstylerule-insertrule": {"export":true,"for_":["CSSStyleRule"],"level":"1","normative":true,"shortname":"css-nesting","spec":"css-nesting-1","status":"local","text":"insertRule(rule, index)","type":"method","url":"#dom-cssstylerule-insertrule"},
+"https://drafts.csswg.org/cssom-1/#cssomstring": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"CSSOMString","type":"interface","url":"https://drafts.csswg.org/cssom-1/#cssomstring"},
+"https://webidl.spec.whatwg.org/#idl-undefined": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"undefined","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-undefined"},
+"#dom-cssstylerule-deleterule": {"export":true,"for_":["CSSStyleRule"],"level":"1","normative":true,"shortname":"css-nesting","spec":"css-nesting-1","status":"local","text":"deleteRule(index)","type":"method","url":"#dom-cssstylerule-deleterule"},
+"https://drafts.csswg.org/cssom-1/#concept-css-rule-child-css-rules": {"export":false,"for_":["CSSRule"],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"child css rules","type":"dfn","url":"https://drafts.csswg.org/cssom-1/#concept-css-rule-child-css-rules"},
+"https://drafts.csswg.org/cssom-1/#insert-a-css-rule": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"insert a css rule","type":"dfn","url":"https://drafts.csswg.org/cssom-1/#insert-a-css-rule"},
+"https://drafts.csswg.org/cssom-1/#remove-a-css-rule": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"remove a css rule","type":"dfn","url":"https://drafts.csswg.org/cssom-1/#remove-a-css-rule"},
+"#cssnestingrule": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-nesting","spec":"css-nesting-1","status":"local","text":"CSSNestingRule","type":"interface","url":"#cssnestingrule"},
+"https://webidl.spec.whatwg.org/#Exposed": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"Exposed","type":"extended-attribute","url":"https://webidl.spec.whatwg.org/#Exposed"},
+"https://drafts.csswg.org/cssom-1/#cssrule": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"CSSRule","type":"interface","url":"https://drafts.csswg.org/cssom-1/#cssrule"},
+"#dom-cssnestingrule-selectortext": {"export":true,"for_":["CSSNestingRule"],"level":"1","normative":true,"shortname":"css-nesting","spec":"css-nesting-1","status":"local","text":"selectorText","type":"attribute","url":"#dom-cssnestingrule-selectortext"},
+"https://webidl.spec.whatwg.org/#PutForwards": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"PutForwards","type":"extended-attribute","url":"https://webidl.spec.whatwg.org/#PutForwards"},
+"https://drafts.csswg.org/cssom-1/#dom-cssstyledeclaration-csstext": {"export":true,"for_":["CSSStyleDeclaration"],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"cssText","type":"attribute","url":"https://drafts.csswg.org/cssom-1/#dom-cssstyledeclaration-csstext"},
+"https://drafts.csswg.org/cssom-1/#cssstyledeclaration": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"CSSStyleDeclaration","type":"interface","url":"https://drafts.csswg.org/cssom-1/#cssstyledeclaration"},
+"#dom-cssnestingrule-style": {"export":true,"for_":["CSSNestingRule"],"level":"1","normative":true,"shortname":"css-nesting","spec":"css-nesting-1","status":"local","text":"style","type":"attribute","url":"#dom-cssnestingrule-style"},
+"#dom-cssnestingrule-cssrules": {"export":true,"for_":["CSSNestingRule"],"level":"1","normative":true,"shortname":"css-nesting","spec":"css-nesting-1","status":"local","text":"cssRules","type":"attribute","url":"#dom-cssnestingrule-cssrules"},
+"#dom-cssnestingrule-insertrule": {"export":true,"for_":["CSSNestingRule"],"level":"1","normative":true,"shortname":"css-nesting","spec":"css-nesting-1","status":"local","text":"insertRule(rule, index)","type":"method","url":"#dom-cssnestingrule-insertrule"},
+"#dom-cssnestingrule-deleterule": {"export":true,"for_":["CSSNestingRule"],"level":"1","normative":true,"shortname":"css-nesting","spec":"css-nesting-1","status":"local","text":"deleteRule(index)","type":"method","url":"#dom-cssnestingrule-deleterule"},
+"https://drafts.csswg.org/cssom-1/#serialize-a-group-of-selectors": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"serialize a group of selectors","type":"dfn","url":"https://drafts.csswg.org/cssom-1/#serialize-a-group-of-selectors"},
+"https://drafts.csswg.org/selectors-4/#selector-list": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"selectors","spec":"selectors-4","status":"current","text":"selector list","type":"dfn","url":"https://drafts.csswg.org/selectors-4/#selector-list"},
+"https://drafts.csswg.org/cssom-1/#dom-cssstylerule-selectortext": {"export":true,"for_":["CSSStyleRule"],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"selectorText","type":"attribute","url":"https://drafts.csswg.org/cssom-1/#dom-cssstylerule-selectortext"},
+"https://drafts.csswg.org/cssom-1/#parse-a-group-of-selectors": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"parse a group of selectors","type":"dfn","url":"https://drafts.csswg.org/cssom-1/#parse-a-group-of-selectors"},
+"https://drafts.csswg.org/cssom-1/#cssstyledeclaration-computed-flag": {"export":true,"for_":["CSSStyleDeclaration"],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"computed flag","type":"dfn","url":"https://drafts.csswg.org/cssom-1/#cssstyledeclaration-computed-flag"},
+"https://drafts.csswg.org/cssom-1/#cssstyledeclaration-declarations": {"export":true,"for_":["CSSStyleDeclaration"],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"declarations","type":"dfn","url":"https://drafts.csswg.org/cssom-1/#cssstyledeclaration-declarations"},
+"https://drafts.csswg.org/cssom-1/#concept-declarations-specified-order": {"export":false,"for_":[],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"specified order","type":"dfn","url":"https://drafts.csswg.org/cssom-1/#concept-declarations-specified-order"},
+"https://drafts.csswg.org/cssom-1/#cssstyledeclaration-parent-css-rule": {"export":true,"for_":["CSSStyleDeclaration"],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"parent css rule","type":"dfn","url":"https://drafts.csswg.org/cssom-1/#cssstyledeclaration-parent-css-rule"},
+"https://drafts.csswg.org/cssom-1/#cssstyledeclaration-owner-node": {"export":true,"for_":["CSSStyleDeclaration"],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"owner node","type":"dfn","url":"https://drafts.csswg.org/cssom-1/#cssstyledeclaration-owner-node"},
+"https://drafts.csswg.org/cssom-1/#serialize-a-css-declaration-block": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"serialize a css declaration block","type":"dfn","url":"https://drafts.csswg.org/cssom-1/#serialize-a-css-declaration-block"},
+"https://drafts.csswg.org/cssom-1/#serialize-a-css-rule": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"serialize a css rule","type":"dfn","url":"https://drafts.csswg.org/cssom-1/#serialize-a-css-rule"},
+};
+
+function genRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "DFN: "),
+                mk.code({ class: "dfn-text" }, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    const forListElements = forList.length === 0 ? '' : mk.li({},
+        mk.b({}, "For: "),
+        mk.ul({},
+            ...forList.map(forItem =>
                 mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
-            mk.b({}, "For: "),
-            mk.ul({},
-                ...forList.map(forItem =>
-                    mk.li({},
-                        mk.span({}, `${forItem}`)
-                    ),
+                    mk.span({}, `${forItem}`)
                 ),
             ),
-        );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+        ),
+    );
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
-    }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    return hintPanel;
+}
+function genAllRefHints() {
+    for(const refData of Object.values(refsData)) {
+        const refUrl = refData.url;
+        const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+        if (links.length == 0) {
+            console.log(`Can't find link href="${refUrl}".`, refData);
+            continue;
+        }
+        for(const link of links) {
+            if(link.classList.contains("dfn-link")) continue;
+            const hint = genRefHint(link, refData);
+            append(document.body, hint);
+            insertLinkPopupAction(hint)
         }
     }
+}
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+function hideAllRefHints() {
+    queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    refHint.style.position = "absolute"; // unfix it
+    refHint.classList.remove("on");
+    const teardown = refHint.teardownEventListeners;
+    if (teardown) {
+        refHint.teardownEventListeners = undefined;
+        teardown();
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+function showRefHint(refHint) {
+    hideAllRefHints(); // Only display one at this time.
+
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "true");
+    refHint.classList.add("on");
+    positionRefHint(refHint);
+    setupRefHintEventListeners(refHint);
+}
+
+function setupRefHintEventListeners(refHint) {
+    if (refHint.teardownEventListeners) return;
+    const link = refHint.forLink;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
 
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
 
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+function insertLinkPopupAction(refHint) {
+    const link = refHint.forLink;
+    // link.setAttribute('role', 'button');
+    link.setAttribute('aria-expanded', 'false')
+    link.classList.add('has-ref-hint');
+    link.addEventListener('mouseover', (event) => {
+        showRefHint(refHint);
     });
+    link.addEventListener('focus', (event) => {
+        showRefHint(refHint);
+    })
+}
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+document.addEventListener("DOMContentLoaded", () => {
+    genAllRefHints();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['#selectordef-'] = {"text": "&", "type": "selector", "spec": "css-nesting-1", "shortname": "css-nesting", "level": "1", "status": "local", "url": "#selectordef-", "export": true, "normative": true, "for_": []};
-window.refsData['#nested-style-rule'] = {"text": "nested style rule", "type": "dfn", "spec": "css-nesting-1", "shortname": "css-nesting", "level": "1", "status": "local", "url": "#nested-style-rule", "export": true, "normative": true, "for_": []};
-window.refsData['#nesting-selector'] = {"text": "nesting selector", "type": "dfn", "spec": "css-nesting-1", "shortname": "css-nesting", "level": "1", "status": "local", "url": "#nesting-selector", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/selectors-4/#matches-pseudo'] = {"text": ":is()", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "current", "url": "https://drafts.csswg.org/selectors-4/#matches-pseudo", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/selectors-4/#specificity'] = {"text": "specificity", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "current", "url": "https://drafts.csswg.org/selectors-4/#specificity", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-color-4/#propdef-color'] = {"text": "color", "type": "property", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-color-4/#propdef-color", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/selectors-4/#compound'] = {"text": "compound selector", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "current", "url": "https://drafts.csswg.org/selectors-4/#compound", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/selectors-4/#type-selector'] = {"text": "type selector", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "current", "url": "https://drafts.csswg.org/selectors-4/#type-selector", "export": true, "normative": true, "for_": []};
-window.refsData['#direct-nesting'] = {"text": "direct nesting", "type": "dfn", "spec": "css-nesting-1", "shortname": "css-nesting", "level": "1", "status": "local", "url": "#direct-nesting", "export": true, "normative": true, "for_": []};
-window.refsData['#at-ruledef-nest'] = {"text": "@nest", "type": "at-rule", "spec": "css-nesting-1", "shortname": "css-nesting", "level": "1", "status": "local", "url": "#at-ruledef-nest", "export": true, "normative": true, "for_": []};
-window.refsData['#nest-prefixed'] = {"text": "nest-prefixed", "type": "dfn", "spec": "css-nesting-1", "shortname": "css-nesting", "level": "1", "status": "local", "url": "#nest-prefixed", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/selectors-4/#simple'] = {"text": "simple selector", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "current", "url": "https://drafts.csswg.org/selectors-4/#simple", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/selectors-4/#complex'] = {"text": "complex selector", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "current", "url": "https://drafts.csswg.org/selectors-4/#complex", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-syntax-3/#typedef-declaration-list'] = {"text": "<declaration-list>", "type": "type", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#typedef-declaration-list", "export": true, "normative": true, "for_": []};
-window.refsData['#nest-containing'] = {"text": "nest-containing", "type": "dfn", "spec": "css-nesting-1", "shortname": "css-nesting", "level": "1", "status": "local", "url": "#nest-containing", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-cascade-6/#cascade'] = {"text": "cascade", "type": "dfn", "spec": "css-cascade-6", "shortname": "css-cascade", "level": "6", "status": "current", "url": "https://drafts.csswg.org/css-cascade-6/#cascade", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/selectors-4/#where-pseudo'] = {"text": ":where()", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "current", "url": "https://drafts.csswg.org/selectors-4/#where-pseudo", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/cssom-1/#cssstylerule'] = {"text": "CSSStyleRule", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#cssstylerule", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#SameObject'] = {"text": "SameObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SameObject", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/cssom-1/#cssrulelist'] = {"text": "CSSRuleList", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#cssrulelist", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-cssstylerule-cssrules'] = {"text": "cssRules", "type": "attribute", "spec": "css-nesting-1", "shortname": "css-nesting", "level": "1", "status": "local", "url": "#dom-cssstylerule-cssrules", "export": true, "normative": true, "for_": ["CSSStyleRule"]};
-window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-long'] = {"text": "unsigned long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-long", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-cssstylerule-insertrule'] = {"text": "insertRule(rule, index)", "type": "method", "spec": "css-nesting-1", "shortname": "css-nesting", "level": "1", "status": "local", "url": "#dom-cssstylerule-insertrule", "export": true, "normative": true, "for_": ["CSSStyleRule"]};
-window.refsData['https://drafts.csswg.org/cssom-1/#cssomstring'] = {"text": "CSSOMString", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#cssomstring", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-cssstylerule-deleterule'] = {"text": "deleteRule(index)", "type": "method", "spec": "css-nesting-1", "shortname": "css-nesting", "level": "1", "status": "local", "url": "#dom-cssstylerule-deleterule", "export": true, "normative": true, "for_": ["CSSStyleRule"]};
-window.refsData['https://drafts.csswg.org/cssom-1/#concept-css-rule-child-css-rules'] = {"text": "child css rules", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#concept-css-rule-child-css-rules", "export": false, "normative": true, "for_": ["CSSRule"]};
-window.refsData['https://drafts.csswg.org/cssom-1/#insert-a-css-rule'] = {"text": "insert a css rule", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#insert-a-css-rule", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/cssom-1/#remove-a-css-rule'] = {"text": "remove a css rule", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#remove-a-css-rule", "export": true, "normative": true, "for_": []};
-window.refsData['#cssnestingrule'] = {"text": "CSSNestingRule", "type": "interface", "spec": "css-nesting-1", "shortname": "css-nesting", "level": "1", "status": "local", "url": "#cssnestingrule", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/cssom-1/#cssrule'] = {"text": "CSSRule", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#cssrule", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-cssnestingrule-selectortext'] = {"text": "selectorText", "type": "attribute", "spec": "css-nesting-1", "shortname": "css-nesting", "level": "1", "status": "local", "url": "#dom-cssnestingrule-selectortext", "export": true, "normative": true, "for_": ["CSSNestingRule"]};
-window.refsData['https://webidl.spec.whatwg.org/#PutForwards'] = {"text": "PutForwards", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#PutForwards", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/cssom-1/#dom-cssstyledeclaration-csstext'] = {"text": "cssText", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#dom-cssstyledeclaration-csstext", "export": true, "normative": true, "for_": ["CSSStyleDeclaration"]};
-window.refsData['https://drafts.csswg.org/cssom-1/#cssstyledeclaration'] = {"text": "CSSStyleDeclaration", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#cssstyledeclaration", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-cssnestingrule-style'] = {"text": "style", "type": "attribute", "spec": "css-nesting-1", "shortname": "css-nesting", "level": "1", "status": "local", "url": "#dom-cssnestingrule-style", "export": true, "normative": true, "for_": ["CSSNestingRule"]};
-window.refsData['#dom-cssnestingrule-cssrules'] = {"text": "cssRules", "type": "attribute", "spec": "css-nesting-1", "shortname": "css-nesting", "level": "1", "status": "local", "url": "#dom-cssnestingrule-cssrules", "export": true, "normative": true, "for_": ["CSSNestingRule"]};
-window.refsData['#dom-cssnestingrule-insertrule'] = {"text": "insertRule(rule, index)", "type": "method", "spec": "css-nesting-1", "shortname": "css-nesting", "level": "1", "status": "local", "url": "#dom-cssnestingrule-insertrule", "export": true, "normative": true, "for_": ["CSSNestingRule"]};
-window.refsData['#dom-cssnestingrule-deleterule'] = {"text": "deleteRule(index)", "type": "method", "spec": "css-nesting-1", "shortname": "css-nesting", "level": "1", "status": "local", "url": "#dom-cssnestingrule-deleterule", "export": true, "normative": true, "for_": ["CSSNestingRule"]};
-window.refsData['https://drafts.csswg.org/cssom-1/#serialize-a-group-of-selectors'] = {"text": "serialize a group of selectors", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#serialize-a-group-of-selectors", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/selectors-4/#selector-list'] = {"text": "selector list", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "current", "url": "https://drafts.csswg.org/selectors-4/#selector-list", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/cssom-1/#dom-cssstylerule-selectortext'] = {"text": "selectorText", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#dom-cssstylerule-selectortext", "export": true, "normative": true, "for_": ["CSSStyleRule"]};
-window.refsData['https://drafts.csswg.org/cssom-1/#parse-a-group-of-selectors'] = {"text": "parse a group of selectors", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#parse-a-group-of-selectors", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/cssom-1/#cssstyledeclaration-computed-flag'] = {"text": "computed flag", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#cssstyledeclaration-computed-flag", "export": true, "normative": true, "for_": ["CSSStyleDeclaration"]};
-window.refsData['https://drafts.csswg.org/cssom-1/#cssstyledeclaration-declarations'] = {"text": "declarations", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#cssstyledeclaration-declarations", "export": true, "normative": true, "for_": ["CSSStyleDeclaration"]};
-window.refsData['https://drafts.csswg.org/cssom-1/#concept-declarations-specified-order'] = {"text": "specified order", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#concept-declarations-specified-order", "export": false, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/cssom-1/#cssstyledeclaration-parent-css-rule'] = {"text": "parent css rule", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#cssstyledeclaration-parent-css-rule", "export": true, "normative": true, "for_": ["CSSStyleDeclaration"]};
-window.refsData['https://drafts.csswg.org/cssom-1/#cssstyledeclaration-owner-node'] = {"text": "owner node", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#cssstyledeclaration-owner-node", "export": true, "normative": true, "for_": ["CSSStyleDeclaration"]};
-window.refsData['https://drafts.csswg.org/cssom-1/#serialize-a-css-declaration-block'] = {"text": "serialize a css declaration block", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#serialize-a-css-declaration-block", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/cssom-1/#serialize-a-css-rule'] = {"text": "serialize a css rule", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#serialize-a-css-rule", "export": true, "normative": true, "for_": []};
 </script>

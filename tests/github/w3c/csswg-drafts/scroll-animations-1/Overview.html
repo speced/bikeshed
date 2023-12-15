@@ -80,7 +80,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -454,6 +453,11 @@ figcaption:not(.no-marker)::before {
     }
 }
 </style>
+<style>/* Boilerplate: style-idl-highlighting */
+pre.idl.highlight {
+    background: var(--borderedblock-bg, var(--def-bg));
+}
+</style>
 <style>/* Boilerplate: style-issues */
 a[href].issue-return {
     float: right;
@@ -511,7 +515,6 @@ a[href].issue-return {
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -571,7 +574,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -628,7 +630,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -2545,513 +2546,8 @@ checked anywhere. <a href="https://github.com/w3c/csswg-drafts/issues/5203">[Iss
    <div class="issue"> Consider choosing animation target’s nearest scrollable ancestor
 instead of document’s scrolling Element for <code>auto</code>. <a href="https://github.com/w3c/csswg-drafts/issues/4338">[Issue #4338]</a> <a class="issue-return" href="#issue-62b2910f" title="Jump to section">↵</a></div>
   </div>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['27adb16a'] = {"dfnID": "27adb16a", "url": "https://drafts.csswg.org/css-animations-2/#propdef-animation-timeline", "dfnText": "animation-timeline", "refSections": [{"refs": [{"id": "ref-for-propdef-animation-timeline"}], "title": "2.2. The content progress bar"}, {"refs": [{"id": "ref-for-propdef-animation-timeline\u2460"}], "title": "3.2. The '@scroll-timeline' at-rule"}, {"refs": [{"id": "ref-for-propdef-animation-timeline\u2461"}], "title": "3.3. Examples"}], "external": true};
-window.dfnpanelData['5c21b8af'] = {"dfnID": "5c21b8af", "url": "https://drafts.csswg.org/css-box-4/#padding-box", "dfnText": "padding box", "refSections": [{"refs": [{"id": "ref-for-padding-box"}], "title": "3.1.3.1. Container-based Offset"}], "external": true};
-window.dfnpanelData['86923d07'] = {"dfnID": "86923d07", "url": "https://drafts.csswg.org/css-overflow-3/#scroll-container", "dfnText": "scroll container", "refSections": [{"refs": [{"id": "ref-for-scroll-container"}], "title": "3.1.2. The ScrollTimeline interface"}, {"refs": [{"id": "ref-for-scroll-container\u2460"}], "title": "3.1.3. Scroll Timeline Offset"}, {"refs": [{"id": "ref-for-scroll-container\u2461"}, {"id": "ref-for-scroll-container\u2462"}], "title": "3.1.3.1. Container-based Offset"}, {"refs": [{"id": "ref-for-scroll-container\u2463"}, {"id": "ref-for-scroll-container\u2464"}, {"id": "ref-for-scroll-container\u2465"}], "title": "3.1.3.2. Element-based Offset"}, {"refs": [{"id": "ref-for-scroll-container\u2466"}], "title": "3.1.7. The phase of a ScrollTimeline"}, {"refs": [{"id": "ref-for-scroll-container\u2467"}], "title": "3.1.8. The current time of a ScrollTimeline"}, {"refs": [{"id": "ref-for-scroll-container\u2468"}], "title": "3.2.1. Scroll Timeline descriptors"}], "external": true};
-window.dfnpanelData['60bbf126'] = {"dfnID": "60bbf126", "url": "https://drafts.csswg.org/css-overflow-3/#scrollport", "dfnText": "scrollport", "refSections": [{"refs": [{"id": "ref-for-scrollport"}, {"id": "ref-for-scrollport\u2460"}, {"id": "ref-for-scrollport\u2461"}, {"id": "ref-for-scrollport\u2462"}, {"id": "ref-for-scrollport\u2463"}, {"id": "ref-for-scrollport\u2464"}], "title": "3.1.3.2. Element-based Offset"}], "external": true};
-window.dfnpanelData['84252421'] = {"dfnID": "84252421", "url": "https://drafts.csswg.org/css-syntax-3/#typedef-declaration-list", "dfnText": "<declaration-list>", "refSections": [{"refs": [{"id": "ref-for-typedef-declaration-list"}, {"id": "ref-for-typedef-declaration-list\u2460"}], "title": "3.2. The '@scroll-timeline' at-rule"}], "external": true};
-window.dfnpanelData['ee594e1c'] = {"dfnID": "ee594e1c", "url": "https://drafts.css-houdini.org/css-typed-om-1/#csskeywordvalue", "dfnText": "CSSKeywordValue", "refSections": [{"refs": [{"id": "ref-for-csskeywordvalue"}], "title": "3.1.2. The ScrollTimeline interface"}, {"refs": [{"id": "ref-for-csskeywordvalue\u2460"}, {"id": "ref-for-csskeywordvalue\u2461"}], "title": "3.1.3.1. Container-based Offset"}], "external": true};
-window.dfnpanelData['93c6870a'] = {"dfnID": "93c6870a", "url": "https://drafts.css-houdini.org/css-typed-om-1/#typedefdef-csskeywordish", "dfnText": "CSSKeywordish", "refSections": [{"refs": [{"id": "ref-for-typedefdef-csskeywordish"}], "title": "3.1.2. The ScrollTimeline interface"}], "external": true};
-window.dfnpanelData['16ef1f31'] = {"dfnID": "16ef1f31", "url": "https://drafts.css-houdini.org/css-typed-om-1/#cssnumericvalue", "dfnText": "CSSNumericValue", "refSections": [{"refs": [{"id": "ref-for-cssnumericvalue"}, {"id": "ref-for-cssnumericvalue\u2460"}], "title": "3.1.2. The ScrollTimeline interface"}, {"refs": [{"id": "ref-for-cssnumericvalue\u2461"}, {"id": "ref-for-cssnumericvalue\u2462"}, {"id": "ref-for-cssnumericvalue\u2463"}, {"id": "ref-for-cssnumericvalue\u2464"}], "title": "3.1.3.1. Container-based Offset"}], "external": true};
-window.dfnpanelData['f08d9adf'] = {"dfnID": "f08d9adf", "url": "https://drafts.css-houdini.org/css-typed-om-1/#cssstylevalue-match-a-grammar", "dfnText": "match the grammar", "refSections": [{"refs": [{"id": "ref-for-cssstylevalue-match-a-grammar"}, {"id": "ref-for-cssstylevalue-match-a-grammar\u2460"}], "title": "3.1.2. The ScrollTimeline interface"}, {"refs": [{"id": "ref-for-cssstylevalue-match-a-grammar\u2461"}, {"id": "ref-for-cssstylevalue-match-a-grammar\u2462"}], "title": "3.1.3.1. Container-based Offset"}], "external": true};
-window.dfnpanelData['79d5e44b'] = {"dfnID": "79d5e44b", "url": "https://drafts.css-houdini.org/css-typed-om-1/#rectify-a-keywordish-value", "dfnText": "rectify a keywordish value", "refSections": [{"refs": [{"id": "ref-for-rectify-a-keywordish-value"}], "title": "3.1.2. The ScrollTimeline interface"}], "external": true};
-window.dfnpanelData['68487d22'] = {"dfnID": "68487d22", "url": "https://drafts.csswg.org/css-values-4/#mult-comma", "dfnText": "#", "refSections": [{"refs": [{"id": "ref-for-mult-comma"}], "title": "3.2.1. Scroll Timeline descriptors"}], "external": true};
-window.dfnpanelData['e274345c'] = {"dfnID": "e274345c", "url": "https://drafts.csswg.org/css-values-4/#identifier-value", "dfnText": "<custom-ident>", "refSections": [{"refs": [{"id": "ref-for-identifier-value"}, {"id": "ref-for-identifier-value\u2460"}, {"id": "ref-for-identifier-value\u2461"}], "title": "3.2. The '@scroll-timeline' at-rule"}], "external": true};
-window.dfnpanelData['18222566'] = {"dfnID": "18222566", "url": "https://drafts.csswg.org/css-values-4/#typedef-length-percentage", "dfnText": "<length-percentage>", "refSections": [{"refs": [{"id": "ref-for-typedef-length-percentage"}], "title": "3.1.2. The ScrollTimeline interface"}, {"refs": [{"id": "ref-for-typedef-length-percentage\u2460"}], "title": "3.1.3.1. Container-based Offset"}, {"refs": [{"id": "ref-for-typedef-length-percentage\u2461"}, {"id": "ref-for-typedef-length-percentage\u2462"}], "title": "3.2.1. Scroll Timeline descriptors"}], "external": true};
-window.dfnpanelData['fb030e6c'] = {"dfnID": "fb030e6c", "url": "https://drafts.csswg.org/css-values-4/#length-value", "dfnText": "<length>", "refSections": [{"refs": [{"id": "ref-for-length-value"}], "title": "3.1.3.1. Container-based Offset"}], "external": true};
-window.dfnpanelData['16310992'] = {"dfnID": "16310992", "url": "https://drafts.csswg.org/css-values-4/#number-value", "dfnText": "<number>", "refSections": [{"refs": [{"id": "ref-for-number-value"}, {"id": "ref-for-number-value\u2460"}], "title": "3.2.1. Scroll Timeline descriptors"}], "external": true};
-window.dfnpanelData['977d3003'] = {"dfnID": "977d3003", "url": "https://drafts.csswg.org/css-values-4/#string-value", "dfnText": "<string>", "refSections": [{"refs": [{"id": "ref-for-string-value"}, {"id": "ref-for-string-value\u2460"}], "title": "3.2. The '@scroll-timeline' at-rule"}], "external": true};
-window.dfnpanelData['03570f9e'] = {"dfnID": "03570f9e", "url": "https://drafts.csswg.org/css-values-4/#time-value", "dfnText": "<time>", "refSections": [{"refs": [{"id": "ref-for-time-value"}], "title": "3.2.1. Scroll Timeline descriptors"}], "external": true};
-window.dfnpanelData['584e9c31'] = {"dfnID": "584e9c31", "url": "https://drafts.csswg.org/css-values-4/#funcdef-calc", "dfnText": "calc()", "refSections": [{"refs": [{"id": "ref-for-funcdef-calc"}], "title": "3.1.3.1. Container-based Offset"}], "external": true};
-window.dfnpanelData['358fd6ff'] = {"dfnID": "358fd6ff", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "dfnText": "css-wide keywords", "refSections": [{"refs": [{"id": "ref-for-css-wide-keywords"}], "title": "1.3. Value Definitions"}], "external": true};
-window.dfnpanelData['6ec67710'] = {"dfnID": "6ec67710", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "dfnText": "|", "refSections": [{"refs": [{"id": "ref-for-comb-one"}, {"id": "ref-for-comb-one\u2460"}, {"id": "ref-for-comb-one\u2461"}, {"id": "ref-for-comb-one\u2462"}, {"id": "ref-for-comb-one\u2463"}, {"id": "ref-for-comb-one\u2464"}, {"id": "ref-for-comb-one\u2465"}, {"id": "ref-for-comb-one\u2466"}], "title": "3.2.1. Scroll Timeline descriptors"}], "external": true};
-window.dfnpanelData['e1ab41b7'] = {"dfnID": "e1ab41b7", "url": "https://drafts.csswg.org/css-writing-modes-4/#block-axis", "dfnText": "block axis", "refSections": [{"refs": [{"id": "ref-for-block-axis"}], "title": "3.1.1. The ScrollDirection enumeration"}], "external": true};
-window.dfnpanelData['43667deb'] = {"dfnID": "43667deb", "url": "https://drafts.csswg.org/css-writing-modes-4/#inline-axis", "dfnText": "inline axis", "refSections": [{"refs": [{"id": "ref-for-inline-axis"}], "title": "3.1.1. The ScrollDirection enumeration"}], "external": true};
-window.dfnpanelData['eda608e1'] = {"dfnID": "eda608e1", "url": "https://drafts.csswg.org/css-animations-1/#propdef-animation", "dfnText": "animation", "refSections": [{"refs": [{"id": "ref-for-propdef-animation"}], "title": "2.2. The content progress bar"}], "external": true};
-window.dfnpanelData['c1df3b00'] = {"dfnID": "c1df3b00", "url": "https://drafts.csswg.org/css-animations-1/#csskeyframerule", "dfnText": "csskeyframerule", "refSections": [{"refs": [{"id": "ref-for-csskeyframerule"}], "title": "3.1.6. The progress of a ScrollTimeline"}], "external": true};
-window.dfnpanelData['f8d03099'] = {"dfnID": "f8d03099", "url": "https://drafts.csswg.org/css-animations-1/#interface-csskeyframesrule-findrule", "dfnText": "findrule", "refSections": [{"refs": [{"id": "ref-for-interface-csskeyframesrule-findrule"}], "title": "3.1.6. The progress of a ScrollTimeline"}], "external": true};
-window.dfnpanelData['5fced98b'] = {"dfnID": "5fced98b", "url": "https://drafts.csswg.org/cssom-1/#cssomstring", "dfnText": "CSSOMString", "refSections": [{"refs": [{"id": "ref-for-cssomstring"}, {"id": "ref-for-cssomstring\u2460"}, {"id": "ref-for-cssomstring\u2461"}, {"id": "ref-for-cssomstring\u2462"}, {"id": "ref-for-cssomstring\u2463"}, {"id": "ref-for-cssomstring\u2464"}, {"id": "ref-for-cssomstring\u2465"}, {"id": "ref-for-cssomstring\u2466"}, {"id": "ref-for-cssomstring\u2467"}, {"id": "ref-for-cssomstring\u2468"}], "title": "3.2.2. The CSSScrollTimelineRule Interface"}], "external": true};
-window.dfnpanelData['ebaeb088'] = {"dfnID": "ebaeb088", "url": "https://drafts.csswg.org/cssom-1/#cssrule", "dfnText": "CSSRule", "refSections": [{"refs": [{"id": "ref-for-cssrule"}], "title": "3.2.2. The CSSScrollTimelineRule Interface"}], "external": true};
-window.dfnpanelData['d09ad82c'] = {"dfnID": "d09ad82c", "url": "https://drafts.csswg.org/cssom-1/#serialize-a-css-component-value", "dfnText": "serialize a css component value", "refSections": [{"refs": [{"id": "ref-for-serialize-a-css-component-value"}, {"id": "ref-for-serialize-a-css-component-value\u2460"}, {"id": "ref-for-serialize-a-css-component-value\u2461"}], "title": "3.2.2. The CSSScrollTimelineRule Interface"}], "external": true};
-window.dfnpanelData['0ba50be3'] = {"dfnID": "0ba50be3", "url": "https://drafts.csswg.org/cssom-1/#serialize-a-selector", "dfnText": "serialize a selector", "refSections": [{"refs": [{"id": "ref-for-serialize-a-selector"}], "title": "3.2.2. The CSSScrollTimelineRule Interface"}], "external": true};
-window.dfnpanelData['f96aa907'] = {"dfnID": "f96aa907", "url": "https://drafts.csswg.org/cssom-1/#serialize-an-identifier", "dfnText": "serialize an identifier", "refSections": [{"refs": [{"id": "ref-for-serialize-an-identifier"}, {"id": "ref-for-serialize-an-identifier\u2460"}, {"id": "ref-for-serialize-an-identifier\u2461"}, {"id": "ref-for-serialize-an-identifier\u2462"}, {"id": "ref-for-serialize-an-identifier\u2463"}], "title": "3.2.2. The CSSScrollTimelineRule Interface"}], "external": true};
-window.dfnpanelData['93a76e75'] = {"dfnID": "93a76e75", "url": "https://drafts.csswg.org/cssom-view/#css-layout-box", "dfnText": "css layout box", "refSections": [{"refs": [{"id": "ref-for-css-layout-box"}], "title": "3.1.3.1. Container-based Offset"}, {"refs": [{"id": "ref-for-css-layout-box\u2460"}, {"id": "ref-for-css-layout-box\u2461"}], "title": "3.1.3.2. Element-based Offset"}, {"refs": [{"id": "ref-for-css-layout-box\u2462"}], "title": "3.1.7. The phase of a ScrollTimeline"}, {"refs": [{"id": "ref-for-css-layout-box\u2463"}], "title": "3.1.8. The current time of a ScrollTimeline"}], "external": true};
-window.dfnpanelData['15013ecb'] = {"dfnID": "15013ecb", "url": "https://drafts.csswg.org/cssom-view/#overflow-directions", "dfnText": "overflow direction", "refSections": [{"refs": [{"id": "ref-for-overflow-directions"}], "title": "3.1.3.1. Container-based Offset"}], "external": true};
-window.dfnpanelData['4186822a'] = {"dfnID": "4186822a", "url": "https://drafts.csswg.org/cssom-view-1/#scrolling-box", "dfnText": "scrolling box", "refSections": [{"refs": [{"id": "ref-for-scrolling-box"}], "title": "3.1.3.1. Container-based Offset"}, {"refs": [{"id": "ref-for-scrolling-box\u2460"}, {"id": "ref-for-scrolling-box\u2461"}], "title": "3.1.3.2. Element-based Offset"}], "external": true};
-window.dfnpanelData['dff67f7b'] = {"dfnID": "dff67f7b", "url": "https://drafts.csswg.org/cssom-view-1/#dom-document-scrollingelement", "dfnText": "scrollingElement", "refSections": [{"refs": [{"id": "ref-for-dom-document-scrollingelement"}], "title": "3.1.2. The ScrollTimeline interface"}, {"refs": [{"id": "ref-for-dom-document-scrollingelement\u2460"}], "title": "3.2.1. Scroll Timeline descriptors"}], "external": true};
-window.dfnpanelData['85394472'] = {"dfnID": "85394472", "url": "https://dom.spec.whatwg.org/#document", "dfnText": "Document", "refSections": [{"refs": [{"id": "ref-for-document"}], "title": "3.1.2. The ScrollTimeline interface"}, {"refs": [{"id": "ref-for-document\u2460"}], "title": "3.2.1. Scroll Timeline descriptors"}], "external": true};
-window.dfnpanelData['296f3551'] = {"dfnID": "296f3551", "url": "https://dom.spec.whatwg.org/#element", "dfnText": "Element", "refSections": [{"refs": [{"id": "ref-for-element"}, {"id": "ref-for-element\u2460"}, {"id": "ref-for-element\u2461"}], "title": "3.1.2. The ScrollTimeline interface"}, {"refs": [{"id": "ref-for-element\u2462"}, {"id": "ref-for-element\u2463"}], "title": "3.1.3.2. Element-based Offset"}], "external": true};
-window.dfnpanelData['19f9e9df'] = {"dfnID": "19f9e9df", "url": "https://dom.spec.whatwg.org/#concept-shadow-tree", "dfnText": "shadow tree", "refSections": [{"refs": [{"id": "ref-for-concept-shadow-tree"}], "title": "3.2. The '@scroll-timeline' at-rule"}], "external": true};
-window.dfnpanelData['5d7209e9'] = {"dfnID": "5d7209e9", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window", "dfnText": "Window", "refSections": [{"refs": [{"id": "ref-for-window"}], "title": "3.1.2. The ScrollTimeline interface"}, {"refs": [{"id": "ref-for-window\u2460"}], "title": "3.2.1. Scroll Timeline descriptors"}], "external": true};
-window.dfnpanelData['ce3d2bbb'] = {"dfnID": "ce3d2bbb", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#current-global-object", "dfnText": "current global object", "refSections": [{"refs": [{"id": "ref-for-current-global-object"}], "title": "3.1.2. The ScrollTimeline interface"}, {"refs": [{"id": "ref-for-current-global-object\u2460"}], "title": "3.2.1. Scroll Timeline descriptors"}], "external": true};
-window.dfnpanelData['f351b546'] = {"dfnID": "f351b546", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-document-window", "dfnText": "document associated with a window", "refSections": [{"refs": [{"id": "ref-for-concept-document-window"}], "title": "3.1.2. The ScrollTimeline interface"}, {"refs": [{"id": "ref-for-concept-document-window\u2460"}], "title": "3.2.1. Scroll Timeline descriptors"}], "external": true};
-window.dfnpanelData['e57197d8'] = {"dfnID": "e57197d8", "url": "https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html#dom-animationframeprovider-requestanimationframe", "dfnText": "requestAnimationFrame(callback)", "refSections": [{"refs": [{"id": "ref-for-dom-animationframeprovider-requestanimationframe"}], "title": "4. Avoiding cycles with layout"}], "external": true};
-window.dfnpanelData['60e63159'] = {"dfnID": "60e63159", "url": "https://drafts.csswg.org/selectors-4/#typedef-id-selector", "dfnText": "<id-selector>", "refSections": [{"refs": [{"id": "ref-for-typedef-id-selector"}, {"id": "ref-for-typedef-id-selector\u2460"}, {"id": "ref-for-typedef-id-selector\u2461"}, {"id": "ref-for-typedef-id-selector\u2462"}], "title": "3.2.1. Scroll Timeline descriptors"}], "external": true};
-window.dfnpanelData['28642d4f'] = {"dfnID": "28642d4f", "url": "https://drafts.csswg.org/web-animations-1/#animationtimeline", "dfnText": "AnimationTimeline", "refSections": [{"refs": [{"id": "ref-for-animationtimeline"}, {"id": "ref-for-animationtimeline\u2460"}], "title": "3.1.2. The ScrollTimeline interface"}], "external": true};
-window.dfnpanelData['77786c58'] = {"dfnID": "77786c58", "url": "https://w3c.github.io/web-animations/#timeline-active-phase", "dfnText": "active phase", "refSections": [{"refs": [{"id": "ref-for-timeline-active-phase"}], "title": "3.1.7. The phase of a ScrollTimeline"}], "external": true};
-window.dfnpanelData['52b40c46'] = {"dfnID": "52b40c46", "url": "https://w3c.github.io/web-animations/#timeline-after-phase", "dfnText": "after phase", "refSections": [{"refs": [{"id": "ref-for-timeline-after-phase"}], "title": "3.1.7. The phase of a ScrollTimeline"}], "external": true};
-window.dfnpanelData['7fd14b9f'] = {"dfnID": "7fd14b9f", "url": "https://w3c.github.io/web-animations/#concept-animation", "dfnText": "animation", "refSections": [{"refs": [{"id": "ref-for-concept-animation"}], "title": "1.1. Relationship to other specifications"}], "external": true};
-window.dfnpanelData['c462bd82'] = {"dfnID": "c462bd82", "url": "https://w3c.github.io/web-animations/#timeline-before-phase", "dfnText": "before phase", "refSections": [{"refs": [{"id": "ref-for-timeline-before-phase"}], "title": "3.1.7. The phase of a ScrollTimeline"}], "external": true};
-window.dfnpanelData['ee5882b8'] = {"dfnID": "ee5882b8", "url": "https://w3c.github.io/web-animations/#current-time", "dfnText": "current time", "refSections": [{"refs": [{"id": "ref-for-current-time"}], "title": "3.1.6. The progress of a ScrollTimeline"}, {"refs": [{"id": "ref-for-current-time\u2460"}, {"id": "ref-for-current-time\u2461"}, {"id": "ref-for-current-time\u2462"}, {"id": "ref-for-current-time\u2463"}, {"id": "ref-for-current-time\u2464"}, {"id": "ref-for-current-time\u2465"}], "title": "3.1.8. The current time of a ScrollTimeline"}], "external": true};
-window.dfnpanelData['82b129cf'] = {"dfnID": "82b129cf", "url": "https://w3c.github.io/web-animations/#duration", "dfnText": "duration", "refSections": [{"refs": [{"id": "ref-for-duration"}], "title": "3.1.2. The ScrollTimeline interface"}], "external": true};
-window.dfnpanelData['26c82f32'] = {"dfnID": "26c82f32", "url": "https://w3c.github.io/web-animations/#timeline-inactive-phase", "dfnText": "inactive phase", "refSections": [{"refs": [{"id": "ref-for-timeline-inactive-phase"}], "title": "3.1.7. The phase of a ScrollTimeline"}], "external": true};
-window.dfnpanelData['5da8b149'] = {"dfnID": "5da8b149", "url": "https://w3c.github.io/web-animations/#timeline-phase", "dfnText": "phase", "refSections": [{"refs": [{"id": "ref-for-timeline-phase"}, {"id": "ref-for-timeline-phase\u2460"}, {"id": "ref-for-timeline-phase\u2461"}, {"id": "ref-for-timeline-phase\u2462"}, {"id": "ref-for-timeline-phase\u2463"}, {"id": "ref-for-timeline-phase\u2464"}], "title": "3.1.7. The phase of a ScrollTimeline"}], "external": true};
-window.dfnpanelData['b7ad515b'] = {"dfnID": "b7ad515b", "url": "https://w3c.github.io/web-animations/#start-delay", "dfnText": "start delay", "refSections": [{"refs": [{"id": "ref-for-start-delay"}], "title": "3.1.2. The ScrollTimeline interface"}], "external": true};
-window.dfnpanelData['94f4030b'] = {"dfnID": "94f4030b", "url": "https://w3c.github.io/web-animations/#target-effect-end", "dfnText": "target effect end", "refSections": [{"refs": [{"id": "ref-for-target-effect-end"}, {"id": "ref-for-target-effect-end\u2460"}], "title": "3.1.4. The effective time range of a ScrollTimeline"}], "external": true};
-window.dfnpanelData['58eebff5'] = {"dfnID": "58eebff5", "url": "https://w3c.github.io/web-animations/#timeline", "dfnText": "timeline", "refSections": [{"refs": [{"id": "ref-for-timeline"}, {"id": "ref-for-timeline\u2460"}], "title": "1.1. Relationship to other specifications"}], "external": true};
-window.dfnpanelData['dca2de17'] = {"dfnID": "dca2de17", "url": "https://webidl.spec.whatwg.org/#idl-DOMException", "dfnText": "DOMException", "refSections": [{"refs": [{"id": "ref-for-idl-DOMException"}], "title": "3.1.2. The ScrollTimeline interface"}], "external": true};
-window.dfnpanelData['8855a9aa'] = {"dfnID": "8855a9aa", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "dfnText": "DOMString", "refSections": [{"refs": [{"id": "ref-for-idl-DOMString"}], "title": "3.1.2. The ScrollTimeline interface"}], "external": true};
-window.dfnpanelData['889e932f'] = {"dfnID": "889e932f", "url": "https://webidl.spec.whatwg.org/#Exposed", "dfnText": "Exposed", "refSections": [{"refs": [{"id": "ref-for-Exposed"}], "title": "3.1.2. The ScrollTimeline interface"}, {"refs": [{"id": "ref-for-Exposed\u2460"}], "title": "3.2.2. The CSSScrollTimelineRule Interface"}], "external": true};
-window.dfnpanelData['dcf5fafa'] = {"dfnID": "dcf5fafa", "url": "https://webidl.spec.whatwg.org/#idl-frozen-array", "dfnText": "FrozenArray", "refSections": [{"refs": [{"id": "ref-for-idl-frozen-array"}], "title": "3.1.2. The ScrollTimeline interface"}], "external": true};
-window.dfnpanelData['be2d2b4c'] = {"dfnID": "be2d2b4c", "url": "https://webidl.spec.whatwg.org/#syntaxerror", "dfnText": "SyntaxError", "refSections": [{"refs": [{"id": "ref-for-syntaxerror"}], "title": "3.1.2. The ScrollTimeline interface"}], "external": true};
-window.dfnpanelData['8c800cdf'] = {"dfnID": "8c800cdf", "url": "https://webidl.spec.whatwg.org/#idl-double", "dfnText": "double", "refSections": [{"refs": [{"id": "ref-for-idl-double"}, {"id": "ref-for-idl-double\u2460"}], "title": "3.1.2. The ScrollTimeline interface"}, {"refs": [{"id": "ref-for-idl-double\u2461"}, {"id": "ref-for-idl-double\u2462"}], "title": "3.1.3.2. Element-based Offset"}], "external": true};
-window.dfnpanelData['9cce47fd'] = {"dfnID": "9cce47fd", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "dfnText": "sequence", "refSections": [{"refs": [{"id": "ref-for-idl-sequence"}], "title": "3.1.2. The ScrollTimeline interface"}], "external": true};
-window.dfnpanelData['enumdef-scrolldirection'] = {"dfnID": "enumdef-scrolldirection", "url": "#enumdef-scrolldirection", "dfnText": "ScrollDirection", "refSections": [{"refs": [{"id": "ref-for-enumdef-scrolldirection"}, {"id": "ref-for-enumdef-scrolldirection\u2460"}], "title": "3.1.1. The ScrollDirection enumeration"}, {"refs": [{"id": "ref-for-enumdef-scrolldirection\u2461"}, {"id": "ref-for-enumdef-scrolldirection\u2462"}, {"id": "ref-for-enumdef-scrolldirection\u2463"}], "title": "3.1.2. The ScrollTimeline interface"}], "external": false};
-window.dfnpanelData['enumdef-scrolltimelineautokeyword'] = {"dfnID": "enumdef-scrolltimelineautokeyword", "url": "#enumdef-scrolltimelineautokeyword", "dfnText": "ScrollTimelineAutoKeyword", "refSections": [{"refs": [{"id": "ref-for-enumdef-scrolltimelineautokeyword"}, {"id": "ref-for-enumdef-scrolltimelineautokeyword\u2460"}], "title": "3.1.2. The ScrollTimeline interface"}], "external": false};
-window.dfnpanelData['typedefdef-containerbasedoffset'] = {"dfnID": "typedefdef-containerbasedoffset", "url": "#typedefdef-containerbasedoffset", "dfnText": "ContainerBasedOffset", "refSections": [{"refs": [{"id": "ref-for-typedefdef-containerbasedoffset"}], "title": "3.1.2. The ScrollTimeline interface"}], "external": false};
-window.dfnpanelData['typedefdef-scrolltimelineoffset'] = {"dfnID": "typedefdef-scrolltimelineoffset", "url": "#typedefdef-scrolltimelineoffset", "dfnText": "ScrollTimelineOffset", "refSections": [{"refs": [{"id": "ref-for-typedefdef-scrolltimelineoffset"}, {"id": "ref-for-typedefdef-scrolltimelineoffset\u2460"}, {"id": "ref-for-typedefdef-scrolltimelineoffset\u2461"}], "title": "3.1.2. The ScrollTimeline interface"}], "external": false};
-window.dfnpanelData['dictdef-scrolltimelineoptions'] = {"dfnID": "dictdef-scrolltimelineoptions", "url": "#dictdef-scrolltimelineoptions", "dfnText": "ScrollTimelineOptions", "refSections": [{"refs": [{"id": "ref-for-dictdef-scrolltimelineoptions"}], "title": "3.1.2. The ScrollTimeline interface"}], "external": false};
-window.dfnpanelData['scrolltimeline'] = {"dfnID": "scrolltimeline", "url": "#scrolltimeline", "dfnText": "ScrollTimeline", "refSections": [{"refs": [{"id": "ref-for-scrolltimeline"}, {"id": "ref-for-scrolltimeline\u2460"}, {"id": "ref-for-scrolltimeline\u2461"}], "title": "3.1.2. The ScrollTimeline interface"}, {"refs": [{"id": "ref-for-scrolltimeline\u2462"}, {"id": "ref-for-scrolltimeline\u2463"}, {"id": "ref-for-scrolltimeline\u2464"}], "title": "3.1.4. The effective time range of a ScrollTimeline"}, {"refs": [{"id": "ref-for-scrolltimeline\u2465"}], "title": "3.1.5. The effective scroll offsets of a ScrollTimeline"}, {"refs": [{"id": "ref-for-scrolltimeline\u2466"}], "title": "3.1.6. The progress of a ScrollTimeline"}, {"refs": [{"id": "ref-for-scrolltimeline\u2467"}, {"id": "ref-for-scrolltimeline\u2468"}], "title": "3.1.7. The phase of a ScrollTimeline"}, {"refs": [{"id": "ref-for-scrolltimeline\u2460\u24ea"}, {"id": "ref-for-scrolltimeline\u2460\u2460"}], "title": "3.1.8. The current time of a ScrollTimeline"}, {"refs": [{"id": "ref-for-scrolltimeline\u2460\u2461"}], "title": "4. Avoiding cycles with layout"}], "external": false};
-window.dfnpanelData['scroll-timeline'] = {"dfnID": "scroll-timeline", "url": "#scroll-timeline", "dfnText": "scroll timeline", "refSections": [{"refs": [{"id": "ref-for-scroll-timeline"}], "title": "1.1. Relationship to other specifications"}, {"refs": [{"id": "ref-for-scroll-timeline\u2460"}], "title": "3.2. The '@scroll-timeline' at-rule"}], "external": false};
-window.dfnpanelData['dom-scrolltimeline-scrolltimeline'] = {"dfnID": "dom-scrolltimeline-scrolltimeline", "url": "#dom-scrolltimeline-scrolltimeline", "dfnText": "ScrollTimeline(options)", "refSections": [{"refs": [{"id": "ref-for-dom-scrolltimeline-scrolltimeline"}], "title": "3.1.2. The ScrollTimeline interface"}], "external": false};
-window.dfnpanelData['dom-scrolltimeline-source'] = {"dfnID": "dom-scrolltimeline-source", "url": "#dom-scrolltimeline-source", "dfnText": "source", "refSections": [{"refs": [{"id": "ref-for-dom-scrolltimeline-source"}, {"id": "ref-for-dom-scrolltimeline-source\u2460"}], "title": "3.1.2. The ScrollTimeline interface"}, {"refs": [{"id": "ref-for-dom-scrolltimeline-source\u2461"}], "title": "3.1.3. Scroll Timeline Offset"}, {"refs": [{"id": "ref-for-dom-scrolltimeline-source\u2462"}, {"id": "ref-for-dom-scrolltimeline-source\u2463"}, {"id": "ref-for-dom-scrolltimeline-source\u2464"}, {"id": "ref-for-dom-scrolltimeline-source\u2465"}, {"id": "ref-for-dom-scrolltimeline-source\u2466"}, {"id": "ref-for-dom-scrolltimeline-source\u2467"}, {"id": "ref-for-dom-scrolltimeline-source\u2468"}], "title": "3.1.3.1. Container-based Offset"}, {"refs": [{"id": "ref-for-dom-scrolltimeline-source\u2460\u24ea"}, {"id": "ref-for-dom-scrolltimeline-source\u2460\u2460"}, {"id": "ref-for-dom-scrolltimeline-source\u2460\u2461"}, {"id": "ref-for-dom-scrolltimeline-source\u2460\u2462"}, {"id": "ref-for-dom-scrolltimeline-source\u2460\u2463"}, {"id": "ref-for-dom-scrolltimeline-source\u2460\u2464"}, {"id": "ref-for-dom-scrolltimeline-source\u2460\u2465"}, {"id": "ref-for-dom-scrolltimeline-source\u2460\u2466"}, {"id": "ref-for-dom-scrolltimeline-source\u2460\u2467"}, {"id": "ref-for-dom-scrolltimeline-source\u2460\u2468"}, {"id": "ref-for-dom-scrolltimeline-source\u2461\u24ea"}], "title": "3.1.3.2. Element-based Offset"}, {"refs": [{"id": "ref-for-dom-scrolltimeline-source\u2461\u2460"}, {"id": "ref-for-dom-scrolltimeline-source\u2461\u2461"}, {"id": "ref-for-dom-scrolltimeline-source\u2461\u2462"}, {"id": "ref-for-dom-scrolltimeline-source\u2461\u2463"}, {"id": "ref-for-dom-scrolltimeline-source\u2461\u2464"}], "title": "3.1.7. The phase of a ScrollTimeline"}, {"refs": [{"id": "ref-for-dom-scrolltimeline-source\u2461\u2465"}, {"id": "ref-for-dom-scrolltimeline-source\u2461\u2466"}, {"id": "ref-for-dom-scrolltimeline-source\u2461\u2467"}, {"id": "ref-for-dom-scrolltimeline-source\u2461\u2468"}, {"id": "ref-for-dom-scrolltimeline-source\u2462\u24ea"}], "title": "3.1.8. The current time of a ScrollTimeline"}, {"refs": [{"id": "ref-for-dom-scrolltimeline-source\u2462\u2460"}, {"id": "ref-for-dom-scrolltimeline-source\u2462\u2461"}], "title": "3.2.1. Scroll Timeline descriptors"}], "external": false};
-window.dfnpanelData['dom-scrolltimeline-orientation'] = {"dfnID": "dom-scrolltimeline-orientation", "url": "#dom-scrolltimeline-orientation", "dfnText": "orientation", "refSections": [{"refs": [{"id": "ref-for-dom-scrolltimeline-orientation"}, {"id": "ref-for-dom-scrolltimeline-orientation\u2460"}, {"id": "ref-for-dom-scrolltimeline-orientation\u2461"}], "title": "3.1.2. The ScrollTimeline interface"}, {"refs": [{"id": "ref-for-dom-scrolltimeline-orientation\u2462"}], "title": "3.1.3. Scroll Timeline Offset"}, {"refs": [{"id": "ref-for-dom-scrolltimeline-orientation\u2463"}, {"id": "ref-for-dom-scrolltimeline-orientation\u2464"}, {"id": "ref-for-dom-scrolltimeline-orientation\u2465"}], "title": "3.1.3.1. Container-based Offset"}, {"refs": [{"id": "ref-for-dom-scrolltimeline-orientation\u2466"}, {"id": "ref-for-dom-scrolltimeline-orientation\u2467"}, {"id": "ref-for-dom-scrolltimeline-orientation\u2468"}, {"id": "ref-for-dom-scrolltimeline-orientation\u2460\u24ea"}], "title": "3.1.3.2. Element-based Offset"}, {"refs": [{"id": "ref-for-dom-scrolltimeline-orientation\u2460\u2460"}, {"id": "ref-for-dom-scrolltimeline-orientation\u2460\u2461"}], "title": "3.1.7. The phase of a ScrollTimeline"}, {"refs": [{"id": "ref-for-dom-scrolltimeline-orientation\u2460\u2462"}], "title": "3.1.8. The current time of a ScrollTimeline"}, {"refs": [{"id": "ref-for-dom-scrolltimeline-orientation\u2460\u2463"}], "title": "3.2.1. Scroll Timeline descriptors"}], "external": false};
-window.dfnpanelData['dom-scrolltimeline-scrolloffsets'] = {"dfnID": "dom-scrolltimeline-scrolloffsets", "url": "#dom-scrolltimeline-scrolloffsets", "dfnText": "scrollOffsets", "refSections": [{"refs": [{"id": "ref-for-dom-scrolltimeline-scrolloffsets"}, {"id": "ref-for-dom-scrolltimeline-scrolloffsets\u2460"}, {"id": "ref-for-dom-scrolltimeline-scrolloffsets\u2461"}, {"id": "ref-for-dom-scrolltimeline-scrolloffsets\u2462"}], "title": "3.1.2. The ScrollTimeline interface"}, {"refs": [{"id": "ref-for-dom-scrolltimeline-scrolloffsets\u2463"}, {"id": "ref-for-dom-scrolltimeline-scrolloffsets\u2464"}, {"id": "ref-for-dom-scrolltimeline-scrolloffsets\u2465"}, {"id": "ref-for-dom-scrolltimeline-scrolloffsets\u2466"}], "title": "3.1.5. The effective scroll offsets of a ScrollTimeline"}, {"refs": [{"id": "ref-for-dom-scrolltimeline-scrolloffsets\u2467"}], "title": "3.1.6. The progress of a ScrollTimeline"}, {"refs": [{"id": "ref-for-dom-scrolltimeline-scrolloffsets\u2468"}], "title": "3.2.1. Scroll Timeline descriptors"}], "external": false};
-window.dfnpanelData['dom-scrolltimeline-timerange'] = {"dfnID": "dom-scrolltimeline-timerange", "url": "#dom-scrolltimeline-timerange", "dfnText": "timeRange", "refSections": [{"refs": [{"id": "ref-for-dom-scrolltimeline-timerange"}, {"id": "ref-for-dom-scrolltimeline-timerange\u2460"}, {"id": "ref-for-dom-scrolltimeline-timerange\u2461"}, {"id": "ref-for-dom-scrolltimeline-timerange\u2462"}], "title": "3.1.2. The ScrollTimeline interface"}, {"refs": [{"id": "ref-for-dom-scrolltimeline-timerange\u2463"}, {"id": "ref-for-dom-scrolltimeline-timerange\u2464"}], "title": "3.1.4. The effective time range of a ScrollTimeline"}, {"refs": [{"id": "ref-for-dom-scrolltimeline-timerange\u2465"}], "title": "3.2.1. Scroll Timeline descriptors"}], "external": false};
-window.dfnpanelData['effective-scroll-offset'] = {"dfnID": "effective-scroll-offset", "url": "#effective-scroll-offset", "dfnText": "effective scroll offset", "refSections": [{"refs": [{"id": "ref-for-effective-scroll-offset"}], "title": "3.1.2. The ScrollTimeline interface"}, {"refs": [{"id": "ref-for-effective-scroll-offset\u2460"}, {"id": "ref-for-effective-scroll-offset\u2461"}], "title": "3.1.3. Scroll Timeline Offset"}, {"refs": [{"id": "ref-for-effective-scroll-offset\u2462"}, {"id": "ref-for-effective-scroll-offset\u2463"}], "title": "3.1.3.1. Container-based Offset"}, {"refs": [{"id": "ref-for-effective-scroll-offset\u2464"}, {"id": "ref-for-effective-scroll-offset\u2465"}, {"id": "ref-for-effective-scroll-offset\u2466"}, {"id": "ref-for-effective-scroll-offset\u2467"}], "title": "3.1.3.2. Element-based Offset"}, {"refs": [{"id": "ref-for-effective-scroll-offset\u2468"}], "title": "3.1.5. The effective scroll offsets of a ScrollTimeline"}], "external": false};
-window.dfnpanelData['scroll-timeline-offset'] = {"dfnID": "scroll-timeline-offset", "url": "#scroll-timeline-offset", "dfnText": "scroll timeline offset", "refSections": [{"refs": [{"id": "ref-for-scroll-timeline-offset"}], "title": "3.1.2. The ScrollTimeline interface"}, {"refs": [{"id": "ref-for-scroll-timeline-offset\u2460"}], "title": "3.1.3. Scroll Timeline Offset"}, {"refs": [{"id": "ref-for-scroll-timeline-offset\u2461"}, {"id": "ref-for-scroll-timeline-offset\u2462"}, {"id": "ref-for-scroll-timeline-offset\u2463"}], "title": "3.2.1. Scroll Timeline descriptors"}], "external": false};
-window.dfnpanelData['resolve-a-scroll-timeline-offset'] = {"dfnID": "resolve-a-scroll-timeline-offset", "url": "#resolve-a-scroll-timeline-offset", "dfnText": "resolve a scroll timeline offset", "refSections": [{"refs": [{"id": "ref-for-resolve-a-scroll-timeline-offset"}, {"id": "ref-for-resolve-a-scroll-timeline-offset\u2460"}, {"id": "ref-for-resolve-a-scroll-timeline-offset\u2461"}, {"id": "ref-for-resolve-a-scroll-timeline-offset\u2462"}], "title": "3.1.5. The effective scroll offsets of a ScrollTimeline"}], "external": false};
-window.dfnpanelData['effective-start-offset'] = {"dfnID": "effective-start-offset", "url": "#effective-start-offset", "dfnText": "effective start offset", "refSections": [{"refs": [{"id": "ref-for-effective-start-offset"}], "title": "3.1.7. The phase of a ScrollTimeline"}, {"refs": [{"id": "ref-for-effective-start-offset\u2460"}], "title": "3.1.8. The current time of a ScrollTimeline"}], "external": false};
-window.dfnpanelData['effective-end-offset'] = {"dfnID": "effective-end-offset", "url": "#effective-end-offset", "dfnText": "effective end offset", "refSections": [{"refs": [{"id": "ref-for-effective-end-offset"}, {"id": "ref-for-effective-end-offset\u2460"}], "title": "3.1.7. The phase of a ScrollTimeline"}, {"refs": [{"id": "ref-for-effective-end-offset\u2461"}], "title": "3.1.8. The current time of a ScrollTimeline"}], "external": false};
-window.dfnpanelData['container-based-offset'] = {"dfnID": "container-based-offset", "url": "#container-based-offset", "dfnText": "container-based offset", "refSections": [{"refs": [{"id": "ref-for-container-based-offset"}], "title": "3.1.3. Scroll Timeline Offset"}, {"refs": [{"id": "ref-for-container-based-offset\u2460"}], "title": "3.1.3.1. Container-based Offset"}, {"refs": [{"id": "ref-for-container-based-offset\u2461"}], "title": "3.2.1. Scroll Timeline descriptors"}], "external": false};
-window.dfnpanelData['resolve-a-container-based-offset'] = {"dfnID": "resolve-a-container-based-offset", "url": "#resolve-a-container-based-offset", "dfnText": "resolve a container-based offset", "refSections": [{"refs": [{"id": "ref-for-resolve-a-container-based-offset"}], "title": "3.1.3. Scroll Timeline Offset"}], "external": false};
-window.dfnpanelData['element-based-offset'] = {"dfnID": "element-based-offset", "url": "#element-based-offset", "dfnText": "element-based offset", "refSections": [{"refs": [{"id": "ref-for-element-based-offset"}], "title": "3.1.3. Scroll Timeline Offset"}, {"refs": [{"id": "ref-for-element-based-offset\u2460"}], "title": "3.1.3.2. Element-based Offset"}, {"refs": [{"id": "ref-for-element-based-offset\u2461"}], "title": "3.2.1. Scroll Timeline descriptors"}], "external": false};
-window.dfnpanelData['enumdef-edge'] = {"dfnID": "enumdef-edge", "url": "#enumdef-edge", "dfnText": "Edge", "refSections": [{"refs": [{"id": "ref-for-enumdef-edge"}, {"id": "ref-for-enumdef-edge\u2460"}], "title": "3.1.3.2. Element-based Offset"}], "external": false};
-window.dfnpanelData['dom-edge-start'] = {"dfnID": "dom-edge-start", "url": "#dom-edge-start", "dfnText": "\"start\"", "refSections": [{"refs": [{"id": "ref-for-dom-edge-start"}, {"id": "ref-for-dom-edge-start\u2460"}], "title": "3.1.2. The ScrollTimeline interface"}], "external": false};
-window.dfnpanelData['dom-edge-end'] = {"dfnID": "dom-edge-end", "url": "#dom-edge-end", "dfnText": "\"end\"", "refSections": [{"refs": [{"id": "ref-for-dom-edge-end"}, {"id": "ref-for-dom-edge-end\u2460"}], "title": "3.1.2. The ScrollTimeline interface"}], "external": false};
-window.dfnpanelData['dictdef-elementbasedoffset'] = {"dfnID": "dictdef-elementbasedoffset", "url": "#dictdef-elementbasedoffset", "dfnText": "ElementBasedOffset", "refSections": [{"refs": [{"id": "ref-for-dictdef-elementbasedoffset"}, {"id": "ref-for-dictdef-elementbasedoffset\u2460"}], "title": "3.1.2. The ScrollTimeline interface"}, {"refs": [{"id": "ref-for-dictdef-elementbasedoffset\u2461"}], "title": "3.1.3.2. Element-based Offset"}], "external": false};
-window.dfnpanelData['dom-elementbasedoffset-target'] = {"dfnID": "dom-elementbasedoffset-target", "url": "#dom-elementbasedoffset-target", "dfnText": "target", "refSections": [{"refs": [{"id": "ref-for-dom-elementbasedoffset-target"}, {"id": "ref-for-dom-elementbasedoffset-target\u2460"}, {"id": "ref-for-dom-elementbasedoffset-target\u2461"}], "title": "3.1.3.2. Element-based Offset"}, {"refs": [{"id": "ref-for-dom-elementbasedoffset-target\u2462"}], "title": "3.1.8. The current time of a ScrollTimeline"}, {"refs": [{"id": "ref-for-dom-elementbasedoffset-target\u2463"}], "title": "3.2.1. Scroll Timeline descriptors"}], "external": false};
-window.dfnpanelData['dom-elementbasedoffset-edge'] = {"dfnID": "dom-elementbasedoffset-edge", "url": "#dom-elementbasedoffset-edge", "dfnText": "edge", "refSections": [{"refs": [{"id": "ref-for-dom-elementbasedoffset-edge"}, {"id": "ref-for-dom-elementbasedoffset-edge\u2460"}, {"id": "ref-for-dom-elementbasedoffset-edge\u2461"}, {"id": "ref-for-dom-elementbasedoffset-edge\u2462"}, {"id": "ref-for-dom-elementbasedoffset-edge\u2463"}], "title": "3.1.3.2. Element-based Offset"}, {"refs": [{"id": "ref-for-dom-elementbasedoffset-edge\u2464"}], "title": "3.2.1. Scroll Timeline descriptors"}, {"refs": [{"id": "ref-for-dom-elementbasedoffset-edge\u2465"}], "title": "3.2.2. The CSSScrollTimelineRule Interface"}], "external": false};
-window.dfnpanelData['dom-elementbasedoffset-threshold'] = {"dfnID": "dom-elementbasedoffset-threshold", "url": "#dom-elementbasedoffset-threshold", "dfnText": "threshold", "refSections": [{"refs": [{"id": "ref-for-dom-elementbasedoffset-threshold"}, {"id": "ref-for-dom-elementbasedoffset-threshold\u2460"}], "title": "3.1.3.2. Element-based Offset"}, {"refs": [{"id": "ref-for-dom-elementbasedoffset-threshold\u2461"}], "title": "3.2.1. Scroll Timeline descriptors"}, {"refs": [{"id": "ref-for-dom-elementbasedoffset-threshold\u2462"}], "title": "3.2.2. The CSSScrollTimelineRule Interface"}], "external": false};
-window.dfnpanelData['resolve-an-element-based-offset'] = {"dfnID": "resolve-an-element-based-offset", "url": "#resolve-an-element-based-offset", "dfnText": "resolve an element-based offset", "refSections": [{"refs": [{"id": "ref-for-resolve-an-element-based-offset"}], "title": "3.1.3. Scroll Timeline Offset"}], "external": false};
-window.dfnpanelData['effective-time-range'] = {"dfnID": "effective-time-range", "url": "#effective-time-range", "dfnText": "effective time range", "refSections": [{"refs": [{"id": "ref-for-effective-time-range"}, {"id": "ref-for-effective-time-range\u2460"}], "title": "3.1.2. The ScrollTimeline interface"}, {"refs": [{"id": "ref-for-effective-time-range\u2461"}, {"id": "ref-for-effective-time-range\u2462"}, {"id": "ref-for-effective-time-range\u2463"}], "title": "3.1.4. The effective time range of a ScrollTimeline"}, {"refs": [{"id": "ref-for-effective-time-range\u2464"}, {"id": "ref-for-effective-time-range\u2465"}], "title": "3.1.8. The current time of a ScrollTimeline"}], "external": false};
-window.dfnpanelData['effective-scroll-offsets'] = {"dfnID": "effective-scroll-offsets", "url": "#effective-scroll-offsets", "dfnText": "effective scroll offsets", "refSections": [{"refs": [{"id": "ref-for-effective-scroll-offsets"}, {"id": "ref-for-effective-scroll-offsets\u2460"}], "title": "3.1.3. Scroll Timeline Offset"}, {"refs": [{"id": "ref-for-effective-scroll-offsets\u2461"}], "title": "3.1.3.1. Container-based Offset"}, {"refs": [{"id": "ref-for-effective-scroll-offsets\u2462"}], "title": "3.1.5. The effective scroll offsets of a ScrollTimeline"}, {"refs": [{"id": "ref-for-effective-scroll-offsets\u2463"}], "title": "3.1.7. The phase of a ScrollTimeline"}, {"refs": [{"id": "ref-for-effective-scroll-offsets\u2464"}, {"id": "ref-for-effective-scroll-offsets\u2465"}], "title": "3.1.8. The current time of a ScrollTimeline"}], "external": false};
-window.dfnpanelData['resolve-scroll-timeline-offsets'] = {"dfnID": "resolve-scroll-timeline-offsets", "url": "#resolve-scroll-timeline-offsets", "dfnText": "resolve scroll timeline offsets", "refSections": [{"refs": [{"id": "ref-for-resolve-scroll-timeline-offsets"}], "title": "3.1.6. The progress of a ScrollTimeline"}], "external": false};
-window.dfnpanelData['calculate-scroll-timeline-progress'] = {"dfnID": "calculate-scroll-timeline-progress", "url": "#calculate-scroll-timeline-progress", "dfnText": "calculate scroll timeline progress", "refSections": [{"refs": [{"id": "ref-for-calculate-scroll-timeline-progress"}], "title": "3.1.8. The current time of a ScrollTimeline"}], "external": false};
-window.dfnpanelData['at-ruledef-scroll-timeline'] = {"dfnID": "at-ruledef-scroll-timeline", "url": "#at-ruledef-scroll-timeline", "dfnText": "@scroll-timeline", "refSections": [{"refs": [{"id": "ref-for-at-ruledef-scroll-timeline"}, {"id": "ref-for-at-ruledef-scroll-timeline\u2460"}, {"id": "ref-for-at-ruledef-scroll-timeline\u2461"}], "title": "3.2. The '@scroll-timeline' at-rule"}, {"refs": [{"id": "ref-for-at-ruledef-scroll-timeline\u2462"}, {"id": "ref-for-at-ruledef-scroll-timeline\u2463"}, {"id": "ref-for-at-ruledef-scroll-timeline\u2464"}, {"id": "ref-for-at-ruledef-scroll-timeline\u2465"}], "title": "3.2.1. Scroll Timeline descriptors"}, {"refs": [{"id": "ref-for-at-ruledef-scroll-timeline\u2466"}, {"id": "ref-for-at-ruledef-scroll-timeline\u2467"}, {"id": "ref-for-at-ruledef-scroll-timeline\u2468"}, {"id": "ref-for-at-ruledef-scroll-timeline\u2460\u24ea"}, {"id": "ref-for-at-ruledef-scroll-timeline\u2460\u2460"}], "title": "3.2.2. The CSSScrollTimelineRule Interface"}], "external": false};
-window.dfnpanelData['typedef-scroll-timeline-offset'] = {"dfnID": "typedef-scroll-timeline-offset", "url": "#typedef-scroll-timeline-offset", "dfnText": "<scroll-timeline-offset>", "refSections": [{"refs": [{"id": "ref-for-typedef-scroll-timeline-offset"}, {"id": "ref-for-typedef-scroll-timeline-offset\u2460"}, {"id": "ref-for-typedef-scroll-timeline-offset\u2461"}], "title": "3.2.1. Scroll Timeline descriptors"}], "external": false};
-window.dfnpanelData['typedef-element-offset'] = {"dfnID": "typedef-element-offset", "url": "#typedef-element-offset", "dfnText": "<element-offset>", "refSections": [{"refs": [{"id": "ref-for-typedef-element-offset"}, {"id": "ref-for-typedef-element-offset\u2460"}], "title": "3.2.1. Scroll Timeline descriptors"}], "external": false};
-window.dfnpanelData['typedef-element-offset-edge'] = {"dfnID": "typedef-element-offset-edge", "url": "#typedef-element-offset-edge", "dfnText": "<element-offset-edge>", "refSections": [{"refs": [{"id": "ref-for-typedef-element-offset-edge"}, {"id": "ref-for-typedef-element-offset-edge\u2460"}], "title": "3.2.1. Scroll Timeline descriptors"}], "external": false};
-window.dfnpanelData['cssscrolltimelinerule'] = {"dfnID": "cssscrolltimelinerule", "url": "#cssscrolltimelinerule", "dfnText": "CSSScrollTimelineRule", "refSections": [{"refs": [{"id": "ref-for-cssscrolltimelinerule"}], "title": "3.2.2. The CSSScrollTimelineRule Interface"}], "external": false};
-window.dfnpanelData['dom-cssscrolltimelinerule-name'] = {"dfnID": "dom-cssscrolltimelinerule-name", "url": "#dom-cssscrolltimelinerule-name", "dfnText": "name", "refSections": [{"refs": [{"id": "ref-for-dom-cssscrolltimelinerule-name"}, {"id": "ref-for-dom-cssscrolltimelinerule-name\u2460"}], "title": "3.2.2. The CSSScrollTimelineRule Interface"}], "external": false};
-window.dfnpanelData['dom-cssscrolltimelinerule-source'] = {"dfnID": "dom-cssscrolltimelinerule-source", "url": "#dom-cssscrolltimelinerule-source", "dfnText": "source", "refSections": [{"refs": [{"id": "ref-for-dom-cssscrolltimelinerule-source"}], "title": "3.2.2. The CSSScrollTimelineRule Interface"}], "external": false};
-window.dfnpanelData['dom-cssscrolltimelinerule-orientation'] = {"dfnID": "dom-cssscrolltimelinerule-orientation", "url": "#dom-cssscrolltimelinerule-orientation", "dfnText": "orientation", "refSections": [{"refs": [{"id": "ref-for-dom-cssscrolltimelinerule-orientation"}], "title": "3.2.2. The CSSScrollTimelineRule Interface"}], "external": false};
-window.dfnpanelData['dom-cssscrolltimelinerule-scrolloffsets'] = {"dfnID": "dom-cssscrolltimelinerule-scrolloffsets", "url": "#dom-cssscrolltimelinerule-scrolloffsets", "dfnText": "scrollOffsets", "refSections": [{"refs": [{"id": "ref-for-dom-cssscrolltimelinerule-scrolloffsets"}], "title": "3.2.2. The CSSScrollTimelineRule Interface"}], "external": false};
-window.dfnpanelData['dom-cssscrolltimelinerule-timerange'] = {"dfnID": "dom-cssscrolltimelinerule-timerange", "url": "#dom-cssscrolltimelinerule-timerange", "dfnText": "timeRange", "refSections": [{"refs": [{"id": "ref-for-dom-cssscrolltimelinerule-timerange"}], "title": "3.2.2. The CSSScrollTimelineRule Interface"}], "external": false};
-window.dfnpanelData['serialize-a-scroll-timeline-offset'] = {"dfnID": "serialize-a-scroll-timeline-offset", "url": "#serialize-a-scroll-timeline-offset", "dfnText": "serialize a scroll timeline offset", "refSections": [{"refs": [{"id": "ref-for-serialize-a-scroll-timeline-offset"}, {"id": "ref-for-serialize-a-scroll-timeline-offset\u2460"}], "title": "3.2.2. The CSSScrollTimelineRule Interface"}], "external": false};
-window.dfnpanelData['serialize-a-selector-function'] = {"dfnID": "serialize-a-selector-function", "url": "#serialize-a-selector-function", "dfnText": "serialize a selector() function", "refSections": [{"refs": [{"id": "ref-for-serialize-a-selector-function"}, {"id": "ref-for-serialize-a-selector-function\u2460"}], "title": "3.2.2. The CSSScrollTimelineRule Interface"}], "external": false};
-window.dfnpanelData['layout-cycles'] = {"dfnID": "layout-cycles", "url": "#layout-cycles", "dfnText": "layout cycles", "refSections": [{"refs": [{"id": "ref-for-layout-cycles"}], "title": "4. Avoiding cycles with layout"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -3245,12 +2741,519 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"27adb16a": {"dfnID":"27adb16a","dfnText":"animation-timeline","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-animation-timeline"}],"title":"2.2. The content progress bar"},{"refs":[{"id":"ref-for-propdef-animation-timeline\u2460"}],"title":"3.2. The '@scroll-timeline' at-rule"},{"refs":[{"id":"ref-for-propdef-animation-timeline\u2461"}],"title":"3.3. Examples"}],"url":"https://drafts.csswg.org/css-animations-2/#propdef-animation-timeline"},
+"5c21b8af": {"dfnID":"5c21b8af","dfnText":"padding box","external":true,"refSections":[{"refs":[{"id":"ref-for-padding-box"}],"title":"3.1.3.1. Container-based Offset"}],"url":"https://drafts.csswg.org/css-box-4/#padding-box"},
+"86923d07": {"dfnID":"86923d07","dfnText":"scroll container","external":true,"refSections":[{"refs":[{"id":"ref-for-scroll-container"}],"title":"3.1.2. The ScrollTimeline interface"},{"refs":[{"id":"ref-for-scroll-container\u2460"}],"title":"3.1.3. Scroll Timeline Offset"},{"refs":[{"id":"ref-for-scroll-container\u2461"},{"id":"ref-for-scroll-container\u2462"}],"title":"3.1.3.1. Container-based Offset"},{"refs":[{"id":"ref-for-scroll-container\u2463"},{"id":"ref-for-scroll-container\u2464"},{"id":"ref-for-scroll-container\u2465"}],"title":"3.1.3.2. Element-based Offset"},{"refs":[{"id":"ref-for-scroll-container\u2466"}],"title":"3.1.7. The phase of a ScrollTimeline"},{"refs":[{"id":"ref-for-scroll-container\u2467"}],"title":"3.1.8. The current time of a ScrollTimeline"},{"refs":[{"id":"ref-for-scroll-container\u2468"}],"title":"3.2.1. Scroll Timeline descriptors"}],"url":"https://drafts.csswg.org/css-overflow-3/#scroll-container"},
+"60bbf126": {"dfnID":"60bbf126","dfnText":"scrollport","external":true,"refSections":[{"refs":[{"id":"ref-for-scrollport"},{"id":"ref-for-scrollport\u2460"},{"id":"ref-for-scrollport\u2461"},{"id":"ref-for-scrollport\u2462"},{"id":"ref-for-scrollport\u2463"},{"id":"ref-for-scrollport\u2464"}],"title":"3.1.3.2. Element-based Offset"}],"url":"https://drafts.csswg.org/css-overflow-3/#scrollport"},
+"84252421": {"dfnID":"84252421","dfnText":"<declaration-list>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-declaration-list"},{"id":"ref-for-typedef-declaration-list\u2460"}],"title":"3.2. The '@scroll-timeline' at-rule"}],"url":"https://drafts.csswg.org/css-syntax-3/#typedef-declaration-list"},
+"ee594e1c": {"dfnID":"ee594e1c","dfnText":"CSSKeywordValue","external":true,"refSections":[{"refs":[{"id":"ref-for-csskeywordvalue"}],"title":"3.1.2. The ScrollTimeline interface"},{"refs":[{"id":"ref-for-csskeywordvalue\u2460"},{"id":"ref-for-csskeywordvalue\u2461"}],"title":"3.1.3.1. Container-based Offset"}],"url":"https://drafts.css-houdini.org/css-typed-om-1/#csskeywordvalue"},
+"93c6870a": {"dfnID":"93c6870a","dfnText":"CSSKeywordish","external":true,"refSections":[{"refs":[{"id":"ref-for-typedefdef-csskeywordish"}],"title":"3.1.2. The ScrollTimeline interface"}],"url":"https://drafts.css-houdini.org/css-typed-om-1/#typedefdef-csskeywordish"},
+"16ef1f31": {"dfnID":"16ef1f31","dfnText":"CSSNumericValue","external":true,"refSections":[{"refs":[{"id":"ref-for-cssnumericvalue"},{"id":"ref-for-cssnumericvalue\u2460"}],"title":"3.1.2. The ScrollTimeline interface"},{"refs":[{"id":"ref-for-cssnumericvalue\u2461"},{"id":"ref-for-cssnumericvalue\u2462"},{"id":"ref-for-cssnumericvalue\u2463"},{"id":"ref-for-cssnumericvalue\u2464"}],"title":"3.1.3.1. Container-based Offset"}],"url":"https://drafts.css-houdini.org/css-typed-om-1/#cssnumericvalue"},
+"f08d9adf": {"dfnID":"f08d9adf","dfnText":"match the grammar","external":true,"refSections":[{"refs":[{"id":"ref-for-cssstylevalue-match-a-grammar"},{"id":"ref-for-cssstylevalue-match-a-grammar\u2460"}],"title":"3.1.2. The ScrollTimeline interface"},{"refs":[{"id":"ref-for-cssstylevalue-match-a-grammar\u2461"},{"id":"ref-for-cssstylevalue-match-a-grammar\u2462"}],"title":"3.1.3.1. Container-based Offset"}],"url":"https://drafts.css-houdini.org/css-typed-om-1/#cssstylevalue-match-a-grammar"},
+"79d5e44b": {"dfnID":"79d5e44b","dfnText":"rectify a keywordish value","external":true,"refSections":[{"refs":[{"id":"ref-for-rectify-a-keywordish-value"}],"title":"3.1.2. The ScrollTimeline interface"}],"url":"https://drafts.css-houdini.org/css-typed-om-1/#rectify-a-keywordish-value"},
+"68487d22": {"dfnID":"68487d22","dfnText":"#","external":true,"refSections":[{"refs":[{"id":"ref-for-mult-comma"}],"title":"3.2.1. Scroll Timeline descriptors"}],"url":"https://drafts.csswg.org/css-values-4/#mult-comma"},
+"e274345c": {"dfnID":"e274345c","dfnText":"<custom-ident>","external":true,"refSections":[{"refs":[{"id":"ref-for-identifier-value"},{"id":"ref-for-identifier-value\u2460"},{"id":"ref-for-identifier-value\u2461"}],"title":"3.2. The '@scroll-timeline' at-rule"}],"url":"https://drafts.csswg.org/css-values-4/#identifier-value"},
+"18222566": {"dfnID":"18222566","dfnText":"<length-percentage>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-length-percentage"}],"title":"3.1.2. The ScrollTimeline interface"},{"refs":[{"id":"ref-for-typedef-length-percentage\u2460"}],"title":"3.1.3.1. Container-based Offset"},{"refs":[{"id":"ref-for-typedef-length-percentage\u2461"},{"id":"ref-for-typedef-length-percentage\u2462"}],"title":"3.2.1. Scroll Timeline descriptors"}],"url":"https://drafts.csswg.org/css-values-4/#typedef-length-percentage"},
+"fb030e6c": {"dfnID":"fb030e6c","dfnText":"<length>","external":true,"refSections":[{"refs":[{"id":"ref-for-length-value"}],"title":"3.1.3.1. Container-based Offset"}],"url":"https://drafts.csswg.org/css-values-4/#length-value"},
+"16310992": {"dfnID":"16310992","dfnText":"<number>","external":true,"refSections":[{"refs":[{"id":"ref-for-number-value"},{"id":"ref-for-number-value\u2460"}],"title":"3.2.1. Scroll Timeline descriptors"}],"url":"https://drafts.csswg.org/css-values-4/#number-value"},
+"977d3003": {"dfnID":"977d3003","dfnText":"<string>","external":true,"refSections":[{"refs":[{"id":"ref-for-string-value"},{"id":"ref-for-string-value\u2460"}],"title":"3.2. The '@scroll-timeline' at-rule"}],"url":"https://drafts.csswg.org/css-values-4/#string-value"},
+"03570f9e": {"dfnID":"03570f9e","dfnText":"<time>","external":true,"refSections":[{"refs":[{"id":"ref-for-time-value"}],"title":"3.2.1. Scroll Timeline descriptors"}],"url":"https://drafts.csswg.org/css-values-4/#time-value"},
+"584e9c31": {"dfnID":"584e9c31","dfnText":"calc()","external":true,"refSections":[{"refs":[{"id":"ref-for-funcdef-calc"}],"title":"3.1.3.1. Container-based Offset"}],"url":"https://drafts.csswg.org/css-values-4/#funcdef-calc"},
+"358fd6ff": {"dfnID":"358fd6ff","dfnText":"css-wide keywords","external":true,"refSections":[{"refs":[{"id":"ref-for-css-wide-keywords"}],"title":"1.3. Value Definitions"}],"url":"https://drafts.csswg.org/css-values-4/#css-wide-keywords"},
+"6ec67710": {"dfnID":"6ec67710","dfnText":"|","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-one"},{"id":"ref-for-comb-one\u2460"},{"id":"ref-for-comb-one\u2461"},{"id":"ref-for-comb-one\u2462"},{"id":"ref-for-comb-one\u2463"},{"id":"ref-for-comb-one\u2464"},{"id":"ref-for-comb-one\u2465"},{"id":"ref-for-comb-one\u2466"}],"title":"3.2.1. Scroll Timeline descriptors"}],"url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"e1ab41b7": {"dfnID":"e1ab41b7","dfnText":"block axis","external":true,"refSections":[{"refs":[{"id":"ref-for-block-axis"}],"title":"3.1.1. The ScrollDirection enumeration"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#block-axis"},
+"43667deb": {"dfnID":"43667deb","dfnText":"inline axis","external":true,"refSections":[{"refs":[{"id":"ref-for-inline-axis"}],"title":"3.1.1. The ScrollDirection enumeration"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#inline-axis"},
+"eda608e1": {"dfnID":"eda608e1","dfnText":"animation","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-animation"}],"title":"2.2. The content progress bar"}],"url":"https://drafts.csswg.org/css-animations-1/#propdef-animation"},
+"c1df3b00": {"dfnID":"c1df3b00","dfnText":"csskeyframerule","external":true,"refSections":[{"refs":[{"id":"ref-for-csskeyframerule"}],"title":"3.1.6. The progress of a ScrollTimeline"}],"url":"https://drafts.csswg.org/css-animations-1/#csskeyframerule"},
+"f8d03099": {"dfnID":"f8d03099","dfnText":"findrule","external":true,"refSections":[{"refs":[{"id":"ref-for-interface-csskeyframesrule-findrule"}],"title":"3.1.6. The progress of a ScrollTimeline"}],"url":"https://drafts.csswg.org/css-animations-1/#interface-csskeyframesrule-findrule"},
+"5fced98b": {"dfnID":"5fced98b","dfnText":"CSSOMString","external":true,"refSections":[{"refs":[{"id":"ref-for-cssomstring"},{"id":"ref-for-cssomstring\u2460"},{"id":"ref-for-cssomstring\u2461"},{"id":"ref-for-cssomstring\u2462"},{"id":"ref-for-cssomstring\u2463"},{"id":"ref-for-cssomstring\u2464"},{"id":"ref-for-cssomstring\u2465"},{"id":"ref-for-cssomstring\u2466"},{"id":"ref-for-cssomstring\u2467"},{"id":"ref-for-cssomstring\u2468"}],"title":"3.2.2. The CSSScrollTimelineRule Interface"}],"url":"https://drafts.csswg.org/cssom-1/#cssomstring"},
+"ebaeb088": {"dfnID":"ebaeb088","dfnText":"CSSRule","external":true,"refSections":[{"refs":[{"id":"ref-for-cssrule"}],"title":"3.2.2. The CSSScrollTimelineRule Interface"}],"url":"https://drafts.csswg.org/cssom-1/#cssrule"},
+"d09ad82c": {"dfnID":"d09ad82c","dfnText":"serialize a css component value","external":true,"refSections":[{"refs":[{"id":"ref-for-serialize-a-css-component-value"},{"id":"ref-for-serialize-a-css-component-value\u2460"},{"id":"ref-for-serialize-a-css-component-value\u2461"}],"title":"3.2.2. The CSSScrollTimelineRule Interface"}],"url":"https://drafts.csswg.org/cssom-1/#serialize-a-css-component-value"},
+"0ba50be3": {"dfnID":"0ba50be3","dfnText":"serialize a selector","external":true,"refSections":[{"refs":[{"id":"ref-for-serialize-a-selector"}],"title":"3.2.2. The CSSScrollTimelineRule Interface"}],"url":"https://drafts.csswg.org/cssom-1/#serialize-a-selector"},
+"f96aa907": {"dfnID":"f96aa907","dfnText":"serialize an identifier","external":true,"refSections":[{"refs":[{"id":"ref-for-serialize-an-identifier"},{"id":"ref-for-serialize-an-identifier\u2460"},{"id":"ref-for-serialize-an-identifier\u2461"},{"id":"ref-for-serialize-an-identifier\u2462"},{"id":"ref-for-serialize-an-identifier\u2463"}],"title":"3.2.2. The CSSScrollTimelineRule Interface"}],"url":"https://drafts.csswg.org/cssom-1/#serialize-an-identifier"},
+"93a76e75": {"dfnID":"93a76e75","dfnText":"css layout box","external":true,"refSections":[{"refs":[{"id":"ref-for-css-layout-box"}],"title":"3.1.3.1. Container-based Offset"},{"refs":[{"id":"ref-for-css-layout-box\u2460"},{"id":"ref-for-css-layout-box\u2461"}],"title":"3.1.3.2. Element-based Offset"},{"refs":[{"id":"ref-for-css-layout-box\u2462"}],"title":"3.1.7. The phase of a ScrollTimeline"},{"refs":[{"id":"ref-for-css-layout-box\u2463"}],"title":"3.1.8. The current time of a ScrollTimeline"}],"url":"https://drafts.csswg.org/cssom-view/#css-layout-box"},
+"15013ecb": {"dfnID":"15013ecb","dfnText":"overflow direction","external":true,"refSections":[{"refs":[{"id":"ref-for-overflow-directions"}],"title":"3.1.3.1. Container-based Offset"}],"url":"https://drafts.csswg.org/cssom-view/#overflow-directions"},
+"4186822a": {"dfnID":"4186822a","dfnText":"scrolling box","external":true,"refSections":[{"refs":[{"id":"ref-for-scrolling-box"}],"title":"3.1.3.1. Container-based Offset"},{"refs":[{"id":"ref-for-scrolling-box\u2460"},{"id":"ref-for-scrolling-box\u2461"}],"title":"3.1.3.2. Element-based Offset"}],"url":"https://drafts.csswg.org/cssom-view-1/#scrolling-box"},
+"dff67f7b": {"dfnID":"dff67f7b","dfnText":"scrollingElement","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-document-scrollingelement"}],"title":"3.1.2. The ScrollTimeline interface"},{"refs":[{"id":"ref-for-dom-document-scrollingelement\u2460"}],"title":"3.2.1. Scroll Timeline descriptors"}],"url":"https://drafts.csswg.org/cssom-view-1/#dom-document-scrollingelement"},
+"85394472": {"dfnID":"85394472","dfnText":"Document","external":true,"refSections":[{"refs":[{"id":"ref-for-document"}],"title":"3.1.2. The ScrollTimeline interface"},{"refs":[{"id":"ref-for-document\u2460"}],"title":"3.2.1. Scroll Timeline descriptors"}],"url":"https://dom.spec.whatwg.org/#document"},
+"296f3551": {"dfnID":"296f3551","dfnText":"Element","external":true,"refSections":[{"refs":[{"id":"ref-for-element"},{"id":"ref-for-element\u2460"},{"id":"ref-for-element\u2461"}],"title":"3.1.2. The ScrollTimeline interface"},{"refs":[{"id":"ref-for-element\u2462"},{"id":"ref-for-element\u2463"}],"title":"3.1.3.2. Element-based Offset"}],"url":"https://dom.spec.whatwg.org/#element"},
+"19f9e9df": {"dfnID":"19f9e9df","dfnText":"shadow tree","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-shadow-tree"}],"title":"3.2. The '@scroll-timeline' at-rule"}],"url":"https://dom.spec.whatwg.org/#concept-shadow-tree"},
+"5d7209e9": {"dfnID":"5d7209e9","dfnText":"Window","external":true,"refSections":[{"refs":[{"id":"ref-for-window"}],"title":"3.1.2. The ScrollTimeline interface"},{"refs":[{"id":"ref-for-window\u2460"}],"title":"3.2.1. Scroll Timeline descriptors"}],"url":"https://html.spec.whatwg.org/multipage/nav-history-apis.html#window"},
+"ce3d2bbb": {"dfnID":"ce3d2bbb","dfnText":"current global object","external":true,"refSections":[{"refs":[{"id":"ref-for-current-global-object"}],"title":"3.1.2. The ScrollTimeline interface"},{"refs":[{"id":"ref-for-current-global-object\u2460"}],"title":"3.2.1. Scroll Timeline descriptors"}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#current-global-object"},
+"f351b546": {"dfnID":"f351b546","dfnText":"document associated with a window","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-document-window"}],"title":"3.1.2. The ScrollTimeline interface"},{"refs":[{"id":"ref-for-concept-document-window\u2460"}],"title":"3.2.1. Scroll Timeline descriptors"}],"url":"https://html.spec.whatwg.org/multipage/browsers.html#concept-document-window"},
+"e57197d8": {"dfnID":"e57197d8","dfnText":"requestAnimationFrame(callback)","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-animationframeprovider-requestanimationframe"}],"title":"4. Avoiding cycles with layout"}],"url":"https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html#dom-animationframeprovider-requestanimationframe"},
+"60e63159": {"dfnID":"60e63159","dfnText":"<id-selector>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-id-selector"},{"id":"ref-for-typedef-id-selector\u2460"},{"id":"ref-for-typedef-id-selector\u2461"},{"id":"ref-for-typedef-id-selector\u2462"}],"title":"3.2.1. Scroll Timeline descriptors"}],"url":"https://drafts.csswg.org/selectors-4/#typedef-id-selector"},
+"28642d4f": {"dfnID":"28642d4f","dfnText":"AnimationTimeline","external":true,"refSections":[{"refs":[{"id":"ref-for-animationtimeline"},{"id":"ref-for-animationtimeline\u2460"}],"title":"3.1.2. The ScrollTimeline interface"}],"url":"https://drafts.csswg.org/web-animations-1/#animationtimeline"},
+"77786c58": {"dfnID":"77786c58","dfnText":"active phase","external":true,"refSections":[{"refs":[{"id":"ref-for-timeline-active-phase"}],"title":"3.1.7. The phase of a ScrollTimeline"}],"url":"https://w3c.github.io/web-animations/#timeline-active-phase"},
+"52b40c46": {"dfnID":"52b40c46","dfnText":"after phase","external":true,"refSections":[{"refs":[{"id":"ref-for-timeline-after-phase"}],"title":"3.1.7. The phase of a ScrollTimeline"}],"url":"https://w3c.github.io/web-animations/#timeline-after-phase"},
+"7fd14b9f": {"dfnID":"7fd14b9f","dfnText":"animation","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-animation"}],"title":"1.1. Relationship to other specifications"}],"url":"https://w3c.github.io/web-animations/#concept-animation"},
+"c462bd82": {"dfnID":"c462bd82","dfnText":"before phase","external":true,"refSections":[{"refs":[{"id":"ref-for-timeline-before-phase"}],"title":"3.1.7. The phase of a ScrollTimeline"}],"url":"https://w3c.github.io/web-animations/#timeline-before-phase"},
+"ee5882b8": {"dfnID":"ee5882b8","dfnText":"current time","external":true,"refSections":[{"refs":[{"id":"ref-for-current-time"}],"title":"3.1.6. The progress of a ScrollTimeline"},{"refs":[{"id":"ref-for-current-time\u2460"},{"id":"ref-for-current-time\u2461"},{"id":"ref-for-current-time\u2462"},{"id":"ref-for-current-time\u2463"},{"id":"ref-for-current-time\u2464"},{"id":"ref-for-current-time\u2465"}],"title":"3.1.8. The current time of a ScrollTimeline"}],"url":"https://w3c.github.io/web-animations/#current-time"},
+"82b129cf": {"dfnID":"82b129cf","dfnText":"duration","external":true,"refSections":[{"refs":[{"id":"ref-for-duration"}],"title":"3.1.2. The ScrollTimeline interface"}],"url":"https://w3c.github.io/web-animations/#duration"},
+"26c82f32": {"dfnID":"26c82f32","dfnText":"inactive phase","external":true,"refSections":[{"refs":[{"id":"ref-for-timeline-inactive-phase"}],"title":"3.1.7. The phase of a ScrollTimeline"}],"url":"https://w3c.github.io/web-animations/#timeline-inactive-phase"},
+"5da8b149": {"dfnID":"5da8b149","dfnText":"phase","external":true,"refSections":[{"refs":[{"id":"ref-for-timeline-phase"},{"id":"ref-for-timeline-phase\u2460"},{"id":"ref-for-timeline-phase\u2461"},{"id":"ref-for-timeline-phase\u2462"},{"id":"ref-for-timeline-phase\u2463"},{"id":"ref-for-timeline-phase\u2464"}],"title":"3.1.7. The phase of a ScrollTimeline"}],"url":"https://w3c.github.io/web-animations/#timeline-phase"},
+"b7ad515b": {"dfnID":"b7ad515b","dfnText":"start delay","external":true,"refSections":[{"refs":[{"id":"ref-for-start-delay"}],"title":"3.1.2. The ScrollTimeline interface"}],"url":"https://w3c.github.io/web-animations/#start-delay"},
+"94f4030b": {"dfnID":"94f4030b","dfnText":"target effect end","external":true,"refSections":[{"refs":[{"id":"ref-for-target-effect-end"},{"id":"ref-for-target-effect-end\u2460"}],"title":"3.1.4. The effective time range of a ScrollTimeline"}],"url":"https://w3c.github.io/web-animations/#target-effect-end"},
+"58eebff5": {"dfnID":"58eebff5","dfnText":"timeline","external":true,"refSections":[{"refs":[{"id":"ref-for-timeline"},{"id":"ref-for-timeline\u2460"}],"title":"1.1. Relationship to other specifications"}],"url":"https://w3c.github.io/web-animations/#timeline"},
+"dca2de17": {"dfnID":"dca2de17","dfnText":"DOMException","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-DOMException"}],"title":"3.1.2. The ScrollTimeline interface"}],"url":"https://webidl.spec.whatwg.org/#idl-DOMException"},
+"8855a9aa": {"dfnID":"8855a9aa","dfnText":"DOMString","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-DOMString"}],"title":"3.1.2. The ScrollTimeline interface"}],"url":"https://webidl.spec.whatwg.org/#idl-DOMString"},
+"889e932f": {"dfnID":"889e932f","dfnText":"Exposed","external":true,"refSections":[{"refs":[{"id":"ref-for-Exposed"}],"title":"3.1.2. The ScrollTimeline interface"},{"refs":[{"id":"ref-for-Exposed\u2460"}],"title":"3.2.2. The CSSScrollTimelineRule Interface"}],"url":"https://webidl.spec.whatwg.org/#Exposed"},
+"dcf5fafa": {"dfnID":"dcf5fafa","dfnText":"FrozenArray","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-frozen-array"}],"title":"3.1.2. The ScrollTimeline interface"}],"url":"https://webidl.spec.whatwg.org/#idl-frozen-array"},
+"be2d2b4c": {"dfnID":"be2d2b4c","dfnText":"SyntaxError","external":true,"refSections":[{"refs":[{"id":"ref-for-syntaxerror"}],"title":"3.1.2. The ScrollTimeline interface"}],"url":"https://webidl.spec.whatwg.org/#syntaxerror"},
+"8c800cdf": {"dfnID":"8c800cdf","dfnText":"double","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-double"},{"id":"ref-for-idl-double\u2460"}],"title":"3.1.2. The ScrollTimeline interface"},{"refs":[{"id":"ref-for-idl-double\u2461"},{"id":"ref-for-idl-double\u2462"}],"title":"3.1.3.2. Element-based Offset"}],"url":"https://webidl.spec.whatwg.org/#idl-double"},
+"9cce47fd": {"dfnID":"9cce47fd","dfnText":"sequence","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-sequence"}],"title":"3.1.2. The ScrollTimeline interface"}],"url":"https://webidl.spec.whatwg.org/#idl-sequence"},
+"enumdef-scrolldirection": {"dfnID":"enumdef-scrolldirection","dfnText":"ScrollDirection","external":false,"refSections":[{"refs":[{"id":"ref-for-enumdef-scrolldirection"},{"id":"ref-for-enumdef-scrolldirection\u2460"}],"title":"3.1.1. The ScrollDirection enumeration"},{"refs":[{"id":"ref-for-enumdef-scrolldirection\u2461"},{"id":"ref-for-enumdef-scrolldirection\u2462"},{"id":"ref-for-enumdef-scrolldirection\u2463"}],"title":"3.1.2. The ScrollTimeline interface"}],"url":"#enumdef-scrolldirection"},
+"enumdef-scrolltimelineautokeyword": {"dfnID":"enumdef-scrolltimelineautokeyword","dfnText":"ScrollTimelineAutoKeyword","external":false,"refSections":[{"refs":[{"id":"ref-for-enumdef-scrolltimelineautokeyword"},{"id":"ref-for-enumdef-scrolltimelineautokeyword\u2460"}],"title":"3.1.2. The ScrollTimeline interface"}],"url":"#enumdef-scrolltimelineautokeyword"},
+"typedefdef-containerbasedoffset": {"dfnID":"typedefdef-containerbasedoffset","dfnText":"ContainerBasedOffset","external":false,"refSections":[{"refs":[{"id":"ref-for-typedefdef-containerbasedoffset"}],"title":"3.1.2. The ScrollTimeline interface"}],"url":"#typedefdef-containerbasedoffset"},
+"typedefdef-scrolltimelineoffset": {"dfnID":"typedefdef-scrolltimelineoffset","dfnText":"ScrollTimelineOffset","external":false,"refSections":[{"refs":[{"id":"ref-for-typedefdef-scrolltimelineoffset"},{"id":"ref-for-typedefdef-scrolltimelineoffset\u2460"},{"id":"ref-for-typedefdef-scrolltimelineoffset\u2461"}],"title":"3.1.2. The ScrollTimeline interface"}],"url":"#typedefdef-scrolltimelineoffset"},
+"dictdef-scrolltimelineoptions": {"dfnID":"dictdef-scrolltimelineoptions","dfnText":"ScrollTimelineOptions","external":false,"refSections":[{"refs":[{"id":"ref-for-dictdef-scrolltimelineoptions"}],"title":"3.1.2. The ScrollTimeline interface"}],"url":"#dictdef-scrolltimelineoptions"},
+"scrolltimeline": {"dfnID":"scrolltimeline","dfnText":"ScrollTimeline","external":false,"refSections":[{"refs":[{"id":"ref-for-scrolltimeline"},{"id":"ref-for-scrolltimeline\u2460"},{"id":"ref-for-scrolltimeline\u2461"}],"title":"3.1.2. The ScrollTimeline interface"},{"refs":[{"id":"ref-for-scrolltimeline\u2462"},{"id":"ref-for-scrolltimeline\u2463"},{"id":"ref-for-scrolltimeline\u2464"}],"title":"3.1.4. The effective time range of a ScrollTimeline"},{"refs":[{"id":"ref-for-scrolltimeline\u2465"}],"title":"3.1.5. The effective scroll offsets of a ScrollTimeline"},{"refs":[{"id":"ref-for-scrolltimeline\u2466"}],"title":"3.1.6. The progress of a ScrollTimeline"},{"refs":[{"id":"ref-for-scrolltimeline\u2467"},{"id":"ref-for-scrolltimeline\u2468"}],"title":"3.1.7. The phase of a ScrollTimeline"},{"refs":[{"id":"ref-for-scrolltimeline\u2460\u24ea"},{"id":"ref-for-scrolltimeline\u2460\u2460"}],"title":"3.1.8. The current time of a ScrollTimeline"},{"refs":[{"id":"ref-for-scrolltimeline\u2460\u2461"}],"title":"4. Avoiding cycles with layout"}],"url":"#scrolltimeline"},
+"scroll-timeline": {"dfnID":"scroll-timeline","dfnText":"scroll timeline","external":false,"refSections":[{"refs":[{"id":"ref-for-scroll-timeline"}],"title":"1.1. Relationship to other specifications"},{"refs":[{"id":"ref-for-scroll-timeline\u2460"}],"title":"3.2. The '@scroll-timeline' at-rule"}],"url":"#scroll-timeline"},
+"dom-scrolltimeline-scrolltimeline": {"dfnID":"dom-scrolltimeline-scrolltimeline","dfnText":"ScrollTimeline(options)","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-scrolltimeline-scrolltimeline"}],"title":"3.1.2. The ScrollTimeline interface"}],"url":"#dom-scrolltimeline-scrolltimeline"},
+"dom-scrolltimeline-source": {"dfnID":"dom-scrolltimeline-source","dfnText":"source","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-scrolltimeline-source"},{"id":"ref-for-dom-scrolltimeline-source\u2460"}],"title":"3.1.2. The ScrollTimeline interface"},{"refs":[{"id":"ref-for-dom-scrolltimeline-source\u2461"}],"title":"3.1.3. Scroll Timeline Offset"},{"refs":[{"id":"ref-for-dom-scrolltimeline-source\u2462"},{"id":"ref-for-dom-scrolltimeline-source\u2463"},{"id":"ref-for-dom-scrolltimeline-source\u2464"},{"id":"ref-for-dom-scrolltimeline-source\u2465"},{"id":"ref-for-dom-scrolltimeline-source\u2466"},{"id":"ref-for-dom-scrolltimeline-source\u2467"},{"id":"ref-for-dom-scrolltimeline-source\u2468"}],"title":"3.1.3.1. Container-based Offset"},{"refs":[{"id":"ref-for-dom-scrolltimeline-source\u2460\u24ea"},{"id":"ref-for-dom-scrolltimeline-source\u2460\u2460"},{"id":"ref-for-dom-scrolltimeline-source\u2460\u2461"},{"id":"ref-for-dom-scrolltimeline-source\u2460\u2462"},{"id":"ref-for-dom-scrolltimeline-source\u2460\u2463"},{"id":"ref-for-dom-scrolltimeline-source\u2460\u2464"},{"id":"ref-for-dom-scrolltimeline-source\u2460\u2465"},{"id":"ref-for-dom-scrolltimeline-source\u2460\u2466"},{"id":"ref-for-dom-scrolltimeline-source\u2460\u2467"},{"id":"ref-for-dom-scrolltimeline-source\u2460\u2468"},{"id":"ref-for-dom-scrolltimeline-source\u2461\u24ea"}],"title":"3.1.3.2. Element-based Offset"},{"refs":[{"id":"ref-for-dom-scrolltimeline-source\u2461\u2460"},{"id":"ref-for-dom-scrolltimeline-source\u2461\u2461"},{"id":"ref-for-dom-scrolltimeline-source\u2461\u2462"},{"id":"ref-for-dom-scrolltimeline-source\u2461\u2463"},{"id":"ref-for-dom-scrolltimeline-source\u2461\u2464"}],"title":"3.1.7. The phase of a ScrollTimeline"},{"refs":[{"id":"ref-for-dom-scrolltimeline-source\u2461\u2465"},{"id":"ref-for-dom-scrolltimeline-source\u2461\u2466"},{"id":"ref-for-dom-scrolltimeline-source\u2461\u2467"},{"id":"ref-for-dom-scrolltimeline-source\u2461\u2468"},{"id":"ref-for-dom-scrolltimeline-source\u2462\u24ea"}],"title":"3.1.8. The current time of a ScrollTimeline"},{"refs":[{"id":"ref-for-dom-scrolltimeline-source\u2462\u2460"},{"id":"ref-for-dom-scrolltimeline-source\u2462\u2461"}],"title":"3.2.1. Scroll Timeline descriptors"}],"url":"#dom-scrolltimeline-source"},
+"dom-scrolltimeline-orientation": {"dfnID":"dom-scrolltimeline-orientation","dfnText":"orientation","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-scrolltimeline-orientation"},{"id":"ref-for-dom-scrolltimeline-orientation\u2460"},{"id":"ref-for-dom-scrolltimeline-orientation\u2461"}],"title":"3.1.2. The ScrollTimeline interface"},{"refs":[{"id":"ref-for-dom-scrolltimeline-orientation\u2462"}],"title":"3.1.3. Scroll Timeline Offset"},{"refs":[{"id":"ref-for-dom-scrolltimeline-orientation\u2463"},{"id":"ref-for-dom-scrolltimeline-orientation\u2464"},{"id":"ref-for-dom-scrolltimeline-orientation\u2465"}],"title":"3.1.3.1. Container-based Offset"},{"refs":[{"id":"ref-for-dom-scrolltimeline-orientation\u2466"},{"id":"ref-for-dom-scrolltimeline-orientation\u2467"},{"id":"ref-for-dom-scrolltimeline-orientation\u2468"},{"id":"ref-for-dom-scrolltimeline-orientation\u2460\u24ea"}],"title":"3.1.3.2. Element-based Offset"},{"refs":[{"id":"ref-for-dom-scrolltimeline-orientation\u2460\u2460"},{"id":"ref-for-dom-scrolltimeline-orientation\u2460\u2461"}],"title":"3.1.7. The phase of a ScrollTimeline"},{"refs":[{"id":"ref-for-dom-scrolltimeline-orientation\u2460\u2462"}],"title":"3.1.8. The current time of a ScrollTimeline"},{"refs":[{"id":"ref-for-dom-scrolltimeline-orientation\u2460\u2463"}],"title":"3.2.1. Scroll Timeline descriptors"}],"url":"#dom-scrolltimeline-orientation"},
+"dom-scrolltimeline-scrolloffsets": {"dfnID":"dom-scrolltimeline-scrolloffsets","dfnText":"scrollOffsets","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-scrolltimeline-scrolloffsets"},{"id":"ref-for-dom-scrolltimeline-scrolloffsets\u2460"},{"id":"ref-for-dom-scrolltimeline-scrolloffsets\u2461"},{"id":"ref-for-dom-scrolltimeline-scrolloffsets\u2462"}],"title":"3.1.2. The ScrollTimeline interface"},{"refs":[{"id":"ref-for-dom-scrolltimeline-scrolloffsets\u2463"},{"id":"ref-for-dom-scrolltimeline-scrolloffsets\u2464"},{"id":"ref-for-dom-scrolltimeline-scrolloffsets\u2465"},{"id":"ref-for-dom-scrolltimeline-scrolloffsets\u2466"}],"title":"3.1.5. The effective scroll offsets of a ScrollTimeline"},{"refs":[{"id":"ref-for-dom-scrolltimeline-scrolloffsets\u2467"}],"title":"3.1.6. The progress of a ScrollTimeline"},{"refs":[{"id":"ref-for-dom-scrolltimeline-scrolloffsets\u2468"}],"title":"3.2.1. Scroll Timeline descriptors"}],"url":"#dom-scrolltimeline-scrolloffsets"},
+"dom-scrolltimeline-timerange": {"dfnID":"dom-scrolltimeline-timerange","dfnText":"timeRange","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-scrolltimeline-timerange"},{"id":"ref-for-dom-scrolltimeline-timerange\u2460"},{"id":"ref-for-dom-scrolltimeline-timerange\u2461"},{"id":"ref-for-dom-scrolltimeline-timerange\u2462"}],"title":"3.1.2. The ScrollTimeline interface"},{"refs":[{"id":"ref-for-dom-scrolltimeline-timerange\u2463"},{"id":"ref-for-dom-scrolltimeline-timerange\u2464"}],"title":"3.1.4. The effective time range of a ScrollTimeline"},{"refs":[{"id":"ref-for-dom-scrolltimeline-timerange\u2465"}],"title":"3.2.1. Scroll Timeline descriptors"}],"url":"#dom-scrolltimeline-timerange"},
+"effective-scroll-offset": {"dfnID":"effective-scroll-offset","dfnText":"effective scroll offset","external":false,"refSections":[{"refs":[{"id":"ref-for-effective-scroll-offset"}],"title":"3.1.2. The ScrollTimeline interface"},{"refs":[{"id":"ref-for-effective-scroll-offset\u2460"},{"id":"ref-for-effective-scroll-offset\u2461"}],"title":"3.1.3. Scroll Timeline Offset"},{"refs":[{"id":"ref-for-effective-scroll-offset\u2462"},{"id":"ref-for-effective-scroll-offset\u2463"}],"title":"3.1.3.1. Container-based Offset"},{"refs":[{"id":"ref-for-effective-scroll-offset\u2464"},{"id":"ref-for-effective-scroll-offset\u2465"},{"id":"ref-for-effective-scroll-offset\u2466"},{"id":"ref-for-effective-scroll-offset\u2467"}],"title":"3.1.3.2. Element-based Offset"},{"refs":[{"id":"ref-for-effective-scroll-offset\u2468"}],"title":"3.1.5. The effective scroll offsets of a ScrollTimeline"}],"url":"#effective-scroll-offset"},
+"scroll-timeline-offset": {"dfnID":"scroll-timeline-offset","dfnText":"scroll timeline offset","external":false,"refSections":[{"refs":[{"id":"ref-for-scroll-timeline-offset"}],"title":"3.1.2. The ScrollTimeline interface"},{"refs":[{"id":"ref-for-scroll-timeline-offset\u2460"}],"title":"3.1.3. Scroll Timeline Offset"},{"refs":[{"id":"ref-for-scroll-timeline-offset\u2461"},{"id":"ref-for-scroll-timeline-offset\u2462"},{"id":"ref-for-scroll-timeline-offset\u2463"}],"title":"3.2.1. Scroll Timeline descriptors"}],"url":"#scroll-timeline-offset"},
+"resolve-a-scroll-timeline-offset": {"dfnID":"resolve-a-scroll-timeline-offset","dfnText":"resolve a scroll timeline offset","external":false,"refSections":[{"refs":[{"id":"ref-for-resolve-a-scroll-timeline-offset"},{"id":"ref-for-resolve-a-scroll-timeline-offset\u2460"},{"id":"ref-for-resolve-a-scroll-timeline-offset\u2461"},{"id":"ref-for-resolve-a-scroll-timeline-offset\u2462"}],"title":"3.1.5. The effective scroll offsets of a ScrollTimeline"}],"url":"#resolve-a-scroll-timeline-offset"},
+"effective-start-offset": {"dfnID":"effective-start-offset","dfnText":"effective start offset","external":false,"refSections":[{"refs":[{"id":"ref-for-effective-start-offset"}],"title":"3.1.7. The phase of a ScrollTimeline"},{"refs":[{"id":"ref-for-effective-start-offset\u2460"}],"title":"3.1.8. The current time of a ScrollTimeline"}],"url":"#effective-start-offset"},
+"effective-end-offset": {"dfnID":"effective-end-offset","dfnText":"effective end offset","external":false,"refSections":[{"refs":[{"id":"ref-for-effective-end-offset"},{"id":"ref-for-effective-end-offset\u2460"}],"title":"3.1.7. The phase of a ScrollTimeline"},{"refs":[{"id":"ref-for-effective-end-offset\u2461"}],"title":"3.1.8. The current time of a ScrollTimeline"}],"url":"#effective-end-offset"},
+"container-based-offset": {"dfnID":"container-based-offset","dfnText":"container-based offset","external":false,"refSections":[{"refs":[{"id":"ref-for-container-based-offset"}],"title":"3.1.3. Scroll Timeline Offset"},{"refs":[{"id":"ref-for-container-based-offset\u2460"}],"title":"3.1.3.1. Container-based Offset"},{"refs":[{"id":"ref-for-container-based-offset\u2461"}],"title":"3.2.1. Scroll Timeline descriptors"}],"url":"#container-based-offset"},
+"resolve-a-container-based-offset": {"dfnID":"resolve-a-container-based-offset","dfnText":"resolve a container-based offset","external":false,"refSections":[{"refs":[{"id":"ref-for-resolve-a-container-based-offset"}],"title":"3.1.3. Scroll Timeline Offset"}],"url":"#resolve-a-container-based-offset"},
+"element-based-offset": {"dfnID":"element-based-offset","dfnText":"element-based offset","external":false,"refSections":[{"refs":[{"id":"ref-for-element-based-offset"}],"title":"3.1.3. Scroll Timeline Offset"},{"refs":[{"id":"ref-for-element-based-offset\u2460"}],"title":"3.1.3.2. Element-based Offset"},{"refs":[{"id":"ref-for-element-based-offset\u2461"}],"title":"3.2.1. Scroll Timeline descriptors"}],"url":"#element-based-offset"},
+"enumdef-edge": {"dfnID":"enumdef-edge","dfnText":"Edge","external":false,"refSections":[{"refs":[{"id":"ref-for-enumdef-edge"},{"id":"ref-for-enumdef-edge\u2460"}],"title":"3.1.3.2. Element-based Offset"}],"url":"#enumdef-edge"},
+"dom-edge-start": {"dfnID":"dom-edge-start","dfnText":"\"start\"","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-edge-start"},{"id":"ref-for-dom-edge-start\u2460"}],"title":"3.1.2. The ScrollTimeline interface"}],"url":"#dom-edge-start"},
+"dom-edge-end": {"dfnID":"dom-edge-end","dfnText":"\"end\"","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-edge-end"},{"id":"ref-for-dom-edge-end\u2460"}],"title":"3.1.2. The ScrollTimeline interface"}],"url":"#dom-edge-end"},
+"dictdef-elementbasedoffset": {"dfnID":"dictdef-elementbasedoffset","dfnText":"ElementBasedOffset","external":false,"refSections":[{"refs":[{"id":"ref-for-dictdef-elementbasedoffset"},{"id":"ref-for-dictdef-elementbasedoffset\u2460"}],"title":"3.1.2. The ScrollTimeline interface"},{"refs":[{"id":"ref-for-dictdef-elementbasedoffset\u2461"}],"title":"3.1.3.2. Element-based Offset"}],"url":"#dictdef-elementbasedoffset"},
+"dom-elementbasedoffset-target": {"dfnID":"dom-elementbasedoffset-target","dfnText":"target","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-elementbasedoffset-target"},{"id":"ref-for-dom-elementbasedoffset-target\u2460"},{"id":"ref-for-dom-elementbasedoffset-target\u2461"}],"title":"3.1.3.2. Element-based Offset"},{"refs":[{"id":"ref-for-dom-elementbasedoffset-target\u2462"}],"title":"3.1.8. The current time of a ScrollTimeline"},{"refs":[{"id":"ref-for-dom-elementbasedoffset-target\u2463"}],"title":"3.2.1. Scroll Timeline descriptors"}],"url":"#dom-elementbasedoffset-target"},
+"dom-elementbasedoffset-edge": {"dfnID":"dom-elementbasedoffset-edge","dfnText":"edge","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-elementbasedoffset-edge"},{"id":"ref-for-dom-elementbasedoffset-edge\u2460"},{"id":"ref-for-dom-elementbasedoffset-edge\u2461"},{"id":"ref-for-dom-elementbasedoffset-edge\u2462"},{"id":"ref-for-dom-elementbasedoffset-edge\u2463"}],"title":"3.1.3.2. Element-based Offset"},{"refs":[{"id":"ref-for-dom-elementbasedoffset-edge\u2464"}],"title":"3.2.1. Scroll Timeline descriptors"},{"refs":[{"id":"ref-for-dom-elementbasedoffset-edge\u2465"}],"title":"3.2.2. The CSSScrollTimelineRule Interface"}],"url":"#dom-elementbasedoffset-edge"},
+"dom-elementbasedoffset-threshold": {"dfnID":"dom-elementbasedoffset-threshold","dfnText":"threshold","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-elementbasedoffset-threshold"},{"id":"ref-for-dom-elementbasedoffset-threshold\u2460"}],"title":"3.1.3.2. Element-based Offset"},{"refs":[{"id":"ref-for-dom-elementbasedoffset-threshold\u2461"}],"title":"3.2.1. Scroll Timeline descriptors"},{"refs":[{"id":"ref-for-dom-elementbasedoffset-threshold\u2462"}],"title":"3.2.2. The CSSScrollTimelineRule Interface"}],"url":"#dom-elementbasedoffset-threshold"},
+"resolve-an-element-based-offset": {"dfnID":"resolve-an-element-based-offset","dfnText":"resolve an element-based offset","external":false,"refSections":[{"refs":[{"id":"ref-for-resolve-an-element-based-offset"}],"title":"3.1.3. Scroll Timeline Offset"}],"url":"#resolve-an-element-based-offset"},
+"effective-time-range": {"dfnID":"effective-time-range","dfnText":"effective time range","external":false,"refSections":[{"refs":[{"id":"ref-for-effective-time-range"},{"id":"ref-for-effective-time-range\u2460"}],"title":"3.1.2. The ScrollTimeline interface"},{"refs":[{"id":"ref-for-effective-time-range\u2461"},{"id":"ref-for-effective-time-range\u2462"},{"id":"ref-for-effective-time-range\u2463"}],"title":"3.1.4. The effective time range of a ScrollTimeline"},{"refs":[{"id":"ref-for-effective-time-range\u2464"},{"id":"ref-for-effective-time-range\u2465"}],"title":"3.1.8. The current time of a ScrollTimeline"}],"url":"#effective-time-range"},
+"effective-scroll-offsets": {"dfnID":"effective-scroll-offsets","dfnText":"effective scroll offsets","external":false,"refSections":[{"refs":[{"id":"ref-for-effective-scroll-offsets"},{"id":"ref-for-effective-scroll-offsets\u2460"}],"title":"3.1.3. Scroll Timeline Offset"},{"refs":[{"id":"ref-for-effective-scroll-offsets\u2461"}],"title":"3.1.3.1. Container-based Offset"},{"refs":[{"id":"ref-for-effective-scroll-offsets\u2462"}],"title":"3.1.5. The effective scroll offsets of a ScrollTimeline"},{"refs":[{"id":"ref-for-effective-scroll-offsets\u2463"}],"title":"3.1.7. The phase of a ScrollTimeline"},{"refs":[{"id":"ref-for-effective-scroll-offsets\u2464"},{"id":"ref-for-effective-scroll-offsets\u2465"}],"title":"3.1.8. The current time of a ScrollTimeline"}],"url":"#effective-scroll-offsets"},
+"resolve-scroll-timeline-offsets": {"dfnID":"resolve-scroll-timeline-offsets","dfnText":"resolve scroll timeline offsets","external":false,"refSections":[{"refs":[{"id":"ref-for-resolve-scroll-timeline-offsets"}],"title":"3.1.6. The progress of a ScrollTimeline"}],"url":"#resolve-scroll-timeline-offsets"},
+"calculate-scroll-timeline-progress": {"dfnID":"calculate-scroll-timeline-progress","dfnText":"calculate scroll timeline progress","external":false,"refSections":[{"refs":[{"id":"ref-for-calculate-scroll-timeline-progress"}],"title":"3.1.8. The current time of a ScrollTimeline"}],"url":"#calculate-scroll-timeline-progress"},
+"at-ruledef-scroll-timeline": {"dfnID":"at-ruledef-scroll-timeline","dfnText":"@scroll-timeline","external":false,"refSections":[{"refs":[{"id":"ref-for-at-ruledef-scroll-timeline"},{"id":"ref-for-at-ruledef-scroll-timeline\u2460"},{"id":"ref-for-at-ruledef-scroll-timeline\u2461"}],"title":"3.2. The '@scroll-timeline' at-rule"},{"refs":[{"id":"ref-for-at-ruledef-scroll-timeline\u2462"},{"id":"ref-for-at-ruledef-scroll-timeline\u2463"},{"id":"ref-for-at-ruledef-scroll-timeline\u2464"},{"id":"ref-for-at-ruledef-scroll-timeline\u2465"}],"title":"3.2.1. Scroll Timeline descriptors"},{"refs":[{"id":"ref-for-at-ruledef-scroll-timeline\u2466"},{"id":"ref-for-at-ruledef-scroll-timeline\u2467"},{"id":"ref-for-at-ruledef-scroll-timeline\u2468"},{"id":"ref-for-at-ruledef-scroll-timeline\u2460\u24ea"},{"id":"ref-for-at-ruledef-scroll-timeline\u2460\u2460"}],"title":"3.2.2. The CSSScrollTimelineRule Interface"}],"url":"#at-ruledef-scroll-timeline"},
+"typedef-scroll-timeline-offset": {"dfnID":"typedef-scroll-timeline-offset","dfnText":"<scroll-timeline-offset>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-scroll-timeline-offset"},{"id":"ref-for-typedef-scroll-timeline-offset\u2460"},{"id":"ref-for-typedef-scroll-timeline-offset\u2461"}],"title":"3.2.1. Scroll Timeline descriptors"}],"url":"#typedef-scroll-timeline-offset"},
+"typedef-element-offset": {"dfnID":"typedef-element-offset","dfnText":"<element-offset>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-element-offset"},{"id":"ref-for-typedef-element-offset\u2460"}],"title":"3.2.1. Scroll Timeline descriptors"}],"url":"#typedef-element-offset"},
+"typedef-element-offset-edge": {"dfnID":"typedef-element-offset-edge","dfnText":"<element-offset-edge>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-element-offset-edge"},{"id":"ref-for-typedef-element-offset-edge\u2460"}],"title":"3.2.1. Scroll Timeline descriptors"}],"url":"#typedef-element-offset-edge"},
+"cssscrolltimelinerule": {"dfnID":"cssscrolltimelinerule","dfnText":"CSSScrollTimelineRule","external":false,"refSections":[{"refs":[{"id":"ref-for-cssscrolltimelinerule"}],"title":"3.2.2. The CSSScrollTimelineRule Interface"}],"url":"#cssscrolltimelinerule"},
+"dom-cssscrolltimelinerule-name": {"dfnID":"dom-cssscrolltimelinerule-name","dfnText":"name","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-cssscrolltimelinerule-name"},{"id":"ref-for-dom-cssscrolltimelinerule-name\u2460"}],"title":"3.2.2. The CSSScrollTimelineRule Interface"}],"url":"#dom-cssscrolltimelinerule-name"},
+"dom-cssscrolltimelinerule-source": {"dfnID":"dom-cssscrolltimelinerule-source","dfnText":"source","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-cssscrolltimelinerule-source"}],"title":"3.2.2. The CSSScrollTimelineRule Interface"}],"url":"#dom-cssscrolltimelinerule-source"},
+"dom-cssscrolltimelinerule-orientation": {"dfnID":"dom-cssscrolltimelinerule-orientation","dfnText":"orientation","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-cssscrolltimelinerule-orientation"}],"title":"3.2.2. The CSSScrollTimelineRule Interface"}],"url":"#dom-cssscrolltimelinerule-orientation"},
+"dom-cssscrolltimelinerule-scrolloffsets": {"dfnID":"dom-cssscrolltimelinerule-scrolloffsets","dfnText":"scrollOffsets","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-cssscrolltimelinerule-scrolloffsets"}],"title":"3.2.2. The CSSScrollTimelineRule Interface"}],"url":"#dom-cssscrolltimelinerule-scrolloffsets"},
+"dom-cssscrolltimelinerule-timerange": {"dfnID":"dom-cssscrolltimelinerule-timerange","dfnText":"timeRange","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-cssscrolltimelinerule-timerange"}],"title":"3.2.2. The CSSScrollTimelineRule Interface"}],"url":"#dom-cssscrolltimelinerule-timerange"},
+"serialize-a-scroll-timeline-offset": {"dfnID":"serialize-a-scroll-timeline-offset","dfnText":"serialize a scroll timeline offset","external":false,"refSections":[{"refs":[{"id":"ref-for-serialize-a-scroll-timeline-offset"},{"id":"ref-for-serialize-a-scroll-timeline-offset\u2460"}],"title":"3.2.2. The CSSScrollTimelineRule Interface"}],"url":"#serialize-a-scroll-timeline-offset"},
+"serialize-a-selector-function": {"dfnID":"serialize-a-selector-function","dfnText":"serialize a selector() function","external":false,"refSections":[{"refs":[{"id":"ref-for-serialize-a-selector-function"},{"id":"ref-for-serialize-a-selector-function\u2460"}],"title":"3.2.2. The CSSScrollTimelineRule Interface"}],"url":"#serialize-a-selector-function"},
+"layout-cycles": {"dfnID":"layout-cycles","dfnText":"layout cycles","external":false,"refSections":[{"refs":[{"id":"ref-for-layout-cycles"}],"title":"4. Avoiding cycles with layout"}],"url":"#layout-cycles"},
+};
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+const typeFormatters = {
+    'dfn': (text) => `[=${text}=]`,
+    'abstract-op': (text) => `[\$${text}\$]`,
+    'value': (text) => `''${text}''`,
+    'http-header': (text) => `[:${text}:]`,
+    'idl': (text) => `{{${text}}}`,
+    'interface': 'idl',
+    'constructor': 'idl',
+    'method': 'idl',
+    'argument': 'idl',
+    'attribute': 'idl',
+    'callback': 'idl',
+    'dictionary': 'idl',
+    'dict-member': 'idl',
+    'enum': 'idl',
+    'enum-value': 'idl',
+    'exception': 'idl',
+    'const': 'idl',
+    'typedef': 'idl',
+    'stringifier': 'idl',
+    'serializer': 'idl',
+    'iterator': 'idl',
+    'maplike': 'idl',
+    'setlike': 'idl',
+    'extended-attribute': 'idl',
+    'event': 'idl',
+    'element': (element) => `<{${element}}>`,
+    'element-state': 'element',
+    'element-attr': 'element',
+    'attr-value': 'element',
+    'scheme': 'dfn',
+    'permission': 'dfn',
+    'grammar': (text) => `${text} (within a <pre class=prod>)`,
+    'type': (text)=> `<<${text}>>`,
+    'property': (text) => `'${text}'`,
+    'descriptor': 'property',
+    'function': 'value',
+    'at-rule': 'value',
+    'selector': 'value',
+};
+const typesUsingFor = new Set(
+    [
+        "descriptor",
+        "value",
+        "element-attr",
+        "attr-value",
+        "element-state",
+        "method",
+        "constructor",
+        "argument",
+        "attribute",
+        "const",
+        "dict-member",
+        "event",
+        "enum-value",
+        "stringifier",
+        "serializer",
+        "iterator",
+        "maplike",
+        "setlike",
+        "state",
+        "mode",
+        "context",
+        "facet",
+    ],
+)
+const typesNotUsingFor = new Set(
+    [
+        "property",
+        "element",
+        "interface",
+        "namespace",
+        "callback",
+        "dictionary",
+        "enum",
+        "exception",
+        "typedef",
+        "http-header",
+        "permission",
+    ],
+)
+function linkFormatterFromType(type) {
+    const fnOrType = typeFormatters[type];
+    if(typeof fnOrType === 'string') {
+        // follow the alias
+        return linkFormatterFromType(fnOrType);
+    }
+    return fnOrType;
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!typesUsingFor.has(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!typesNotUsingFor.has(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
+
+function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+    dfnPanel.forDfn = dfn;
+    if(!dfn) { console.log(dfnPanel); }
+    return dfnPanel;
+}
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        const panel = genDfnPanel({ ...panelData, dfn });
+        append(document.body, panel);
+        insertDfnPopupAction(panel)
+    }
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+})
+
+function hideAllDfnPanels() {
+    // Turn off any currently "on" or "activated" panels.
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
+}
+
+function showDfnPanel(dfnPanel) {
+    hideAllDfnPanels(); // Only display one at this time.
+
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "true");
+
+    dfnPanel.classList.add("on");
+    positionDfnPanel(dfnPanel);
+
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    // Increment tabindex for each anchor and button tags in panel
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.style.position = "absolute"; // unfix it
+    dfnPanel.classList.remove("on");
+    dfnPanel.classList.remove("activated");
+}
+
+function toggleDfnPanel(dfnPanel) {
+    if(dfnPanel.classList.contains("on")) {
+        hideDfnPanel(dfnPanel);
+    } else {
+        showDfnPanel(dfnPanel);
+    }
+}
+
+function insertDfnPopupAction(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        showDfnPanel(dfnPanel);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfnPanel);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel(dfnPanel, dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    })
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
 }
 </script>
 <script>/* Boilerplate: script-link-titles */
+"use strict";
+{
 let linkTitleData = {
- "https://drafts.csswg.org/css-values-4/#length-value": "Expands to: advance measure | cap | ch | cm | dvb | dvh | dvi | dvmax | dvmin | dvw | em | ex | ic | in | lh | lvb | lvh | lvi | lvmax | lvmin | lvw | mm | pc | pt | px | q | rcap | rch | rem | rex | ric | rlh | svb | svh | svi | svmax | svmin | svw | vb | vh | vi | vmax | vmin | vw",
- "https://drafts.csswg.org/css-values-4/#time-value": "Expands to: ms | s"
+"https://drafts.csswg.org/css-values-4/#length-value": "Expands to: advance measure | cap | ch | cm | dvb | dvh | dvi | dvmax | dvmin | dvw | em | ex | ic | in | lh | lvb | lvh | lvi | lvmax | lvmin | lvw | mm | pc | pt | px | q | rcap | rch | rem | rex | ric | rlh | svb | svh | svi | svmax | svmin | svw | vb | vh | vi | vmax | vmin | vw",
+"https://drafts.csswg.org/css-values-4/#time-value": "Expands to: ms | s",
 };
 
 function setTypeTitles() {
@@ -3262,326 +3265,327 @@ function setTypeTitles() {
 }
 
 document.addEventListener("DOMContentLoaded", setTypeTitles);
+}
 </script>
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
+let refsData = {
+"https://w3c.github.io/web-animations/#concept-animation": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"animation","type":"dfn","url":"https://w3c.github.io/web-animations/#concept-animation"},
+"https://w3c.github.io/web-animations/#timeline": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"timeline","type":"dfn","url":"https://w3c.github.io/web-animations/#timeline"},
+"#scroll-timeline": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"scroll timeline","type":"dfn","url":"#scroll-timeline"},
+"https://drafts.csswg.org/css-values-4/#css-wide-keywords": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"css-wide keywords","type":"dfn","url":"https://drafts.csswg.org/css-values-4/#css-wide-keywords"},
+"https://drafts.csswg.org/css-animations-1/#propdef-animation": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-animations","spec":"css-animations-1","status":"current","text":"animation","type":"property","url":"https://drafts.csswg.org/css-animations-1/#propdef-animation"},
+"https://drafts.csswg.org/css-animations-2/#propdef-animation-timeline": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-animations","spec":"css-animations-2","status":"current","text":"animation-timeline","type":"property","url":"https://drafts.csswg.org/css-animations-2/#propdef-animation-timeline"},
+"#enumdef-scrolldirection": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"ScrollDirection","type":"enum","url":"#enumdef-scrolldirection"},
+"https://drafts.csswg.org/css-writing-modes-4/#block-axis": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"block axis","type":"dfn","url":"https://drafts.csswg.org/css-writing-modes-4/#block-axis"},
+"https://drafts.csswg.org/css-writing-modes-4/#inline-axis": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"inline axis","type":"dfn","url":"https://drafts.csswg.org/css-writing-modes-4/#inline-axis"},
+"#scrolltimeline": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"ScrollTimeline","type":"interface","url":"#scrolltimeline"},
+"https://drafts.css-houdini.org/css-typed-om-1/#cssnumericvalue": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-typed-om","spec":"css-typed-om-1","status":"current","text":"CSSNumericValue","type":"interface","url":"https://drafts.css-houdini.org/css-typed-om-1/#cssnumericvalue"},
+"https://drafts.css-houdini.org/css-typed-om-1/#typedefdef-csskeywordish": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-typed-om","spec":"css-typed-om-1","status":"current","text":"CSSKeywordish","type":"typedef","url":"https://drafts.css-houdini.org/css-typed-om-1/#typedefdef-csskeywordish"},
+"#typedefdef-containerbasedoffset": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"ContainerBasedOffset","type":"typedef","url":"#typedefdef-containerbasedoffset"},
+"#dictdef-elementbasedoffset": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"ElementBasedOffset","type":"dictionary","url":"#dictdef-elementbasedoffset"},
+"https://dom.spec.whatwg.org/#element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"Element","type":"interface","url":"https://dom.spec.whatwg.org/#element"},
+"https://webidl.spec.whatwg.org/#idl-sequence": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"sequence","type":"dfn","url":"https://webidl.spec.whatwg.org/#idl-sequence"},
+"#typedefdef-scrolltimelineoffset": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"ScrollTimelineOffset","type":"typedef","url":"#typedefdef-scrolltimelineoffset"},
+"https://webidl.spec.whatwg.org/#idl-double": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"double","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-double"},
+"#enumdef-scrolltimelineautokeyword": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"ScrollTimelineAutoKeyword","type":"enum","url":"#enumdef-scrolltimelineautokeyword"},
+"https://webidl.spec.whatwg.org/#Exposed": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"Exposed","type":"extended-attribute","url":"https://webidl.spec.whatwg.org/#Exposed"},
+"https://drafts.csswg.org/web-animations-1/#animationtimeline": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"web-animations","spec":"web-animations-1","status":"current","text":"AnimationTimeline","type":"interface","url":"https://drafts.csswg.org/web-animations-1/#animationtimeline"},
+"#dom-scrolltimeline-scrolltimeline": {"export":true,"for_":["ScrollTimeline"],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"ScrollTimeline(options)","type":"constructor","url":"#dom-scrolltimeline-scrolltimeline"},
+"#dictdef-scrolltimelineoptions": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"ScrollTimelineOptions","type":"dictionary","url":"#dictdef-scrolltimelineoptions"},
+"#dom-scrolltimeline-source": {"export":true,"for_":["ScrollTimeline"],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"source","type":"attribute","url":"#dom-scrolltimeline-source"},
+"#dom-scrolltimeline-orientation": {"export":true,"for_":["ScrollTimeline"],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"orientation","type":"attribute","url":"#dom-scrolltimeline-orientation"},
+"https://webidl.spec.whatwg.org/#idl-frozen-array": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"FrozenArray","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-frozen-array"},
+"#dom-scrolltimeline-scrolloffsets": {"export":true,"for_":["ScrollTimeline"],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"scrollOffsets","type":"attribute","url":"#dom-scrolltimeline-scrolloffsets"},
+"#dom-scrolltimeline-timerange": {"export":true,"for_":["ScrollTimeline"],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"timeRange","type":"attribute","url":"#dom-scrolltimeline-timerange"},
+"https://drafts.csswg.org/css-overflow-3/#scroll-container": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-overflow","spec":"css-overflow-3","status":"current","text":"scroll container","type":"dfn","url":"https://drafts.csswg.org/css-overflow-3/#scroll-container"},
+"https://drafts.csswg.org/cssom-view-1/#dom-document-scrollingelement": {"export":true,"for_":["Document"],"level":"1","normative":true,"shortname":"cssom-view","spec":"cssom-view-1","status":"current","text":"scrollingElement","type":"attribute","url":"https://drafts.csswg.org/cssom-view-1/#dom-document-scrollingelement"},
+"https://dom.spec.whatwg.org/#document": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"Document","type":"interface","url":"https://dom.spec.whatwg.org/#document"},
+"https://html.spec.whatwg.org/multipage/browsers.html#concept-document-window": {"export":true,"for_":[],"level":"","normative":true,"shortname":"html","spec":"html","status":"anchor-block","text":"document associated with a window","type":"dfn","url":"https://html.spec.whatwg.org/multipage/browsers.html#concept-document-window"},
+"https://html.spec.whatwg.org/multipage/nav-history-apis.html#window": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"Window","type":"interface","url":"https://html.spec.whatwg.org/multipage/nav-history-apis.html#window"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#current-global-object": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"current global object","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#current-global-object"},
+"#scroll-timeline-offset": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"scroll timeline offset","type":"dfn","url":"#scroll-timeline-offset"},
+"#effective-scroll-offset": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"effective scroll offset","type":"dfn","url":"#effective-scroll-offset"},
+"https://webidl.spec.whatwg.org/#idl-DOMString": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"DOMString","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-DOMString"},
+"https://drafts.css-houdini.org/css-typed-om-1/#rectify-a-keywordish-value": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-typed-om","spec":"css-typed-om-1","status":"current","text":"rectify a keywordish value","type":"dfn","url":"https://drafts.css-houdini.org/css-typed-om-1/#rectify-a-keywordish-value"},
+"https://drafts.css-houdini.org/css-typed-om-1/#csskeywordvalue": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-typed-om","spec":"css-typed-om-1","status":"current","text":"CSSKeywordValue","type":"interface","url":"https://drafts.css-houdini.org/css-typed-om-1/#csskeywordvalue"},
+"https://drafts.css-houdini.org/css-typed-om-1/#cssstylevalue-match-a-grammar": {"export":true,"for_":["CSSStyleValue"],"level":"1","normative":true,"shortname":"css-typed-om","spec":"css-typed-om-1","status":"current","text":"match the grammar","type":"dfn","url":"https://drafts.css-houdini.org/css-typed-om-1/#cssstylevalue-match-a-grammar"},
+"https://drafts.csswg.org/css-values-4/#typedef-length-percentage": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<length-percentage>","type":"type","url":"https://drafts.csswg.org/css-values-4/#typedef-length-percentage"},
+"https://webidl.spec.whatwg.org/#idl-DOMException": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"DOMException","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-DOMException"},
+"https://webidl.spec.whatwg.org/#syntaxerror": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"SyntaxError","type":"exception","url":"https://webidl.spec.whatwg.org/#syntaxerror"},
+"https://w3c.github.io/web-animations/#duration": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"duration","type":"dfn","url":"https://w3c.github.io/web-animations/#duration"},
+"https://w3c.github.io/web-animations/#start-delay": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"start delay","type":"dfn","url":"https://w3c.github.io/web-animations/#start-delay"},
+"#dom-edge-start": {"export":true,"for_":["Edge"],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"\"start\"","type":"enum-value","url":"#dom-edge-start"},
+"#dom-edge-end": {"export":true,"for_":["Edge"],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"\"end\"","type":"enum-value","url":"#dom-edge-end"},
+"#effective-time-range": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"effective time range","type":"dfn","url":"#effective-time-range"},
+"#container-based-offset": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"container-based offset","type":"dfn","url":"#container-based-offset"},
+"#element-based-offset": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"element-based offset","type":"dfn","url":"#element-based-offset"},
+"#resolve-a-container-based-offset": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"resolve a container-based offset","type":"dfn","url":"#resolve-a-container-based-offset"},
+"#resolve-an-element-based-offset": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"resolve an element-based offset","type":"dfn","url":"#resolve-an-element-based-offset"},
+"#effective-scroll-offsets": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"effective scroll offsets","type":"dfn","url":"#effective-scroll-offsets"},
+"https://drafts.csswg.org/cssom-view/#css-layout-box": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"cssom-view","spec":"cssom-view-1","status":"anchor-block","text":"css layout box","type":"dfn","url":"https://drafts.csswg.org/cssom-view/#css-layout-box"},
+"https://drafts.csswg.org/css-values-4/#funcdef-calc": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"calc()","type":"function","url":"https://drafts.csswg.org/css-values-4/#funcdef-calc"},
+"https://drafts.csswg.org/css-values-4/#length-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<length>","type":"type","url":"https://drafts.csswg.org/css-values-4/#length-value"},
+"https://drafts.csswg.org/cssom-view-1/#scrolling-box": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"cssom-view","spec":"cssom-view-1","status":"current","text":"scrolling box","type":"dfn","url":"https://drafts.csswg.org/cssom-view-1/#scrolling-box"},
+"https://drafts.csswg.org/css-box-4/#padding-box": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"current","text":"padding box","type":"dfn","url":"https://drafts.csswg.org/css-box-4/#padding-box"},
+"https://drafts.csswg.org/cssom-view/#overflow-directions": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"cssom-view","spec":"cssom-view-1","status":"anchor-block","text":"overflow direction","type":"dfn","url":"https://drafts.csswg.org/cssom-view/#overflow-directions"},
+"#dom-elementbasedoffset-target": {"export":true,"for_":["ElementBasedOffset"],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"target","type":"dict-member","url":"#dom-elementbasedoffset-target"},
+"#enumdef-edge": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"Edge","type":"enum","url":"#enumdef-edge"},
+"#dom-elementbasedoffset-edge": {"export":true,"for_":["ElementBasedOffset"],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"edge","type":"dict-member","url":"#dom-elementbasedoffset-edge"},
+"#dom-elementbasedoffset-threshold": {"export":true,"for_":["ElementBasedOffset"],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"threshold","type":"dict-member","url":"#dom-elementbasedoffset-threshold"},
+"https://drafts.csswg.org/css-overflow-3/#scrollport": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-overflow","spec":"css-overflow-3","status":"current","text":"scrollport","type":"dfn","url":"https://drafts.csswg.org/css-overflow-3/#scrollport"},
+"https://w3c.github.io/web-animations/#target-effect-end": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"target effect end","type":"dfn","url":"https://w3c.github.io/web-animations/#target-effect-end"},
+"#resolve-a-scroll-timeline-offset": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"resolve a scroll timeline offset","type":"dfn","url":"#resolve-a-scroll-timeline-offset"},
+"#resolve-scroll-timeline-offsets": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"resolve scroll timeline offsets","type":"dfn","url":"#resolve-scroll-timeline-offsets"},
+"https://w3c.github.io/web-animations/#current-time": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"current time","type":"dfn","url":"https://w3c.github.io/web-animations/#current-time"},
+"https://drafts.csswg.org/css-animations-1/#interface-csskeyframesrule-findrule": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-animations","spec":"css-animations-1","status":"anchor-block","text":"findrule","type":"dfn","url":"https://drafts.csswg.org/css-animations-1/#interface-csskeyframesrule-findrule"},
+"https://drafts.csswg.org/css-animations-1/#csskeyframerule": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-animations","spec":"css-animations-1","status":"anchor-block","text":"csskeyframerule","type":"dfn","url":"https://drafts.csswg.org/css-animations-1/#csskeyframerule"},
+"https://w3c.github.io/web-animations/#timeline-phase": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"phase","type":"dfn","url":"https://w3c.github.io/web-animations/#timeline-phase"},
+"https://w3c.github.io/web-animations/#timeline-inactive-phase": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"inactive phase","type":"dfn","url":"https://w3c.github.io/web-animations/#timeline-inactive-phase"},
+"#effective-start-offset": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"effective start offset","type":"dfn","url":"#effective-start-offset"},
+"https://w3c.github.io/web-animations/#timeline-before-phase": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"before phase","type":"dfn","url":"https://w3c.github.io/web-animations/#timeline-before-phase"},
+"#effective-end-offset": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"effective end offset","type":"dfn","url":"#effective-end-offset"},
+"https://w3c.github.io/web-animations/#timeline-after-phase": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"after phase","type":"dfn","url":"https://w3c.github.io/web-animations/#timeline-after-phase"},
+"https://w3c.github.io/web-animations/#timeline-active-phase": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"active phase","type":"dfn","url":"https://w3c.github.io/web-animations/#timeline-active-phase"},
+"#calculate-scroll-timeline-progress": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"calculate scroll timeline progress","type":"dfn","url":"#calculate-scroll-timeline-progress"},
+"https://drafts.csswg.org/css-syntax-3/#typedef-declaration-list": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-syntax","spec":"css-syntax-3","status":"current","text":"<declaration-list>","type":"type","url":"https://drafts.csswg.org/css-syntax-3/#typedef-declaration-list"},
+"#at-ruledef-scroll-timeline": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"@scroll-timeline","type":"at-rule","url":"#at-ruledef-scroll-timeline"},
+"https://drafts.csswg.org/css-values-4/#identifier-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<custom-ident>","type":"type","url":"https://drafts.csswg.org/css-values-4/#identifier-value"},
+"https://drafts.csswg.org/css-values-4/#string-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<string>","type":"type","url":"https://drafts.csswg.org/css-values-4/#string-value"},
+"https://dom.spec.whatwg.org/#concept-shadow-tree": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"shadow tree","type":"dfn","url":"https://dom.spec.whatwg.org/#concept-shadow-tree"},
+"https://drafts.csswg.org/selectors-4/#typedef-id-selector": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"selectors","spec":"selectors-4","status":"current","text":"<id-selector>","type":"type","url":"https://drafts.csswg.org/selectors-4/#typedef-id-selector"},
+"https://drafts.csswg.org/css-values-4/#comb-one": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"|","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"#typedef-scroll-timeline-offset": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"<scroll-timeline-offset>","type":"type","url":"#typedef-scroll-timeline-offset"},
+"https://drafts.csswg.org/css-values-4/#mult-comma": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"#","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#mult-comma"},
+"#typedef-element-offset": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"<element-offset>","type":"type","url":"#typedef-element-offset"},
+"#typedef-element-offset-edge": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"<element-offset-edge>","type":"type","url":"#typedef-element-offset-edge"},
+"https://drafts.csswg.org/css-values-4/#number-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<number>","type":"type","url":"https://drafts.csswg.org/css-values-4/#number-value"},
+"https://drafts.csswg.org/css-values-4/#time-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<time>","type":"type","url":"https://drafts.csswg.org/css-values-4/#time-value"},
+"#cssscrolltimelinerule": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"CSSScrollTimelineRule","type":"interface","url":"#cssscrolltimelinerule"},
+"https://drafts.csswg.org/cssom-1/#cssrule": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"CSSRule","type":"interface","url":"https://drafts.csswg.org/cssom-1/#cssrule"},
+"https://drafts.csswg.org/cssom-1/#cssomstring": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"CSSOMString","type":"interface","url":"https://drafts.csswg.org/cssom-1/#cssomstring"},
+"#dom-cssscrolltimelinerule-name": {"export":true,"for_":["CSSScrollTimelineRule"],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"name","type":"attribute","url":"#dom-cssscrolltimelinerule-name"},
+"#dom-cssscrolltimelinerule-source": {"export":true,"for_":["CSSScrollTimelineRule"],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"source","type":"attribute","url":"#dom-cssscrolltimelinerule-source"},
+"#dom-cssscrolltimelinerule-orientation": {"export":true,"for_":["CSSScrollTimelineRule"],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"orientation","type":"attribute","url":"#dom-cssscrolltimelinerule-orientation"},
+"#dom-cssscrolltimelinerule-scrolloffsets": {"export":true,"for_":["CSSScrollTimelineRule"],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"scrollOffsets","type":"attribute","url":"#dom-cssscrolltimelinerule-scrolloffsets"},
+"#dom-cssscrolltimelinerule-timerange": {"export":true,"for_":["CSSScrollTimelineRule"],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"timeRange","type":"attribute","url":"#dom-cssscrolltimelinerule-timerange"},
+"https://drafts.csswg.org/cssom-1/#serialize-an-identifier": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"serialize an identifier","type":"dfn","url":"https://drafts.csswg.org/cssom-1/#serialize-an-identifier"},
+"#serialize-a-selector-function": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"serialize a selector() function","type":"dfn","url":"#serialize-a-selector-function"},
+"#serialize-a-scroll-timeline-offset": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"serialize a scroll timeline offset","type":"dfn","url":"#serialize-a-scroll-timeline-offset"},
+"https://drafts.csswg.org/cssom-1/#serialize-a-css-component-value": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"serialize a css component value","type":"dfn","url":"https://drafts.csswg.org/cssom-1/#serialize-a-css-component-value"},
+"https://drafts.csswg.org/cssom-1/#serialize-a-selector": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"serialize a selector","type":"dfn","url":"https://drafts.csswg.org/cssom-1/#serialize-a-selector"},
+"#layout-cycles": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"layout cycles","type":"dfn","url":"#layout-cycles"},
+"https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html#dom-animationframeprovider-requestanimationframe": {"export":true,"for_":["AnimationFrameProvider"],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"requestAnimationFrame(callback)","type":"method","url":"https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html#dom-animationframeprovider-requestanimationframe"},
+"#descdef-scroll-timeline-orientation": {"export":true,"for_":["@scroll-timeline"],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"orientation","type":"descriptor","url":"#descdef-scroll-timeline-orientation"},
+"#descdef-scroll-timeline-scroll-offsets": {"export":true,"for_":["@scroll-timeline"],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"scroll-offsets","type":"descriptor","url":"#descdef-scroll-timeline-scroll-offsets"},
+"#descdef-scroll-timeline-source": {"export":true,"for_":["@scroll-timeline"],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"source","type":"descriptor","url":"#descdef-scroll-timeline-source"},
+"#descdef-scroll-timeline-time-range": {"export":true,"for_":["@scroll-timeline"],"level":"1","normative":true,"shortname":"scroll-animations-1","spec":"scroll-animations-1-1","status":"local","text":"time-range","type":"descriptor","url":"#descdef-scroll-timeline-time-range"},
+};
+
+function genRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "DFN: "),
+                mk.code({ class: "dfn-text" }, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    const forListElements = forList.length === 0 ? '' : mk.li({},
+        mk.b({}, "For: "),
+        mk.ul({},
+            ...forList.map(forItem =>
                 mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
-            mk.b({}, "For: "),
-            mk.ul({},
-                ...forList.map(forItem =>
-                    mk.li({},
-                        mk.span({}, `${forItem}`)
-                    ),
+                    mk.span({}, `${forItem}`)
                 ),
             ),
-        );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+        ),
+    );
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
-    }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    return hintPanel;
+}
+function genAllRefHints() {
+    for(const refData of Object.values(refsData)) {
+        const refUrl = refData.url;
+        const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+        if (links.length == 0) {
+            console.log(`Can't find link href="${refUrl}".`, refData);
+            continue;
+        }
+        for(const link of links) {
+            if(link.classList.contains("dfn-link")) continue;
+            const hint = genRefHint(link, refData);
+            append(document.body, hint);
+            insertLinkPopupAction(hint)
         }
     }
+}
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+function hideAllRefHints() {
+    queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    refHint.style.position = "absolute"; // unfix it
+    refHint.classList.remove("on");
+    const teardown = refHint.teardownEventListeners;
+    if (teardown) {
+        refHint.teardownEventListeners = undefined;
+        teardown();
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+function showRefHint(refHint) {
+    hideAllRefHints(); // Only display one at this time.
+
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "true");
+    refHint.classList.add("on");
+    positionRefHint(refHint);
+    setupRefHintEventListeners(refHint);
+}
+
+function setupRefHintEventListeners(refHint) {
+    if (refHint.teardownEventListeners) return;
+    const link = refHint.forLink;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
 
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
 
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+function insertLinkPopupAction(refHint) {
+    const link = refHint.forLink;
+    // link.setAttribute('role', 'button');
+    link.setAttribute('aria-expanded', 'false')
+    link.classList.add('has-ref-hint');
+    link.addEventListener('mouseover', (event) => {
+        showRefHint(refHint);
     });
+    link.addEventListener('focus', (event) => {
+        showRefHint(refHint);
+    })
+}
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+document.addEventListener("DOMContentLoaded", () => {
+    genAllRefHints();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['https://w3c.github.io/web-animations/#concept-animation'] = {"text": "animation", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/web-animations/#concept-animation", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/web-animations/#timeline'] = {"text": "timeline", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/web-animations/#timeline", "export": true, "normative": true, "for_": []};
-window.refsData['#scroll-timeline'] = {"text": "scroll timeline", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#scroll-timeline", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#css-wide-keywords'] = {"text": "css-wide keywords", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-animations-1/#propdef-animation'] = {"text": "animation", "type": "property", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-animations-1/#propdef-animation", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-animations-2/#propdef-animation-timeline'] = {"text": "animation-timeline", "type": "property", "spec": "css-animations-2", "shortname": "css-animations", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-animations-2/#propdef-animation-timeline", "export": true, "normative": true, "for_": []};
-window.refsData['#enumdef-scrolldirection'] = {"text": "ScrollDirection", "type": "enum", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#enumdef-scrolldirection", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#block-axis'] = {"text": "block axis", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#block-axis", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#inline-axis'] = {"text": "inline axis", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#inline-axis", "export": true, "normative": true, "for_": []};
-window.refsData['#scrolltimeline'] = {"text": "ScrollTimeline", "type": "interface", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#scrolltimeline", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.css-houdini.org/css-typed-om-1/#cssnumericvalue'] = {"text": "CSSNumericValue", "type": "interface", "spec": "css-typed-om-1", "shortname": "css-typed-om", "level": "1", "status": "current", "url": "https://drafts.css-houdini.org/css-typed-om-1/#cssnumericvalue", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.css-houdini.org/css-typed-om-1/#typedefdef-csskeywordish'] = {"text": "CSSKeywordish", "type": "typedef", "spec": "css-typed-om-1", "shortname": "css-typed-om", "level": "1", "status": "current", "url": "https://drafts.css-houdini.org/css-typed-om-1/#typedefdef-csskeywordish", "export": true, "normative": true, "for_": []};
-window.refsData['#typedefdef-containerbasedoffset'] = {"text": "ContainerBasedOffset", "type": "typedef", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#typedefdef-containerbasedoffset", "export": true, "normative": true, "for_": []};
-window.refsData['#dictdef-elementbasedoffset'] = {"text": "ElementBasedOffset", "type": "dictionary", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dictdef-elementbasedoffset", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#element'] = {"text": "Element", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#element", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
-window.refsData['#typedefdef-scrolltimelineoffset'] = {"text": "ScrollTimelineOffset", "type": "typedef", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#typedefdef-scrolltimelineoffset", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-double'] = {"text": "double", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-double", "export": true, "normative": true, "for_": []};
-window.refsData['#enumdef-scrolltimelineautokeyword'] = {"text": "ScrollTimelineAutoKeyword", "type": "enum", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#enumdef-scrolltimelineautokeyword", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#animationtimeline'] = {"text": "AnimationTimeline", "type": "interface", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#animationtimeline", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-scrolltimeline-scrolltimeline'] = {"text": "ScrollTimeline(options)", "type": "constructor", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dom-scrolltimeline-scrolltimeline", "export": true, "normative": true, "for_": ["ScrollTimeline"]};
-window.refsData['#dictdef-scrolltimelineoptions'] = {"text": "ScrollTimelineOptions", "type": "dictionary", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dictdef-scrolltimelineoptions", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-scrolltimeline-source'] = {"text": "source", "type": "attribute", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dom-scrolltimeline-source", "export": true, "normative": true, "for_": ["ScrollTimeline"]};
-window.refsData['#dom-scrolltimeline-orientation'] = {"text": "orientation", "type": "attribute", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dom-scrolltimeline-orientation", "export": true, "normative": true, "for_": ["ScrollTimeline"]};
-window.refsData['https://webidl.spec.whatwg.org/#idl-frozen-array'] = {"text": "FrozenArray", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-frozen-array", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-scrolltimeline-scrolloffsets'] = {"text": "scrollOffsets", "type": "attribute", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dom-scrolltimeline-scrolloffsets", "export": true, "normative": true, "for_": ["ScrollTimeline"]};
-window.refsData['#dom-scrolltimeline-timerange'] = {"text": "timeRange", "type": "attribute", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dom-scrolltimeline-timerange", "export": true, "normative": true, "for_": ["ScrollTimeline"]};
-window.refsData['https://drafts.csswg.org/css-overflow-3/#scroll-container'] = {"text": "scroll container", "type": "dfn", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#scroll-container", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/cssom-view-1/#dom-document-scrollingelement'] = {"text": "scrollingElement", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-view-1/#dom-document-scrollingelement", "export": true, "normative": true, "for_": ["Document"]};
-window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#concept-document-window'] = {"text": "document associated with a window", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-document-window", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#window'] = {"text": "Window", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#current-global-object'] = {"text": "current global object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#current-global-object", "export": true, "normative": true, "for_": []};
-window.refsData['#scroll-timeline-offset'] = {"text": "scroll timeline offset", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#scroll-timeline-offset", "export": true, "normative": true, "for_": []};
-window.refsData['#effective-scroll-offset'] = {"text": "effective scroll offset", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#effective-scroll-offset", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.css-houdini.org/css-typed-om-1/#rectify-a-keywordish-value'] = {"text": "rectify a keywordish value", "type": "dfn", "spec": "css-typed-om-1", "shortname": "css-typed-om", "level": "1", "status": "current", "url": "https://drafts.css-houdini.org/css-typed-om-1/#rectify-a-keywordish-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.css-houdini.org/css-typed-om-1/#csskeywordvalue'] = {"text": "CSSKeywordValue", "type": "interface", "spec": "css-typed-om-1", "shortname": "css-typed-om", "level": "1", "status": "current", "url": "https://drafts.css-houdini.org/css-typed-om-1/#csskeywordvalue", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.css-houdini.org/css-typed-om-1/#cssstylevalue-match-a-grammar'] = {"text": "match the grammar", "type": "dfn", "spec": "css-typed-om-1", "shortname": "css-typed-om", "level": "1", "status": "current", "url": "https://drafts.css-houdini.org/css-typed-om-1/#cssstylevalue-match-a-grammar", "export": true, "normative": true, "for_": ["CSSStyleValue"]};
-window.refsData['https://drafts.csswg.org/css-values-4/#typedef-length-percentage'] = {"text": "<length-percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#typedef-length-percentage", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-DOMException'] = {"text": "DOMException", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMException", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#syntaxerror'] = {"text": "SyntaxError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#syntaxerror", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/web-animations/#duration'] = {"text": "duration", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/web-animations/#duration", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/web-animations/#start-delay'] = {"text": "start delay", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/web-animations/#start-delay", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-edge-start'] = {"text": "\"start\"", "type": "enum-value", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dom-edge-start", "export": true, "normative": true, "for_": ["Edge"]};
-window.refsData['#dom-edge-end'] = {"text": "\"end\"", "type": "enum-value", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dom-edge-end", "export": true, "normative": true, "for_": ["Edge"]};
-window.refsData['#effective-time-range'] = {"text": "effective time range", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#effective-time-range", "export": true, "normative": true, "for_": []};
-window.refsData['#container-based-offset'] = {"text": "container-based offset", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#container-based-offset", "export": true, "normative": true, "for_": []};
-window.refsData['#element-based-offset'] = {"text": "element-based offset", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#element-based-offset", "export": true, "normative": true, "for_": []};
-window.refsData['#resolve-a-container-based-offset'] = {"text": "resolve a container-based offset", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#resolve-a-container-based-offset", "export": true, "normative": true, "for_": []};
-window.refsData['#resolve-an-element-based-offset'] = {"text": "resolve an element-based offset", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#resolve-an-element-based-offset", "export": true, "normative": true, "for_": []};
-window.refsData['#effective-scroll-offsets'] = {"text": "effective scroll offsets", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#effective-scroll-offsets", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/cssom-view/#css-layout-box'] = {"text": "css layout box", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/cssom-view/#css-layout-box", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#funcdef-calc'] = {"text": "calc()", "type": "function", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#funcdef-calc", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#length-value'] = {"text": "<length>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#length-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/cssom-view-1/#scrolling-box'] = {"text": "scrolling box", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-view-1/#scrolling-box", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-box-4/#padding-box'] = {"text": "padding box", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#padding-box", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/cssom-view/#overflow-directions'] = {"text": "overflow direction", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/cssom-view/#overflow-directions", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-elementbasedoffset-target'] = {"text": "target", "type": "dict-member", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dom-elementbasedoffset-target", "export": true, "normative": true, "for_": ["ElementBasedOffset"]};
-window.refsData['#enumdef-edge'] = {"text": "Edge", "type": "enum", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#enumdef-edge", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-elementbasedoffset-edge'] = {"text": "edge", "type": "dict-member", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dom-elementbasedoffset-edge", "export": true, "normative": true, "for_": ["ElementBasedOffset"]};
-window.refsData['#dom-elementbasedoffset-threshold'] = {"text": "threshold", "type": "dict-member", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dom-elementbasedoffset-threshold", "export": true, "normative": true, "for_": ["ElementBasedOffset"]};
-window.refsData['https://drafts.csswg.org/css-overflow-3/#scrollport'] = {"text": "scrollport", "type": "dfn", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#scrollport", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/web-animations/#target-effect-end'] = {"text": "target effect end", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/web-animations/#target-effect-end", "export": true, "normative": true, "for_": []};
-window.refsData['#resolve-a-scroll-timeline-offset'] = {"text": "resolve a scroll timeline offset", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#resolve-a-scroll-timeline-offset", "export": true, "normative": true, "for_": []};
-window.refsData['#resolve-scroll-timeline-offsets'] = {"text": "resolve scroll timeline offsets", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#resolve-scroll-timeline-offsets", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/web-animations/#current-time'] = {"text": "current time", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/web-animations/#current-time", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-animations-1/#interface-csskeyframesrule-findrule'] = {"text": "findrule", "type": "dfn", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/css-animations-1/#interface-csskeyframesrule-findrule", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-animations-1/#csskeyframerule'] = {"text": "csskeyframerule", "type": "dfn", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/css-animations-1/#csskeyframerule", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/web-animations/#timeline-phase'] = {"text": "phase", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/web-animations/#timeline-phase", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/web-animations/#timeline-inactive-phase'] = {"text": "inactive phase", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/web-animations/#timeline-inactive-phase", "export": true, "normative": true, "for_": []};
-window.refsData['#effective-start-offset'] = {"text": "effective start offset", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#effective-start-offset", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/web-animations/#timeline-before-phase'] = {"text": "before phase", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/web-animations/#timeline-before-phase", "export": true, "normative": true, "for_": []};
-window.refsData['#effective-end-offset'] = {"text": "effective end offset", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#effective-end-offset", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/web-animations/#timeline-after-phase'] = {"text": "after phase", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/web-animations/#timeline-after-phase", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/web-animations/#timeline-active-phase'] = {"text": "active phase", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/web-animations/#timeline-active-phase", "export": true, "normative": true, "for_": []};
-window.refsData['#calculate-scroll-timeline-progress'] = {"text": "calculate scroll timeline progress", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#calculate-scroll-timeline-progress", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-syntax-3/#typedef-declaration-list'] = {"text": "<declaration-list>", "type": "type", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#typedef-declaration-list", "export": true, "normative": true, "for_": []};
-window.refsData['#at-ruledef-scroll-timeline'] = {"text": "@scroll-timeline", "type": "at-rule", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#at-ruledef-scroll-timeline", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#identifier-value'] = {"text": "<custom-ident>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#identifier-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#string-value'] = {"text": "<string>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#string-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#concept-shadow-tree'] = {"text": "shadow tree", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-shadow-tree", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/selectors-4/#typedef-id-selector'] = {"text": "<id-selector>", "type": "type", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "current", "url": "https://drafts.csswg.org/selectors-4/#typedef-id-selector", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-scroll-timeline-offset'] = {"text": "<scroll-timeline-offset>", "type": "type", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#typedef-scroll-timeline-offset", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#mult-comma'] = {"text": "#", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-comma", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-element-offset'] = {"text": "<element-offset>", "type": "type", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#typedef-element-offset", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-element-offset-edge'] = {"text": "<element-offset-edge>", "type": "type", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#typedef-element-offset-edge", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#number-value'] = {"text": "<number>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#number-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#time-value'] = {"text": "<time>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#time-value", "export": true, "normative": true, "for_": []};
-window.refsData['#cssscrolltimelinerule'] = {"text": "CSSScrollTimelineRule", "type": "interface", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#cssscrolltimelinerule", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/cssom-1/#cssrule'] = {"text": "CSSRule", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#cssrule", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/cssom-1/#cssomstring'] = {"text": "CSSOMString", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#cssomstring", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-cssscrolltimelinerule-name'] = {"text": "name", "type": "attribute", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dom-cssscrolltimelinerule-name", "export": true, "normative": true, "for_": ["CSSScrollTimelineRule"]};
-window.refsData['#dom-cssscrolltimelinerule-source'] = {"text": "source", "type": "attribute", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dom-cssscrolltimelinerule-source", "export": true, "normative": true, "for_": ["CSSScrollTimelineRule"]};
-window.refsData['#dom-cssscrolltimelinerule-orientation'] = {"text": "orientation", "type": "attribute", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dom-cssscrolltimelinerule-orientation", "export": true, "normative": true, "for_": ["CSSScrollTimelineRule"]};
-window.refsData['#dom-cssscrolltimelinerule-scrolloffsets'] = {"text": "scrollOffsets", "type": "attribute", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dom-cssscrolltimelinerule-scrolloffsets", "export": true, "normative": true, "for_": ["CSSScrollTimelineRule"]};
-window.refsData['#dom-cssscrolltimelinerule-timerange'] = {"text": "timeRange", "type": "attribute", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dom-cssscrolltimelinerule-timerange", "export": true, "normative": true, "for_": ["CSSScrollTimelineRule"]};
-window.refsData['https://drafts.csswg.org/cssom-1/#serialize-an-identifier'] = {"text": "serialize an identifier", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#serialize-an-identifier", "export": true, "normative": true, "for_": []};
-window.refsData['#serialize-a-selector-function'] = {"text": "serialize a selector() function", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#serialize-a-selector-function", "export": true, "normative": true, "for_": []};
-window.refsData['#serialize-a-scroll-timeline-offset'] = {"text": "serialize a scroll timeline offset", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#serialize-a-scroll-timeline-offset", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/cssom-1/#serialize-a-css-component-value'] = {"text": "serialize a css component value", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#serialize-a-css-component-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/cssom-1/#serialize-a-selector'] = {"text": "serialize a selector", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#serialize-a-selector", "export": true, "normative": true, "for_": []};
-window.refsData['#layout-cycles'] = {"text": "layout cycles", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#layout-cycles", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html#dom-animationframeprovider-requestanimationframe'] = {"text": "requestAnimationFrame(callback)", "type": "method", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html#dom-animationframeprovider-requestanimationframe", "export": true, "normative": true, "for_": ["AnimationFrameProvider"]};window.refsData['#at-ruledef-scroll-timeline'] = {"text": "@scroll-timeline", "type": "at-rule", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#at-ruledef-scroll-timeline", "export": true, "normative": true, "for_": []};
-window.refsData['#descdef-scroll-timeline-orientation'] = {"text": "orientation", "type": "descriptor", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#descdef-scroll-timeline-orientation", "export": true, "normative": true, "for_": ["@scroll-timeline"]};
-window.refsData['#descdef-scroll-timeline-scroll-offsets'] = {"text": "scroll-offsets", "type": "descriptor", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#descdef-scroll-timeline-scroll-offsets", "export": true, "normative": true, "for_": ["@scroll-timeline"]};
-window.refsData['#descdef-scroll-timeline-source'] = {"text": "source", "type": "descriptor", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#descdef-scroll-timeline-source", "export": true, "normative": true, "for_": ["@scroll-timeline"]};
-window.refsData['#descdef-scroll-timeline-time-range'] = {"text": "time-range", "type": "descriptor", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#descdef-scroll-timeline-time-range", "export": true, "normative": true, "for_": ["@scroll-timeline"]};
 </script>

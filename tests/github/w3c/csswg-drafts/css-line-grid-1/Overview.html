@@ -100,7 +100,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -531,7 +530,6 @@ a[href].issue-return {
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -1730,425 +1728,8 @@ and <a class="production" data-link-type="type" href="https://drafts.csswg.org/c
 	more than one font-size or line-height
 	in a single line box. <a class="issue-return" href="#issue-12524285" title="Jump to section">↵</a></div>
   </div>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['aadd356f'] = {"dfnID": "aadd356f", "url": "https://drafts.csswg.org/css-align-3/#typedef-content-position", "dfnText": "<content-position>", "refSections": [{"refs": [{"id": "ref-for-typedef-content-position"}, {"id": "ref-for-typedef-content-position\u2460"}, {"id": "ref-for-typedef-content-position\u2461"}], "title": "3.2. \nSnapping Block Boxes: the box-snap property"}], "external": true};
-window.dfnpanelData['9f3d4f17'] = {"dfnID": "9f3d4f17", "url": "https://drafts.csswg.org/css-display-4/#block-container", "dfnText": "block container", "refSections": [{"refs": [{"id": "ref-for-block-container"}], "title": "3.1. \nSnapping Line Boxes: the line-snap property"}], "external": true};
-window.dfnpanelData['2d625495'] = {"dfnID": "2d625495", "url": "https://drafts.csswg.org/css-rhythm-1/#propdef-line-height-step", "dfnText": "line-height-step", "refSections": [{"refs": [{"id": "ref-for-propdef-line-height-step"}], "title": "2. \nDefining a Line Grid: the line-grid property"}], "external": true};
-window.dfnpanelData['f2024dbb'] = {"dfnID": "f2024dbb", "url": "https://drafts.csswg.org/css-shapes-1/#typedef-shape-box", "dfnText": "<shape-box>", "refSections": [{"refs": [{"id": "ref-for-typedef-shape-box"}, {"id": "ref-for-typedef-shape-box\u2460"}, {"id": "ref-for-typedef-shape-box\u2461"}, {"id": "ref-for-typedef-shape-box\u2462"}, {"id": "ref-for-typedef-shape-box\u2463"}], "title": "3.2. \nSnapping Block Boxes: the box-snap property"}], "external": true};
-window.dfnpanelData['e274345c'] = {"dfnID": "e274345c", "url": "https://drafts.csswg.org/css-values-4/#identifier-value", "dfnText": "<custom-ident>", "refSections": [{"refs": [{"id": "ref-for-identifier-value"}, {"id": "ref-for-identifier-value\u2460"}], "title": "3.2. \nSnapping Block Boxes: the box-snap property"}], "external": true};
-window.dfnpanelData['358fd6ff'] = {"dfnID": "358fd6ff", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "dfnText": "css-wide keywords", "refSections": [{"refs": [{"id": "ref-for-css-wide-keywords"}], "title": "1.3. \nValue Definitions"}], "external": true};
-window.dfnpanelData['6ec67710'] = {"dfnID": "6ec67710", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "dfnText": "|", "refSections": [{"refs": [{"id": "ref-for-comb-one"}], "title": "2. \nDefining a Line Grid: the line-grid property"}, {"refs": [{"id": "ref-for-comb-one\u2460"}, {"id": "ref-for-comb-one\u2461"}], "title": "3.1. \nSnapping Line Boxes: the line-snap property"}, {"refs": [{"id": "ref-for-comb-one\u2462"}, {"id": "ref-for-comb-one\u2463"}, {"id": "ref-for-comb-one\u2464"}, {"id": "ref-for-comb-one\u2465"}, {"id": "ref-for-comb-one\u2466"}], "title": "3.2. \nSnapping Block Boxes: the box-snap property"}], "external": true};
-window.dfnpanelData['3bd4bbe9'] = {"dfnID": "3bd4bbe9", "url": "https://drafts.csswg.org/css-writing-modes-4/#propdef-text-orientation", "dfnText": "text-orientation", "refSections": [{"refs": [{"id": "ref-for-propdef-text-orientation"}], "title": "3.2. \nSnapping Block Boxes: the box-snap property"}], "external": true};
-window.dfnpanelData['a73617e0'] = {"dfnID": "a73617e0", "url": "https://drafts.csswg.org/css-writing-modes-4/#writing-mode", "dfnText": "writing mode", "refSections": [{"refs": [{"id": "ref-for-writing-mode"}, {"id": "ref-for-writing-mode\u2460"}], "title": "2. \nDefining a Line Grid: the line-grid property"}], "external": true};
-window.dfnpanelData['758665a5'] = {"dfnID": "758665a5", "url": "https://drafts.csswg.org/mediaqueries-5/#paged-media", "dfnText": "paged media", "refSections": [{"refs": [{"id": "ref-for-paged-media"}], "title": "2. \nDefining a Line Grid: the line-grid property"}], "external": true};
-window.dfnpanelData['line-grid'] = {"dfnID": "line-grid", "url": "#line-grid", "dfnText": "Line Grid", "refSections": [{"refs": [{"id": "ref-for-line-grid"}, {"id": "ref-for-line-grid\u2460"}, {"id": "ref-for-line-grid\u2461"}, {"id": "ref-for-line-grid\u2462"}, {"id": "ref-for-line-grid\u2463"}, {"id": "ref-for-line-grid\u2464"}, {"id": "ref-for-line-grid\u2465"}, {"id": "ref-for-line-grid\u2466"}, {"id": "ref-for-line-grid\u2467"}, {"id": "ref-for-line-grid\u2468"}, {"id": "ref-for-line-grid\u2460\u24ea"}, {"id": "ref-for-line-grid\u2460\u2460"}, {"id": "ref-for-line-grid\u2460\u2461"}, {"id": "ref-for-line-grid\u2460\u2462"}, {"id": "ref-for-line-grid\u2460\u2463"}, {"id": "ref-for-line-grid\u2460\u2464"}, {"id": "ref-for-line-grid\u2460\u2465"}, {"id": "ref-for-line-grid\u2460\u2466"}, {"id": "ref-for-line-grid\u2460\u2467"}, {"id": "ref-for-line-grid\u2460\u2468"}], "title": "2. \nDefining a Line Grid: the line-grid property"}, {"refs": [{"id": "ref-for-line-grid\u2461\u24ea"}], "title": "3. \nSnapping to a Grid"}, {"refs": [{"id": "ref-for-line-grid\u2461\u2460"}, {"id": "ref-for-line-grid\u2461\u2461"}, {"id": "ref-for-line-grid\u2461\u2462"}, {"id": "ref-for-line-grid\u2461\u2463"}], "title": "3.1. \nSnapping Line Boxes: the line-snap property"}, {"refs": [{"id": "ref-for-line-grid\u2461\u2464"}, {"id": "ref-for-line-grid\u2461\u2465"}, {"id": "ref-for-line-grid\u2461\u2466"}, {"id": "ref-for-line-grid\u2461\u2467"}, {"id": "ref-for-line-grid\u2461\u2468"}], "title": "3.2. \nSnapping Block Boxes: the box-snap property"}, {"refs": [{"id": "ref-for-line-grid\u2462\u24ea"}], "title": "4.1. \nInteracting with other alignments"}], "external": false};
-window.dfnpanelData['propdef-line-grid'] = {"dfnID": "propdef-line-grid", "url": "#propdef-line-grid", "dfnText": "line-grid", "refSections": [{"refs": [{"id": "ref-for-propdef-line-grid"}, {"id": "ref-for-propdef-line-grid\u2460"}, {"id": "ref-for-propdef-line-grid\u2461"}], "title": "2. \nDefining a Line Grid: the line-grid property"}, {"refs": [{"id": "ref-for-propdef-line-grid\u2462"}], "title": "3.1. \nSnapping Line Boxes: the line-snap property"}], "external": false};
-window.dfnpanelData['valdef-line-grid-match-parent'] = {"dfnID": "valdef-line-grid-match-parent", "url": "#valdef-line-grid-match-parent", "dfnText": "match-parent", "refSections": [{"refs": [{"id": "ref-for-valdef-line-grid-match-parent"}, {"id": "ref-for-valdef-line-grid-match-parent\u2460"}], "title": "2. \nDefining a Line Grid: the line-grid property"}, {"refs": [{"id": "ref-for-valdef-line-grid-match-parent\u2461"}], "title": "\nSince September 16th 2014"}], "external": false};
-window.dfnpanelData['valdef-line-grid-create'] = {"dfnID": "valdef-line-grid-create", "url": "#valdef-line-grid-create", "dfnText": "create", "refSections": [{"refs": [{"id": "ref-for-valdef-line-grid-create"}], "title": "2. \nDefining a Line Grid: the line-grid property"}], "external": false};
-window.dfnpanelData['propdef-line-snap'] = {"dfnID": "propdef-line-snap", "url": "#propdef-line-snap", "dfnText": "line-snap", "refSections": [{"refs": [{"id": "ref-for-propdef-line-snap"}], "title": "2. \nDefining a Line Grid: the line-grid property"}, {"refs": [{"id": "ref-for-propdef-line-snap\u2460"}], "title": "3. \nSnapping to a Grid"}, {"refs": [{"id": "ref-for-propdef-line-snap\u2461"}], "title": "3.1. \nSnapping Line Boxes: the line-snap property"}], "external": false};
-window.dfnpanelData['propdef-box-snap'] = {"dfnID": "propdef-box-snap", "url": "#propdef-box-snap", "dfnText": "box-snap", "refSections": [{"refs": [{"id": "ref-for-propdef-box-snap"}], "title": "2. \nDefining a Line Grid: the line-grid property"}, {"refs": [{"id": "ref-for-propdef-box-snap\u2460"}], "title": "3. \nSnapping to a Grid"}, {"refs": [{"id": "ref-for-propdef-box-snap\u2461"}, {"id": "ref-for-propdef-box-snap\u2462"}, {"id": "ref-for-propdef-box-snap\u2463"}, {"id": "ref-for-propdef-box-snap\u2464"}], "title": "3.2. \nSnapping Block Boxes: the box-snap property"}, {"refs": [{"id": "ref-for-propdef-box-snap\u2465"}], "title": "4.1. \nInteracting with other alignments"}], "external": false};
-window.dfnpanelData['valdef-box-snap-block-start'] = {"dfnID": "valdef-box-snap-block-start", "url": "#valdef-box-snap-block-start", "dfnText": "block-start", "refSections": [{"refs": [{"id": "ref-for-valdef-box-snap-block-start"}], "title": "3.2. \nSnapping Block Boxes: the box-snap property"}], "external": false};
-window.dfnpanelData['valdef-box-snap-block-end'] = {"dfnID": "valdef-box-snap-block-end", "url": "#valdef-box-snap-block-end", "dfnText": "block-end", "refSections": [{"refs": [{"id": "ref-for-valdef-box-snap-block-end"}], "title": "3.2. \nSnapping Block Boxes: the box-snap property"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -2342,12 +1923,431 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"aadd356f": {"dfnID":"aadd356f","dfnText":"<content-position>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-content-position"},{"id":"ref-for-typedef-content-position\u2460"},{"id":"ref-for-typedef-content-position\u2461"}],"title":"3.2. \nSnapping Block Boxes: the box-snap property"}],"url":"https://drafts.csswg.org/css-align-3/#typedef-content-position"},
+"9f3d4f17": {"dfnID":"9f3d4f17","dfnText":"block container","external":true,"refSections":[{"refs":[{"id":"ref-for-block-container"}],"title":"3.1. \nSnapping Line Boxes: the line-snap property"}],"url":"https://drafts.csswg.org/css-display-4/#block-container"},
+"2d625495": {"dfnID":"2d625495","dfnText":"line-height-step","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-line-height-step"}],"title":"2. \nDefining a Line Grid: the line-grid property"}],"url":"https://drafts.csswg.org/css-rhythm-1/#propdef-line-height-step"},
+"f2024dbb": {"dfnID":"f2024dbb","dfnText":"<shape-box>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-shape-box"},{"id":"ref-for-typedef-shape-box\u2460"},{"id":"ref-for-typedef-shape-box\u2461"},{"id":"ref-for-typedef-shape-box\u2462"},{"id":"ref-for-typedef-shape-box\u2463"}],"title":"3.2. \nSnapping Block Boxes: the box-snap property"}],"url":"https://drafts.csswg.org/css-shapes-1/#typedef-shape-box"},
+"e274345c": {"dfnID":"e274345c","dfnText":"<custom-ident>","external":true,"refSections":[{"refs":[{"id":"ref-for-identifier-value"},{"id":"ref-for-identifier-value\u2460"}],"title":"3.2. \nSnapping Block Boxes: the box-snap property"}],"url":"https://drafts.csswg.org/css-values-4/#identifier-value"},
+"358fd6ff": {"dfnID":"358fd6ff","dfnText":"css-wide keywords","external":true,"refSections":[{"refs":[{"id":"ref-for-css-wide-keywords"}],"title":"1.3. \nValue Definitions"}],"url":"https://drafts.csswg.org/css-values-4/#css-wide-keywords"},
+"6ec67710": {"dfnID":"6ec67710","dfnText":"|","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-one"}],"title":"2. \nDefining a Line Grid: the line-grid property"},{"refs":[{"id":"ref-for-comb-one\u2460"},{"id":"ref-for-comb-one\u2461"}],"title":"3.1. \nSnapping Line Boxes: the line-snap property"},{"refs":[{"id":"ref-for-comb-one\u2462"},{"id":"ref-for-comb-one\u2463"},{"id":"ref-for-comb-one\u2464"},{"id":"ref-for-comb-one\u2465"},{"id":"ref-for-comb-one\u2466"}],"title":"3.2. \nSnapping Block Boxes: the box-snap property"}],"url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"3bd4bbe9": {"dfnID":"3bd4bbe9","dfnText":"text-orientation","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-text-orientation"}],"title":"3.2. \nSnapping Block Boxes: the box-snap property"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#propdef-text-orientation"},
+"a73617e0": {"dfnID":"a73617e0","dfnText":"writing mode","external":true,"refSections":[{"refs":[{"id":"ref-for-writing-mode"},{"id":"ref-for-writing-mode\u2460"}],"title":"2. \nDefining a Line Grid: the line-grid property"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#writing-mode"},
+"758665a5": {"dfnID":"758665a5","dfnText":"paged media","external":true,"refSections":[{"refs":[{"id":"ref-for-paged-media"}],"title":"2. \nDefining a Line Grid: the line-grid property"}],"url":"https://drafts.csswg.org/mediaqueries-5/#paged-media"},
+"line-grid": {"dfnID":"line-grid","dfnText":"Line Grid","external":false,"refSections":[{"refs":[{"id":"ref-for-line-grid"},{"id":"ref-for-line-grid\u2460"},{"id":"ref-for-line-grid\u2461"},{"id":"ref-for-line-grid\u2462"},{"id":"ref-for-line-grid\u2463"},{"id":"ref-for-line-grid\u2464"},{"id":"ref-for-line-grid\u2465"},{"id":"ref-for-line-grid\u2466"},{"id":"ref-for-line-grid\u2467"},{"id":"ref-for-line-grid\u2468"},{"id":"ref-for-line-grid\u2460\u24ea"},{"id":"ref-for-line-grid\u2460\u2460"},{"id":"ref-for-line-grid\u2460\u2461"},{"id":"ref-for-line-grid\u2460\u2462"},{"id":"ref-for-line-grid\u2460\u2463"},{"id":"ref-for-line-grid\u2460\u2464"},{"id":"ref-for-line-grid\u2460\u2465"},{"id":"ref-for-line-grid\u2460\u2466"},{"id":"ref-for-line-grid\u2460\u2467"},{"id":"ref-for-line-grid\u2460\u2468"}],"title":"2. \nDefining a Line Grid: the line-grid property"},{"refs":[{"id":"ref-for-line-grid\u2461\u24ea"}],"title":"3. \nSnapping to a Grid"},{"refs":[{"id":"ref-for-line-grid\u2461\u2460"},{"id":"ref-for-line-grid\u2461\u2461"},{"id":"ref-for-line-grid\u2461\u2462"},{"id":"ref-for-line-grid\u2461\u2463"}],"title":"3.1. \nSnapping Line Boxes: the line-snap property"},{"refs":[{"id":"ref-for-line-grid\u2461\u2464"},{"id":"ref-for-line-grid\u2461\u2465"},{"id":"ref-for-line-grid\u2461\u2466"},{"id":"ref-for-line-grid\u2461\u2467"},{"id":"ref-for-line-grid\u2461\u2468"}],"title":"3.2. \nSnapping Block Boxes: the box-snap property"},{"refs":[{"id":"ref-for-line-grid\u2462\u24ea"}],"title":"4.1. \nInteracting with other alignments"}],"url":"#line-grid"},
+"propdef-line-grid": {"dfnID":"propdef-line-grid","dfnText":"line-grid","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-line-grid"},{"id":"ref-for-propdef-line-grid\u2460"},{"id":"ref-for-propdef-line-grid\u2461"}],"title":"2. \nDefining a Line Grid: the line-grid property"},{"refs":[{"id":"ref-for-propdef-line-grid\u2462"}],"title":"3.1. \nSnapping Line Boxes: the line-snap property"}],"url":"#propdef-line-grid"},
+"valdef-line-grid-match-parent": {"dfnID":"valdef-line-grid-match-parent","dfnText":"match-parent","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-line-grid-match-parent"},{"id":"ref-for-valdef-line-grid-match-parent\u2460"}],"title":"2. \nDefining a Line Grid: the line-grid property"},{"refs":[{"id":"ref-for-valdef-line-grid-match-parent\u2461"}],"title":"\nSince September 16th 2014"}],"url":"#valdef-line-grid-match-parent"},
+"valdef-line-grid-create": {"dfnID":"valdef-line-grid-create","dfnText":"create","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-line-grid-create"}],"title":"2. \nDefining a Line Grid: the line-grid property"}],"url":"#valdef-line-grid-create"},
+"propdef-line-snap": {"dfnID":"propdef-line-snap","dfnText":"line-snap","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-line-snap"}],"title":"2. \nDefining a Line Grid: the line-grid property"},{"refs":[{"id":"ref-for-propdef-line-snap\u2460"}],"title":"3. \nSnapping to a Grid"},{"refs":[{"id":"ref-for-propdef-line-snap\u2461"}],"title":"3.1. \nSnapping Line Boxes: the line-snap property"}],"url":"#propdef-line-snap"},
+"propdef-box-snap": {"dfnID":"propdef-box-snap","dfnText":"box-snap","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-box-snap"}],"title":"2. \nDefining a Line Grid: the line-grid property"},{"refs":[{"id":"ref-for-propdef-box-snap\u2460"}],"title":"3. \nSnapping to a Grid"},{"refs":[{"id":"ref-for-propdef-box-snap\u2461"},{"id":"ref-for-propdef-box-snap\u2462"},{"id":"ref-for-propdef-box-snap\u2463"},{"id":"ref-for-propdef-box-snap\u2464"}],"title":"3.2. \nSnapping Block Boxes: the box-snap property"},{"refs":[{"id":"ref-for-propdef-box-snap\u2465"}],"title":"4.1. \nInteracting with other alignments"}],"url":"#propdef-box-snap"},
+"valdef-box-snap-block-start": {"dfnID":"valdef-box-snap-block-start","dfnText":"block-start","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-box-snap-block-start"}],"title":"3.2. \nSnapping Block Boxes: the box-snap property"}],"url":"#valdef-box-snap-block-start"},
+"valdef-box-snap-block-end": {"dfnID":"valdef-box-snap-block-end","dfnText":"block-end","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-box-snap-block-end"}],"title":"3.2. \nSnapping Block Boxes: the box-snap property"}],"url":"#valdef-box-snap-block-end"},
+};
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+const typeFormatters = {
+    'dfn': (text) => `[=${text}=]`,
+    'abstract-op': (text) => `[\$${text}\$]`,
+    'value': (text) => `''${text}''`,
+    'http-header': (text) => `[:${text}:]`,
+    'idl': (text) => `{{${text}}}`,
+    'interface': 'idl',
+    'constructor': 'idl',
+    'method': 'idl',
+    'argument': 'idl',
+    'attribute': 'idl',
+    'callback': 'idl',
+    'dictionary': 'idl',
+    'dict-member': 'idl',
+    'enum': 'idl',
+    'enum-value': 'idl',
+    'exception': 'idl',
+    'const': 'idl',
+    'typedef': 'idl',
+    'stringifier': 'idl',
+    'serializer': 'idl',
+    'iterator': 'idl',
+    'maplike': 'idl',
+    'setlike': 'idl',
+    'extended-attribute': 'idl',
+    'event': 'idl',
+    'element': (element) => `<{${element}}>`,
+    'element-state': 'element',
+    'element-attr': 'element',
+    'attr-value': 'element',
+    'scheme': 'dfn',
+    'permission': 'dfn',
+    'grammar': (text) => `${text} (within a <pre class=prod>)`,
+    'type': (text)=> `<<${text}>>`,
+    'property': (text) => `'${text}'`,
+    'descriptor': 'property',
+    'function': 'value',
+    'at-rule': 'value',
+    'selector': 'value',
+};
+const typesUsingFor = new Set(
+    [
+        "descriptor",
+        "value",
+        "element-attr",
+        "attr-value",
+        "element-state",
+        "method",
+        "constructor",
+        "argument",
+        "attribute",
+        "const",
+        "dict-member",
+        "event",
+        "enum-value",
+        "stringifier",
+        "serializer",
+        "iterator",
+        "maplike",
+        "setlike",
+        "state",
+        "mode",
+        "context",
+        "facet",
+    ],
+)
+const typesNotUsingFor = new Set(
+    [
+        "property",
+        "element",
+        "interface",
+        "namespace",
+        "callback",
+        "dictionary",
+        "enum",
+        "exception",
+        "typedef",
+        "http-header",
+        "permission",
+    ],
+)
+function linkFormatterFromType(type) {
+    const fnOrType = typeFormatters[type];
+    if(typeof fnOrType === 'string') {
+        // follow the alias
+        return linkFormatterFromType(fnOrType);
+    }
+    return fnOrType;
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!typesUsingFor.has(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!typesNotUsingFor.has(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
+
+function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+    dfnPanel.forDfn = dfn;
+    if(!dfn) { console.log(dfnPanel); }
+    return dfnPanel;
+}
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        const panel = genDfnPanel({ ...panelData, dfn });
+        append(document.body, panel);
+        insertDfnPopupAction(panel)
+    }
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+})
+
+function hideAllDfnPanels() {
+    // Turn off any currently "on" or "activated" panels.
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
+}
+
+function showDfnPanel(dfnPanel) {
+    hideAllDfnPanels(); // Only display one at this time.
+
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "true");
+
+    dfnPanel.classList.add("on");
+    positionDfnPanel(dfnPanel);
+
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    // Increment tabindex for each anchor and button tags in panel
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.style.position = "absolute"; // unfix it
+    dfnPanel.classList.remove("on");
+    dfnPanel.classList.remove("activated");
+}
+
+function toggleDfnPanel(dfnPanel) {
+    if(dfnPanel.classList.contains("on")) {
+        hideDfnPanel(dfnPanel);
+    } else {
+        showDfnPanel(dfnPanel);
+    }
+}
+
+function insertDfnPopupAction(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        showDfnPanel(dfnPanel);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfnPanel);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel(dfnPanel, dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    })
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
 }
 </script>
 <script>/* Boilerplate: script-link-titles */
+"use strict";
+{
 let linkTitleData = {
- "https://drafts.csswg.org/css-align-3/#typedef-content-position": "Expands to: center | end | flex-end | flex-start | start",
- "https://drafts.csswg.org/css-shapes-1/#typedef-shape-box": "Expands to: border-box | content-box | fill-box | margin-box | padding-box | stroke-box | svg viewport origin box | view-box"
+"https://drafts.csswg.org/css-shapes-1/#typedef-shape-box": "Expands to: border-box | content-box | fill-box | margin-box | padding-box | stroke-box | svg viewport origin box | view-box",
+"https://drafts.csswg.org/css-align-3/#typedef-content-position": "Expands to: center | end | flex-end | flex-start | start",
 };
 
 function setTypeTitles() {
@@ -2359,236 +2359,235 @@ function setTypeTitles() {
 }
 
 document.addEventListener("DOMContentLoaded", setTypeTitles);
+}
 </script>
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
+let refsData = {
+"https://drafts.csswg.org/css-values-4/#css-wide-keywords": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"css-wide keywords","type":"dfn","url":"https://drafts.csswg.org/css-values-4/#css-wide-keywords"},
+"#propdef-line-grid": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-line-grid","spec":"css-line-grid-1","status":"local","text":"line-grid","type":"property","url":"#propdef-line-grid"},
+"https://drafts.csswg.org/css-values-4/#comb-one": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"|","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"#line-grid": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-line-grid","spec":"css-line-grid-1","status":"local","text":"line grid","type":"dfn","url":"#line-grid"},
+"#propdef-line-snap": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-line-grid","spec":"css-line-grid-1","status":"local","text":"line-snap","type":"property","url":"#propdef-line-snap"},
+"#propdef-box-snap": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-line-grid","spec":"css-line-grid-1","status":"local","text":"box-snap","type":"property","url":"#propdef-box-snap"},
+"https://drafts.csswg.org/css-writing-modes-4/#writing-mode": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"writing mode","type":"dfn","url":"https://drafts.csswg.org/css-writing-modes-4/#writing-mode"},
+"#valdef-line-grid-create": {"export":true,"for_":["line-grid"],"level":"1","normative":true,"shortname":"css-line-grid","spec":"css-line-grid-1","status":"local","text":"create","type":"value","url":"#valdef-line-grid-create"},
+"https://drafts.csswg.org/css-rhythm-1/#propdef-line-height-step": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-rhythm","spec":"css-rhythm-1","status":"current","text":"line-height-step","type":"property","url":"https://drafts.csswg.org/css-rhythm-1/#propdef-line-height-step"},
+"#valdef-line-grid-match-parent": {"export":true,"for_":["line-grid"],"level":"1","normative":true,"shortname":"css-line-grid","spec":"css-line-grid-1","status":"local","text":"match-parent","type":"value","url":"#valdef-line-grid-match-parent"},
+"https://drafts.csswg.org/mediaqueries-5/#paged-media": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"mediaqueries","spec":"mediaqueries-5","status":"current","text":"paged media","type":"dfn","url":"https://drafts.csswg.org/mediaqueries-5/#paged-media"},
+"https://drafts.csswg.org/css-display-4/#block-container": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"block container","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#block-container"},
+"#valdef-box-snap-block-start": {"export":true,"for_":["box-snap"],"level":"1","normative":true,"shortname":"css-line-grid","spec":"css-line-grid-1","status":"local","text":"block-start","type":"value","url":"#valdef-box-snap-block-start"},
+"#valdef-box-snap-block-end": {"export":true,"for_":["box-snap"],"level":"1","normative":true,"shortname":"css-line-grid","spec":"css-line-grid-1","status":"local","text":"block-end","type":"value","url":"#valdef-box-snap-block-end"},
+"https://drafts.csswg.org/css-writing-modes-4/#propdef-text-orientation": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"text-orientation","type":"property","url":"https://drafts.csswg.org/css-writing-modes-4/#propdef-text-orientation"},
+"https://drafts.csswg.org/css-shapes-1/#typedef-shape-box": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-shapes","spec":"css-shapes-1","status":"current","text":"<shape-box>","type":"type","url":"https://drafts.csswg.org/css-shapes-1/#typedef-shape-box"},
+"https://drafts.csswg.org/css-align-3/#typedef-content-position": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-align","spec":"css-align-3","status":"current","text":"<content-position>","type":"type","url":"https://drafts.csswg.org/css-align-3/#typedef-content-position"},
+"https://drafts.csswg.org/css-values-4/#identifier-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<custom-ident>","type":"type","url":"https://drafts.csswg.org/css-values-4/#identifier-value"},
+};
+
+function genRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "DFN: "),
+                mk.code({ class: "dfn-text" }, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    const forListElements = forList.length === 0 ? '' : mk.li({},
+        mk.b({}, "For: "),
+        mk.ul({},
+            ...forList.map(forItem =>
                 mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
-            mk.b({}, "For: "),
-            mk.ul({},
-                ...forList.map(forItem =>
-                    mk.li({},
-                        mk.span({}, `${forItem}`)
-                    ),
+                    mk.span({}, `${forItem}`)
                 ),
             ),
-        );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+        ),
+    );
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
-    }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    return hintPanel;
+}
+function genAllRefHints() {
+    for(const refData of Object.values(refsData)) {
+        const refUrl = refData.url;
+        const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+        if (links.length == 0) {
+            console.log(`Can't find link href="${refUrl}".`, refData);
+            continue;
+        }
+        for(const link of links) {
+            if(link.classList.contains("dfn-link")) continue;
+            const hint = genRefHint(link, refData);
+            append(document.body, hint);
+            insertLinkPopupAction(hint)
         }
     }
+}
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+function hideAllRefHints() {
+    queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    refHint.style.position = "absolute"; // unfix it
+    refHint.classList.remove("on");
+    const teardown = refHint.teardownEventListeners;
+    if (teardown) {
+        refHint.teardownEventListeners = undefined;
+        teardown();
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+function showRefHint(refHint) {
+    hideAllRefHints(); // Only display one at this time.
+
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "true");
+    refHint.classList.add("on");
+    positionRefHint(refHint);
+    setupRefHintEventListeners(refHint);
+}
+
+function setupRefHintEventListeners(refHint) {
+    if (refHint.teardownEventListeners) return;
+    const link = refHint.forLink;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
 
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
 
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+function insertLinkPopupAction(refHint) {
+    const link = refHint.forLink;
+    // link.setAttribute('role', 'button');
+    link.setAttribute('aria-expanded', 'false')
+    link.classList.add('has-ref-hint');
+    link.addEventListener('mouseover', (event) => {
+        showRefHint(refHint);
     });
+    link.addEventListener('focus', (event) => {
+        showRefHint(refHint);
+    })
+}
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+document.addEventListener("DOMContentLoaded", () => {
+    genAllRefHints();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['https://drafts.csswg.org/css-values-4/#css-wide-keywords'] = {"text": "css-wide keywords", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-line-grid'] = {"text": "line-grid", "type": "property", "spec": "css-line-grid-1", "shortname": "css-line-grid", "level": "1", "status": "local", "url": "#propdef-line-grid", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
-window.refsData['#line-grid'] = {"text": "line grid", "type": "dfn", "spec": "css-line-grid-1", "shortname": "css-line-grid", "level": "1", "status": "local", "url": "#line-grid", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-line-snap'] = {"text": "line-snap", "type": "property", "spec": "css-line-grid-1", "shortname": "css-line-grid", "level": "1", "status": "local", "url": "#propdef-line-snap", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-box-snap'] = {"text": "box-snap", "type": "property", "spec": "css-line-grid-1", "shortname": "css-line-grid", "level": "1", "status": "local", "url": "#propdef-box-snap", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#writing-mode'] = {"text": "writing mode", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#writing-mode", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-line-grid-create'] = {"text": "create", "type": "value", "spec": "css-line-grid-1", "shortname": "css-line-grid", "level": "1", "status": "local", "url": "#valdef-line-grid-create", "export": true, "normative": true, "for_": ["line-grid"]};
-window.refsData['https://drafts.csswg.org/css-rhythm-1/#propdef-line-height-step'] = {"text": "line-height-step", "type": "property", "spec": "css-rhythm-1", "shortname": "css-rhythm", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-rhythm-1/#propdef-line-height-step", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-line-grid-match-parent'] = {"text": "match-parent", "type": "value", "spec": "css-line-grid-1", "shortname": "css-line-grid", "level": "1", "status": "local", "url": "#valdef-line-grid-match-parent", "export": true, "normative": true, "for_": ["line-grid"]};
-window.refsData['https://drafts.csswg.org/mediaqueries-5/#paged-media'] = {"text": "paged media", "type": "dfn", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-5/#paged-media", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#block-container'] = {"text": "block container", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#block-container", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-box-snap-block-start'] = {"text": "block-start", "type": "value", "spec": "css-line-grid-1", "shortname": "css-line-grid", "level": "1", "status": "local", "url": "#valdef-box-snap-block-start", "export": true, "normative": true, "for_": ["box-snap"]};
-window.refsData['#valdef-box-snap-block-end'] = {"text": "block-end", "type": "value", "spec": "css-line-grid-1", "shortname": "css-line-grid", "level": "1", "status": "local", "url": "#valdef-box-snap-block-end", "export": true, "normative": true, "for_": ["box-snap"]};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#propdef-text-orientation'] = {"text": "text-orientation", "type": "property", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#propdef-text-orientation", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-shapes-1/#typedef-shape-box'] = {"text": "<shape-box>", "type": "type", "spec": "css-shapes-1", "shortname": "css-shapes", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-shapes-1/#typedef-shape-box", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-align-3/#typedef-content-position'] = {"text": "<content-position>", "type": "type", "spec": "css-align-3", "shortname": "css-align", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-align-3/#typedef-content-position", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#identifier-value'] = {"text": "<custom-ident>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#identifier-value", "export": true, "normative": true, "for_": []};window.refsData['#propdef-box-snap'] = {"text": "box-snap", "type": "property", "spec": "css-line-grid-1", "shortname": "css-line-grid", "level": "1", "status": "local", "url": "#propdef-box-snap", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-line-grid'] = {"text": "line-grid", "type": "property", "spec": "css-line-grid-1", "shortname": "css-line-grid", "level": "1", "status": "local", "url": "#propdef-line-grid", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-line-snap'] = {"text": "line-snap", "type": "property", "spec": "css-line-grid-1", "shortname": "css-line-grid", "level": "1", "status": "local", "url": "#propdef-line-snap", "export": true, "normative": true, "for_": []};
 </script>

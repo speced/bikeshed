@@ -91,7 +91,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -742,7 +741,6 @@ a[href].issue-return {
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -802,7 +800,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -859,7 +856,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -3694,473 +3690,8 @@ or security considerations beyond "implement it correctly".</p>
     </div>
    </div>
   </details>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['957ec3c1'] = {"dfnID": "957ec3c1", "url": "https://drafts.csswg.org/css-backgrounds-3/#typedef-line-style", "dfnText": "<line-style>", "refSections": [{"refs": [{"id": "ref-for-typedef-line-style"}, {"id": "ref-for-typedef-line-style\u2460"}], "title": "4.3. The Style Of Column Rules: the column-rule-style property"}], "external": true};
-window.dfnpanelData['ceaa27cc'] = {"dfnID": "ceaa27cc", "url": "https://drafts.csswg.org/css-backgrounds-3/#typedef-line-width", "dfnText": "<line-width>", "refSections": [{"refs": [{"id": "ref-for-typedef-line-width"}], "title": "4.4. The Width Of Column Rules: the column-rule-width property"}], "external": true};
-window.dfnpanelData['a9734ee4'] = {"dfnID": "a9734ee4", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border", "dfnText": "border", "refSections": [{"refs": [{"id": "ref-for-propdef-border"}, {"id": "ref-for-propdef-border\u2460"}], "title": "1. \nIntroduction"}], "external": true};
-window.dfnpanelData['7594868a'] = {"dfnID": "7594868a", "url": "https://drafts.csswg.org/css-backgrounds-3/#valdef-line-style-hidden", "dfnText": "hidden", "refSections": [{"refs": [{"id": "ref-for-valdef-line-style-hidden"}], "title": "4.4. The Width Of Column Rules: the column-rule-width property"}], "external": true};
-window.dfnpanelData['55617484'] = {"dfnID": "55617484", "url": "https://drafts.csswg.org/css-backgrounds-3/#valdef-line-style-none", "dfnText": "none", "refSections": [{"refs": [{"id": "ref-for-valdef-line-style-none"}], "title": "4.3. The Style Of Column Rules: the column-rule-style property"}, {"refs": [{"id": "ref-for-valdef-line-style-none\u2460"}], "title": "4.4. The Width Of Column Rules: the column-rule-width property"}], "external": true};
-window.dfnpanelData['9bdefa58'] = {"dfnID": "9bdefa58", "url": "https://drafts.csswg.org/css-break-4/#fragment", "dfnText": "fragment", "refSections": [{"refs": [{"id": "ref-for-fragment"}], "title": "2. \nThe Multi-Column Model"}, {"refs": [{"id": "ref-for-fragment\u2460"}], "title": "6.1. Spanning An Element Across Columns: the column-span property"}], "external": true};
-window.dfnpanelData['bb9778e3'] = {"dfnID": "bb9778e3", "url": "https://drafts.csswg.org/css-break-4/#fragmentation", "dfnText": "fragmentation", "refSections": [{"refs": [{"id": "ref-for-fragmentation"}], "title": "2. \nThe Multi-Column Model"}], "external": true};
-window.dfnpanelData['40060954'] = {"dfnID": "40060954", "url": "https://drafts.csswg.org/css-break-4/#fragmentation-container", "dfnText": "fragmentation container", "refSections": [{"refs": [{"id": "ref-for-fragmentation-container"}], "title": "2. \nThe Multi-Column Model"}], "external": true};
-window.dfnpanelData['a270c80d'] = {"dfnID": "a270c80d", "url": "https://drafts.csswg.org/css-break-4/#fragmentation-context", "dfnText": "fragmentation context", "refSections": [{"refs": [{"id": "ref-for-fragmentation-context"}], "title": "2. \nThe Multi-Column Model"}], "external": true};
-window.dfnpanelData['b6730ce5'] = {"dfnID": "b6730ce5", "url": "https://drafts.csswg.org/css-break-4/#propdef-widows", "dfnText": "widows", "refSections": [{"refs": [{"id": "ref-for-propdef-widows"}], "title": "7. \nFilling Columns"}], "external": true};
-window.dfnpanelData['1548047a'] = {"dfnID": "1548047a", "url": "https://drafts.csswg.org/css-color-5/#typedef-color", "dfnText": "<color>", "refSections": [{"refs": [{"id": "ref-for-typedef-color"}, {"id": "ref-for-typedef-color\u2460"}], "title": "4.2. The Color of Column Rules: the \ncolumn-rule-color property"}], "external": true};
-window.dfnpanelData['0e9419b9'] = {"dfnID": "0e9419b9", "url": "https://drafts.csswg.org/css-display-3/#propdef-display", "dfnText": "display", "refSections": [{"refs": [{"id": "ref-for-propdef-display"}], "title": "2. \nThe Multi-Column Model"}], "external": true};
-window.dfnpanelData['43b15e47'] = {"dfnID": "43b15e47", "url": "https://drafts.csswg.org/css-display-4/#anonymous", "dfnText": "anonymous box", "refSections": [{"refs": [{"id": "ref-for-anonymous"}, {"id": "ref-for-anonymous\u2460"}], "title": "2. \nThe Multi-Column Model"}], "external": true};
-window.dfnpanelData['9f3d4f17'] = {"dfnID": "9f3d4f17", "url": "https://drafts.csswg.org/css-display-4/#block-container", "dfnText": "block container", "refSections": [{"refs": [{"id": "ref-for-block-container"}], "title": "2. \nThe Multi-Column Model"}, {"refs": [{"id": "ref-for-block-container\u2460"}], "title": "3.1. The Inline Size of Columns: the column-width property"}, {"refs": [{"id": "ref-for-block-container\u2461"}], "title": "3.2. The Number of Columns: the column-count property"}, {"refs": [{"id": "ref-for-block-container\u2462"}], "title": "Changes from the\nCandidate Recommendation (CR) of 12 April 2011."}], "external": true};
-window.dfnpanelData['ca960d4f'] = {"dfnID": "ca960d4f", "url": "https://drafts.csswg.org/css-display-4/#block-formatting-context", "dfnText": "block formatting context", "refSections": [{"refs": [{"id": "ref-for-block-formatting-context"}, {"id": "ref-for-block-formatting-context\u2460"}, {"id": "ref-for-block-formatting-context\u2461"}], "title": "2. \nThe Multi-Column Model"}, {"refs": [{"id": "ref-for-block-formatting-context\u2462"}, {"id": "ref-for-block-formatting-context\u2463"}], "title": "6.1. Spanning An Element Across Columns: the column-span property"}, {"refs": [{"id": "ref-for-block-formatting-context\u2464"}], "title": "Changes from the Working Draft (WD) of 28 May 2018"}], "external": true};
-window.dfnpanelData['fd9aa8f7'] = {"dfnID": "fd9aa8f7", "url": "https://drafts.csswg.org/css-display-4/#block-level-box", "dfnText": "block-level box", "refSections": [{"refs": [{"id": "ref-for-block-level-box"}, {"id": "ref-for-block-level-box\u2460"}], "title": "2. \nThe Multi-Column Model"}], "external": true};
-window.dfnpanelData['ea663a43'] = {"dfnID": "ea663a43", "url": "https://drafts.csswg.org/css-display-4/#containing-block", "dfnText": "containing block", "refSections": [{"refs": [{"id": "ref-for-containing-block"}, {"id": "ref-for-containing-block\u2460"}], "title": "2. \nThe Multi-Column Model"}, {"refs": [{"id": "ref-for-containing-block\u2461"}, {"id": "ref-for-containing-block\u2462"}], "title": "6.1. Spanning An Element Across Columns: the column-span property"}], "external": true};
-window.dfnpanelData['58157ca0'] = {"dfnID": "58157ca0", "url": "https://drafts.csswg.org/css-display-4/#containing-block-chain", "dfnText": "containing block chain", "refSections": [{"refs": [{"id": "ref-for-containing-block-chain"}], "title": "6.1. Spanning An Element Across Columns: the column-span property"}], "external": true};
-window.dfnpanelData['0bc73d68'] = {"dfnID": "0bc73d68", "url": "https://drafts.csswg.org/css-display-4/#formatting-context", "dfnText": "formatting context", "refSections": [{"refs": [{"id": "ref-for-formatting-context"}, {"id": "ref-for-formatting-context\u2460"}, {"id": "ref-for-formatting-context\u2461"}], "title": "6.1. Spanning An Element Across Columns: the column-span property"}], "external": true};
-window.dfnpanelData['8141cabb'] = {"dfnID": "8141cabb", "url": "https://drafts.csswg.org/css-display-4/#independent-formatting-context", "dfnText": "independent formatting context", "refSections": [{"refs": [{"id": "ref-for-independent-formatting-context"}, {"id": "ref-for-independent-formatting-context\u2460"}], "title": "2. \nThe Multi-Column Model"}, {"refs": [{"id": "ref-for-independent-formatting-context\u2461"}], "title": "6.1. Spanning An Element Across Columns: the column-span property"}], "external": true};
-window.dfnpanelData['a46ac4e1'] = {"dfnID": "a46ac4e1", "url": "https://drafts.csswg.org/css-display-4/#out-of-flow", "dfnText": "out of flow", "refSections": [{"refs": [{"id": "ref-for-out-of-flow"}, {"id": "ref-for-out-of-flow\u2460"}], "title": "6.1. Spanning An Element Across Columns: the column-span property"}], "external": true};
-window.dfnpanelData['7ba1e996'] = {"dfnID": "7ba1e996", "url": "https://drafts.csswg.org/css-display-4/#out-of-flow", "dfnText": "out-of-flow", "refSections": [{"refs": [{"id": "ref-for-out-of-flow"}, {"id": "ref-for-out-of-flow\u2460"}], "title": "6.1. Spanning An Element Across Columns: the column-span property"}], "external": true};
-window.dfnpanelData['80eb9508'] = {"dfnID": "80eb9508", "url": "https://drafts.csswg.org/css-display-4/#principal-box", "dfnText": "principal box", "refSections": [{"refs": [{"id": "ref-for-principal-box"}], "title": "2. \nThe Multi-Column Model"}], "external": true};
-window.dfnpanelData['f005b2f6'] = {"dfnID": "f005b2f6", "url": "https://drafts.csswg.org/css-grid-2/#grid-container", "dfnText": "grid container", "refSections": [{"refs": [{"id": "ref-for-grid-container"}], "title": "1. \nIntroduction"}], "external": true};
-window.dfnpanelData['1044d688'] = {"dfnID": "1044d688", "url": "https://drafts.csswg.org/css-grid-2/#grid-item", "dfnText": "grid item", "refSections": [{"refs": [{"id": "ref-for-grid-item"}], "title": "1. \nIntroduction"}], "external": true};
-window.dfnpanelData['86928bde'] = {"dfnID": "86928bde", "url": "https://drafts.csswg.org/css-overflow-3/#propdef-overflow", "dfnText": "overflow", "refSections": [{"refs": [{"id": "ref-for-propdef-overflow"}], "title": "8.2. \nPagination and Overflow Outside Multicol Containers"}], "external": true};
-window.dfnpanelData['e73f6d8c'] = {"dfnID": "e73f6d8c", "url": "https://drafts.csswg.org/css-position-3/#absolute-position", "dfnText": "absolutely positioned box", "refSections": [{"refs": [{"id": "ref-for-absolute-position"}], "title": "2. \nThe Multi-Column Model"}, {"refs": [{"id": "ref-for-absolute-position\u2460"}], "title": "6.1. Spanning An Element Across Columns: the column-span property"}], "external": true};
-window.dfnpanelData['b8a0ba74'] = {"dfnID": "b8a0ba74", "url": "https://drafts.csswg.org/css-position-3/#propdef-position", "dfnText": "position", "refSections": [{"refs": [{"id": "ref-for-propdef-position"}, {"id": "ref-for-propdef-position\u2460"}, {"id": "ref-for-propdef-position\u2461"}], "title": "2. \nThe Multi-Column Model"}, {"refs": [{"id": "ref-for-propdef-position\u2462"}], "title": "Changes from the Working Draft (WD) of 5 October 2017"}], "external": true};
-window.dfnpanelData['994d0e36'] = {"dfnID": "994d0e36", "url": "https://drafts.csswg.org/css-tables-3/#table-wrapper-box", "dfnText": "table wrapper box", "refSections": [{"refs": [{"id": "ref-for-table-wrapper-box"}], "title": "3.1. The Inline Size of Columns: the column-width property"}, {"refs": [{"id": "ref-for-table-wrapper-box\u2460"}], "title": "3.2. The Number of Columns: the column-count property"}, {"refs": [{"id": "ref-for-table-wrapper-box\u2461"}], "title": "Changes from the\nCandidate Recommendation (CR) of 12 April 2011."}], "external": true};
-window.dfnpanelData['70c9f859'] = {"dfnID": "70c9f859", "url": "https://drafts.csswg.org/css-values-4/#integer-value", "dfnText": "<integer>", "refSections": [{"refs": [{"id": "ref-for-integer-value"}, {"id": "ref-for-integer-value\u2460"}], "title": "3.2. The Number of Columns: the column-count property"}], "external": true};
-window.dfnpanelData['18222566'] = {"dfnID": "18222566", "url": "https://drafts.csswg.org/css-values-4/#typedef-length-percentage", "dfnText": "<length-percentage>", "refSections": [{"refs": [{"id": "ref-for-typedef-length-percentage"}], "title": "Changes from the\nCandidate Recommendation (CR) of 12 April 2011."}], "external": true};
-window.dfnpanelData['fb030e6c'] = {"dfnID": "fb030e6c", "url": "https://drafts.csswg.org/css-values-4/#length-value", "dfnText": "<length>", "refSections": [{"refs": [{"id": "ref-for-length-value"}, {"id": "ref-for-length-value\u2460"}], "title": "3.1. The Inline Size of Columns: the column-width property"}, {"refs": [{"id": "ref-for-length-value\u2461"}], "title": "Changes from the\nCandidate Recommendation (CR) of 12 April 2011."}], "external": true};
-window.dfnpanelData['358fd6ff'] = {"dfnID": "358fd6ff", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "dfnText": "css-wide keywords", "refSections": [{"refs": [{"id": "ref-for-css-wide-keywords"}], "title": "1.1. \nValue Definitions"}], "external": true};
-window.dfnpanelData['6ec67710'] = {"dfnID": "6ec67710", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "dfnText": "|", "refSections": [{"refs": [{"id": "ref-for-comb-one"}], "title": "3.1. The Inline Size of Columns: the column-width property"}, {"refs": [{"id": "ref-for-comb-one\u2460"}], "title": "3.2. The Number of Columns: the column-count property"}, {"refs": [{"id": "ref-for-comb-one\u2461"}], "title": "6.1. Spanning An Element Across Columns: the column-span property"}, {"refs": [{"id": "ref-for-comb-one\u2462"}, {"id": "ref-for-comb-one\u2463"}], "title": "7.1. Column Balancing: the column-fill property"}], "external": true};
-window.dfnpanelData['8a82fda1'] = {"dfnID": "8a82fda1", "url": "https://drafts.csswg.org/css-values-4/#comb-any", "dfnText": "||", "refSections": [{"refs": [{"id": "ref-for-comb-any"}], "title": "3.3. The column-width and column-count Shorthand: The columns Property"}, {"refs": [{"id": "ref-for-comb-any\u2460"}, {"id": "ref-for-comb-any\u2461"}], "title": "4.5. Column Rule Shorthand: the column-rule property"}], "external": true};
-window.dfnpanelData['e1ab41b7'] = {"dfnID": "e1ab41b7", "url": "https://drafts.csswg.org/css-writing-modes-4/#block-axis", "dfnText": "block axis", "refSections": [{"refs": [{"id": "ref-for-block-axis"}], "title": "2. \nThe Multi-Column Model"}], "external": true};
-window.dfnpanelData['887c0c5c'] = {"dfnID": "887c0c5c", "url": "https://drafts.csswg.org/css-writing-modes-4/#inline-base-direction", "dfnText": "inline base direction", "refSections": [{"refs": [{"id": "ref-for-inline-base-direction"}], "title": "2. \nThe Multi-Column Model"}], "external": true};
-window.dfnpanelData['07cc8d20'] = {"dfnID": "07cc8d20", "url": "https://drafts.csswg.org/css-align-3/#propdef-column-gap", "dfnText": "column-gap", "refSections": [{"refs": [{"id": "ref-for-propdef-column-gap"}, {"id": "ref-for-propdef-column-gap\u2460"}, {"id": "ref-for-propdef-column-gap\u2461"}], "title": "4.1. Gutters Between Columns: the column-gap property"}, {"refs": [{"id": "ref-for-propdef-column-gap\u2462"}, {"id": "ref-for-propdef-column-gap\u2463"}, {"id": "ref-for-propdef-column-gap\u2464"}], "title": "Changes from the Working Draft (WD) of 28 May 2018"}, {"refs": [{"id": "ref-for-propdef-column-gap\u2465"}], "title": "Changes from the\nCandidate Recommendation (CR) of 12 April 2011."}], "external": true};
-window.dfnpanelData['f0f00e3a'] = {"dfnID": "f0f00e3a", "url": "https://drafts.csswg.org/css-align-3/#valdef-row-gap-normal", "dfnText": "normal", "refSections": [{"refs": [{"id": "ref-for-valdef-row-gap-normal"}], "title": "4.1. Gutters Between Columns: the column-gap property"}], "external": true};
-window.dfnpanelData['0a52b385'] = {"dfnID": "0a52b385", "url": "https://drafts.csswg.org/css-break-3/#propdef-break-after", "dfnText": "break-after", "refSections": [{"refs": [{"id": "ref-for-propdef-break-after"}], "title": "5. \nColumn Breaks"}, {"refs": [{"id": "ref-for-propdef-break-after\u2460"}, {"id": "ref-for-propdef-break-after\u2461"}], "title": "5.1. Controlling Fragmentation: the break-before, break-after, break-inside properties"}], "external": true};
-window.dfnpanelData['c1654d36'] = {"dfnID": "c1654d36", "url": "https://drafts.csswg.org/css-break-3/#propdef-break-before", "dfnText": "break-before", "refSections": [{"refs": [{"id": "ref-for-propdef-break-before"}], "title": "5. \nColumn Breaks"}, {"refs": [{"id": "ref-for-propdef-break-before\u2460"}, {"id": "ref-for-propdef-break-before\u2461"}], "title": "5.1. Controlling Fragmentation: the break-before, break-after, break-inside properties"}], "external": true};
-window.dfnpanelData['9522389e'] = {"dfnID": "9522389e", "url": "https://drafts.csswg.org/css-break-3/#propdef-break-inside", "dfnText": "break-inside", "refSections": [{"refs": [{"id": "ref-for-propdef-break-inside"}], "title": "5. \nColumn Breaks"}, {"refs": [{"id": "ref-for-propdef-break-inside\u2460"}, {"id": "ref-for-propdef-break-inside\u2461"}], "title": "5.1. Controlling Fragmentation: the break-before, break-after, break-inside properties"}], "external": true};
-window.dfnpanelData['2589df91'] = {"dfnID": "2589df91", "url": "https://drafts.csswg.org/css-break-3/#propdef-orphans", "dfnText": "orphans", "refSections": [{"refs": [{"id": "ref-for-propdef-orphans"}], "title": "7. \nFilling Columns"}], "external": true};
-window.dfnpanelData['68019d7a'] = {"dfnID": "68019d7a", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-height", "dfnText": "height", "refSections": [{"refs": [{"id": "ref-for-propdef-height"}], "title": "8.2. \nPagination and Overflow Outside Multicol Containers"}], "external": true};
-window.dfnpanelData['88643fe0'] = {"dfnID": "88643fe0", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-width", "dfnText": "width", "refSections": [{"refs": [{"id": "ref-for-propdef-width"}], "title": "2. \nThe Multi-Column Model"}], "external": true};
-window.dfnpanelData['758665a5'] = {"dfnID": "758665a5", "url": "https://drafts.csswg.org/mediaqueries-5/#paged-media", "dfnText": "paged media", "refSections": [{"refs": [{"id": "ref-for-paged-media"}], "title": "3.4. The Pseudo-algorithm"}, {"refs": [{"id": "ref-for-paged-media\u2460"}], "title": "6.1. Spanning An Element Across Columns: the column-span property"}, {"refs": [{"id": "ref-for-paged-media\u2461"}], "title": "8.2. \nPagination and Overflow Outside Multicol Containers"}], "external": true};
-window.dfnpanelData['multi-column-layout'] = {"dfnID": "multi-column-layout", "url": "#multi-column-layout", "dfnText": "multi-column layout", "refSections": [{"refs": [{"id": "ref-for-multi-column-layout"}], "title": "2. \nThe Multi-Column Model"}], "external": false};
-window.dfnpanelData['multi-column-container'] = {"dfnID": "multi-column-container", "url": "#multi-column-container", "dfnText": "multi-column container", "refSections": [{"refs": [{"id": "ref-for-multi-column-container"}, {"id": "ref-for-multi-column-container\u2460"}], "title": "1. \nIntroduction"}, {"refs": [{"id": "ref-for-multi-column-container\u2461"}, {"id": "ref-for-multi-column-container\u2462"}, {"id": "ref-for-multi-column-container\u2463"}, {"id": "ref-for-multi-column-container\u2464"}, {"id": "ref-for-multi-column-container\u2465"}, {"id": "ref-for-multi-column-container\u2466"}], "title": "2. \nThe Multi-Column Model"}, {"refs": [{"id": "ref-for-multi-column-container\u2467"}], "title": "3.2. The Number of Columns: the column-count property"}, {"refs": [{"id": "ref-for-multi-column-container\u2468"}, {"id": "ref-for-multi-column-container\u2460\u24ea"}, {"id": "ref-for-multi-column-container\u2460\u2460"}, {"id": "ref-for-multi-column-container\u2460\u2461"}, {"id": "ref-for-multi-column-container\u2460\u2462"}, {"id": "ref-for-multi-column-container\u2460\u2463"}], "title": "4. Column Gaps and Rules"}, {"refs": [{"id": "ref-for-multi-column-container\u2460\u2464"}, {"id": "ref-for-multi-column-container\u2460\u2465"}, {"id": "ref-for-multi-column-container\u2460\u2466"}, {"id": "ref-for-multi-column-container\u2460\u2467"}], "title": "6.1. Spanning An Element Across Columns: the column-span property"}], "external": false};
-window.dfnpanelData['column-box'] = {"dfnID": "column-box", "url": "#column-box", "dfnText": "column boxes", "refSections": [{"refs": [{"id": "ref-for-column-box"}, {"id": "ref-for-column-box\u2460"}, {"id": "ref-for-column-box\u2461"}, {"id": "ref-for-column-box\u2462"}, {"id": "ref-for-column-box\u2463"}, {"id": "ref-for-column-box\u2464"}], "title": "2. \nThe Multi-Column Model"}, {"refs": [{"id": "ref-for-column-box\u2465"}], "title": "6.1. Spanning An Element Across Columns: the column-span property"}, {"refs": [{"id": "ref-for-column-box\u2466"}], "title": "8.1. \nOverflow Inside Multicol Containers"}], "external": false};
-window.dfnpanelData['multi-column-line'] = {"dfnID": "multi-column-line", "url": "#multi-column-line", "dfnText": "multicol lines", "refSections": [{"refs": [{"id": "ref-for-multi-column-line"}, {"id": "ref-for-multi-column-line\u2460"}, {"id": "ref-for-multi-column-line\u2461"}, {"id": "ref-for-multi-column-line\u2462"}], "title": "2. \nThe Multi-Column Model"}, {"refs": [{"id": "ref-for-multi-column-line\u2463"}, {"id": "ref-for-multi-column-line\u2464"}, {"id": "ref-for-multi-column-line\u2465"}, {"id": "ref-for-multi-column-line\u2466"}], "title": "6.1. Spanning An Element Across Columns: the column-span property"}, {"refs": [{"id": "ref-for-multi-column-line\u2467"}], "title": "7.1. Column Balancing: the column-fill property"}], "external": false};
-window.dfnpanelData['column-gap'] = {"dfnID": "column-gap", "url": "#column-gap", "dfnText": "column gap", "refSections": [{"refs": [{"id": "ref-for-column-gap"}], "title": "1. \nIntroduction"}, {"refs": [{"id": "ref-for-column-gap\u2460"}], "title": "4. Column Gaps and Rules"}, {"refs": [{"id": "ref-for-column-gap\u2461"}], "title": "4.5. Column Rule Shorthand: the column-rule property"}], "external": false};
-window.dfnpanelData['column-rule'] = {"dfnID": "column-rule", "url": "#column-rule", "dfnText": "column rule", "refSections": [{"refs": [{"id": "ref-for-column-rule"}], "title": "1. \nIntroduction"}, {"refs": [{"id": "ref-for-column-rule\u2460"}, {"id": "ref-for-column-rule\u2461"}, {"id": "ref-for-column-rule\u2462"}], "title": "4. Column Gaps and Rules"}, {"refs": [{"id": "ref-for-column-rule\u2463"}], "title": "4.2. The Color of Column Rules: the \ncolumn-rule-color property"}, {"refs": [{"id": "ref-for-column-rule\u2464"}], "title": "4.5. Column Rule Shorthand: the column-rule property"}, {"refs": [{"id": "ref-for-column-rule\u2465"}], "title": "6.1. Spanning An Element Across Columns: the column-span property"}], "external": false};
-window.dfnpanelData['multi-column-formatting-context'] = {"dfnID": "multi-column-formatting-context", "url": "#multi-column-formatting-context", "dfnText": "multi-column formatting context", "refSections": [{"refs": [{"id": "ref-for-multi-column-formatting-context"}], "title": "4.1. Gutters Between Columns: the column-gap property"}], "external": false};
-window.dfnpanelData['propdef-column-width'] = {"dfnID": "propdef-column-width", "url": "#propdef-column-width", "dfnText": "column-width", "refSections": [{"refs": [{"id": "ref-for-propdef-column-width"}], "title": "2. \nThe Multi-Column Model"}, {"refs": [{"id": "ref-for-propdef-column-width\u2460"}, {"id": "ref-for-propdef-column-width\u2461"}], "title": "3. \nThe Number and Width of Columns"}, {"refs": [{"id": "ref-for-propdef-column-width\u2462"}, {"id": "ref-for-propdef-column-width\u2463"}, {"id": "ref-for-propdef-column-width\u2464"}], "title": "3.1. The Inline Size of Columns: the column-width property"}, {"refs": [{"id": "ref-for-propdef-column-width\u2465"}, {"id": "ref-for-propdef-column-width\u2466"}], "title": "3.2. The Number of Columns: the column-count property"}, {"refs": [{"id": "ref-for-propdef-column-width\u2467"}, {"id": "ref-for-propdef-column-width\u2468"}, {"id": "ref-for-propdef-column-width\u2460\u24ea"}], "title": "3.3. The column-width and column-count Shorthand: The columns Property"}, {"refs": [{"id": "ref-for-propdef-column-width\u2460\u2460"}, {"id": "ref-for-propdef-column-width\u2460\u2461"}], "title": "3.4. The Pseudo-algorithm"}, {"refs": [{"id": "ref-for-propdef-column-width\u2460\u2462"}, {"id": "ref-for-propdef-column-width\u2460\u2463"}], "title": "Changes from the\nCandidate Recommendation (CR) of 12 April 2011."}], "external": false};
-window.dfnpanelData['valdef-column-width-auto'] = {"dfnID": "valdef-column-width-auto", "url": "#valdef-column-width-auto", "dfnText": "auto", "refSections": [{"refs": [{"id": "ref-for-valdef-column-width-auto"}], "title": "2. \nThe Multi-Column Model"}, {"refs": [{"id": "ref-for-valdef-column-width-auto\u2460"}], "title": "3.1. The Inline Size of Columns: the column-width property"}], "external": false};
-window.dfnpanelData['propdef-column-count'] = {"dfnID": "propdef-column-count", "url": "#propdef-column-count", "dfnText": "column-count", "refSections": [{"refs": [{"id": "ref-for-propdef-column-count"}], "title": "2. \nThe Multi-Column Model"}, {"refs": [{"id": "ref-for-propdef-column-count\u2460"}, {"id": "ref-for-propdef-column-count\u2461"}], "title": "3. \nThe Number and Width of Columns"}, {"refs": [{"id": "ref-for-propdef-column-count\u2462"}], "title": "3.1. The Inline Size of Columns: the column-width property"}, {"refs": [{"id": "ref-for-propdef-column-count\u2463"}, {"id": "ref-for-propdef-column-count\u2464"}], "title": "3.2. The Number of Columns: the column-count property"}, {"refs": [{"id": "ref-for-propdef-column-count\u2465"}, {"id": "ref-for-propdef-column-count\u2466"}, {"id": "ref-for-propdef-column-count\u2467"}], "title": "3.3. The column-width and column-count Shorthand: The columns Property"}, {"refs": [{"id": "ref-for-propdef-column-count\u2468"}, {"id": "ref-for-propdef-column-count\u2460\u24ea"}, {"id": "ref-for-propdef-column-count\u2460\u2460"}], "title": "3.4. The Pseudo-algorithm"}, {"refs": [{"id": "ref-for-propdef-column-count\u2460\u2461"}, {"id": "ref-for-propdef-column-count\u2460\u2462"}], "title": "Changes from the\nCandidate Recommendation (CR) of 12 April 2011."}], "external": false};
-window.dfnpanelData['propdef-columns'] = {"dfnID": "propdef-columns", "url": "#propdef-columns", "dfnText": "columns", "refSections": [{"refs": [{"id": "ref-for-propdef-columns"}], "title": "1. \nIntroduction"}, {"refs": [{"id": "ref-for-propdef-columns\u2460"}], "title": "3. \nThe Number and Width of Columns"}, {"refs": [{"id": "ref-for-propdef-columns\u2461"}, {"id": "ref-for-propdef-columns\u2462"}], "title": "3.3. The column-width and column-count Shorthand: The columns Property"}, {"refs": [{"id": "ref-for-propdef-columns\u2463"}], "title": "Changes from the\nCandidate Recommendation (CR) of 12 April 2011."}], "external": false};
-window.dfnpanelData['propdef-column-rule-color'] = {"dfnID": "propdef-column-rule-color", "url": "#propdef-column-rule-color", "dfnText": "column-rule-color", "refSections": [{"refs": [{"id": "ref-for-propdef-column-rule-color"}], "title": "4.2. The Color of Column Rules: the \ncolumn-rule-color property"}, {"refs": [{"id": "ref-for-propdef-column-rule-color\u2460"}, {"id": "ref-for-propdef-column-rule-color\u2461"}], "title": "4.5. Column Rule Shorthand: the column-rule property"}], "external": false};
-window.dfnpanelData['propdef-column-rule-style'] = {"dfnID": "propdef-column-rule-style", "url": "#propdef-column-rule-style", "dfnText": "column-rule-style", "refSections": [{"refs": [{"id": "ref-for-propdef-column-rule-style"}, {"id": "ref-for-propdef-column-rule-style\u2460"}], "title": "4.3. The Style Of Column Rules: the column-rule-style property"}, {"refs": [{"id": "ref-for-propdef-column-rule-style\u2461"}, {"id": "ref-for-propdef-column-rule-style\u2462"}], "title": "4.5. Column Rule Shorthand: the column-rule property"}], "external": false};
-window.dfnpanelData['propdef-column-rule-width'] = {"dfnID": "propdef-column-rule-width", "url": "#propdef-column-rule-width", "dfnText": "column-rule-width", "refSections": [{"refs": [{"id": "ref-for-propdef-column-rule-width"}], "title": "4.3. The Style Of Column Rules: the column-rule-style property"}, {"refs": [{"id": "ref-for-propdef-column-rule-width\u2460"}], "title": "4.4. The Width Of Column Rules: the column-rule-width property"}, {"refs": [{"id": "ref-for-propdef-column-rule-width\u2461"}, {"id": "ref-for-propdef-column-rule-width\u2462"}], "title": "4.5. Column Rule Shorthand: the column-rule property"}, {"refs": [{"id": "ref-for-propdef-column-rule-width\u2463"}], "title": "Changes from the\nCandidate Recommendation (CR) of 12 April 2011."}], "external": false};
-window.dfnpanelData['propdef-column-rule'] = {"dfnID": "propdef-column-rule", "url": "#propdef-column-rule", "dfnText": "column-rule", "refSections": [{"refs": [{"id": "ref-for-propdef-column-rule"}, {"id": "ref-for-propdef-column-rule\u2460"}, {"id": "ref-for-propdef-column-rule\u2461"}, {"id": "ref-for-propdef-column-rule\u2462"}], "title": "1. \nIntroduction"}, {"refs": [{"id": "ref-for-propdef-column-rule\u2463"}], "title": "4.5. Column Rule Shorthand: the column-rule property"}], "external": false};
-window.dfnpanelData['propdef-column-span'] = {"dfnID": "propdef-column-span", "url": "#propdef-column-span", "dfnText": "column-span", "refSections": [{"refs": [{"id": "ref-for-propdef-column-span"}], "title": "1. \nIntroduction"}, {"refs": [{"id": "ref-for-propdef-column-span\u2460"}], "title": "6. \nSpanning Columns"}, {"refs": [{"id": "ref-for-propdef-column-span\u2461"}, {"id": "ref-for-propdef-column-span\u2462"}, {"id": "ref-for-propdef-column-span\u2463"}, {"id": "ref-for-propdef-column-span\u2464"}, {"id": "ref-for-propdef-column-span\u2465"}], "title": "6.1. Spanning An Element Across Columns: the column-span property"}, {"refs": [{"id": "ref-for-propdef-column-span\u2466"}], "title": "Changes from the\nCandidate Recommendation (CR) of 12 April 2011."}], "external": false};
-window.dfnpanelData['valdef-column-span-none'] = {"dfnID": "valdef-column-span-none", "url": "#valdef-column-span-none", "dfnText": "none", "refSections": [{"refs": [{"id": "ref-for-valdef-column-span-none"}], "title": "6.1. Spanning An Element Across Columns: the column-span property"}], "external": false};
-window.dfnpanelData['valdef-column-span-all'] = {"dfnID": "valdef-column-span-all", "url": "#valdef-column-span-all", "dfnText": "all", "refSections": [{"refs": [{"id": "ref-for-valdef-column-span-all"}, {"id": "ref-for-valdef-column-span-all\u2460"}, {"id": "ref-for-valdef-column-span-all\u2461"}], "title": "6.1. Spanning An Element Across Columns: the column-span property"}], "external": false};
-window.dfnpanelData['spanner'] = {"dfnID": "spanner", "url": "#spanner", "dfnText": "spanner", "refSections": [{"refs": [{"id": "ref-for-spanner"}, {"id": "ref-for-spanner\u2460"}], "title": "2. \nThe Multi-Column Model"}, {"refs": [{"id": "ref-for-spanner\u2461"}, {"id": "ref-for-spanner\u2462"}], "title": "6.1. Spanning An Element Across Columns: the column-span property"}, {"refs": [{"id": "ref-for-spanner\u2463"}], "title": "7.1. Column Balancing: the column-fill property"}], "external": false};
-window.dfnpanelData['propdef-column-fill'] = {"dfnID": "propdef-column-fill", "url": "#propdef-column-fill", "dfnText": "column-fill", "refSections": [{"refs": [{"id": "ref-for-propdef-column-fill"}], "title": "1. \nIntroduction"}, {"refs": [{"id": "ref-for-propdef-column-fill\u2460"}], "title": "7.1. Column Balancing: the column-fill property"}, {"refs": [{"id": "ref-for-propdef-column-fill\u2461"}, {"id": "ref-for-propdef-column-fill\u2462"}, {"id": "ref-for-propdef-column-fill\u2463"}], "title": "Changes from the\nCandidate Recommendation (CR) of 12 April 2011."}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -4354,14 +3885,481 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"957ec3c1": {"dfnID":"957ec3c1","dfnText":"<line-style>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-line-style"},{"id":"ref-for-typedef-line-style\u2460"}],"title":"4.3. The Style Of Column Rules: the column-rule-style property"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#typedef-line-style"},
+"ceaa27cc": {"dfnID":"ceaa27cc","dfnText":"<line-width>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-line-width"}],"title":"4.4. The Width Of Column Rules: the column-rule-width property"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#typedef-line-width"},
+"a9734ee4": {"dfnID":"a9734ee4","dfnText":"border","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-border"},{"id":"ref-for-propdef-border\u2460"}],"title":"1. \nIntroduction"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-border"},
+"7594868a": {"dfnID":"7594868a","dfnText":"hidden","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-line-style-hidden"}],"title":"4.4. The Width Of Column Rules: the column-rule-width property"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#valdef-line-style-hidden"},
+"55617484": {"dfnID":"55617484","dfnText":"none","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-line-style-none"}],"title":"4.3. The Style Of Column Rules: the column-rule-style property"},{"refs":[{"id":"ref-for-valdef-line-style-none\u2460"}],"title":"4.4. The Width Of Column Rules: the column-rule-width property"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#valdef-line-style-none"},
+"9bdefa58": {"dfnID":"9bdefa58","dfnText":"fragment","external":true,"refSections":[{"refs":[{"id":"ref-for-fragment"}],"title":"2. \nThe Multi-Column Model"},{"refs":[{"id":"ref-for-fragment\u2460"}],"title":"6.1. Spanning An Element Across Columns: the column-span property"}],"url":"https://drafts.csswg.org/css-break-4/#fragment"},
+"bb9778e3": {"dfnID":"bb9778e3","dfnText":"fragmentation","external":true,"refSections":[{"refs":[{"id":"ref-for-fragmentation"}],"title":"2. \nThe Multi-Column Model"}],"url":"https://drafts.csswg.org/css-break-4/#fragmentation"},
+"40060954": {"dfnID":"40060954","dfnText":"fragmentation container","external":true,"refSections":[{"refs":[{"id":"ref-for-fragmentation-container"}],"title":"2. \nThe Multi-Column Model"}],"url":"https://drafts.csswg.org/css-break-4/#fragmentation-container"},
+"a270c80d": {"dfnID":"a270c80d","dfnText":"fragmentation context","external":true,"refSections":[{"refs":[{"id":"ref-for-fragmentation-context"}],"title":"2. \nThe Multi-Column Model"}],"url":"https://drafts.csswg.org/css-break-4/#fragmentation-context"},
+"b6730ce5": {"dfnID":"b6730ce5","dfnText":"widows","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-widows"}],"title":"7. \nFilling Columns"}],"url":"https://drafts.csswg.org/css-break-4/#propdef-widows"},
+"1548047a": {"dfnID":"1548047a","dfnText":"<color>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-color"},{"id":"ref-for-typedef-color\u2460"}],"title":"4.2. The Color of Column Rules: the \ncolumn-rule-color property"}],"url":"https://drafts.csswg.org/css-color-5/#typedef-color"},
+"0e9419b9": {"dfnID":"0e9419b9","dfnText":"display","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-display"}],"title":"2. \nThe Multi-Column Model"}],"url":"https://drafts.csswg.org/css-display-3/#propdef-display"},
+"43b15e47": {"dfnID":"43b15e47","dfnText":"anonymous box","external":true,"refSections":[{"refs":[{"id":"ref-for-anonymous"},{"id":"ref-for-anonymous\u2460"}],"title":"2. \nThe Multi-Column Model"}],"url":"https://drafts.csswg.org/css-display-4/#anonymous"},
+"9f3d4f17": {"dfnID":"9f3d4f17","dfnText":"block container","external":true,"refSections":[{"refs":[{"id":"ref-for-block-container"}],"title":"2. \nThe Multi-Column Model"},{"refs":[{"id":"ref-for-block-container\u2460"}],"title":"3.1. The Inline Size of Columns: the column-width property"},{"refs":[{"id":"ref-for-block-container\u2461"}],"title":"3.2. The Number of Columns: the column-count property"},{"refs":[{"id":"ref-for-block-container\u2462"}],"title":"Changes from the\nCandidate Recommendation (CR) of 12 April 2011."}],"url":"https://drafts.csswg.org/css-display-4/#block-container"},
+"ca960d4f": {"dfnID":"ca960d4f","dfnText":"block formatting context","external":true,"refSections":[{"refs":[{"id":"ref-for-block-formatting-context"},{"id":"ref-for-block-formatting-context\u2460"},{"id":"ref-for-block-formatting-context\u2461"}],"title":"2. \nThe Multi-Column Model"},{"refs":[{"id":"ref-for-block-formatting-context\u2462"},{"id":"ref-for-block-formatting-context\u2463"}],"title":"6.1. Spanning An Element Across Columns: the column-span property"},{"refs":[{"id":"ref-for-block-formatting-context\u2464"}],"title":"Changes from the Working Draft (WD) of 28 May 2018"}],"url":"https://drafts.csswg.org/css-display-4/#block-formatting-context"},
+"fd9aa8f7": {"dfnID":"fd9aa8f7","dfnText":"block-level box","external":true,"refSections":[{"refs":[{"id":"ref-for-block-level-box"},{"id":"ref-for-block-level-box\u2460"}],"title":"2. \nThe Multi-Column Model"}],"url":"https://drafts.csswg.org/css-display-4/#block-level-box"},
+"ea663a43": {"dfnID":"ea663a43","dfnText":"containing block","external":true,"refSections":[{"refs":[{"id":"ref-for-containing-block"},{"id":"ref-for-containing-block\u2460"}],"title":"2. \nThe Multi-Column Model"},{"refs":[{"id":"ref-for-containing-block\u2461"},{"id":"ref-for-containing-block\u2462"}],"title":"6.1. Spanning An Element Across Columns: the column-span property"}],"url":"https://drafts.csswg.org/css-display-4/#containing-block"},
+"58157ca0": {"dfnID":"58157ca0","dfnText":"containing block chain","external":true,"refSections":[{"refs":[{"id":"ref-for-containing-block-chain"}],"title":"6.1. Spanning An Element Across Columns: the column-span property"}],"url":"https://drafts.csswg.org/css-display-4/#containing-block-chain"},
+"0bc73d68": {"dfnID":"0bc73d68","dfnText":"formatting context","external":true,"refSections":[{"refs":[{"id":"ref-for-formatting-context"},{"id":"ref-for-formatting-context\u2460"},{"id":"ref-for-formatting-context\u2461"}],"title":"6.1. Spanning An Element Across Columns: the column-span property"}],"url":"https://drafts.csswg.org/css-display-4/#formatting-context"},
+"8141cabb": {"dfnID":"8141cabb","dfnText":"independent formatting context","external":true,"refSections":[{"refs":[{"id":"ref-for-independent-formatting-context"},{"id":"ref-for-independent-formatting-context\u2460"}],"title":"2. \nThe Multi-Column Model"},{"refs":[{"id":"ref-for-independent-formatting-context\u2461"}],"title":"6.1. Spanning An Element Across Columns: the column-span property"}],"url":"https://drafts.csswg.org/css-display-4/#independent-formatting-context"},
+"a46ac4e1": {"dfnID":"a46ac4e1","dfnText":"out of flow","external":true,"refSections":[{"refs":[{"id":"ref-for-out-of-flow"},{"id":"ref-for-out-of-flow\u2460"}],"title":"6.1. Spanning An Element Across Columns: the column-span property"}],"url":"https://drafts.csswg.org/css-display-4/#out-of-flow"},
+"7ba1e996": {"dfnID":"7ba1e996","dfnText":"out-of-flow","external":true,"refSections":[{"refs":[{"id":"ref-for-out-of-flow"},{"id":"ref-for-out-of-flow\u2460"}],"title":"6.1. Spanning An Element Across Columns: the column-span property"}],"url":"https://drafts.csswg.org/css-display-4/#out-of-flow"},
+"80eb9508": {"dfnID":"80eb9508","dfnText":"principal box","external":true,"refSections":[{"refs":[{"id":"ref-for-principal-box"}],"title":"2. \nThe Multi-Column Model"}],"url":"https://drafts.csswg.org/css-display-4/#principal-box"},
+"f005b2f6": {"dfnID":"f005b2f6","dfnText":"grid container","external":true,"refSections":[{"refs":[{"id":"ref-for-grid-container"}],"title":"1. \nIntroduction"}],"url":"https://drafts.csswg.org/css-grid-2/#grid-container"},
+"1044d688": {"dfnID":"1044d688","dfnText":"grid item","external":true,"refSections":[{"refs":[{"id":"ref-for-grid-item"}],"title":"1. \nIntroduction"}],"url":"https://drafts.csswg.org/css-grid-2/#grid-item"},
+"86928bde": {"dfnID":"86928bde","dfnText":"overflow","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-overflow"}],"title":"8.2. \nPagination and Overflow Outside Multicol Containers"}],"url":"https://drafts.csswg.org/css-overflow-3/#propdef-overflow"},
+"e73f6d8c": {"dfnID":"e73f6d8c","dfnText":"absolutely positioned box","external":true,"refSections":[{"refs":[{"id":"ref-for-absolute-position"}],"title":"2. \nThe Multi-Column Model"},{"refs":[{"id":"ref-for-absolute-position\u2460"}],"title":"6.1. Spanning An Element Across Columns: the column-span property"}],"url":"https://drafts.csswg.org/css-position-3/#absolute-position"},
+"b8a0ba74": {"dfnID":"b8a0ba74","dfnText":"position","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-position"},{"id":"ref-for-propdef-position\u2460"},{"id":"ref-for-propdef-position\u2461"}],"title":"2. \nThe Multi-Column Model"},{"refs":[{"id":"ref-for-propdef-position\u2462"}],"title":"Changes from the Working Draft (WD) of 5 October 2017"}],"url":"https://drafts.csswg.org/css-position-3/#propdef-position"},
+"994d0e36": {"dfnID":"994d0e36","dfnText":"table wrapper box","external":true,"refSections":[{"refs":[{"id":"ref-for-table-wrapper-box"}],"title":"3.1. The Inline Size of Columns: the column-width property"},{"refs":[{"id":"ref-for-table-wrapper-box\u2460"}],"title":"3.2. The Number of Columns: the column-count property"},{"refs":[{"id":"ref-for-table-wrapper-box\u2461"}],"title":"Changes from the\nCandidate Recommendation (CR) of 12 April 2011."}],"url":"https://drafts.csswg.org/css-tables-3/#table-wrapper-box"},
+"70c9f859": {"dfnID":"70c9f859","dfnText":"<integer>","external":true,"refSections":[{"refs":[{"id":"ref-for-integer-value"},{"id":"ref-for-integer-value\u2460"}],"title":"3.2. The Number of Columns: the column-count property"}],"url":"https://drafts.csswg.org/css-values-4/#integer-value"},
+"18222566": {"dfnID":"18222566","dfnText":"<length-percentage>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-length-percentage"}],"title":"Changes from the\nCandidate Recommendation (CR) of 12 April 2011."}],"url":"https://drafts.csswg.org/css-values-4/#typedef-length-percentage"},
+"fb030e6c": {"dfnID":"fb030e6c","dfnText":"<length>","external":true,"refSections":[{"refs":[{"id":"ref-for-length-value"},{"id":"ref-for-length-value\u2460"}],"title":"3.1. The Inline Size of Columns: the column-width property"},{"refs":[{"id":"ref-for-length-value\u2461"}],"title":"Changes from the\nCandidate Recommendation (CR) of 12 April 2011."}],"url":"https://drafts.csswg.org/css-values-4/#length-value"},
+"358fd6ff": {"dfnID":"358fd6ff","dfnText":"css-wide keywords","external":true,"refSections":[{"refs":[{"id":"ref-for-css-wide-keywords"}],"title":"1.1. \nValue Definitions"}],"url":"https://drafts.csswg.org/css-values-4/#css-wide-keywords"},
+"6ec67710": {"dfnID":"6ec67710","dfnText":"|","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-one"}],"title":"3.1. The Inline Size of Columns: the column-width property"},{"refs":[{"id":"ref-for-comb-one\u2460"}],"title":"3.2. The Number of Columns: the column-count property"},{"refs":[{"id":"ref-for-comb-one\u2461"}],"title":"6.1. Spanning An Element Across Columns: the column-span property"},{"refs":[{"id":"ref-for-comb-one\u2462"},{"id":"ref-for-comb-one\u2463"}],"title":"7.1. Column Balancing: the column-fill property"}],"url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"8a82fda1": {"dfnID":"8a82fda1","dfnText":"||","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-any"}],"title":"3.3. The column-width and column-count Shorthand: The columns Property"},{"refs":[{"id":"ref-for-comb-any\u2460"},{"id":"ref-for-comb-any\u2461"}],"title":"4.5. Column Rule Shorthand: the column-rule property"}],"url":"https://drafts.csswg.org/css-values-4/#comb-any"},
+"e1ab41b7": {"dfnID":"e1ab41b7","dfnText":"block axis","external":true,"refSections":[{"refs":[{"id":"ref-for-block-axis"}],"title":"2. \nThe Multi-Column Model"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#block-axis"},
+"887c0c5c": {"dfnID":"887c0c5c","dfnText":"inline base direction","external":true,"refSections":[{"refs":[{"id":"ref-for-inline-base-direction"}],"title":"2. \nThe Multi-Column Model"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#inline-base-direction"},
+"07cc8d20": {"dfnID":"07cc8d20","dfnText":"column-gap","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-column-gap"},{"id":"ref-for-propdef-column-gap\u2460"},{"id":"ref-for-propdef-column-gap\u2461"}],"title":"4.1. Gutters Between Columns: the column-gap property"},{"refs":[{"id":"ref-for-propdef-column-gap\u2462"},{"id":"ref-for-propdef-column-gap\u2463"},{"id":"ref-for-propdef-column-gap\u2464"}],"title":"Changes from the Working Draft (WD) of 28 May 2018"},{"refs":[{"id":"ref-for-propdef-column-gap\u2465"}],"title":"Changes from the\nCandidate Recommendation (CR) of 12 April 2011."}],"url":"https://drafts.csswg.org/css-align-3/#propdef-column-gap"},
+"f0f00e3a": {"dfnID":"f0f00e3a","dfnText":"normal","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-row-gap-normal"}],"title":"4.1. Gutters Between Columns: the column-gap property"}],"url":"https://drafts.csswg.org/css-align-3/#valdef-row-gap-normal"},
+"0a52b385": {"dfnID":"0a52b385","dfnText":"break-after","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-break-after"}],"title":"5. \nColumn Breaks"},{"refs":[{"id":"ref-for-propdef-break-after\u2460"},{"id":"ref-for-propdef-break-after\u2461"}],"title":"5.1. Controlling Fragmentation: the break-before, break-after, break-inside properties"}],"url":"https://drafts.csswg.org/css-break-3/#propdef-break-after"},
+"c1654d36": {"dfnID":"c1654d36","dfnText":"break-before","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-break-before"}],"title":"5. \nColumn Breaks"},{"refs":[{"id":"ref-for-propdef-break-before\u2460"},{"id":"ref-for-propdef-break-before\u2461"}],"title":"5.1. Controlling Fragmentation: the break-before, break-after, break-inside properties"}],"url":"https://drafts.csswg.org/css-break-3/#propdef-break-before"},
+"9522389e": {"dfnID":"9522389e","dfnText":"break-inside","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-break-inside"}],"title":"5. \nColumn Breaks"},{"refs":[{"id":"ref-for-propdef-break-inside\u2460"},{"id":"ref-for-propdef-break-inside\u2461"}],"title":"5.1. Controlling Fragmentation: the break-before, break-after, break-inside properties"}],"url":"https://drafts.csswg.org/css-break-3/#propdef-break-inside"},
+"2589df91": {"dfnID":"2589df91","dfnText":"orphans","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-orphans"}],"title":"7. \nFilling Columns"}],"url":"https://drafts.csswg.org/css-break-3/#propdef-orphans"},
+"68019d7a": {"dfnID":"68019d7a","dfnText":"height","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-height"}],"title":"8.2. \nPagination and Overflow Outside Multicol Containers"}],"url":"https://drafts.csswg.org/css-sizing-3/#propdef-height"},
+"88643fe0": {"dfnID":"88643fe0","dfnText":"width","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-width"}],"title":"2. \nThe Multi-Column Model"}],"url":"https://drafts.csswg.org/css-sizing-3/#propdef-width"},
+"758665a5": {"dfnID":"758665a5","dfnText":"paged media","external":true,"refSections":[{"refs":[{"id":"ref-for-paged-media"}],"title":"3.4. The Pseudo-algorithm"},{"refs":[{"id":"ref-for-paged-media\u2460"}],"title":"6.1. Spanning An Element Across Columns: the column-span property"},{"refs":[{"id":"ref-for-paged-media\u2461"}],"title":"8.2. \nPagination and Overflow Outside Multicol Containers"}],"url":"https://drafts.csswg.org/mediaqueries-5/#paged-media"},
+"multi-column-layout": {"dfnID":"multi-column-layout","dfnText":"multi-column layout","external":false,"refSections":[{"refs":[{"id":"ref-for-multi-column-layout"}],"title":"2. \nThe Multi-Column Model"}],"url":"#multi-column-layout"},
+"multi-column-container": {"dfnID":"multi-column-container","dfnText":"multi-column container","external":false,"refSections":[{"refs":[{"id":"ref-for-multi-column-container"},{"id":"ref-for-multi-column-container\u2460"}],"title":"1. \nIntroduction"},{"refs":[{"id":"ref-for-multi-column-container\u2461"},{"id":"ref-for-multi-column-container\u2462"},{"id":"ref-for-multi-column-container\u2463"},{"id":"ref-for-multi-column-container\u2464"},{"id":"ref-for-multi-column-container\u2465"},{"id":"ref-for-multi-column-container\u2466"}],"title":"2. \nThe Multi-Column Model"},{"refs":[{"id":"ref-for-multi-column-container\u2467"}],"title":"3.2. The Number of Columns: the column-count property"},{"refs":[{"id":"ref-for-multi-column-container\u2468"},{"id":"ref-for-multi-column-container\u2460\u24ea"},{"id":"ref-for-multi-column-container\u2460\u2460"},{"id":"ref-for-multi-column-container\u2460\u2461"},{"id":"ref-for-multi-column-container\u2460\u2462"},{"id":"ref-for-multi-column-container\u2460\u2463"}],"title":"4. Column Gaps and Rules"},{"refs":[{"id":"ref-for-multi-column-container\u2460\u2464"},{"id":"ref-for-multi-column-container\u2460\u2465"},{"id":"ref-for-multi-column-container\u2460\u2466"},{"id":"ref-for-multi-column-container\u2460\u2467"}],"title":"6.1. Spanning An Element Across Columns: the column-span property"}],"url":"#multi-column-container"},
+"column-box": {"dfnID":"column-box","dfnText":"column boxes","external":false,"refSections":[{"refs":[{"id":"ref-for-column-box"},{"id":"ref-for-column-box\u2460"},{"id":"ref-for-column-box\u2461"},{"id":"ref-for-column-box\u2462"},{"id":"ref-for-column-box\u2463"},{"id":"ref-for-column-box\u2464"}],"title":"2. \nThe Multi-Column Model"},{"refs":[{"id":"ref-for-column-box\u2465"}],"title":"6.1. Spanning An Element Across Columns: the column-span property"},{"refs":[{"id":"ref-for-column-box\u2466"}],"title":"8.1. \nOverflow Inside Multicol Containers"}],"url":"#column-box"},
+"multi-column-line": {"dfnID":"multi-column-line","dfnText":"multicol lines","external":false,"refSections":[{"refs":[{"id":"ref-for-multi-column-line"},{"id":"ref-for-multi-column-line\u2460"},{"id":"ref-for-multi-column-line\u2461"},{"id":"ref-for-multi-column-line\u2462"}],"title":"2. \nThe Multi-Column Model"},{"refs":[{"id":"ref-for-multi-column-line\u2463"},{"id":"ref-for-multi-column-line\u2464"},{"id":"ref-for-multi-column-line\u2465"},{"id":"ref-for-multi-column-line\u2466"}],"title":"6.1. Spanning An Element Across Columns: the column-span property"},{"refs":[{"id":"ref-for-multi-column-line\u2467"}],"title":"7.1. Column Balancing: the column-fill property"}],"url":"#multi-column-line"},
+"column-gap": {"dfnID":"column-gap","dfnText":"column gap","external":false,"refSections":[{"refs":[{"id":"ref-for-column-gap"}],"title":"1. \nIntroduction"},{"refs":[{"id":"ref-for-column-gap\u2460"}],"title":"4. Column Gaps and Rules"},{"refs":[{"id":"ref-for-column-gap\u2461"}],"title":"4.5. Column Rule Shorthand: the column-rule property"}],"url":"#column-gap"},
+"column-rule": {"dfnID":"column-rule","dfnText":"column rule","external":false,"refSections":[{"refs":[{"id":"ref-for-column-rule"}],"title":"1. \nIntroduction"},{"refs":[{"id":"ref-for-column-rule\u2460"},{"id":"ref-for-column-rule\u2461"},{"id":"ref-for-column-rule\u2462"}],"title":"4. Column Gaps and Rules"},{"refs":[{"id":"ref-for-column-rule\u2463"}],"title":"4.2. The Color of Column Rules: the \ncolumn-rule-color property"},{"refs":[{"id":"ref-for-column-rule\u2464"}],"title":"4.5. Column Rule Shorthand: the column-rule property"},{"refs":[{"id":"ref-for-column-rule\u2465"}],"title":"6.1. Spanning An Element Across Columns: the column-span property"}],"url":"#column-rule"},
+"multi-column-formatting-context": {"dfnID":"multi-column-formatting-context","dfnText":"multi-column formatting context","external":false,"refSections":[{"refs":[{"id":"ref-for-multi-column-formatting-context"}],"title":"4.1. Gutters Between Columns: the column-gap property"}],"url":"#multi-column-formatting-context"},
+"propdef-column-width": {"dfnID":"propdef-column-width","dfnText":"column-width","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-column-width"}],"title":"2. \nThe Multi-Column Model"},{"refs":[{"id":"ref-for-propdef-column-width\u2460"},{"id":"ref-for-propdef-column-width\u2461"}],"title":"3. \nThe Number and Width of Columns"},{"refs":[{"id":"ref-for-propdef-column-width\u2462"},{"id":"ref-for-propdef-column-width\u2463"},{"id":"ref-for-propdef-column-width\u2464"}],"title":"3.1. The Inline Size of Columns: the column-width property"},{"refs":[{"id":"ref-for-propdef-column-width\u2465"},{"id":"ref-for-propdef-column-width\u2466"}],"title":"3.2. The Number of Columns: the column-count property"},{"refs":[{"id":"ref-for-propdef-column-width\u2467"},{"id":"ref-for-propdef-column-width\u2468"},{"id":"ref-for-propdef-column-width\u2460\u24ea"}],"title":"3.3. The column-width and column-count Shorthand: The columns Property"},{"refs":[{"id":"ref-for-propdef-column-width\u2460\u2460"},{"id":"ref-for-propdef-column-width\u2460\u2461"}],"title":"3.4. The Pseudo-algorithm"},{"refs":[{"id":"ref-for-propdef-column-width\u2460\u2462"},{"id":"ref-for-propdef-column-width\u2460\u2463"}],"title":"Changes from the\nCandidate Recommendation (CR) of 12 April 2011."}],"url":"#propdef-column-width"},
+"valdef-column-width-auto": {"dfnID":"valdef-column-width-auto","dfnText":"auto","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-column-width-auto"}],"title":"2. \nThe Multi-Column Model"},{"refs":[{"id":"ref-for-valdef-column-width-auto\u2460"}],"title":"3.1. The Inline Size of Columns: the column-width property"}],"url":"#valdef-column-width-auto"},
+"propdef-column-count": {"dfnID":"propdef-column-count","dfnText":"column-count","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-column-count"}],"title":"2. \nThe Multi-Column Model"},{"refs":[{"id":"ref-for-propdef-column-count\u2460"},{"id":"ref-for-propdef-column-count\u2461"}],"title":"3. \nThe Number and Width of Columns"},{"refs":[{"id":"ref-for-propdef-column-count\u2462"}],"title":"3.1. The Inline Size of Columns: the column-width property"},{"refs":[{"id":"ref-for-propdef-column-count\u2463"},{"id":"ref-for-propdef-column-count\u2464"}],"title":"3.2. The Number of Columns: the column-count property"},{"refs":[{"id":"ref-for-propdef-column-count\u2465"},{"id":"ref-for-propdef-column-count\u2466"},{"id":"ref-for-propdef-column-count\u2467"}],"title":"3.3. The column-width and column-count Shorthand: The columns Property"},{"refs":[{"id":"ref-for-propdef-column-count\u2468"},{"id":"ref-for-propdef-column-count\u2460\u24ea"},{"id":"ref-for-propdef-column-count\u2460\u2460"}],"title":"3.4. The Pseudo-algorithm"},{"refs":[{"id":"ref-for-propdef-column-count\u2460\u2461"},{"id":"ref-for-propdef-column-count\u2460\u2462"}],"title":"Changes from the\nCandidate Recommendation (CR) of 12 April 2011."}],"url":"#propdef-column-count"},
+"propdef-columns": {"dfnID":"propdef-columns","dfnText":"columns","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-columns"}],"title":"1. \nIntroduction"},{"refs":[{"id":"ref-for-propdef-columns\u2460"}],"title":"3. \nThe Number and Width of Columns"},{"refs":[{"id":"ref-for-propdef-columns\u2461"},{"id":"ref-for-propdef-columns\u2462"}],"title":"3.3. The column-width and column-count Shorthand: The columns Property"},{"refs":[{"id":"ref-for-propdef-columns\u2463"}],"title":"Changes from the\nCandidate Recommendation (CR) of 12 April 2011."}],"url":"#propdef-columns"},
+"propdef-column-rule-color": {"dfnID":"propdef-column-rule-color","dfnText":"column-rule-color","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-column-rule-color"}],"title":"4.2. The Color of Column Rules: the \ncolumn-rule-color property"},{"refs":[{"id":"ref-for-propdef-column-rule-color\u2460"},{"id":"ref-for-propdef-column-rule-color\u2461"}],"title":"4.5. Column Rule Shorthand: the column-rule property"}],"url":"#propdef-column-rule-color"},
+"propdef-column-rule-style": {"dfnID":"propdef-column-rule-style","dfnText":"column-rule-style","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-column-rule-style"},{"id":"ref-for-propdef-column-rule-style\u2460"}],"title":"4.3. The Style Of Column Rules: the column-rule-style property"},{"refs":[{"id":"ref-for-propdef-column-rule-style\u2461"},{"id":"ref-for-propdef-column-rule-style\u2462"}],"title":"4.5. Column Rule Shorthand: the column-rule property"}],"url":"#propdef-column-rule-style"},
+"propdef-column-rule-width": {"dfnID":"propdef-column-rule-width","dfnText":"column-rule-width","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-column-rule-width"}],"title":"4.3. The Style Of Column Rules: the column-rule-style property"},{"refs":[{"id":"ref-for-propdef-column-rule-width\u2460"}],"title":"4.4. The Width Of Column Rules: the column-rule-width property"},{"refs":[{"id":"ref-for-propdef-column-rule-width\u2461"},{"id":"ref-for-propdef-column-rule-width\u2462"}],"title":"4.5. Column Rule Shorthand: the column-rule property"},{"refs":[{"id":"ref-for-propdef-column-rule-width\u2463"}],"title":"Changes from the\nCandidate Recommendation (CR) of 12 April 2011."}],"url":"#propdef-column-rule-width"},
+"propdef-column-rule": {"dfnID":"propdef-column-rule","dfnText":"column-rule","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-column-rule"},{"id":"ref-for-propdef-column-rule\u2460"},{"id":"ref-for-propdef-column-rule\u2461"},{"id":"ref-for-propdef-column-rule\u2462"}],"title":"1. \nIntroduction"},{"refs":[{"id":"ref-for-propdef-column-rule\u2463"}],"title":"4.5. Column Rule Shorthand: the column-rule property"}],"url":"#propdef-column-rule"},
+"propdef-column-span": {"dfnID":"propdef-column-span","dfnText":"column-span","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-column-span"}],"title":"1. \nIntroduction"},{"refs":[{"id":"ref-for-propdef-column-span\u2460"}],"title":"6. \nSpanning Columns"},{"refs":[{"id":"ref-for-propdef-column-span\u2461"},{"id":"ref-for-propdef-column-span\u2462"},{"id":"ref-for-propdef-column-span\u2463"},{"id":"ref-for-propdef-column-span\u2464"},{"id":"ref-for-propdef-column-span\u2465"}],"title":"6.1. Spanning An Element Across Columns: the column-span property"},{"refs":[{"id":"ref-for-propdef-column-span\u2466"}],"title":"Changes from the\nCandidate Recommendation (CR) of 12 April 2011."}],"url":"#propdef-column-span"},
+"valdef-column-span-none": {"dfnID":"valdef-column-span-none","dfnText":"none","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-column-span-none"}],"title":"6.1. Spanning An Element Across Columns: the column-span property"}],"url":"#valdef-column-span-none"},
+"valdef-column-span-all": {"dfnID":"valdef-column-span-all","dfnText":"all","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-column-span-all"},{"id":"ref-for-valdef-column-span-all\u2460"},{"id":"ref-for-valdef-column-span-all\u2461"}],"title":"6.1. Spanning An Element Across Columns: the column-span property"}],"url":"#valdef-column-span-all"},
+"spanner": {"dfnID":"spanner","dfnText":"spanner","external":false,"refSections":[{"refs":[{"id":"ref-for-spanner"},{"id":"ref-for-spanner\u2460"}],"title":"2. \nThe Multi-Column Model"},{"refs":[{"id":"ref-for-spanner\u2461"},{"id":"ref-for-spanner\u2462"}],"title":"6.1. Spanning An Element Across Columns: the column-span property"},{"refs":[{"id":"ref-for-spanner\u2463"}],"title":"7.1. Column Balancing: the column-fill property"}],"url":"#spanner"},
+"propdef-column-fill": {"dfnID":"propdef-column-fill","dfnText":"column-fill","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-column-fill"}],"title":"1. \nIntroduction"},{"refs":[{"id":"ref-for-propdef-column-fill\u2460"}],"title":"7.1. Column Balancing: the column-fill property"},{"refs":[{"id":"ref-for-propdef-column-fill\u2461"},{"id":"ref-for-propdef-column-fill\u2462"},{"id":"ref-for-propdef-column-fill\u2463"}],"title":"Changes from the\nCandidate Recommendation (CR) of 12 April 2011."}],"url":"#propdef-column-fill"},
+};
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+const typeFormatters = {
+    'dfn': (text) => `[=${text}=]`,
+    'abstract-op': (text) => `[\$${text}\$]`,
+    'value': (text) => `''${text}''`,
+    'http-header': (text) => `[:${text}:]`,
+    'idl': (text) => `{{${text}}}`,
+    'interface': 'idl',
+    'constructor': 'idl',
+    'method': 'idl',
+    'argument': 'idl',
+    'attribute': 'idl',
+    'callback': 'idl',
+    'dictionary': 'idl',
+    'dict-member': 'idl',
+    'enum': 'idl',
+    'enum-value': 'idl',
+    'exception': 'idl',
+    'const': 'idl',
+    'typedef': 'idl',
+    'stringifier': 'idl',
+    'serializer': 'idl',
+    'iterator': 'idl',
+    'maplike': 'idl',
+    'setlike': 'idl',
+    'extended-attribute': 'idl',
+    'event': 'idl',
+    'element': (element) => `<{${element}}>`,
+    'element-state': 'element',
+    'element-attr': 'element',
+    'attr-value': 'element',
+    'scheme': 'dfn',
+    'permission': 'dfn',
+    'grammar': (text) => `${text} (within a <pre class=prod>)`,
+    'type': (text)=> `<<${text}>>`,
+    'property': (text) => `'${text}'`,
+    'descriptor': 'property',
+    'function': 'value',
+    'at-rule': 'value',
+    'selector': 'value',
+};
+const typesUsingFor = new Set(
+    [
+        "descriptor",
+        "value",
+        "element-attr",
+        "attr-value",
+        "element-state",
+        "method",
+        "constructor",
+        "argument",
+        "attribute",
+        "const",
+        "dict-member",
+        "event",
+        "enum-value",
+        "stringifier",
+        "serializer",
+        "iterator",
+        "maplike",
+        "setlike",
+        "state",
+        "mode",
+        "context",
+        "facet",
+    ],
+)
+const typesNotUsingFor = new Set(
+    [
+        "property",
+        "element",
+        "interface",
+        "namespace",
+        "callback",
+        "dictionary",
+        "enum",
+        "exception",
+        "typedef",
+        "http-header",
+        "permission",
+    ],
+)
+function linkFormatterFromType(type) {
+    const fnOrType = typeFormatters[type];
+    if(typeof fnOrType === 'string') {
+        // follow the alias
+        return linkFormatterFromType(fnOrType);
+    }
+    return fnOrType;
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!typesUsingFor.has(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!typesNotUsingFor.has(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
+
+function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+    dfnPanel.forDfn = dfn;
+    if(!dfn) { console.log(dfnPanel); }
+    return dfnPanel;
+}
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        const panel = genDfnPanel({ ...panelData, dfn });
+        append(document.body, panel);
+        insertDfnPopupAction(panel)
+    }
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+})
+
+function hideAllDfnPanels() {
+    // Turn off any currently "on" or "activated" panels.
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
+}
+
+function showDfnPanel(dfnPanel) {
+    hideAllDfnPanels(); // Only display one at this time.
+
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "true");
+
+    dfnPanel.classList.add("on");
+    positionDfnPanel(dfnPanel);
+
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    // Increment tabindex for each anchor and button tags in panel
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.style.position = "absolute"; // unfix it
+    dfnPanel.classList.remove("on");
+    dfnPanel.classList.remove("activated");
+}
+
+function toggleDfnPanel(dfnPanel) {
+    if(dfnPanel.classList.contains("on")) {
+        hideDfnPanel(dfnPanel);
+    } else {
+        showDfnPanel(dfnPanel);
+    }
+}
+
+function insertDfnPopupAction(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        showDfnPanel(dfnPanel);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfnPanel);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel(dfnPanel, dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    })
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
 }
 </script>
 <script>/* Boilerplate: script-link-titles */
+"use strict";
+{
 let linkTitleData = {
- "https://drafts.csswg.org/css-backgrounds-3/#typedef-line-style": "Expands to: dashed | dotted | double | groove | hidden | inset | none | outset | ridge | solid",
- "https://drafts.csswg.org/css-backgrounds-3/#typedef-line-width": "Expands to: medium | thick | thin",
- "https://drafts.csswg.org/css-color-5/#typedef-color": "Expands to: aliceblue | antiquewhite | aqua | aquamarine | azure | beige | bisque | black | blanchedalmond | blue | blueviolet | brown | burlywood | cadetblue | chartreuse | chocolate | coral | cornflowerblue | cornsilk | crimson | currentcolor | cyan | darkblue | darkcyan | darkgoldenrod | darkgray | darkgreen | darkgrey | darkkhaki | darkmagenta | darkolivegreen | darkorange | darkorchid | darkred | darksalmon | darkseagreen | darkslateblue | darkslategray | darkslategrey | darkturquoise | darkviolet | deeppink | deepskyblue | dimgray | dimgrey | dodgerblue | firebrick | floralwhite | forestgreen | fuchsia | gainsboro | ghostwhite | gold | goldenrod | gray | green | greenyellow | grey | honeydew | hotpink | indianred | indigo | ivory | khaki | lavender | lavenderblush | lawngreen | lemonchiffon | lightblue | lightcoral | lightcyan | lightgoldenrodyellow | lightgray | lightgreen | lightgrey | lightpink | lightsalmon | lightseagreen | lightskyblue | lightslategray | lightslategrey | lightsteelblue | lightyellow | lime | limegreen | linen | magenta | maroon | mediumaquamarine | mediumblue | mediumorchid | mediumpurple | mediumseagreen | mediumslateblue | mediumspringgreen | mediumturquoise | mediumvioletred | midnightblue | mintcream | mistyrose | moccasin | navajowhite | navy | none | oldlace | olive | olivedrab | orange | orangered | orchid | palegoldenrod | palegreen | paleturquoise | palevioletred | papayawhip | peachpuff | peru | pink | plum | powderblue | purple | rebeccapurple | red | rosybrown | royalblue | saddlebrown | salmon | sandybrown | seagreen | seashell | sienna | silver | skyblue | slateblue | slategray | slategrey | snow | springgreen | steelblue | tan | teal | thistle | tomato | transparent | turquoise | violet | wheat | white | whitesmoke | yellow | yellowgreen",
- "https://drafts.csswg.org/css-values-4/#length-value": "Expands to: advance measure | cap | ch | cm | dvb | dvh | dvi | dvmax | dvmin | dvw | em | ex | ic | in | lh | lvb | lvh | lvi | lvmax | lvmin | lvw | mm | pc | pt | px | q | rcap | rch | rem | rex | ric | rlh | svb | svh | svi | svmax | svmin | svw | vb | vh | vi | vmax | vmin | vw"
+"https://drafts.csswg.org/css-values-4/#length-value": "Expands to: advance measure | cap | ch | cm | dvb | dvh | dvi | dvmax | dvmin | dvw | em | ex | ic | in | lh | lvb | lvh | lvi | lvmax | lvmin | lvw | mm | pc | pt | px | q | rcap | rch | rem | rex | ric | rlh | svb | svh | svi | svmax | svmin | svw | vb | vh | vi | vmax | vmin | vw",
+"https://drafts.csswg.org/css-color-5/#typedef-color": "Expands to: aliceblue | antiquewhite | aqua | aquamarine | azure | beige | bisque | black | blanchedalmond | blue | blueviolet | brown | burlywood | cadetblue | chartreuse | chocolate | coral | cornflowerblue | cornsilk | crimson | currentcolor | cyan | darkblue | darkcyan | darkgoldenrod | darkgray | darkgreen | darkgrey | darkkhaki | darkmagenta | darkolivegreen | darkorange | darkorchid | darkred | darksalmon | darkseagreen | darkslateblue | darkslategray | darkslategrey | darkturquoise | darkviolet | deeppink | deepskyblue | dimgray | dimgrey | dodgerblue | firebrick | floralwhite | forestgreen | fuchsia | gainsboro | ghostwhite | gold | goldenrod | gray | green | greenyellow | grey | honeydew | hotpink | indianred | indigo | ivory | khaki | lavender | lavenderblush | lawngreen | lemonchiffon | lightblue | lightcoral | lightcyan | lightgoldenrodyellow | lightgray | lightgreen | lightgrey | lightpink | lightsalmon | lightseagreen | lightskyblue | lightslategray | lightslategrey | lightsteelblue | lightyellow | lime | limegreen | linen | magenta | maroon | mediumaquamarine | mediumblue | mediumorchid | mediumpurple | mediumseagreen | mediumslateblue | mediumspringgreen | mediumturquoise | mediumvioletred | midnightblue | mintcream | mistyrose | moccasin | navajowhite | navy | none | oldlace | olive | olivedrab | orange | orangered | orchid | palegoldenrod | palegreen | paleturquoise | palevioletred | papayawhip | peachpuff | peru | pink | plum | powderblue | purple | rebeccapurple | red | rosybrown | royalblue | saddlebrown | salmon | sandybrown | seagreen | seashell | sienna | silver | skyblue | slateblue | slategray | slategrey | snow | springgreen | steelblue | tan | teal | thistle | tomato | transparent | turquoise | violet | wheat | white | whitesmoke | yellow | yellowgreen",
+"https://drafts.csswg.org/css-backgrounds-3/#typedef-line-style": "Expands to: dashed | dotted | double | groove | hidden | inset | none | outset | ridge | solid",
+"https://drafts.csswg.org/css-backgrounds-3/#typedef-line-width": "Expands to: medium | thick | thin",
 };
 
 function setTypeTitles() {
@@ -4373,11 +4371,11 @@ function setTypeTitles() {
 }
 
 document.addEventListener("DOMContentLoaded", setTypeTitles);
+}
 </script>
 <script>/* Boilerplate: script-position-annos */
 "use strict";
 {
-
 function repositionAnnoPanels(){
     const panels = [...document.querySelectorAll("[data-anno-for]")];
     const main = document.querySelector("main");
@@ -4421,294 +4419,289 @@ window.addEventListener("resize", repositionAnnoPanels);
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
+let refsData = {
+"https://drafts.csswg.org/css-grid-2/#grid-container": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-grid","spec":"css-grid-2","status":"current","text":"grid container","type":"dfn","url":"https://drafts.csswg.org/css-grid-2/#grid-container"},
+"https://drafts.csswg.org/css-grid-2/#grid-item": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-grid","spec":"css-grid-2","status":"current","text":"grid item","type":"dfn","url":"https://drafts.csswg.org/css-grid-2/#grid-item"},
+"#multi-column-container": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-multicol","spec":"css-multicol-1","status":"local","text":"multi-column container","type":"dfn","url":"#multi-column-container"},
+"#propdef-columns": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-multicol","spec":"css-multicol-1","status":"local","text":"columns","type":"property","url":"#propdef-columns"},
+"#propdef-column-rule": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-multicol","spec":"css-multicol-1","status":"local","text":"column-rule","type":"property","url":"#propdef-column-rule"},
+"https://drafts.csswg.org/css-backgrounds-3/#propdef-border": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"current","text":"border","type":"property","url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-border"},
+"#propdef-column-fill": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-multicol","spec":"css-multicol-1","status":"local","text":"column-fill","type":"property","url":"#propdef-column-fill"},
+"#propdef-column-span": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-multicol","spec":"css-multicol-1","status":"local","text":"column-span","type":"property","url":"#propdef-column-span"},
+"#column-gap": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-multicol","spec":"css-multicol-1","status":"local","text":"column gap","type":"dfn","url":"#column-gap"},
+"#column-rule": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-multicol","spec":"css-multicol-1","status":"local","text":"column rule","type":"dfn","url":"#column-rule"},
+"https://drafts.csswg.org/css-values-4/#css-wide-keywords": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"css-wide keywords","type":"dfn","url":"https://drafts.csswg.org/css-values-4/#css-wide-keywords"},
+"#propdef-column-width": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-multicol","spec":"css-multicol-1","status":"local","text":"column-width","type":"property","url":"#propdef-column-width"},
+"#propdef-column-count": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-multicol","spec":"css-multicol-1","status":"local","text":"column-count","type":"property","url":"#propdef-column-count"},
+"#valdef-column-width-auto": {"export":true,"for_":["column-width"],"level":"1","normative":true,"shortname":"css-multicol","spec":"css-multicol-1","status":"local","text":"auto","type":"value","url":"#valdef-column-width-auto"},
+"#multi-column-layout": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-multicol","spec":"css-multicol-1","status":"local","text":"multi-column layout","type":"dfn","url":"#multi-column-layout"},
+"https://drafts.csswg.org/css-break-4/#fragmentation-context": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"current","text":"fragmentation context","type":"dfn","url":"https://drafts.csswg.org/css-break-4/#fragmentation-context"},
+"https://drafts.csswg.org/css-display-4/#anonymous": {"export":true,"for_":["CSS"],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"anonymous box","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#anonymous"},
+"https://drafts.csswg.org/css-break-4/#fragmentation-container": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"current","text":"fragmentation container","type":"dfn","url":"https://drafts.csswg.org/css-break-4/#fragmentation-container"},
+"#column-box": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-multicol","spec":"css-multicol-1","status":"local","text":"column box","type":"dfn","url":"#column-box"},
+"https://drafts.csswg.org/css-display-4/#block-formatting-context": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"block formatting context","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#block-formatting-context"},
+"https://drafts.csswg.org/css-display-4/#containing-block": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"containing block","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#containing-block"},
+"https://drafts.csswg.org/css-sizing-3/#propdef-width": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-sizing","spec":"css-sizing-3","status":"current","text":"width","type":"property","url":"https://drafts.csswg.org/css-sizing-3/#propdef-width"},
+"https://drafts.csswg.org/css-writing-modes-4/#block-axis": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"block axis","type":"dfn","url":"https://drafts.csswg.org/css-writing-modes-4/#block-axis"},
+"https://drafts.csswg.org/css-break-4/#fragment": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"current","text":"fragment","type":"dfn","url":"https://drafts.csswg.org/css-break-4/#fragment"},
+"https://drafts.csswg.org/css-position-3/#absolute-position": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-position","spec":"css-position-3","status":"current","text":"absolutely positioned box","type":"dfn","url":"https://drafts.csswg.org/css-position-3/#absolute-position"},
+"https://drafts.csswg.org/css-position-3/#propdef-position": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-position","spec":"css-position-3","status":"current","text":"position","type":"property","url":"https://drafts.csswg.org/css-position-3/#propdef-position"},
+"https://drafts.csswg.org/css-display-4/#principal-box": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"principal box","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#principal-box"},
+"https://drafts.csswg.org/css-writing-modes-4/#inline-base-direction": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"inline base direction","type":"dfn","url":"https://drafts.csswg.org/css-writing-modes-4/#inline-base-direction"},
+"#multi-column-line": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-multicol","spec":"css-multicol-1","status":"local","text":"multicol line","type":"dfn","url":"#multi-column-line"},
+"https://drafts.csswg.org/css-break-4/#fragmentation": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"current","text":"fragmentation","type":"dfn","url":"https://drafts.csswg.org/css-break-4/#fragmentation"},
+"#spanner": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-multicol","spec":"css-multicol-1","status":"local","text":"spanner","type":"dfn","url":"#spanner"},
+"https://drafts.csswg.org/css-display-4/#block-container": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"block container","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#block-container"},
+"https://drafts.csswg.org/css-display-4/#independent-formatting-context": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"independent formatting context","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#independent-formatting-context"},
+"https://drafts.csswg.org/css-display-4/#block-level-box": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"block-level box","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#block-level-box"},
+"https://drafts.csswg.org/css-display-3/#propdef-display": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-display","spec":"css-display-3","status":"current","text":"display","type":"property","url":"https://drafts.csswg.org/css-display-3/#propdef-display"},
+"https://drafts.csswg.org/css-values-4/#comb-one": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"|","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"https://drafts.csswg.org/css-values-4/#length-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<length>","type":"type","url":"https://drafts.csswg.org/css-values-4/#length-value"},
+"https://drafts.csswg.org/css-tables-3/#table-wrapper-box": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-tables","spec":"css-tables-3","status":"current","text":"table wrapper box","type":"dfn","url":"https://drafts.csswg.org/css-tables-3/#table-wrapper-box"},
+"https://drafts.csswg.org/css-values-4/#integer-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<integer>","type":"type","url":"https://drafts.csswg.org/css-values-4/#integer-value"},
+"https://drafts.csswg.org/css-values-4/#comb-any": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"||","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-any"},
+"https://drafts.csswg.org/mediaqueries-5/#paged-media": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"mediaqueries","spec":"mediaqueries-5","status":"current","text":"paged media","type":"dfn","url":"https://drafts.csswg.org/mediaqueries-5/#paged-media"},
+"https://drafts.csswg.org/css-align-3/#propdef-column-gap": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-align","spec":"css-align-3","status":"current","text":"column-gap","type":"property","url":"https://drafts.csswg.org/css-align-3/#propdef-column-gap"},
+"#multi-column-formatting-context": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-multicol","spec":"css-multicol-1","status":"local","text":"multi-column formatting context","type":"dfn","url":"#multi-column-formatting-context"},
+"https://drafts.csswg.org/css-align-3/#valdef-row-gap-normal": {"export":true,"for_":["row-gap","column-gap","gap"],"level":"3","normative":true,"shortname":"css-align","spec":"css-align-3","status":"current","text":"normal","type":"value","url":"https://drafts.csswg.org/css-align-3/#valdef-row-gap-normal"},
+"#propdef-column-rule-color": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-multicol","spec":"css-multicol-1","status":"local","text":"column-rule-color","type":"property","url":"#propdef-column-rule-color"},
+"https://drafts.csswg.org/css-color-5/#typedef-color": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-color","spec":"css-color-5","status":"current","text":"<color>","type":"type","url":"https://drafts.csswg.org/css-color-5/#typedef-color"},
+"#propdef-column-rule-style": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-multicol","spec":"css-multicol-1","status":"local","text":"column-rule-style","type":"property","url":"#propdef-column-rule-style"},
+"https://drafts.csswg.org/css-backgrounds-3/#typedef-line-style": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"current","text":"<line-style>","type":"type","url":"https://drafts.csswg.org/css-backgrounds-3/#typedef-line-style"},
+"https://drafts.csswg.org/css-backgrounds-3/#valdef-line-style-none": {"export":true,"for_":["<line-style>","border-style","border-top-style","border-left-style","border-bottom-style","border-right-style","border"],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"current","text":"none","type":"value","url":"https://drafts.csswg.org/css-backgrounds-3/#valdef-line-style-none"},
+"#propdef-column-rule-width": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-multicol","spec":"css-multicol-1","status":"local","text":"column-rule-width","type":"property","url":"#propdef-column-rule-width"},
+"https://drafts.csswg.org/css-backgrounds-3/#typedef-line-width": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"current","text":"<line-width>","type":"type","url":"https://drafts.csswg.org/css-backgrounds-3/#typedef-line-width"},
+"https://drafts.csswg.org/css-backgrounds-3/#valdef-line-style-hidden": {"export":true,"for_":["<line-style>","border-style","border-top-style","border-left-style","border-bottom-style","border-right-style","border"],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"current","text":"hidden","type":"value","url":"https://drafts.csswg.org/css-backgrounds-3/#valdef-line-style-hidden"},
+"https://drafts.csswg.org/css-break-3/#propdef-break-before": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-break","spec":"css-break-3","status":"current","text":"break-before","type":"property","url":"https://drafts.csswg.org/css-break-3/#propdef-break-before"},
+"https://drafts.csswg.org/css-break-3/#propdef-break-after": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-break","spec":"css-break-3","status":"current","text":"break-after","type":"property","url":"https://drafts.csswg.org/css-break-3/#propdef-break-after"},
+"https://drafts.csswg.org/css-break-3/#propdef-break-inside": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-break","spec":"css-break-3","status":"current","text":"break-inside","type":"property","url":"https://drafts.csswg.org/css-break-3/#propdef-break-inside"},
+"https://drafts.csswg.org/css-display-4/#out-of-flow": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"out of flow","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#out-of-flow"},
+"https://drafts.csswg.org/css-display-4/#formatting-context": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"formatting context","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#formatting-context"},
+"#valdef-column-span-all": {"export":true,"for_":["column-span"],"level":"1","normative":true,"shortname":"css-multicol","spec":"css-multicol-1","status":"local","text":"all","type":"value","url":"#valdef-column-span-all"},
+"https://drafts.csswg.org/css-display-4/#containing-block-chain": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"containing block chain","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#containing-block-chain"},
+"#valdef-column-span-none": {"export":true,"for_":["column-span"],"level":"1","normative":true,"shortname":"css-multicol","spec":"css-multicol-1","status":"local","text":"none","type":"value","url":"#valdef-column-span-none"},
+"https://drafts.csswg.org/css-break-4/#propdef-widows": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"current","text":"widows","type":"property","url":"https://drafts.csswg.org/css-break-4/#propdef-widows"},
+"https://drafts.csswg.org/css-break-3/#propdef-orphans": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-break","spec":"css-break-3","status":"current","text":"orphans","type":"property","url":"https://drafts.csswg.org/css-break-3/#propdef-orphans"},
+"https://drafts.csswg.org/css-overflow-3/#propdef-overflow": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-overflow","spec":"css-overflow-3","status":"current","text":"overflow","type":"property","url":"https://drafts.csswg.org/css-overflow-3/#propdef-overflow"},
+"https://drafts.csswg.org/css-sizing-3/#propdef-height": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-sizing","spec":"css-sizing-3","status":"current","text":"height","type":"property","url":"https://drafts.csswg.org/css-sizing-3/#propdef-height"},
+"https://drafts.csswg.org/css-values-4/#typedef-length-percentage": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<length-percentage>","type":"type","url":"https://drafts.csswg.org/css-values-4/#typedef-length-percentage"},
+};
+
+function genRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "DFN: "),
+                mk.code({ class: "dfn-text" }, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    const forListElements = forList.length === 0 ? '' : mk.li({},
+        mk.b({}, "For: "),
+        mk.ul({},
+            ...forList.map(forItem =>
                 mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
-            mk.b({}, "For: "),
-            mk.ul({},
-                ...forList.map(forItem =>
-                    mk.li({},
-                        mk.span({}, `${forItem}`)
-                    ),
+                    mk.span({}, `${forItem}`)
                 ),
             ),
-        );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+        ),
+    );
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
-    }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    return hintPanel;
+}
+function genAllRefHints() {
+    for(const refData of Object.values(refsData)) {
+        const refUrl = refData.url;
+        const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+        if (links.length == 0) {
+            console.log(`Can't find link href="${refUrl}".`, refData);
+            continue;
+        }
+        for(const link of links) {
+            if(link.classList.contains("dfn-link")) continue;
+            const hint = genRefHint(link, refData);
+            append(document.body, hint);
+            insertLinkPopupAction(hint)
         }
     }
+}
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+function hideAllRefHints() {
+    queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    refHint.style.position = "absolute"; // unfix it
+    refHint.classList.remove("on");
+    const teardown = refHint.teardownEventListeners;
+    if (teardown) {
+        refHint.teardownEventListeners = undefined;
+        teardown();
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+function showRefHint(refHint) {
+    hideAllRefHints(); // Only display one at this time.
+
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "true");
+    refHint.classList.add("on");
+    positionRefHint(refHint);
+    setupRefHintEventListeners(refHint);
+}
+
+function setupRefHintEventListeners(refHint) {
+    if (refHint.teardownEventListeners) return;
+    const link = refHint.forLink;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
 
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
 
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+function insertLinkPopupAction(refHint) {
+    const link = refHint.forLink;
+    // link.setAttribute('role', 'button');
+    link.setAttribute('aria-expanded', 'false')
+    link.classList.add('has-ref-hint');
+    link.addEventListener('mouseover', (event) => {
+        showRefHint(refHint);
     });
+    link.addEventListener('focus', (event) => {
+        showRefHint(refHint);
+    })
+}
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+document.addEventListener("DOMContentLoaded", () => {
+    genAllRefHints();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
 </script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['https://drafts.csswg.org/css-grid-2/#grid-container'] = {"text": "grid container", "type": "dfn", "spec": "css-grid-2", "shortname": "css-grid", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-grid-2/#grid-container", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-grid-2/#grid-item'] = {"text": "grid item", "type": "dfn", "spec": "css-grid-2", "shortname": "css-grid", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-grid-2/#grid-item", "export": true, "normative": true, "for_": []};
-window.refsData['#multi-column-container'] = {"text": "multi-column container", "type": "dfn", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "local", "url": "#multi-column-container", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-columns'] = {"text": "columns", "type": "property", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "local", "url": "#propdef-columns", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-column-rule'] = {"text": "column-rule", "type": "property", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "local", "url": "#propdef-column-rule", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border'] = {"text": "border", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-column-fill'] = {"text": "column-fill", "type": "property", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "local", "url": "#propdef-column-fill", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-column-span'] = {"text": "column-span", "type": "property", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "local", "url": "#propdef-column-span", "export": true, "normative": true, "for_": []};
-window.refsData['#column-gap'] = {"text": "column gap", "type": "dfn", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "local", "url": "#column-gap", "export": true, "normative": true, "for_": []};
-window.refsData['#column-rule'] = {"text": "column rule", "type": "dfn", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "local", "url": "#column-rule", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#css-wide-keywords'] = {"text": "css-wide keywords", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-column-width'] = {"text": "column-width", "type": "property", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "local", "url": "#propdef-column-width", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-column-count'] = {"text": "column-count", "type": "property", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "local", "url": "#propdef-column-count", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-column-width-auto'] = {"text": "auto", "type": "value", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "local", "url": "#valdef-column-width-auto", "export": true, "normative": true, "for_": ["column-width"]};
-window.refsData['#multi-column-layout'] = {"text": "multi-column layout", "type": "dfn", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "local", "url": "#multi-column-layout", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-break-4/#fragmentation-context'] = {"text": "fragmentation context", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-break-4/#fragmentation-context", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#anonymous'] = {"text": "anonymous box", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#anonymous", "export": true, "normative": true, "for_": ["CSS"]};
-window.refsData['https://drafts.csswg.org/css-break-4/#fragmentation-container'] = {"text": "fragmentation container", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-break-4/#fragmentation-container", "export": true, "normative": true, "for_": []};
-window.refsData['#column-box'] = {"text": "column box", "type": "dfn", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "local", "url": "#column-box", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#block-formatting-context'] = {"text": "block formatting context", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#block-formatting-context", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#containing-block'] = {"text": "containing block", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#containing-block", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-sizing-3/#propdef-width'] = {"text": "width", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-width", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#block-axis'] = {"text": "block axis", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#block-axis", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-break-4/#fragment'] = {"text": "fragment", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-break-4/#fragment", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-position-3/#absolute-position'] = {"text": "absolutely positioned box", "type": "dfn", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#absolute-position", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-position-3/#propdef-position'] = {"text": "position", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-position", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#principal-box'] = {"text": "principal box", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#principal-box", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#inline-base-direction'] = {"text": "inline base direction", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#inline-base-direction", "export": true, "normative": true, "for_": []};
-window.refsData['#multi-column-line'] = {"text": "multicol line", "type": "dfn", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "local", "url": "#multi-column-line", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-break-4/#fragmentation'] = {"text": "fragmentation", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-break-4/#fragmentation", "export": true, "normative": true, "for_": []};
-window.refsData['#spanner'] = {"text": "spanner", "type": "dfn", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "local", "url": "#spanner", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#block-container'] = {"text": "block container", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#block-container", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#independent-formatting-context'] = {"text": "independent formatting context", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#independent-formatting-context", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#block-level-box'] = {"text": "block-level box", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#block-level-box", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-3/#propdef-display'] = {"text": "display", "type": "property", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-display-3/#propdef-display", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#length-value'] = {"text": "<length>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#length-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-tables-3/#table-wrapper-box'] = {"text": "table wrapper box", "type": "dfn", "spec": "css-tables-3", "shortname": "css-tables", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-tables-3/#table-wrapper-box", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#integer-value'] = {"text": "<integer>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#integer-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-any'] = {"text": "||", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-any", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/mediaqueries-5/#paged-media'] = {"text": "paged media", "type": "dfn", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-5/#paged-media", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-align-3/#propdef-column-gap'] = {"text": "column-gap", "type": "property", "spec": "css-align-3", "shortname": "css-align", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-align-3/#propdef-column-gap", "export": true, "normative": true, "for_": []};
-window.refsData['#multi-column-formatting-context'] = {"text": "multi-column formatting context", "type": "dfn", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "local", "url": "#multi-column-formatting-context", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-align-3/#valdef-row-gap-normal'] = {"text": "normal", "type": "value", "spec": "css-align-3", "shortname": "css-align", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-align-3/#valdef-row-gap-normal", "export": true, "normative": true, "for_": ["row-gap", "column-gap", "gap"]};
-window.refsData['#propdef-column-rule-color'] = {"text": "column-rule-color", "type": "property", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "local", "url": "#propdef-column-rule-color", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-color-5/#typedef-color'] = {"text": "<color>", "type": "type", "spec": "css-color-5", "shortname": "css-color", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-color-5/#typedef-color", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-column-rule-style'] = {"text": "column-rule-style", "type": "property", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "local", "url": "#propdef-column-rule-style", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#typedef-line-style'] = {"text": "<line-style>", "type": "type", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#typedef-line-style", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#valdef-line-style-none'] = {"text": "none", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#valdef-line-style-none", "export": true, "normative": true, "for_": ["<line-style>", "border-style", "border-top-style", "border-left-style", "border-bottom-style", "border-right-style", "border"]};
-window.refsData['#propdef-column-rule-width'] = {"text": "column-rule-width", "type": "property", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "local", "url": "#propdef-column-rule-width", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#typedef-line-width'] = {"text": "<line-width>", "type": "type", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#typedef-line-width", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#valdef-line-style-hidden'] = {"text": "hidden", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#valdef-line-style-hidden", "export": true, "normative": true, "for_": ["<line-style>", "border-style", "border-top-style", "border-left-style", "border-bottom-style", "border-right-style", "border"]};
-window.refsData['https://drafts.csswg.org/css-break-3/#propdef-break-before'] = {"text": "break-before", "type": "property", "spec": "css-break-3", "shortname": "css-break", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-break-3/#propdef-break-before", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-break-3/#propdef-break-after'] = {"text": "break-after", "type": "property", "spec": "css-break-3", "shortname": "css-break", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-break-3/#propdef-break-after", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-break-3/#propdef-break-inside'] = {"text": "break-inside", "type": "property", "spec": "css-break-3", "shortname": "css-break", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-break-3/#propdef-break-inside", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#out-of-flow'] = {"text": "out of flow", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#out-of-flow", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#formatting-context'] = {"text": "formatting context", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#formatting-context", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-column-span-all'] = {"text": "all", "type": "value", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "local", "url": "#valdef-column-span-all", "export": true, "normative": true, "for_": ["column-span"]};
-window.refsData['https://drafts.csswg.org/css-display-4/#containing-block-chain'] = {"text": "containing block chain", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#containing-block-chain", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-column-span-none'] = {"text": "none", "type": "value", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "local", "url": "#valdef-column-span-none", "export": true, "normative": true, "for_": ["column-span"]};
-window.refsData['https://drafts.csswg.org/css-break-4/#propdef-widows'] = {"text": "widows", "type": "property", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-break-4/#propdef-widows", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-break-3/#propdef-orphans'] = {"text": "orphans", "type": "property", "spec": "css-break-3", "shortname": "css-break", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-break-3/#propdef-orphans", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-overflow-3/#propdef-overflow'] = {"text": "overflow", "type": "property", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#propdef-overflow", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-sizing-3/#propdef-height'] = {"text": "height", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-height", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#typedef-length-percentage'] = {"text": "<length-percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#typedef-length-percentage", "export": true, "normative": true, "for_": []};window.refsData['#propdef-column-count'] = {"text": "column-count", "type": "property", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "local", "url": "#propdef-column-count", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-column-fill'] = {"text": "column-fill", "type": "property", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "local", "url": "#propdef-column-fill", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-column-rule'] = {"text": "column-rule", "type": "property", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "local", "url": "#propdef-column-rule", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-column-rule-color'] = {"text": "column-rule-color", "type": "property", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "local", "url": "#propdef-column-rule-color", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-column-rule-style'] = {"text": "column-rule-style", "type": "property", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "local", "url": "#propdef-column-rule-style", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-column-rule-width'] = {"text": "column-rule-width", "type": "property", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "local", "url": "#propdef-column-rule-width", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-column-span'] = {"text": "column-span", "type": "property", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "local", "url": "#propdef-column-span", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-column-width'] = {"text": "column-width", "type": "property", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "local", "url": "#propdef-column-width", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-columns'] = {"text": "columns", "type": "property", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "local", "url": "#propdef-columns", "export": true, "normative": true, "for_": []};
-</script>
 <script>/* Boilerplate: script-wpt */
-let wptPath = "/css/css-multicol/";
 "use strict";
+{
+let wptData = {
+"path": "/css/css-multicol/",
+};
 
 document.addEventListener("DOMContentLoaded", async ()=>{
-    if(wptPath == "/") return;
+    if(wptData.path == "/") return;
 
     const runsUrl = "https://wpt.fyi/api/runs?label=master&label=stable&max-count=1&product=chrome&product=firefox&product=safari&product=edge";
     const runs = await (await fetch(runsUrl)).json();
@@ -4720,7 +4713,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         },
         body: JSON.stringify({
             "run_ids": runs.map(x=>x.id),
-            "query": {"path": wptPath},
+            "query": {"path": wptData.path},
         })
     })).json();
 
@@ -4740,11 +4733,11 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         const numTests = passData[0][1];
         if(numTests > 1) {
             nameEl.insertAdjacentElement("beforeend",
-                el("small", {}, ` (${numTests} tests)`));
+                mk.small({}, ` (${numTests} tests)`));
         }
         if(passData == undefined) return;
-        const resultsEl = el("span",{"class":"wpt-results"},
-            ...passData.map((p,i) => el("span",
+        const resultsEl = mk.span({"class":"wpt-results"},
+            ...passData.map((p,i) => mk.span(
             {
                 "title": `${browsers[i].name} ${p[0]}/${p[1]}`,
                 "class": "wpt-result",
@@ -4766,8 +4759,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     });
     const overview = document.querySelector(".wpt-overview");
     if(overview) {
-        overview.appendChild(el('ul',{}, ...browsers.map(formatWptResult)));
-        document.head.appendChild(el('style', {},
+        overview.appendChild(mk.ul({}, ...browsers.map(formatWptResult)));
+        document.head.appendChild(mk.style({},
             `.wpt-overview ul { display: flex; flex-flow: row wrap; gap: .2em; justify-content: start; list-style: none; padding: 0; margin: 0;}
              .wpt-overview li { padding: .25em 1em; color: black; text-align: center; }
              .wpt-overview img { height: 1.5em; height: max(1.5em, 32px); background: transparent; }
@@ -4781,19 +4774,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
              .wpt-overview .passes-all { background: #81c784; }`));
     }
 });
-function el(name, attrs, ...content) {
-    const x = document.createElement(name);
-    for(const [k,v] of Object.entries(attrs)) {
-        x.setAttribute(k, v);
-    }
-    for(let child of content) {
-        if(typeof child == "string") child = document.createTextNode(child);
-        try {
-        x.appendChild(child);
-        } catch(e) { console.log({x, child}); }
-    }
-    return x;
-}
+
 function formatWptResult({name, version, passes, total}) {
     const passRate = passes/total;
     let passClass = "";
@@ -4809,15 +4790,16 @@ function formatWptResult({name, version, passes, total}) {
     const shortVersion = /^\d+/.exec(version);
     const icon = []
 
-    if(name == "Chrome") icon.push(el('img', {alt:"", src:"https://wpt.fyi/static/chrome_64x64.png"}));
-    if(name == "Edge") icon.push(el('img', {alt:"", src:"https://wpt.fyi/static/edge_64x64.png"}));
-    if(name == "Safari") icon.push(el('img', {alt:"", src:"https://wpt.fyi/static/safari_64x64.png"}));
-    if(name == "Firefox") icon.push(el('img', {alt:"", src:"https://wpt.fyi/static/firefox_64x64.png"}));
+    if(name == "Chrome") icon.push(mk.img({alt:"", src:"https://wpt.fyi/static/chrome_64x64.png"}));
+    if(name == "Edge") icon.push(mk.img({alt:"", src:"https://wpt.fyi/static/edge_64x64.png"}));
+    if(name == "Safari") icon.push(mk.img({alt:"", src:"https://wpt.fyi/static/safari_64x64.png"}));
+    if(name == "Firefox") icon.push(mk.img({alt:"", src:"https://wpt.fyi/static/firefox_64x64.png"}));
 
-    return el('li', {"class":passClass},
-        el('nobr', {'class':'browser'}, ...icon, ` ${name} ${shortVersion}`),
-        el('br', {}),
-        el('nobr', {'class':'pass-rate'}, `${passes}/${total}`)
+    return mk.li({"class":passClass},
+        mk.nobr({'class':'browser'}, ...icon, ` ${name} ${shortVersion}`),
+        mk.br(),
+        mk.nobr({'class':'pass-rate'}, `${passes}/${total}`)
     );
+}
 }
 </script>

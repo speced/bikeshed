@@ -96,7 +96,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -470,6 +469,11 @@ figcaption:not(.no-marker)::before {
     }
 }
 </style>
+<style>/* Boilerplate: style-idl-highlighting */
+pre.idl.highlight {
+    background: var(--borderedblock-bg, var(--def-bg));
+}
+</style>
 <style>/* Boilerplate: style-issues */
 a[href].issue-return {
     float: right;
@@ -747,7 +751,6 @@ a[href].issue-return {
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -807,7 +810,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -864,7 +866,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -1804,467 +1805,8 @@ elem<c- p>.</c->getAnimations<c- p>()[</c-><c- mf>0</c-><c- p>].</c->transitionP
     </div>
    </div>
   </details>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['8000726e'] = {"dfnID": "8000726e", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-left-width", "dfnText": "border-left-width", "refSections": [{"refs": [{"id": "ref-for-propdef-border-left-width"}], "title": "2.1. The transition-property Property"}], "external": true};
-window.dfnpanelData['9cd25054'] = {"dfnID": "9cd25054", "url": "https://drafts.csswg.org/css-cascade-5/#computed-value", "dfnText": "computed value", "refSections": [{"refs": [{"id": "ref-for-computed-value"}], "title": "6.2. Requirements on pending style changes"}], "external": true};
-window.dfnpanelData['91bfbe18'] = {"dfnID": "91bfbe18", "url": "https://drafts.csswg.org/css-color-4/#propdef-opacity", "dfnText": "opacity", "refSections": [{"refs": [{"id": "ref-for-propdef-opacity"}, {"id": "ref-for-propdef-opacity\u2460"}, {"id": "ref-for-propdef-opacity\u2461"}, {"id": "ref-for-propdef-opacity\u2462"}], "title": "6.2. Requirements on pending style changes"}], "external": true};
-window.dfnpanelData['7d9dff52'] = {"dfnID": "7d9dff52", "url": "https://drafts.csswg.org/css-easing-2/#easing-function", "dfnText": "timing function", "refSections": [{"refs": [{"id": "ref-for-easing-function"}], "title": "2.3. The transition-timing-function Property"}], "external": true};
-window.dfnpanelData['2eff47ba'] = {"dfnID": "2eff47ba", "url": "https://drafts.csswg.org/css-transitions-1/#transitionevent", "dfnText": "TransitionEvent", "refSections": [{"refs": [{"id": "ref-for-transitionevent"}], "title": "5.1. Event dispatch"}], "external": true};
-window.dfnpanelData['f12240f8'] = {"dfnID": "f12240f8", "url": "https://drafts.csswg.org/css-transitions-1/#valdef-transition-property-all", "dfnText": "all", "refSections": [{"refs": [{"id": "ref-for-valdef-transition-property-all"}], "title": "2.1. The transition-property Property"}], "external": true};
-window.dfnpanelData['8f82c052'] = {"dfnID": "8f82c052", "url": "https://drafts.csswg.org/css-transitions-1/#transition-cancel", "dfnText": "cancel", "refSections": [{"refs": [{"id": "ref-for-transition-cancel"}, {"id": "ref-for-transition-cancel\u2460"}, {"id": "ref-for-transition-cancel\u2461"}], "title": "3. Starting of transitions"}], "external": true};
-window.dfnpanelData['fd037081'] = {"dfnID": "fd037081", "url": "https://drafts.csswg.org/css-transitions-1/#completed-transition", "dfnText": "completed transition", "refSections": [{"refs": [{"id": "ref-for-completed-transition"}], "title": "3. Starting of transitions"}], "external": true};
-window.dfnpanelData['328d4c84'] = {"dfnID": "328d4c84", "url": "https://drafts.csswg.org/css-transitions-1/#Events-TransitionEvent-elapsedTime", "dfnText": "elapsedTime", "refSections": [{"refs": [{"id": "ref-for-Events-TransitionEvent-elapsedTime"}, {"id": "ref-for-Events-TransitionEvent-elapsedTime\u2460"}], "title": "5.1. Event dispatch"}], "external": true};
-window.dfnpanelData['68dfc6c2'] = {"dfnID": "68dfc6c2", "url": "https://drafts.csswg.org/css-transitions-1/#transition-reversing-shortening-factor", "dfnText": "reversing shortening factor", "refSections": [{"refs": [{"id": "ref-for-transition-reversing-shortening-factor"}], "title": "3.1. Faster reversing of interrupted transitions"}], "external": true};
-window.dfnpanelData['d9cac3a8'] = {"dfnID": "d9cac3a8", "url": "https://drafts.csswg.org/css-transitions-1/#transition-reversing-adjusted-start-value", "dfnText": "reversing-adjusted start value", "refSections": [{"refs": [{"id": "ref-for-transition-reversing-adjusted-start-value"}], "title": "3.1. Faster reversing of interrupted transitions"}], "external": true};
-window.dfnpanelData['337088c4'] = {"dfnID": "337088c4", "url": "https://drafts.csswg.org/css-transitions-1/#running-transition", "dfnText": "running transition", "refSections": [{"refs": [{"id": "ref-for-running-transition"}, {"id": "ref-for-running-transition\u2460"}], "title": "3. Starting of transitions"}], "external": true};
-window.dfnpanelData['f6d1b137'] = {"dfnID": "f6d1b137", "url": "https://drafts.csswg.org/css-transitions-1/#style-change-event", "dfnText": "style change event", "refSections": [{"refs": [{"id": "ref-for-style-change-event"}], "title": "3.2. The current transition generation"}], "external": true};
-window.dfnpanelData['7aa5d99a'] = {"dfnID": "7aa5d99a", "url": "https://drafts.csswg.org/css-transitions-1/#propdef-transition-delay", "dfnText": "transition-delay", "refSections": [{"refs": [{"id": "ref-for-propdef-transition-delay"}, {"id": "ref-for-propdef-transition-delay\u2460"}], "title": "2.4. The transition-delay Property"}], "external": true};
-window.dfnpanelData['2641466b'] = {"dfnID": "2641466b", "url": "https://drafts.csswg.org/css-transitions-1/#propdef-transition-duration", "dfnText": "transition-duration", "refSections": [{"refs": [{"id": "ref-for-propdef-transition-duration"}, {"id": "ref-for-propdef-transition-duration\u2460"}], "title": "2.2. The transition-duration Property"}], "external": true};
-window.dfnpanelData['847d4593'] = {"dfnID": "847d4593", "url": "https://drafts.csswg.org/css-transitions-1/#propdef-transition-property", "dfnText": "transition-property", "refSections": [{"refs": [{"id": "ref-for-propdef-transition-property"}, {"id": "ref-for-propdef-transition-property\u2460"}], "title": "2.1. The transition-property Property"}, {"refs": [{"id": "ref-for-propdef-transition-property\u2461"}], "title": "3. Starting of transitions"}, {"refs": [{"id": "ref-for-propdef-transition-property\u2462"}], "title": "8. Issues deferred from previous levels of the spec"}], "external": true};
-window.dfnpanelData['d1cbb6e4'] = {"dfnID": "d1cbb6e4", "url": "https://drafts.csswg.org/css-transitions-1/#propdef-transition-timing-function", "dfnText": "transition-timing-function", "refSections": [{"refs": [{"id": "ref-for-propdef-transition-timing-function"}, {"id": "ref-for-propdef-transition-timing-function\u2460"}], "title": "2.3. The transition-timing-function Property"}], "external": true};
-window.dfnpanelData['d5e9fdd7'] = {"dfnID": "d5e9fdd7", "url": "https://drafts.csswg.org/css-transitions-1/#transitioncancel", "dfnText": "transitioncancel", "refSections": [{"refs": [{"id": "ref-for-transitioncancel"}, {"id": "ref-for-transitioncancel\u2460"}, {"id": "ref-for-transitioncancel\u2461"}, {"id": "ref-for-transitioncancel\u2462"}, {"id": "ref-for-transitioncancel\u2463"}], "title": "5.1. Event dispatch"}], "external": true};
-window.dfnpanelData['9732626d'] = {"dfnID": "9732626d", "url": "https://drafts.csswg.org/css-transitions-1/#transitionend", "dfnText": "transitionend", "refSections": [{"refs": [{"id": "ref-for-transitionend"}, {"id": "ref-for-transitionend\u2460"}, {"id": "ref-for-transitionend\u2461"}, {"id": "ref-for-transitionend\u2462"}, {"id": "ref-for-transitionend\u2463"}, {"id": "ref-for-transitionend\u2464"}, {"id": "ref-for-transitionend\u2465"}, {"id": "ref-for-transitionend\u2466"}, {"id": "ref-for-transitionend\u2467"}, {"id": "ref-for-transitionend\u2468"}, {"id": "ref-for-transitionend\u2460\u24ea"}], "title": "5.1. Event dispatch"}], "external": true};
-window.dfnpanelData['4ffbeb37'] = {"dfnID": "4ffbeb37", "url": "https://drafts.csswg.org/css-transitions-1/#transitionrun", "dfnText": "transitionrun", "refSections": [{"refs": [{"id": "ref-for-transitionrun"}, {"id": "ref-for-transitionrun\u2460"}, {"id": "ref-for-transitionrun\u2461"}, {"id": "ref-for-transitionrun\u2462"}, {"id": "ref-for-transitionrun\u2463"}, {"id": "ref-for-transitionrun\u2464"}, {"id": "ref-for-transitionrun\u2465"}, {"id": "ref-for-transitionrun\u2466"}], "title": "5.1. Event dispatch"}], "external": true};
-window.dfnpanelData['d7b7dfd6'] = {"dfnID": "d7b7dfd6", "url": "https://drafts.csswg.org/css-transitions-1/#transitionstart", "dfnText": "transitionstart", "refSections": [{"refs": [{"id": "ref-for-transitionstart"}, {"id": "ref-for-transitionstart\u2460"}, {"id": "ref-for-transitionstart\u2461"}, {"id": "ref-for-transitionstart\u2462"}, {"id": "ref-for-transitionstart\u2463"}, {"id": "ref-for-transitionstart\u2464"}, {"id": "ref-for-transitionstart\u2465"}, {"id": "ref-for-transitionstart\u2466"}, {"id": "ref-for-transitionstart\u2467"}, {"id": "ref-for-transitionstart\u2468"}, {"id": "ref-for-transitionstart\u2460\u24ea"}, {"id": "ref-for-transitionstart\u2460\u2460"}], "title": "5.1. Event dispatch"}], "external": true};
-window.dfnpanelData['5fced98b'] = {"dfnID": "5fced98b", "url": "https://drafts.csswg.org/cssom-1/#cssomstring", "dfnText": "CSSOMString", "refSections": [{"refs": [{"id": "ref-for-cssomstring"}, {"id": "ref-for-cssomstring\u2460"}], "title": "6.1. The CSSTransition interface"}], "external": true};
-window.dfnpanelData['b203675a'] = {"dfnID": "b203675a", "url": "https://drafts.csswg.org/cssom-1/#dom-window-getcomputedstyle", "dfnText": "getComputedStyle(elt)", "refSections": [{"refs": [{"id": "ref-for-dom-window-getcomputedstyle"}], "title": "6.2. Requirements on pending style changes"}], "external": true};
-window.dfnpanelData['9638f92b'] = {"dfnID": "9638f92b", "url": "https://dom.spec.whatwg.org/#connected", "dfnText": "connected", "refSections": [{"refs": [{"id": "ref-for-connected"}], "title": "3. Starting of transitions"}], "external": true};
-window.dfnpanelData['25538777'] = {"dfnID": "25538777", "url": "https://dom.spec.whatwg.org/#concept-tree-order", "dfnText": "tree order", "refSections": [{"refs": [{"id": "ref-for-concept-tree-order"}], "title": "4.1. Animation composite order"}], "external": true};
-window.dfnpanelData['509dbb50'] = {"dfnID": "509dbb50", "url": "https://html.spec.whatwg.org/multipage/browsers.html#being-rendered", "dfnText": "being rendered", "refSections": [{"refs": [{"id": "ref-for-being-rendered"}], "title": "3. Starting of transitions"}], "external": true};
-window.dfnpanelData['f4e8783b'] = {"dfnID": "f4e8783b", "url": "https://drafts.csswg.org/web-animations/#animation", "dfnText": "Animation", "refSections": [{"refs": [{"id": "ref-for-animation"}], "title": "4.1. Animation composite order"}, {"refs": [{"id": "ref-for-animation\u2460"}], "title": "6.1. The CSSTransition interface"}], "external": true};
-window.dfnpanelData['cdc4de9d'] = {"dfnID": "cdc4de9d", "url": "https://drafts.csswg.org/web-animations/#active-duration", "dfnText": "active duration", "refSections": [{"refs": [{"id": "ref-for-active-duration"}, {"id": "ref-for-active-duration\u2460"}, {"id": "ref-for-active-duration\u2461"}], "title": "5.1. Event dispatch"}], "external": true};
-window.dfnpanelData['36fce97a'] = {"dfnID": "36fce97a", "url": "https://drafts.csswg.org/web-animations/#active-time", "dfnText": "active time", "refSections": [{"refs": [{"id": "ref-for-active-time"}], "title": "5.1. Event dispatch"}], "external": true};
-window.dfnpanelData['02ceac2e'] = {"dfnID": "02ceac2e", "url": "https://drafts.csswg.org/web-animations/#animation", "dfnText": "animation", "refSections": [{"refs": [{"id": "ref-for-animation"}], "title": "4.1. Animation composite order"}, {"refs": [{"id": "ref-for-animation\u2460"}], "title": "6.1. The CSSTransition interface"}], "external": true};
-window.dfnpanelData['76e6dbc5'] = {"dfnID": "76e6dbc5", "url": "https://drafts.csswg.org/web-animations/#animation-class", "dfnText": "animation class", "refSections": [{"refs": [{"id": "ref-for-animation-class"}, {"id": "ref-for-animation-class\u2460"}], "title": "4.1. Animation composite order"}, {"refs": [{"id": "ref-for-animation-class\u2461"}], "title": "4.2. Animation cascade level"}], "external": true};
-window.dfnpanelData['0824fc9a'] = {"dfnID": "0824fc9a", "url": "https://drafts.csswg.org/web-animations/#animation-effect", "dfnText": "animation effect", "refSections": [{"refs": [{"id": "ref-for-animation-effect"}], "title": "2.2. The transition-duration Property"}, {"refs": [{"id": "ref-for-animation-effect\u2460"}], "title": "2.3. The transition-timing-function Property"}, {"refs": [{"id": "ref-for-animation-effect\u2461"}], "title": "2.4. The transition-delay Property"}, {"refs": [{"id": "ref-for-animation-effect\u2462"}, {"id": "ref-for-animation-effect\u2463"}], "title": "3.1. Faster reversing of interrupted transitions"}], "external": true};
-window.dfnpanelData['22ac6c4e'] = {"dfnID": "22ac6c4e", "url": "https://drafts.csswg.org/web-animations/#cancel-an-animation", "dfnText": "cancel an animation", "refSections": [{"refs": [{"id": "ref-for-cancel-an-animation"}], "title": "3. Starting of transitions"}], "external": true};
-window.dfnpanelData['a5a7b6e7'] = {"dfnID": "a5a7b6e7", "url": "https://drafts.csswg.org/web-animations-1/#dom-animation-cancel", "dfnText": "cancel()", "refSections": [{"refs": [{"id": "ref-for-dom-animation-cancel"}], "title": "3. Starting of transitions"}], "external": true};
-window.dfnpanelData['2ba3c642'] = {"dfnID": "2ba3c642", "url": "https://drafts.csswg.org/web-animations/#current-iteration", "dfnText": "current iteration", "refSections": [{"refs": [{"id": "ref-for-current-iteration"}], "title": "5.1. Event dispatch"}], "external": true};
-window.dfnpanelData['6e716cfa'] = {"dfnID": "6e716cfa", "url": "https://drafts.csswg.org/web-animations/#current-time", "dfnText": "current time", "refSections": [{"refs": [{"id": "ref-for-current-time"}, {"id": "ref-for-current-time\u2460"}], "title": "5.1. Event dispatch"}], "external": true};
-window.dfnpanelData['50122ec8'] = {"dfnID": "50122ec8", "url": "https://drafts.csswg.org/web-animations/#fill-mode", "dfnText": "fill mode", "refSections": [{"refs": [{"id": "ref-for-fill-mode"}], "title": "5.1. Event dispatch"}], "external": true};
-window.dfnpanelData['7aed2fe1'] = {"dfnID": "7aed2fe1", "url": "https://drafts.csswg.org/web-animations/#global-animation-list", "dfnText": "global animation list", "refSections": [{"refs": [{"id": "ref-for-global-animation-list"}, {"id": "ref-for-global-animation-list\u2460"}, {"id": "ref-for-global-animation-list\u2461"}], "title": "4.1. Animation composite order"}], "external": true};
-window.dfnpanelData['2b97b6de'] = {"dfnID": "2b97b6de", "url": "https://drafts.csswg.org/web-animations/#idle-play-state", "dfnText": "idle play state", "refSections": [{"refs": [{"id": "ref-for-idle-play-state"}, {"id": "ref-for-idle-play-state\u2460"}, {"id": "ref-for-idle-play-state\u2461"}], "title": "4.1. Animation composite order"}], "external": true};
-window.dfnpanelData['5f1a75d3'] = {"dfnID": "5f1a75d3", "url": "https://drafts.csswg.org/web-animations/#iteration-duration", "dfnText": "iteration duration", "refSections": [{"refs": [{"id": "ref-for-iteration-duration"}], "title": "2.2. The transition-duration Property"}, {"refs": [{"id": "ref-for-iteration-duration\u2460"}], "title": "5.1. Event dispatch"}], "external": true};
-window.dfnpanelData['45fa027a'] = {"dfnID": "45fa027a", "url": "https://drafts.csswg.org/web-animations/#iteration-start", "dfnText": "iteration start", "refSections": [{"refs": [{"id": "ref-for-iteration-start"}], "title": "5.1. Event dispatch"}], "external": true};
-window.dfnpanelData['077cd126'] = {"dfnID": "077cd126", "url": "https://drafts.csswg.org/web-animations/#pending-play-state", "dfnText": "pending play state", "refSections": [{"refs": [{"id": "ref-for-pending-play-state"}], "title": "5.1. Event dispatch"}], "external": true};
-window.dfnpanelData['9818c0ac'] = {"dfnID": "9818c0ac", "url": "https://drafts.csswg.org/web-animations/#sampling", "dfnText": "sampling", "refSections": [{"refs": [{"id": "ref-for-sampling"}, {"id": "ref-for-sampling\u2460"}], "title": "5.1. Event dispatch"}], "external": true};
-window.dfnpanelData['e5174841'] = {"dfnID": "e5174841", "url": "https://drafts.csswg.org/web-animations/#start-delay", "dfnText": "start delay", "refSections": [{"refs": [{"id": "ref-for-start-delay"}], "title": "2.4. The transition-delay Property"}, {"refs": [{"id": "ref-for-start-delay\u2460"}, {"id": "ref-for-start-delay\u2461"}, {"id": "ref-for-start-delay\u2462"}], "title": "5.1. Event dispatch"}], "external": true};
-window.dfnpanelData['7cca7096'] = {"dfnID": "7cca7096", "url": "https://drafts.csswg.org/web-animations/#target-effect", "dfnText": "target effect", "refSections": [{"refs": [{"id": "ref-for-target-effect"}, {"id": "ref-for-target-effect\u2460"}, {"id": "ref-for-target-effect\u2461"}], "title": "5.1. Event dispatch"}], "external": true};
-window.dfnpanelData['ec657208'] = {"dfnID": "ec657208", "url": "https://drafts.csswg.org/web-animations/#target-effect-end", "dfnText": "target effect end", "refSections": [{"refs": [{"id": "ref-for-target-effect-end"}], "title": "5.1. Event dispatch"}], "external": true};
-window.dfnpanelData['c35d7b6e'] = {"dfnID": "c35d7b6e", "url": "https://drafts.csswg.org/web-animations-1/#transformed-progress", "dfnText": "transformed progress", "refSections": [{"refs": [{"id": "ref-for-transformed-progress"}], "title": "2.3. The transition-timing-function Property"}], "external": true};
-window.dfnpanelData['9be3bced'] = {"dfnID": "9be3bced", "url": "https://drafts.csswg.org/web-animations/#unresolved", "dfnText": "unresolved", "refSections": [{"refs": [{"id": "ref-for-unresolved"}], "title": "5.1. Event dispatch"}], "external": true};
-window.dfnpanelData['2fe418bd'] = {"dfnID": "2fe418bd", "url": "https://drafts.csswg.org/web-animations-2/#dom-animatable-getanimations", "dfnText": "getAnimations()", "refSections": [{"refs": [{"id": "ref-for-dom-animatable-getanimations"}], "title": "6.2. Requirements on pending style changes"}], "external": true};
-window.dfnpanelData['889e932f'] = {"dfnID": "889e932f", "url": "https://webidl.spec.whatwg.org/#Exposed", "dfnText": "Exposed", "refSections": [{"refs": [{"id": "ref-for-Exposed"}], "title": "6.1. The CSSTransition interface"}], "external": true};
-window.dfnpanelData['expanded-transition-property-name'] = {"dfnID": "expanded-transition-property-name", "url": "#expanded-transition-property-name", "dfnText": "expanded transition property\nname", "refSections": [{"refs": [{"id": "ref-for-expanded-transition-property-name"}], "title": "4.1. Animation composite order"}, {"refs": [{"id": "ref-for-expanded-transition-property-name\u2460"}], "title": "6.1. The CSSTransition interface"}], "external": false};
-window.dfnpanelData['owning-element'] = {"dfnID": "owning-element", "url": "#owning-element", "dfnText": "owning element", "refSections": [{"refs": [{"id": "ref-for-owning-element"}, {"id": "ref-for-owning-element\u2460"}, {"id": "ref-for-owning-element\u2461"}, {"id": "ref-for-owning-element\u2462"}, {"id": "ref-for-owning-element\u2463"}], "title": "3. Starting of transitions"}, {"refs": [{"id": "ref-for-owning-element\u2464"}, {"id": "ref-for-owning-element\u2465"}, {"id": "ref-for-owning-element\u2466"}, {"id": "ref-for-owning-element\u2467"}, {"id": "ref-for-owning-element\u2468"}, {"id": "ref-for-owning-element\u2460\u24ea"}, {"id": "ref-for-owning-element\u2460\u2460"}, {"id": "ref-for-owning-element\u2460\u2461"}], "title": "4.1. Animation composite order"}, {"refs": [{"id": "ref-for-owning-element\u2460\u2462"}, {"id": "ref-for-owning-element\u2460\u2463"}], "title": "4.2. Animation cascade level"}], "external": false};
-window.dfnpanelData['current-transition-generation'] = {"dfnID": "current-transition-generation", "url": "#current-transition-generation", "dfnText": "current transition\ngeneration", "refSections": [{"refs": [{"id": "ref-for-current-transition-generation"}], "title": "3.2. The current transition generation"}], "external": false};
-window.dfnpanelData['transition-generation'] = {"dfnID": "transition-generation", "url": "#transition-generation", "dfnText": "transition generation", "refSections": [{"refs": [{"id": "ref-for-transition-generation"}, {"id": "ref-for-transition-generation\u2460"}], "title": "4.1. Animation composite order"}], "external": false};
-window.dfnpanelData['transition-phase'] = {"dfnID": "transition-phase", "url": "#transition-phase", "dfnText": "transition phase", "refSections": [{"refs": [{"id": "ref-for-transition-phase"}, {"id": "ref-for-transition-phase\u2460"}], "title": "5.1. Event dispatch"}], "external": false};
-window.dfnpanelData['interval-start'] = {"dfnID": "interval-start", "url": "#interval-start", "dfnText": "interval start", "refSections": [{"refs": [{"id": "ref-for-interval-start"}, {"id": "ref-for-interval-start\u2460"}, {"id": "ref-for-interval-start\u2461"}, {"id": "ref-for-interval-start\u2462"}, {"id": "ref-for-interval-start\u2463"}, {"id": "ref-for-interval-start\u2464"}, {"id": "ref-for-interval-start\u2465"}], "title": "5.1. Event dispatch"}], "external": false};
-window.dfnpanelData['interval-end'] = {"dfnID": "interval-end", "url": "#interval-end", "dfnText": "interval end", "refSections": [{"refs": [{"id": "ref-for-interval-end"}, {"id": "ref-for-interval-end\u2460"}, {"id": "ref-for-interval-end\u2461"}, {"id": "ref-for-interval-end\u2462"}, {"id": "ref-for-interval-end\u2463"}], "title": "5.1. Event dispatch"}], "external": false};
-window.dfnpanelData['elapsed-time'] = {"dfnID": "elapsed-time", "url": "#elapsed-time", "dfnText": "Elapsed time", "refSections": [{"refs": [{"id": "ref-for-elapsed-time"}], "title": "5.1. Event dispatch"}], "external": false};
-window.dfnpanelData['csstransition'] = {"dfnID": "csstransition", "url": "#csstransition", "dfnText": "CSSTransition", "refSections": [{"refs": [{"id": "ref-for-csstransition"}], "title": "3. Starting of transitions"}, {"refs": [{"id": "ref-for-csstransition\u2460"}, {"id": "ref-for-csstransition\u2461"}], "title": "6.2. Requirements on pending style changes"}], "external": false};
-window.dfnpanelData['dom-csstransition-transitionproperty'] = {"dfnID": "dom-csstransition-transitionproperty", "url": "#dom-csstransition-transitionproperty", "dfnText": "transitionProperty", "refSections": [{"refs": [{"id": "ref-for-dom-csstransition-transitionproperty"}], "title": "6.1. The CSSTransition interface"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -2458,12 +2000,470 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"8000726e": {"dfnID":"8000726e","dfnText":"border-left-width","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-border-left-width"}],"title":"2.1. The transition-property Property"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-border-left-width"},
+"9cd25054": {"dfnID":"9cd25054","dfnText":"computed value","external":true,"refSections":[{"refs":[{"id":"ref-for-computed-value"}],"title":"6.2. Requirements on pending style changes"}],"url":"https://drafts.csswg.org/css-cascade-5/#computed-value"},
+"91bfbe18": {"dfnID":"91bfbe18","dfnText":"opacity","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-opacity"},{"id":"ref-for-propdef-opacity\u2460"},{"id":"ref-for-propdef-opacity\u2461"},{"id":"ref-for-propdef-opacity\u2462"}],"title":"6.2. Requirements on pending style changes"}],"url":"https://drafts.csswg.org/css-color-4/#propdef-opacity"},
+"7d9dff52": {"dfnID":"7d9dff52","dfnText":"timing function","external":true,"refSections":[{"refs":[{"id":"ref-for-easing-function"}],"title":"2.3. The transition-timing-function Property"}],"url":"https://drafts.csswg.org/css-easing-2/#easing-function"},
+"2eff47ba": {"dfnID":"2eff47ba","dfnText":"TransitionEvent","external":true,"refSections":[{"refs":[{"id":"ref-for-transitionevent"}],"title":"5.1. Event dispatch"}],"url":"https://drafts.csswg.org/css-transitions-1/#transitionevent"},
+"f12240f8": {"dfnID":"f12240f8","dfnText":"all","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-transition-property-all"}],"title":"2.1. The transition-property Property"}],"url":"https://drafts.csswg.org/css-transitions-1/#valdef-transition-property-all"},
+"8f82c052": {"dfnID":"8f82c052","dfnText":"cancel","external":true,"refSections":[{"refs":[{"id":"ref-for-transition-cancel"},{"id":"ref-for-transition-cancel\u2460"},{"id":"ref-for-transition-cancel\u2461"}],"title":"3. Starting of transitions"}],"url":"https://drafts.csswg.org/css-transitions-1/#transition-cancel"},
+"fd037081": {"dfnID":"fd037081","dfnText":"completed transition","external":true,"refSections":[{"refs":[{"id":"ref-for-completed-transition"}],"title":"3. Starting of transitions"}],"url":"https://drafts.csswg.org/css-transitions-1/#completed-transition"},
+"328d4c84": {"dfnID":"328d4c84","dfnText":"elapsedTime","external":true,"refSections":[{"refs":[{"id":"ref-for-Events-TransitionEvent-elapsedTime"},{"id":"ref-for-Events-TransitionEvent-elapsedTime\u2460"}],"title":"5.1. Event dispatch"}],"url":"https://drafts.csswg.org/css-transitions-1/#Events-TransitionEvent-elapsedTime"},
+"68dfc6c2": {"dfnID":"68dfc6c2","dfnText":"reversing shortening factor","external":true,"refSections":[{"refs":[{"id":"ref-for-transition-reversing-shortening-factor"}],"title":"3.1. Faster reversing of interrupted transitions"}],"url":"https://drafts.csswg.org/css-transitions-1/#transition-reversing-shortening-factor"},
+"d9cac3a8": {"dfnID":"d9cac3a8","dfnText":"reversing-adjusted start value","external":true,"refSections":[{"refs":[{"id":"ref-for-transition-reversing-adjusted-start-value"}],"title":"3.1. Faster reversing of interrupted transitions"}],"url":"https://drafts.csswg.org/css-transitions-1/#transition-reversing-adjusted-start-value"},
+"337088c4": {"dfnID":"337088c4","dfnText":"running transition","external":true,"refSections":[{"refs":[{"id":"ref-for-running-transition"},{"id":"ref-for-running-transition\u2460"}],"title":"3. Starting of transitions"}],"url":"https://drafts.csswg.org/css-transitions-1/#running-transition"},
+"f6d1b137": {"dfnID":"f6d1b137","dfnText":"style change event","external":true,"refSections":[{"refs":[{"id":"ref-for-style-change-event"}],"title":"3.2. The current transition generation"}],"url":"https://drafts.csswg.org/css-transitions-1/#style-change-event"},
+"7aa5d99a": {"dfnID":"7aa5d99a","dfnText":"transition-delay","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-transition-delay"},{"id":"ref-for-propdef-transition-delay\u2460"}],"title":"2.4. The transition-delay Property"}],"url":"https://drafts.csswg.org/css-transitions-1/#propdef-transition-delay"},
+"2641466b": {"dfnID":"2641466b","dfnText":"transition-duration","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-transition-duration"},{"id":"ref-for-propdef-transition-duration\u2460"}],"title":"2.2. The transition-duration Property"}],"url":"https://drafts.csswg.org/css-transitions-1/#propdef-transition-duration"},
+"847d4593": {"dfnID":"847d4593","dfnText":"transition-property","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-transition-property"},{"id":"ref-for-propdef-transition-property\u2460"}],"title":"2.1. The transition-property Property"},{"refs":[{"id":"ref-for-propdef-transition-property\u2461"}],"title":"3. Starting of transitions"},{"refs":[{"id":"ref-for-propdef-transition-property\u2462"}],"title":"8. Issues deferred from previous levels of the spec"}],"url":"https://drafts.csswg.org/css-transitions-1/#propdef-transition-property"},
+"d1cbb6e4": {"dfnID":"d1cbb6e4","dfnText":"transition-timing-function","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-transition-timing-function"},{"id":"ref-for-propdef-transition-timing-function\u2460"}],"title":"2.3. The transition-timing-function Property"}],"url":"https://drafts.csswg.org/css-transitions-1/#propdef-transition-timing-function"},
+"d5e9fdd7": {"dfnID":"d5e9fdd7","dfnText":"transitioncancel","external":true,"refSections":[{"refs":[{"id":"ref-for-transitioncancel"},{"id":"ref-for-transitioncancel\u2460"},{"id":"ref-for-transitioncancel\u2461"},{"id":"ref-for-transitioncancel\u2462"},{"id":"ref-for-transitioncancel\u2463"}],"title":"5.1. Event dispatch"}],"url":"https://drafts.csswg.org/css-transitions-1/#transitioncancel"},
+"9732626d": {"dfnID":"9732626d","dfnText":"transitionend","external":true,"refSections":[{"refs":[{"id":"ref-for-transitionend"},{"id":"ref-for-transitionend\u2460"},{"id":"ref-for-transitionend\u2461"},{"id":"ref-for-transitionend\u2462"},{"id":"ref-for-transitionend\u2463"},{"id":"ref-for-transitionend\u2464"},{"id":"ref-for-transitionend\u2465"},{"id":"ref-for-transitionend\u2466"},{"id":"ref-for-transitionend\u2467"},{"id":"ref-for-transitionend\u2468"},{"id":"ref-for-transitionend\u2460\u24ea"}],"title":"5.1. Event dispatch"}],"url":"https://drafts.csswg.org/css-transitions-1/#transitionend"},
+"4ffbeb37": {"dfnID":"4ffbeb37","dfnText":"transitionrun","external":true,"refSections":[{"refs":[{"id":"ref-for-transitionrun"},{"id":"ref-for-transitionrun\u2460"},{"id":"ref-for-transitionrun\u2461"},{"id":"ref-for-transitionrun\u2462"},{"id":"ref-for-transitionrun\u2463"},{"id":"ref-for-transitionrun\u2464"},{"id":"ref-for-transitionrun\u2465"},{"id":"ref-for-transitionrun\u2466"}],"title":"5.1. Event dispatch"}],"url":"https://drafts.csswg.org/css-transitions-1/#transitionrun"},
+"d7b7dfd6": {"dfnID":"d7b7dfd6","dfnText":"transitionstart","external":true,"refSections":[{"refs":[{"id":"ref-for-transitionstart"},{"id":"ref-for-transitionstart\u2460"},{"id":"ref-for-transitionstart\u2461"},{"id":"ref-for-transitionstart\u2462"},{"id":"ref-for-transitionstart\u2463"},{"id":"ref-for-transitionstart\u2464"},{"id":"ref-for-transitionstart\u2465"},{"id":"ref-for-transitionstart\u2466"},{"id":"ref-for-transitionstart\u2467"},{"id":"ref-for-transitionstart\u2468"},{"id":"ref-for-transitionstart\u2460\u24ea"},{"id":"ref-for-transitionstart\u2460\u2460"}],"title":"5.1. Event dispatch"}],"url":"https://drafts.csswg.org/css-transitions-1/#transitionstart"},
+"5fced98b": {"dfnID":"5fced98b","dfnText":"CSSOMString","external":true,"refSections":[{"refs":[{"id":"ref-for-cssomstring"},{"id":"ref-for-cssomstring\u2460"}],"title":"6.1. The CSSTransition interface"}],"url":"https://drafts.csswg.org/cssom-1/#cssomstring"},
+"b203675a": {"dfnID":"b203675a","dfnText":"getComputedStyle(elt)","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-window-getcomputedstyle"}],"title":"6.2. Requirements on pending style changes"}],"url":"https://drafts.csswg.org/cssom-1/#dom-window-getcomputedstyle"},
+"9638f92b": {"dfnID":"9638f92b","dfnText":"connected","external":true,"refSections":[{"refs":[{"id":"ref-for-connected"}],"title":"3. Starting of transitions"}],"url":"https://dom.spec.whatwg.org/#connected"},
+"25538777": {"dfnID":"25538777","dfnText":"tree order","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-tree-order"}],"title":"4.1. Animation composite order"}],"url":"https://dom.spec.whatwg.org/#concept-tree-order"},
+"509dbb50": {"dfnID":"509dbb50","dfnText":"being rendered","external":true,"refSections":[{"refs":[{"id":"ref-for-being-rendered"}],"title":"3. Starting of transitions"}],"url":"https://html.spec.whatwg.org/multipage/browsers.html#being-rendered"},
+"f4e8783b": {"dfnID":"f4e8783b","dfnText":"Animation","external":true,"refSections":[{"refs":[{"id":"ref-for-animation"}],"title":"4.1. Animation composite order"},{"refs":[{"id":"ref-for-animation\u2460"}],"title":"6.1. The CSSTransition interface"}],"url":"https://drafts.csswg.org/web-animations/#animation"},
+"cdc4de9d": {"dfnID":"cdc4de9d","dfnText":"active duration","external":true,"refSections":[{"refs":[{"id":"ref-for-active-duration"},{"id":"ref-for-active-duration\u2460"},{"id":"ref-for-active-duration\u2461"}],"title":"5.1. Event dispatch"}],"url":"https://drafts.csswg.org/web-animations/#active-duration"},
+"36fce97a": {"dfnID":"36fce97a","dfnText":"active time","external":true,"refSections":[{"refs":[{"id":"ref-for-active-time"}],"title":"5.1. Event dispatch"}],"url":"https://drafts.csswg.org/web-animations/#active-time"},
+"02ceac2e": {"dfnID":"02ceac2e","dfnText":"animation","external":true,"refSections":[{"refs":[{"id":"ref-for-animation"}],"title":"4.1. Animation composite order"},{"refs":[{"id":"ref-for-animation\u2460"}],"title":"6.1. The CSSTransition interface"}],"url":"https://drafts.csswg.org/web-animations/#animation"},
+"76e6dbc5": {"dfnID":"76e6dbc5","dfnText":"animation class","external":true,"refSections":[{"refs":[{"id":"ref-for-animation-class"},{"id":"ref-for-animation-class\u2460"}],"title":"4.1. Animation composite order"},{"refs":[{"id":"ref-for-animation-class\u2461"}],"title":"4.2. Animation cascade level"}],"url":"https://drafts.csswg.org/web-animations/#animation-class"},
+"0824fc9a": {"dfnID":"0824fc9a","dfnText":"animation effect","external":true,"refSections":[{"refs":[{"id":"ref-for-animation-effect"}],"title":"2.2. The transition-duration Property"},{"refs":[{"id":"ref-for-animation-effect\u2460"}],"title":"2.3. The transition-timing-function Property"},{"refs":[{"id":"ref-for-animation-effect\u2461"}],"title":"2.4. The transition-delay Property"},{"refs":[{"id":"ref-for-animation-effect\u2462"},{"id":"ref-for-animation-effect\u2463"}],"title":"3.1. Faster reversing of interrupted transitions"}],"url":"https://drafts.csswg.org/web-animations/#animation-effect"},
+"22ac6c4e": {"dfnID":"22ac6c4e","dfnText":"cancel an animation","external":true,"refSections":[{"refs":[{"id":"ref-for-cancel-an-animation"}],"title":"3. Starting of transitions"}],"url":"https://drafts.csswg.org/web-animations/#cancel-an-animation"},
+"a5a7b6e7": {"dfnID":"a5a7b6e7","dfnText":"cancel()","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-animation-cancel"}],"title":"3. Starting of transitions"}],"url":"https://drafts.csswg.org/web-animations-1/#dom-animation-cancel"},
+"2ba3c642": {"dfnID":"2ba3c642","dfnText":"current iteration","external":true,"refSections":[{"refs":[{"id":"ref-for-current-iteration"}],"title":"5.1. Event dispatch"}],"url":"https://drafts.csswg.org/web-animations/#current-iteration"},
+"6e716cfa": {"dfnID":"6e716cfa","dfnText":"current time","external":true,"refSections":[{"refs":[{"id":"ref-for-current-time"},{"id":"ref-for-current-time\u2460"}],"title":"5.1. Event dispatch"}],"url":"https://drafts.csswg.org/web-animations/#current-time"},
+"50122ec8": {"dfnID":"50122ec8","dfnText":"fill mode","external":true,"refSections":[{"refs":[{"id":"ref-for-fill-mode"}],"title":"5.1. Event dispatch"}],"url":"https://drafts.csswg.org/web-animations/#fill-mode"},
+"7aed2fe1": {"dfnID":"7aed2fe1","dfnText":"global animation list","external":true,"refSections":[{"refs":[{"id":"ref-for-global-animation-list"},{"id":"ref-for-global-animation-list\u2460"},{"id":"ref-for-global-animation-list\u2461"}],"title":"4.1. Animation composite order"}],"url":"https://drafts.csswg.org/web-animations/#global-animation-list"},
+"2b97b6de": {"dfnID":"2b97b6de","dfnText":"idle play state","external":true,"refSections":[{"refs":[{"id":"ref-for-idle-play-state"},{"id":"ref-for-idle-play-state\u2460"},{"id":"ref-for-idle-play-state\u2461"}],"title":"4.1. Animation composite order"}],"url":"https://drafts.csswg.org/web-animations/#idle-play-state"},
+"5f1a75d3": {"dfnID":"5f1a75d3","dfnText":"iteration duration","external":true,"refSections":[{"refs":[{"id":"ref-for-iteration-duration"}],"title":"2.2. The transition-duration Property"},{"refs":[{"id":"ref-for-iteration-duration\u2460"}],"title":"5.1. Event dispatch"}],"url":"https://drafts.csswg.org/web-animations/#iteration-duration"},
+"45fa027a": {"dfnID":"45fa027a","dfnText":"iteration start","external":true,"refSections":[{"refs":[{"id":"ref-for-iteration-start"}],"title":"5.1. Event dispatch"}],"url":"https://drafts.csswg.org/web-animations/#iteration-start"},
+"077cd126": {"dfnID":"077cd126","dfnText":"pending play state","external":true,"refSections":[{"refs":[{"id":"ref-for-pending-play-state"}],"title":"5.1. Event dispatch"}],"url":"https://drafts.csswg.org/web-animations/#pending-play-state"},
+"9818c0ac": {"dfnID":"9818c0ac","dfnText":"sampling","external":true,"refSections":[{"refs":[{"id":"ref-for-sampling"},{"id":"ref-for-sampling\u2460"}],"title":"5.1. Event dispatch"}],"url":"https://drafts.csswg.org/web-animations/#sampling"},
+"e5174841": {"dfnID":"e5174841","dfnText":"start delay","external":true,"refSections":[{"refs":[{"id":"ref-for-start-delay"}],"title":"2.4. The transition-delay Property"},{"refs":[{"id":"ref-for-start-delay\u2460"},{"id":"ref-for-start-delay\u2461"},{"id":"ref-for-start-delay\u2462"}],"title":"5.1. Event dispatch"}],"url":"https://drafts.csswg.org/web-animations/#start-delay"},
+"7cca7096": {"dfnID":"7cca7096","dfnText":"target effect","external":true,"refSections":[{"refs":[{"id":"ref-for-target-effect"},{"id":"ref-for-target-effect\u2460"},{"id":"ref-for-target-effect\u2461"}],"title":"5.1. Event dispatch"}],"url":"https://drafts.csswg.org/web-animations/#target-effect"},
+"ec657208": {"dfnID":"ec657208","dfnText":"target effect end","external":true,"refSections":[{"refs":[{"id":"ref-for-target-effect-end"}],"title":"5.1. Event dispatch"}],"url":"https://drafts.csswg.org/web-animations/#target-effect-end"},
+"c35d7b6e": {"dfnID":"c35d7b6e","dfnText":"transformed progress","external":true,"refSections":[{"refs":[{"id":"ref-for-transformed-progress"}],"title":"2.3. The transition-timing-function Property"}],"url":"https://drafts.csswg.org/web-animations-1/#transformed-progress"},
+"9be3bced": {"dfnID":"9be3bced","dfnText":"unresolved","external":true,"refSections":[{"refs":[{"id":"ref-for-unresolved"}],"title":"5.1. Event dispatch"}],"url":"https://drafts.csswg.org/web-animations/#unresolved"},
+"2fe418bd": {"dfnID":"2fe418bd","dfnText":"getAnimations()","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-animatable-getanimations"}],"title":"6.2. Requirements on pending style changes"}],"url":"https://drafts.csswg.org/web-animations-2/#dom-animatable-getanimations"},
+"889e932f": {"dfnID":"889e932f","dfnText":"Exposed","external":true,"refSections":[{"refs":[{"id":"ref-for-Exposed"}],"title":"6.1. The CSSTransition interface"}],"url":"https://webidl.spec.whatwg.org/#Exposed"},
+"expanded-transition-property-name": {"dfnID":"expanded-transition-property-name","dfnText":"expanded transition property\nname","external":false,"refSections":[{"refs":[{"id":"ref-for-expanded-transition-property-name"}],"title":"4.1. Animation composite order"},{"refs":[{"id":"ref-for-expanded-transition-property-name\u2460"}],"title":"6.1. The CSSTransition interface"}],"url":"#expanded-transition-property-name"},
+"owning-element": {"dfnID":"owning-element","dfnText":"owning element","external":false,"refSections":[{"refs":[{"id":"ref-for-owning-element"},{"id":"ref-for-owning-element\u2460"},{"id":"ref-for-owning-element\u2461"},{"id":"ref-for-owning-element\u2462"},{"id":"ref-for-owning-element\u2463"}],"title":"3. Starting of transitions"},{"refs":[{"id":"ref-for-owning-element\u2464"},{"id":"ref-for-owning-element\u2465"},{"id":"ref-for-owning-element\u2466"},{"id":"ref-for-owning-element\u2467"},{"id":"ref-for-owning-element\u2468"},{"id":"ref-for-owning-element\u2460\u24ea"},{"id":"ref-for-owning-element\u2460\u2460"},{"id":"ref-for-owning-element\u2460\u2461"}],"title":"4.1. Animation composite order"},{"refs":[{"id":"ref-for-owning-element\u2460\u2462"},{"id":"ref-for-owning-element\u2460\u2463"}],"title":"4.2. Animation cascade level"}],"url":"#owning-element"},
+"current-transition-generation": {"dfnID":"current-transition-generation","dfnText":"current transition\ngeneration","external":false,"refSections":[{"refs":[{"id":"ref-for-current-transition-generation"}],"title":"3.2. The current transition generation"}],"url":"#current-transition-generation"},
+"transition-generation": {"dfnID":"transition-generation","dfnText":"transition generation","external":false,"refSections":[{"refs":[{"id":"ref-for-transition-generation"},{"id":"ref-for-transition-generation\u2460"}],"title":"4.1. Animation composite order"}],"url":"#transition-generation"},
+"transition-phase": {"dfnID":"transition-phase","dfnText":"transition phase","external":false,"refSections":[{"refs":[{"id":"ref-for-transition-phase"},{"id":"ref-for-transition-phase\u2460"}],"title":"5.1. Event dispatch"}],"url":"#transition-phase"},
+"interval-start": {"dfnID":"interval-start","dfnText":"interval start","external":false,"refSections":[{"refs":[{"id":"ref-for-interval-start"},{"id":"ref-for-interval-start\u2460"},{"id":"ref-for-interval-start\u2461"},{"id":"ref-for-interval-start\u2462"},{"id":"ref-for-interval-start\u2463"},{"id":"ref-for-interval-start\u2464"},{"id":"ref-for-interval-start\u2465"}],"title":"5.1. Event dispatch"}],"url":"#interval-start"},
+"interval-end": {"dfnID":"interval-end","dfnText":"interval end","external":false,"refSections":[{"refs":[{"id":"ref-for-interval-end"},{"id":"ref-for-interval-end\u2460"},{"id":"ref-for-interval-end\u2461"},{"id":"ref-for-interval-end\u2462"},{"id":"ref-for-interval-end\u2463"}],"title":"5.1. Event dispatch"}],"url":"#interval-end"},
+"elapsed-time": {"dfnID":"elapsed-time","dfnText":"Elapsed time","external":false,"refSections":[{"refs":[{"id":"ref-for-elapsed-time"}],"title":"5.1. Event dispatch"}],"url":"#elapsed-time"},
+"csstransition": {"dfnID":"csstransition","dfnText":"CSSTransition","external":false,"refSections":[{"refs":[{"id":"ref-for-csstransition"}],"title":"3. Starting of transitions"},{"refs":[{"id":"ref-for-csstransition\u2460"},{"id":"ref-for-csstransition\u2461"}],"title":"6.2. Requirements on pending style changes"}],"url":"#csstransition"},
+"dom-csstransition-transitionproperty": {"dfnID":"dom-csstransition-transitionproperty","dfnText":"transitionProperty","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-csstransition-transitionproperty"}],"title":"6.1. The CSSTransition interface"}],"url":"#dom-csstransition-transitionproperty"},
+};
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+const typeFormatters = {
+    'dfn': (text) => `[=${text}=]`,
+    'abstract-op': (text) => `[\$${text}\$]`,
+    'value': (text) => `''${text}''`,
+    'http-header': (text) => `[:${text}:]`,
+    'idl': (text) => `{{${text}}}`,
+    'interface': 'idl',
+    'constructor': 'idl',
+    'method': 'idl',
+    'argument': 'idl',
+    'attribute': 'idl',
+    'callback': 'idl',
+    'dictionary': 'idl',
+    'dict-member': 'idl',
+    'enum': 'idl',
+    'enum-value': 'idl',
+    'exception': 'idl',
+    'const': 'idl',
+    'typedef': 'idl',
+    'stringifier': 'idl',
+    'serializer': 'idl',
+    'iterator': 'idl',
+    'maplike': 'idl',
+    'setlike': 'idl',
+    'extended-attribute': 'idl',
+    'event': 'idl',
+    'element': (element) => `<{${element}}>`,
+    'element-state': 'element',
+    'element-attr': 'element',
+    'attr-value': 'element',
+    'scheme': 'dfn',
+    'permission': 'dfn',
+    'grammar': (text) => `${text} (within a <pre class=prod>)`,
+    'type': (text)=> `<<${text}>>`,
+    'property': (text) => `'${text}'`,
+    'descriptor': 'property',
+    'function': 'value',
+    'at-rule': 'value',
+    'selector': 'value',
+};
+const typesUsingFor = new Set(
+    [
+        "descriptor",
+        "value",
+        "element-attr",
+        "attr-value",
+        "element-state",
+        "method",
+        "constructor",
+        "argument",
+        "attribute",
+        "const",
+        "dict-member",
+        "event",
+        "enum-value",
+        "stringifier",
+        "serializer",
+        "iterator",
+        "maplike",
+        "setlike",
+        "state",
+        "mode",
+        "context",
+        "facet",
+    ],
+)
+const typesNotUsingFor = new Set(
+    [
+        "property",
+        "element",
+        "interface",
+        "namespace",
+        "callback",
+        "dictionary",
+        "enum",
+        "exception",
+        "typedef",
+        "http-header",
+        "permission",
+    ],
+)
+function linkFormatterFromType(type) {
+    const fnOrType = typeFormatters[type];
+    if(typeof fnOrType === 'string') {
+        // follow the alias
+        return linkFormatterFromType(fnOrType);
+    }
+    return fnOrType;
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!typesUsingFor.has(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!typesNotUsingFor.has(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
+
+function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+    dfnPanel.forDfn = dfn;
+    if(!dfn) { console.log(dfnPanel); }
+    return dfnPanel;
+}
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        const panel = genDfnPanel({ ...panelData, dfn });
+        append(document.body, panel);
+        insertDfnPopupAction(panel)
+    }
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+})
+
+function hideAllDfnPanels() {
+    // Turn off any currently "on" or "activated" panels.
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
+}
+
+function showDfnPanel(dfnPanel) {
+    hideAllDfnPanels(); // Only display one at this time.
+
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "true");
+
+    dfnPanel.classList.add("on");
+    positionDfnPanel(dfnPanel);
+
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    // Increment tabindex for each anchor and button tags in panel
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.style.position = "absolute"; // unfix it
+    dfnPanel.classList.remove("on");
+    dfnPanel.classList.remove("activated");
+}
+
+function toggleDfnPanel(dfnPanel) {
+    if(dfnPanel.classList.contains("on")) {
+        hideDfnPanel(dfnPanel);
+    } else {
+        showDfnPanel(dfnPanel);
+    }
+}
+
+function insertDfnPopupAction(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        showDfnPanel(dfnPanel);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfnPanel);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel(dfnPanel, dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    })
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
 }
 </script>
 <script>/* Boilerplate: script-position-annos */
 "use strict";
 {
-
 function repositionAnnoPanels(){
     const panels = [...document.querySelectorAll("[data-anno-for]")];
     const main = document.querySelector("main");
@@ -2507,271 +2507,271 @@ window.addEventListener("resize", repositionAnnoPanels);
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
+let refsData = {
+"https://drafts.csswg.org/css-transitions-1/#propdef-transition-property": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-transitions","spec":"css-transitions-1","status":"current","text":"transition-property","type":"property","url":"https://drafts.csswg.org/css-transitions-1/#propdef-transition-property"},
+"https://drafts.csswg.org/css-transitions-1/#valdef-transition-property-all": {"export":true,"for_":["transition-property"],"level":"1","normative":true,"shortname":"css-transitions","spec":"css-transitions-1","status":"current","text":"all","type":"value","url":"https://drafts.csswg.org/css-transitions-1/#valdef-transition-property-all"},
+"https://drafts.csswg.org/css-backgrounds-3/#propdef-border-left-width": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"current","text":"border-left-width","type":"property","url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-border-left-width"},
+"https://drafts.csswg.org/css-transitions-1/#propdef-transition-duration": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-transitions","spec":"css-transitions-1","status":"current","text":"transition-duration","type":"property","url":"https://drafts.csswg.org/css-transitions-1/#propdef-transition-duration"},
+"https://drafts.csswg.org/web-animations/#iteration-duration": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"iteration duration","type":"dfn","url":"https://drafts.csswg.org/web-animations/#iteration-duration"},
+"https://drafts.csswg.org/web-animations/#animation-effect": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"animation effect","type":"dfn","url":"https://drafts.csswg.org/web-animations/#animation-effect"},
+"https://drafts.csswg.org/css-transitions-1/#propdef-transition-timing-function": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-transitions","spec":"css-transitions-1","status":"current","text":"transition-timing-function","type":"property","url":"https://drafts.csswg.org/css-transitions-1/#propdef-transition-timing-function"},
+"https://drafts.csswg.org/css-easing-2/#easing-function": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-easing","spec":"css-easing-2","status":"current","text":"timing function","type":"dfn","url":"https://drafts.csswg.org/css-easing-2/#easing-function"},
+"https://drafts.csswg.org/web-animations-1/#transformed-progress": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"web-animations","spec":"web-animations-1","status":"current","text":"transformed progress","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#transformed-progress"},
+"https://drafts.csswg.org/css-transitions-1/#propdef-transition-delay": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-transitions","spec":"css-transitions-1","status":"current","text":"transition-delay","type":"property","url":"https://drafts.csswg.org/css-transitions-1/#propdef-transition-delay"},
+"https://drafts.csswg.org/web-animations/#start-delay": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"start delay","type":"dfn","url":"https://drafts.csswg.org/web-animations/#start-delay"},
+"#owning-element": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-transitions-2","spec":"css-transitions-2-2","status":"local","text":"owning element","type":"dfn","url":"#owning-element"},
+"https://drafts.csswg.org/css-transitions-1/#running-transition": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-transitions","spec":"css-transitions-1","status":"current","text":"running transition","type":"dfn","url":"https://drafts.csswg.org/css-transitions-1/#running-transition"},
+"https://drafts.csswg.org/css-transitions-1/#transition-cancel": {"export":true,"for_":["transition"],"level":"1","normative":true,"shortname":"css-transitions","spec":"css-transitions-1","status":"current","text":"cancel","type":"dfn","url":"https://drafts.csswg.org/css-transitions-1/#transition-cancel"},
+"https://drafts.csswg.org/web-animations/#cancel-an-animation": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"cancel an animation","type":"dfn","url":"https://drafts.csswg.org/web-animations/#cancel-an-animation"},
+"https://dom.spec.whatwg.org/#connected": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"connected","type":"dfn","url":"https://dom.spec.whatwg.org/#connected"},
+"https://html.spec.whatwg.org/multipage/browsers.html#being-rendered": {"export":true,"for_":[],"level":"","normative":true,"shortname":"html","spec":"html","status":"anchor-block","text":"being rendered","type":"dfn","url":"https://html.spec.whatwg.org/multipage/browsers.html#being-rendered"},
+"https://drafts.csswg.org/css-transitions-1/#completed-transition": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-transitions","spec":"css-transitions-1","status":"current","text":"completed transition","type":"dfn","url":"https://drafts.csswg.org/css-transitions-1/#completed-transition"},
+"https://drafts.csswg.org/web-animations-1/#dom-animation-cancel": {"export":true,"for_":["Animation"],"level":"1","normative":true,"shortname":"web-animations","spec":"web-animations-1","status":"current","text":"cancel()","type":"method","url":"https://drafts.csswg.org/web-animations-1/#dom-animation-cancel"},
+"#csstransition": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-transitions-2","spec":"css-transitions-2-2","status":"local","text":"CSSTransition","type":"interface","url":"#csstransition"},
+"https://drafts.csswg.org/css-transitions-1/#transition-reversing-shortening-factor": {"export":true,"for_":["transition"],"level":"1","normative":true,"shortname":"css-transitions","spec":"css-transitions-1","status":"current","text":"reversing shortening factor","type":"dfn","url":"https://drafts.csswg.org/css-transitions-1/#transition-reversing-shortening-factor"},
+"https://drafts.csswg.org/css-transitions-1/#transition-reversing-adjusted-start-value": {"export":true,"for_":["transition"],"level":"1","normative":true,"shortname":"css-transitions","spec":"css-transitions-1","status":"current","text":"reversing-adjusted start value","type":"dfn","url":"https://drafts.csswg.org/css-transitions-1/#transition-reversing-adjusted-start-value"},
+"https://drafts.csswg.org/css-transitions-1/#style-change-event": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-transitions","spec":"css-transitions-1","status":"current","text":"style change event","type":"dfn","url":"https://drafts.csswg.org/css-transitions-1/#style-change-event"},
+"#current-transition-generation": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-transitions-2","spec":"css-transitions-2-2","status":"local","text":"current transition generation","type":"dfn","url":"#current-transition-generation"},
+"https://drafts.csswg.org/web-animations/#animation": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"animation","type":"dfn","url":"https://drafts.csswg.org/web-animations/#animation"},
+"https://drafts.csswg.org/web-animations/#animation-class": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"animation class","type":"dfn","url":"https://drafts.csswg.org/web-animations/#animation-class"},
+"https://drafts.csswg.org/web-animations/#global-animation-list": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"global animation list","type":"dfn","url":"https://drafts.csswg.org/web-animations/#global-animation-list"},
+"https://dom.spec.whatwg.org/#concept-tree-order": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"tree order","type":"dfn","url":"https://dom.spec.whatwg.org/#concept-tree-order"},
+"#transition-generation": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-transitions-2","spec":"css-transitions-2-2","status":"local","text":"transition generation","type":"dfn","url":"#transition-generation"},
+"#expanded-transition-property-name": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-transitions-2","spec":"css-transitions-2-2","status":"local","text":"expanded transition property name","type":"dfn","url":"#expanded-transition-property-name"},
+"https://drafts.csswg.org/web-animations/#idle-play-state": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"idle play state","type":"dfn","url":"https://drafts.csswg.org/web-animations/#idle-play-state"},
+"#transition-phase": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-transitions-2","spec":"css-transitions-2-2","status":"local","text":"transition phase","type":"dfn","url":"#transition-phase"},
+"https://drafts.csswg.org/web-animations/#sampling": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"sampling","type":"dfn","url":"https://drafts.csswg.org/web-animations/#sampling"},
+"https://drafts.csswg.org/web-animations/#target-effect": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"target effect","type":"dfn","url":"https://drafts.csswg.org/web-animations/#target-effect"},
+"https://drafts.csswg.org/web-animations/#unresolved": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"unresolved","type":"dfn","url":"https://drafts.csswg.org/web-animations/#unresolved"},
+"https://drafts.csswg.org/web-animations/#current-time": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"current time","type":"dfn","url":"https://drafts.csswg.org/web-animations/#current-time"},
+"https://drafts.csswg.org/web-animations/#pending-play-state": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"pending play state","type":"dfn","url":"https://drafts.csswg.org/web-animations/#pending-play-state"},
+"https://drafts.csswg.org/css-transitions-1/#Events-TransitionEvent-elapsedTime": {"export":true,"for_":["TransitionEvent"],"level":"1","normative":true,"shortname":"css-transitions","spec":"css-transitions-1","status":"current","text":"elapsedTime","type":"attribute","url":"https://drafts.csswg.org/css-transitions-1/#Events-TransitionEvent-elapsedTime"},
+"https://drafts.csswg.org/web-animations/#active-duration": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"active duration","type":"dfn","url":"https://drafts.csswg.org/web-animations/#active-duration"},
+"https://drafts.csswg.org/web-animations/#target-effect-end": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"target effect end","type":"dfn","url":"https://drafts.csswg.org/web-animations/#target-effect-end"},
+"https://drafts.csswg.org/web-animations/#current-iteration": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"current iteration","type":"dfn","url":"https://drafts.csswg.org/web-animations/#current-iteration"},
+"https://drafts.csswg.org/web-animations/#iteration-start": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"iteration start","type":"dfn","url":"https://drafts.csswg.org/web-animations/#iteration-start"},
+"https://drafts.csswg.org/css-transitions-1/#transitionrun": {"export":true,"for_":["GlobalEventHandlers"],"level":"1","normative":true,"shortname":"css-transitions","spec":"css-transitions-1","status":"current","text":"transitionrun","type":"event","url":"https://drafts.csswg.org/css-transitions-1/#transitionrun"},
+"#interval-start": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-transitions-2","spec":"css-transitions-2-2","status":"local","text":"interval start","type":"dfn","url":"#interval-start"},
+"https://drafts.csswg.org/css-transitions-1/#transitionstart": {"export":true,"for_":["GlobalEventHandlers"],"level":"1","normative":true,"shortname":"css-transitions","spec":"css-transitions-1","status":"current","text":"transitionstart","type":"event","url":"https://drafts.csswg.org/css-transitions-1/#transitionstart"},
+"https://drafts.csswg.org/css-transitions-1/#transitionend": {"export":true,"for_":["GlobalEventHandlers"],"level":"1","normative":true,"shortname":"css-transitions","spec":"css-transitions-1","status":"current","text":"transitionend","type":"event","url":"https://drafts.csswg.org/css-transitions-1/#transitionend"},
+"#interval-end": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-transitions-2","spec":"css-transitions-2-2","status":"local","text":"interval end","type":"dfn","url":"#interval-end"},
+"https://drafts.csswg.org/css-transitions-1/#transitioncancel": {"export":true,"for_":["GlobalEventHandlers"],"level":"1","normative":true,"shortname":"css-transitions","spec":"css-transitions-1","status":"current","text":"transitioncancel","type":"event","url":"https://drafts.csswg.org/css-transitions-1/#transitioncancel"},
+"https://drafts.csswg.org/web-animations/#active-time": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"active time","type":"dfn","url":"https://drafts.csswg.org/web-animations/#active-time"},
+"https://drafts.csswg.org/web-animations/#fill-mode": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"fill mode","type":"dfn","url":"https://drafts.csswg.org/web-animations/#fill-mode"},
+"#elapsed-time": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-transitions-2","spec":"css-transitions-2-2","status":"local","text":"elapsed time","type":"dfn","url":"#elapsed-time"},
+"https://drafts.csswg.org/css-transitions-1/#transitionevent": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-transitions","spec":"css-transitions-1","status":"current","text":"TransitionEvent","type":"interface","url":"https://drafts.csswg.org/css-transitions-1/#transitionevent"},
+"https://webidl.spec.whatwg.org/#Exposed": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"Exposed","type":"extended-attribute","url":"https://webidl.spec.whatwg.org/#Exposed"},
+"https://drafts.csswg.org/cssom-1/#cssomstring": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"CSSOMString","type":"interface","url":"https://drafts.csswg.org/cssom-1/#cssomstring"},
+"#dom-csstransition-transitionproperty": {"export":true,"for_":["CSSTransition"],"level":"2","normative":true,"shortname":"css-transitions-2","spec":"css-transitions-2-2","status":"local","text":"transitionProperty","type":"attribute","url":"#dom-csstransition-transitionproperty"},
+"https://drafts.csswg.org/css-cascade-5/#computed-value": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-cascade","spec":"css-cascade-5","status":"current","text":"computed value","type":"dfn","url":"https://drafts.csswg.org/css-cascade-5/#computed-value"},
+"https://drafts.csswg.org/css-color-4/#propdef-opacity": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-color","spec":"css-color-4","status":"current","text":"opacity","type":"property","url":"https://drafts.csswg.org/css-color-4/#propdef-opacity"},
+"https://drafts.csswg.org/cssom-1/#dom-window-getcomputedstyle": {"export":true,"for_":["Window"],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"getComputedStyle(elt)","type":"method","url":"https://drafts.csswg.org/cssom-1/#dom-window-getcomputedstyle"},
+"https://drafts.csswg.org/web-animations-2/#dom-animatable-getanimations": {"export":true,"for_":["Animatable"],"level":"2","normative":true,"shortname":"web-animations","spec":"web-animations-2","status":"current","text":"getAnimations()","type":"method","url":"https://drafts.csswg.org/web-animations-2/#dom-animatable-getanimations"},
+};
+
+function genRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "DFN: "),
+                mk.code({ class: "dfn-text" }, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    const forListElements = forList.length === 0 ? '' : mk.li({},
+        mk.b({}, "For: "),
+        mk.ul({},
+            ...forList.map(forItem =>
                 mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
-            mk.b({}, "For: "),
-            mk.ul({},
-                ...forList.map(forItem =>
-                    mk.li({},
-                        mk.span({}, `${forItem}`)
-                    ),
+                    mk.span({}, `${forItem}`)
                 ),
             ),
-        );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+        ),
+    );
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
-    }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    return hintPanel;
+}
+function genAllRefHints() {
+    for(const refData of Object.values(refsData)) {
+        const refUrl = refData.url;
+        const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+        if (links.length == 0) {
+            console.log(`Can't find link href="${refUrl}".`, refData);
+            continue;
+        }
+        for(const link of links) {
+            if(link.classList.contains("dfn-link")) continue;
+            const hint = genRefHint(link, refData);
+            append(document.body, hint);
+            insertLinkPopupAction(hint)
         }
     }
+}
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+function hideAllRefHints() {
+    queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    refHint.style.position = "absolute"; // unfix it
+    refHint.classList.remove("on");
+    const teardown = refHint.teardownEventListeners;
+    if (teardown) {
+        refHint.teardownEventListeners = undefined;
+        teardown();
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+function showRefHint(refHint) {
+    hideAllRefHints(); // Only display one at this time.
+
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "true");
+    refHint.classList.add("on");
+    positionRefHint(refHint);
+    setupRefHintEventListeners(refHint);
+}
+
+function setupRefHintEventListeners(refHint) {
+    if (refHint.teardownEventListeners) return;
+    const link = refHint.forLink;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
 
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
 
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+function insertLinkPopupAction(refHint) {
+    const link = refHint.forLink;
+    // link.setAttribute('role', 'button');
+    link.setAttribute('aria-expanded', 'false')
+    link.classList.add('has-ref-hint');
+    link.addEventListener('mouseover', (event) => {
+        showRefHint(refHint);
     });
+    link.addEventListener('focus', (event) => {
+        showRefHint(refHint);
+    })
+}
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+document.addEventListener("DOMContentLoaded", () => {
+    genAllRefHints();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['https://drafts.csswg.org/css-transitions-1/#propdef-transition-property'] = {"text": "transition-property", "type": "property", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transitions-1/#propdef-transition-property", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-transitions-1/#valdef-transition-property-all'] = {"text": "all", "type": "value", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transitions-1/#valdef-transition-property-all", "export": true, "normative": true, "for_": ["transition-property"]};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border-left-width'] = {"text": "border-left-width", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-left-width", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-transitions-1/#propdef-transition-duration'] = {"text": "transition-duration", "type": "property", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transitions-1/#propdef-transition-duration", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations/#iteration-duration'] = {"text": "iteration duration", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations/#iteration-duration", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations/#animation-effect'] = {"text": "animation effect", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations/#animation-effect", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-transitions-1/#propdef-transition-timing-function'] = {"text": "transition-timing-function", "type": "property", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transitions-1/#propdef-transition-timing-function", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-easing-2/#easing-function'] = {"text": "timing function", "type": "dfn", "spec": "css-easing-2", "shortname": "css-easing", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-easing-2/#easing-function", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#transformed-progress'] = {"text": "transformed progress", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#transformed-progress", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-transitions-1/#propdef-transition-delay'] = {"text": "transition-delay", "type": "property", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transitions-1/#propdef-transition-delay", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations/#start-delay'] = {"text": "start delay", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations/#start-delay", "export": true, "normative": true, "for_": []};
-window.refsData['#owning-element'] = {"text": "owning element", "type": "dfn", "spec": "css-transitions-2-2", "shortname": "css-transitions-2", "level": "2", "status": "local", "url": "#owning-element", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-transitions-1/#running-transition'] = {"text": "running transition", "type": "dfn", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transitions-1/#running-transition", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-transitions-1/#transition-cancel'] = {"text": "cancel", "type": "dfn", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transitions-1/#transition-cancel", "export": true, "normative": true, "for_": ["transition"]};
-window.refsData['https://drafts.csswg.org/web-animations/#cancel-an-animation'] = {"text": "cancel an animation", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations/#cancel-an-animation", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#connected'] = {"text": "connected", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#connected", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#being-rendered'] = {"text": "being rendered", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#being-rendered", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-transitions-1/#completed-transition'] = {"text": "completed transition", "type": "dfn", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transitions-1/#completed-transition", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#dom-animation-cancel'] = {"text": "cancel()", "type": "method", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#dom-animation-cancel", "export": true, "normative": true, "for_": ["Animation"]};
-window.refsData['#csstransition'] = {"text": "CSSTransition", "type": "interface", "spec": "css-transitions-2-2", "shortname": "css-transitions-2", "level": "2", "status": "local", "url": "#csstransition", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-transitions-1/#transition-reversing-shortening-factor'] = {"text": "reversing shortening factor", "type": "dfn", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transitions-1/#transition-reversing-shortening-factor", "export": true, "normative": true, "for_": ["transition"]};
-window.refsData['https://drafts.csswg.org/css-transitions-1/#transition-reversing-adjusted-start-value'] = {"text": "reversing-adjusted start value", "type": "dfn", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transitions-1/#transition-reversing-adjusted-start-value", "export": true, "normative": true, "for_": ["transition"]};
-window.refsData['https://drafts.csswg.org/css-transitions-1/#style-change-event'] = {"text": "style change event", "type": "dfn", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transitions-1/#style-change-event", "export": true, "normative": true, "for_": []};
-window.refsData['#current-transition-generation'] = {"text": "current transition generation", "type": "dfn", "spec": "css-transitions-2-2", "shortname": "css-transitions-2", "level": "2", "status": "local", "url": "#current-transition-generation", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations/#animation'] = {"text": "animation", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations/#animation", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations/#animation-class'] = {"text": "animation class", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations/#animation-class", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations/#global-animation-list'] = {"text": "global animation list", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations/#global-animation-list", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#concept-tree-order'] = {"text": "tree order", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-tree-order", "export": true, "normative": true, "for_": []};
-window.refsData['#transition-generation'] = {"text": "transition generation", "type": "dfn", "spec": "css-transitions-2-2", "shortname": "css-transitions-2", "level": "2", "status": "local", "url": "#transition-generation", "export": true, "normative": true, "for_": []};
-window.refsData['#expanded-transition-property-name'] = {"text": "expanded transition property name", "type": "dfn", "spec": "css-transitions-2-2", "shortname": "css-transitions-2", "level": "2", "status": "local", "url": "#expanded-transition-property-name", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations/#idle-play-state'] = {"text": "idle play state", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations/#idle-play-state", "export": true, "normative": true, "for_": []};
-window.refsData['#transition-phase'] = {"text": "transition phase", "type": "dfn", "spec": "css-transitions-2-2", "shortname": "css-transitions-2", "level": "2", "status": "local", "url": "#transition-phase", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations/#sampling'] = {"text": "sampling", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations/#sampling", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations/#target-effect'] = {"text": "target effect", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations/#target-effect", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations/#unresolved'] = {"text": "unresolved", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations/#unresolved", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations/#current-time'] = {"text": "current time", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations/#current-time", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations/#pending-play-state'] = {"text": "pending play state", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations/#pending-play-state", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-transitions-1/#Events-TransitionEvent-elapsedTime'] = {"text": "elapsedTime", "type": "attribute", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transitions-1/#Events-TransitionEvent-elapsedTime", "export": true, "normative": true, "for_": ["TransitionEvent"]};
-window.refsData['https://drafts.csswg.org/web-animations/#active-duration'] = {"text": "active duration", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations/#active-duration", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations/#target-effect-end'] = {"text": "target effect end", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations/#target-effect-end", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations/#current-iteration'] = {"text": "current iteration", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations/#current-iteration", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations/#iteration-start'] = {"text": "iteration start", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations/#iteration-start", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-transitions-1/#transitionrun'] = {"text": "transitionrun", "type": "event", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transitions-1/#transitionrun", "export": true, "normative": true, "for_": ["GlobalEventHandlers"]};
-window.refsData['#interval-start'] = {"text": "interval start", "type": "dfn", "spec": "css-transitions-2-2", "shortname": "css-transitions-2", "level": "2", "status": "local", "url": "#interval-start", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-transitions-1/#transitionstart'] = {"text": "transitionstart", "type": "event", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transitions-1/#transitionstart", "export": true, "normative": true, "for_": ["GlobalEventHandlers"]};
-window.refsData['https://drafts.csswg.org/css-transitions-1/#transitionend'] = {"text": "transitionend", "type": "event", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transitions-1/#transitionend", "export": true, "normative": true, "for_": ["GlobalEventHandlers"]};
-window.refsData['#interval-end'] = {"text": "interval end", "type": "dfn", "spec": "css-transitions-2-2", "shortname": "css-transitions-2", "level": "2", "status": "local", "url": "#interval-end", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-transitions-1/#transitioncancel'] = {"text": "transitioncancel", "type": "event", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transitions-1/#transitioncancel", "export": true, "normative": true, "for_": ["GlobalEventHandlers"]};
-window.refsData['https://drafts.csswg.org/web-animations/#active-time'] = {"text": "active time", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations/#active-time", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations/#fill-mode'] = {"text": "fill mode", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations/#fill-mode", "export": true, "normative": true, "for_": []};
-window.refsData['#elapsed-time'] = {"text": "elapsed time", "type": "dfn", "spec": "css-transitions-2-2", "shortname": "css-transitions-2", "level": "2", "status": "local", "url": "#elapsed-time", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-transitions-1/#transitionevent'] = {"text": "TransitionEvent", "type": "interface", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transitions-1/#transitionevent", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/cssom-1/#cssomstring'] = {"text": "CSSOMString", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#cssomstring", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-csstransition-transitionproperty'] = {"text": "transitionProperty", "type": "attribute", "spec": "css-transitions-2-2", "shortname": "css-transitions-2", "level": "2", "status": "local", "url": "#dom-csstransition-transitionproperty", "export": true, "normative": true, "for_": ["CSSTransition"]};
-window.refsData['https://drafts.csswg.org/css-cascade-5/#computed-value'] = {"text": "computed value", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#computed-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-color-4/#propdef-opacity'] = {"text": "opacity", "type": "property", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-color-4/#propdef-opacity", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/cssom-1/#dom-window-getcomputedstyle'] = {"text": "getComputedStyle(elt)", "type": "method", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#dom-window-getcomputedstyle", "export": true, "normative": true, "for_": ["Window"]};
-window.refsData['https://drafts.csswg.org/web-animations-2/#dom-animatable-getanimations'] = {"text": "getAnimations()", "type": "method", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "current", "url": "https://drafts.csswg.org/web-animations-2/#dom-animatable-getanimations", "export": true, "normative": true, "for_": ["Animatable"]};
 </script>

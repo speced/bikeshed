@@ -78,7 +78,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -452,6 +451,11 @@ figcaption:not(.no-marker)::before {
     }
 }
 </style>
+<style>/* Boilerplate: style-idl-highlighting */
+pre.idl.highlight {
+    background: var(--borderedblock-bg, var(--def-bg));
+}
+</style>
 <style>/* Boilerplate: style-issues */
 a[href].issue-return {
     float: right;
@@ -509,7 +513,6 @@ a[href].issue-return {
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -569,7 +572,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -626,7 +628,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -1582,473 +1583,8 @@ directive-value   = ['area-threshold=' num-val]
    <div class="issue"> need to also clip to any other layers that were promoted ahead of us! <a class="issue-return" href="#issue-6397a33f" title="Jump to section">↵</a></div>
    <div class="issue"> if a parent and child layer both request to be promoted, the parent’s clipping window will have a complex geometry with holes in it that is not accounted for by this algorithm.  Likely need to specify that graphics layers be processed by order of depth. <a class="issue-return" href="#issue-22658f2c" title="Jump to section">↵</a></div>
   </div>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['3b11702b'] = {"dfnID": "3b11702b", "url": "http://www.w3.org/TR/hr-time/#domhighrestimestamp", "dfnText": "DOMHighResTimeStamp", "refSections": [{"refs": [{"id": "ref-for-domhighrestimestamp"}, {"id": "ref-for-domhighrestimestamp\u2460"}, {"id": "ref-for-domhighrestimestamp\u2461"}], "title": "3.2. The VisibilityObserverEntry interface"}], "external": true};
-window.dfnpanelData['382d14c8'] = {"dfnID": "382d14c8", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#dfn-callback-this-value", "dfnText": "callback this value", "refSections": [{"refs": [{"id": "ref-for-dfn-callback-this-value"}], "title": "5.2.2. Notify VisibilityObservers"}], "external": true};
-window.dfnpanelData['2e634af1'] = {"dfnID": "2e634af1", "url": "https://dom.spec.whatwg.org/#cancelled-flag", "dfnText": "cancelled flag", "refSections": [{"refs": [{"id": "ref-for-cancelled-flag"}], "title": "5.2.6. Handle a Violation"}], "external": true};
-window.dfnpanelData['2a4aec04'] = {"dfnID": "2a4aec04", "url": "https://dom.spec.whatwg.org/#dispatching-events", "dfnText": "dispatching events", "refSections": [{"refs": [{"id": "ref-for-dispatching-events"}], "title": "5.2.5. Enforce An input-protection Directive"}, {"refs": [{"id": "db982b430"}], "title": "5.3.2. DOM: Dispatching Events"}], "external": true};
-window.dfnpanelData['84162264'] = {"dfnID": "84162264", "url": "http://w3c.github.io/requestidlecallback/#dfn-list-of-idle-request-callbacks", "dfnText": "list of idle request callbacks", "refSections": [{"refs": [{"id": "ref-for-dfn-list-of-idle-request-callbacks"}], "title": "5.2.1. Queue a VisibilityObserver Task"}], "external": true};
-window.dfnpanelData['a8958262'] = {"dfnID": "a8958262", "url": "https://html.spec.whatwg.org/multipage/browsers.html#parent-browsing-context", "dfnText": "parent browsing context", "refSections": [{"refs": [{"id": "ref-for-parent-browsing-context"}], "title": "5.2.4. Promote Observed GraphicsLayers"}], "external": true};
-window.dfnpanelData['04e154c5'] = {"dfnID": "04e154c5", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#report-the-exception", "dfnText": "report the exception", "refSections": [{"refs": [{"id": "ref-for-report-the-exception"}], "title": "5.2.2. Notify VisibilityObservers"}], "external": true};
-window.dfnpanelData['e41477a7'] = {"dfnID": "e41477a7", "url": "https://html.spec.whatwg.org/multipage/browsers.html#unit-of-related-similar-origin-browsing-contexts", "dfnText": "unit of related similar-origin browsing contexts", "refSections": [{"refs": [{"id": "ref-for-unit-of-related-similar-origin-browsing-contexts"}], "title": "5.1.1. Browsing Contexts"}, {"refs": [{"id": "ref-for-unit-of-related-similar-origin-browsing-contexts\u2460"}], "title": "5.2.1. Queue a VisibilityObserver Task"}, {"refs": [{"id": "ref-for-unit-of-related-similar-origin-browsing-contexts\u2461"}], "title": "5.2.2. Notify VisibilityObservers"}, {"refs": [{"id": "ref-for-unit-of-related-similar-origin-browsing-contexts\u2462"}], "title": "5.2.3. Queue a VisibilityObserverEntry"}], "external": true};
-window.dfnpanelData['253362bb'] = {"dfnID": "253362bb", "url": "https://www.w3.org/TR/css-box-4/#propdef-margin", "dfnText": "margin", "refSections": [{"refs": [{"id": "ref-for-propdef-margin"}], "title": "3.4. The VisibilityObserverInit dictionary"}], "external": true};
-window.dfnpanelData['9f97cd15'] = {"dfnID": "9f97cd15", "url": "https://www.w3.org/TR/cssom-view-1/#dom-element-getboundingclientrect", "dfnText": "getBoundingClientRect()", "refSections": [{"refs": [{"id": "ref-for-dom-element-getboundingclientrect"}, {"id": "ref-for-dom-element-getboundingclientrect\u2460"}], "title": "3.4. The VisibilityObserverInit dictionary"}, {"refs": [{"id": "ref-for-dom-element-getboundingclientrect\u2461"}], "title": "4.1.1. Directive Value"}, {"refs": [{"id": "ref-for-dom-element-getboundingclientrect\u2462"}, {"id": "ref-for-dom-element-getboundingclientrect\u2463"}], "title": "5.2.4. Promote Observed GraphicsLayers"}], "external": true};
-window.dfnpanelData['85394472'] = {"dfnID": "85394472", "url": "https://dom.spec.whatwg.org/#document", "dfnText": "Document", "refSections": [{"refs": [{"id": "ref-for-document"}], "title": "3.4. The VisibilityObserverInit dictionary"}, {"refs": [{"id": "ref-for-document\u2460"}], "title": "4.1.1. Directive Value"}, {"refs": [{"id": "ref-for-document\u2461"}], "title": "5.1.3. Document"}, {"refs": [{"id": "ref-for-document\u2462"}], "title": "5.1.4. VisibilityObserver"}, {"refs": [{"id": "ref-for-document\u2463"}], "title": "5.2.2. Notify VisibilityObservers"}, {"refs": [{"id": "ref-for-document\u2464"}, {"id": "ref-for-document\u2465"}, {"id": "ref-for-document\u2466"}], "title": "5.2.4. Promote Observed GraphicsLayers"}, {"refs": [{"id": "ref-for-document\u2467"}], "title": "5.2.5. Enforce An input-protection Directive"}], "external": true};
-window.dfnpanelData['296f3551'] = {"dfnID": "296f3551", "url": "https://dom.spec.whatwg.org/#element", "dfnText": "Element", "refSections": [{"refs": [{"id": "ref-for-element"}, {"id": "ref-for-element\u2460"}], "title": "3.4. The VisibilityObserverInit dictionary"}, {"refs": [{"id": "ref-for-element\u2461"}], "title": "4.1.1. Directive Value"}, {"refs": [{"id": "ref-for-element\u2462"}], "title": "5.1.2. Element"}, {"refs": [{"id": "ref-for-element\u2463"}, {"id": "ref-for-element\u2464"}], "title": "5.2.5. Enforce An input-protection Directive"}], "external": true};
-window.dfnpanelData['129bdae8'] = {"dfnID": "129bdae8", "url": "https://dom.spec.whatwg.org/#event", "dfnText": "Event", "refSections": [{"refs": [{"id": "ref-for-event"}], "title": "5.2.5. Enforce An input-protection Directive"}, {"refs": [{"id": "ref-for-event\u2460"}], "title": "5.3.3. isUnsafe Attribute"}], "external": true};
-window.dfnpanelData['c7af4825'] = {"dfnID": "c7af4825", "url": "https://dom.spec.whatwg.org/#dom-nonelementparentnode-getelementbyid", "dfnText": "getElementById(elementId)", "refSections": [{"refs": [{"id": "ref-for-dom-nonelementparentnode-getelementbyid"}], "title": "4.1.1. Directive Value"}, {"refs": [{"id": "ref-for-dom-nonelementparentnode-getelementbyid\u2460"}], "title": "5.2.5. Enforce An input-protection Directive"}], "external": true};
-window.dfnpanelData['c89908b4'] = {"dfnID": "c89908b4", "url": "https://dom.spec.whatwg.org/#stop-propagation-flag", "dfnText": "stop propagation flag", "refSections": [{"refs": [{"id": "ref-for-stop-propagation-flag"}], "title": "5.2.6. Handle a Violation"}], "external": true};
-window.dfnpanelData['d11c73d6'] = {"dfnID": "d11c73d6", "url": "https://www.w3.org/TR/geometry-1/#domrect", "dfnText": "DOMRect", "refSections": [{"refs": [{"id": "ref-for-domrect"}, {"id": "ref-for-domrect\u2460"}], "title": "3.2. The VisibilityObserverEntry interface"}], "external": true};
-window.dfnpanelData['5a9ab3ba'] = {"dfnID": "5a9ab3ba", "url": "https://www.w3.org/TR/geometry-1/#dictdef-domrectinit", "dfnText": "DOMRectInit", "refSections": [{"refs": [{"id": "ref-for-dictdef-domrectinit"}, {"id": "ref-for-dictdef-domrectinit\u2460"}], "title": "3.2. The VisibilityObserverEntry interface"}], "external": true};
-window.dfnpanelData['224fa1d7'] = {"dfnID": "224fa1d7", "url": "https://www.w3.org/TR/geometry-1/#domrectreadonly", "dfnText": "DOMRectReadOnly", "refSections": [{"refs": [{"id": "ref-for-domrectreadonly"}, {"id": "ref-for-domrectreadonly\u2460"}], "title": "3.2. The VisibilityObserverEntry interface"}], "external": true};
-window.dfnpanelData['8855a9aa'] = {"dfnID": "8855a9aa", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "dfnText": "DOMString", "refSections": [{"refs": [{"id": "ref-for-idl-DOMString"}], "title": "3.4. The VisibilityObserverInit dictionary"}, {"refs": [{"id": "ref-for-idl-DOMString\u2460"}], "title": "4.1.1. Directive Value"}], "external": true};
-window.dfnpanelData['889e932f'] = {"dfnID": "889e932f", "url": "https://webidl.spec.whatwg.org/#Exposed", "dfnText": "Exposed", "refSections": [{"refs": [{"id": "ref-for-Exposed"}], "title": "3.2. The VisibilityObserverEntry interface"}, {"refs": [{"id": "ref-for-Exposed\u2460"}], "title": "3.3. The VisibilityObserver Interface"}], "external": true};
-window.dfnpanelData['5372cca8'] = {"dfnID": "5372cca8", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "dfnText": "boolean", "refSections": [{"refs": [{"id": "ref-for-idl-boolean"}], "title": "3.4. The VisibilityObserverInit dictionary"}, {"refs": [{"id": "ref-for-idl-boolean\u2460"}, {"id": "ref-for-idl-boolean\u2461"}], "title": "5.3.3. isUnsafe Attribute"}], "external": true};
-window.dfnpanelData['8c800cdf'] = {"dfnID": "8c800cdf", "url": "https://webidl.spec.whatwg.org/#idl-double", "dfnText": "double", "refSections": [{"refs": [{"id": "ref-for-idl-double"}, {"id": "ref-for-idl-double\u2460"}], "title": "3.4. The VisibilityObserverInit dictionary"}], "external": true};
-window.dfnpanelData['9cce47fd'] = {"dfnID": "9cce47fd", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "dfnText": "sequence", "refSections": [{"refs": [{"id": "ref-for-idl-sequence"}], "title": "3.1. The VisibilityObserverCallback"}, {"refs": [{"id": "ref-for-idl-sequence\u2460"}], "title": "3.3. The VisibilityObserver Interface"}, {"refs": [{"id": "ref-for-idl-sequence\u2461"}], "title": "3.4. The VisibilityObserverInit dictionary"}], "external": true};
-window.dfnpanelData['callbackdef-visibilityobservercallback'] = {"dfnID": "callbackdef-visibilityobservercallback", "url": "#callbackdef-visibilityobservercallback", "dfnText": "VisibilityObserverCallback", "refSections": [{"refs": [{"id": "ref-for-callbackdef-visibilityobservercallback"}], "title": "3.2. The VisibilityObserverEntry interface"}, {"refs": [{"id": "ref-for-callbackdef-visibilityobservercallback\u2460"}], "title": "3.3. The VisibilityObserver Interface"}], "external": false};
-window.dfnpanelData['visibilityobserverentry'] = {"dfnID": "visibilityobserverentry", "url": "#visibilityobserverentry", "dfnText": "VisibilityObserverEntry", "refSections": [{"refs": [{"id": "ref-for-visibilityobserverentry"}], "title": "3.1. The VisibilityObserverCallback"}, {"refs": [{"id": "ref-for-visibilityobserverentry\u2460"}], "title": "3.3. The VisibilityObserver Interface"}, {"refs": [{"id": "ref-for-visibilityobserverentry\u2461"}], "title": "5.2.5. Enforce An input-protection Directive"}], "external": false};
-window.dfnpanelData['dictdef-visibilityobserverentryinit'] = {"dfnID": "dictdef-visibilityobserverentryinit", "url": "#dictdef-visibilityobserverentryinit", "dfnText": "VisibilityObserverEntryInit", "refSections": [{"refs": [{"id": "ref-for-dictdef-visibilityobserverentryinit"}], "title": "3.2. The VisibilityObserverEntry interface"}], "external": false};
-window.dfnpanelData['dom-visibilityobserverentry-globalvisiblebounds'] = {"dfnID": "dom-visibilityobserverentry-globalvisiblebounds", "url": "#dom-visibilityobserverentry-globalvisiblebounds", "dfnText": "globalVisibleBounds", "refSections": [{"refs": [{"id": "ref-for-dom-visibilityobserverentry-globalvisiblebounds"}, {"id": "ref-for-dom-visibilityobserverentry-globalvisiblebounds\u2460"}, {"id": "ref-for-dom-visibilityobserverentry-globalvisiblebounds\u2461"}], "title": "3.2. The VisibilityObserverEntry interface"}], "external": false};
-window.dfnpanelData['dom-visibilityobserverentry-visiblebounds'] = {"dfnID": "dom-visibilityobserverentry-visiblebounds", "url": "#dom-visibilityobserverentry-visiblebounds", "dfnText": "visibleBounds", "refSections": [{"refs": [{"id": "ref-for-dom-visibilityobserverentry-visiblebounds"}], "title": "3.2. The VisibilityObserverEntry interface"}], "external": false};
-window.dfnpanelData['dom-visibilityobserverentry-time'] = {"dfnID": "dom-visibilityobserverentry-time", "url": "#dom-visibilityobserverentry-time", "dfnText": "time", "refSections": [{"refs": [{"id": "ref-for-dom-visibilityobserverentry-time"}], "title": "3.2. The VisibilityObserverEntry interface"}, {"refs": [{"id": "ref-for-dom-visibilityobserverentry-time\u2460"}], "title": "5.2.5. Enforce An input-protection Directive"}], "external": false};
-window.dfnpanelData['visibilityobserver'] = {"dfnID": "visibilityobserver", "url": "#visibilityobserver", "dfnText": "VisibilityObserver", "refSections": [{"refs": [{"id": "ref-for-visibilityobserver"}], "title": "3.1. The VisibilityObserverCallback"}, {"refs": [{"id": "ref-for-visibilityobserver\u2460"}], "title": "3.3. The VisibilityObserver Interface"}, {"refs": [{"id": "ref-for-visibilityobserver\u2461"}], "title": "5.1.4. VisibilityObserver"}, {"refs": [{"id": "ref-for-visibilityobserver\u2462"}], "title": "5.2.2. Notify VisibilityObservers"}, {"refs": [{"id": "ref-for-visibilityobserver\u2463"}], "title": "5.2.5. Enforce An input-protection Directive"}], "external": false};
-window.dfnpanelData['dom-visibilityobserver-visibilityobserver'] = {"dfnID": "dom-visibilityobserver-visibilityobserver", "url": "#dom-visibilityobserver-visibilityobserver", "dfnText": "new VisibilityObserver(callback, options)", "refSections": [{"refs": [{"id": "ref-for-dom-visibilityobserver-visibilityobserver"}], "title": "5.1.4. VisibilityObserver"}], "external": false};
-window.dfnpanelData['dom-visibilityobserver-observe'] = {"dfnID": "dom-visibilityobserver-observe", "url": "#dom-visibilityobserver-observe", "dfnText": "observe()", "refSections": [{"refs": [{"id": "ref-for-dom-visibilityobserver-observe"}], "title": "3.3. The VisibilityObserver Interface"}], "external": false};
-window.dfnpanelData['dom-visibilityobserver-unobserve'] = {"dfnID": "dom-visibilityobserver-unobserve", "url": "#dom-visibilityobserver-unobserve", "dfnText": "unobserve()", "refSections": [{"refs": [{"id": "ref-for-dom-visibilityobserver-unobserve"}], "title": "3.3. The VisibilityObserver Interface"}], "external": false};
-window.dfnpanelData['dom-visibilityobserver-takerecords'] = {"dfnID": "dom-visibilityobserver-takerecords", "url": "#dom-visibilityobserver-takerecords", "dfnText": "takeRecords()", "refSections": [{"refs": [{"id": "ref-for-dom-visibilityobserver-takerecords"}], "title": "3.3. The VisibilityObserver Interface"}], "external": false};
-window.dfnpanelData['dictdef-visibilityobserverinit'] = {"dfnID": "dictdef-visibilityobserverinit", "url": "#dictdef-visibilityobserverinit", "dfnText": "VisibilityObserverInit", "refSections": [{"refs": [{"id": "ref-for-dictdef-visibilityobserverinit"}], "title": "5.1.4. VisibilityObserver"}], "external": false};
-window.dfnpanelData['dom-visibilityobserverinit-areathreshold'] = {"dfnID": "dom-visibilityobserverinit-areathreshold", "url": "#dom-visibilityobserverinit-areathreshold", "dfnText": "areaThreshold", "refSections": [{"refs": [{"id": "ref-for-dom-visibilityobserverinit-areathreshold"}], "title": "3.4. The VisibilityObserverInit dictionary"}], "external": false};
-window.dfnpanelData['dom-visibilityobserverinit-displacementaware'] = {"dfnID": "dom-visibilityobserverinit-displacementaware", "url": "#dom-visibilityobserverinit-displacementaware", "dfnText": "displacementAware", "refSections": [{"refs": [{"id": "ref-for-dom-visibilityobserverinit-displacementaware"}], "title": "3.4. The VisibilityObserverInit dictionary"}], "external": false};
-window.dfnpanelData['dom-visibilityobserverinit-visiblemargin'] = {"dfnID": "dom-visibilityobserverinit-visiblemargin", "url": "#dom-visibilityobserverinit-visiblemargin", "dfnText": "visibleMargin", "refSections": [{"refs": [{"id": "ref-for-dom-visibilityobserverinit-visiblemargin"}], "title": "3.4. The VisibilityObserverInit dictionary"}, {"refs": [{"id": "ref-for-dom-visibilityobserverinit-visiblemargin\u2460"}], "title": "4.1.1. Directive Value"}], "external": false};
-window.dfnpanelData['dom-visibilityobserverinit-observedelement'] = {"dfnID": "dom-visibilityobserverinit-observedelement", "url": "#dom-visibilityobserverinit-observedelement", "dfnText": "observedElement", "refSections": [{"refs": [{"id": "ref-for-dom-visibilityobserverinit-observedelement"}], "title": "3.4. The VisibilityObserverInit dictionary"}], "external": false};
-window.dfnpanelData['input-protection-directive'] = {"dfnID": "input-protection-directive", "url": "#input-protection-directive", "dfnText": "input-protection Directive", "refSections": [{"refs": [{"id": "ref-for-input-protection-directive"}], "title": "5.1.4. VisibilityObserver"}, {"refs": [{"id": "ref-for-input-protection-directive\u2460"}], "title": "5.2.5. Enforce An input-protection Directive"}, {"refs": [{"id": "ref-for-input-protection-directive\u2461"}], "title": "5.2.6. Handle a Violation"}], "external": false};
-window.dfnpanelData['area-threshold'] = {"dfnID": "area-threshold", "url": "#area-threshold", "dfnText": "area-threshold", "refSections": [{"refs": [{"id": "ref-for-area-threshold"}], "title": "5.2.5. Enforce An input-protection Directive"}], "external": false};
-window.dfnpanelData['protected-element'] = {"dfnID": "protected-element", "url": "#protected-element", "dfnText": "protected-element", "refSections": [{"refs": [{"id": "ref-for-protected-element"}], "title": "3.4. The VisibilityObserverInit dictionary"}, {"refs": [{"id": "ref-for-protected-element\u2460"}], "title": "4.1.1. Directive Value"}, {"refs": [{"id": "ref-for-protected-element\u2461"}], "title": "5.2.5. Enforce An input-protection Directive"}], "external": false};
-window.dfnpanelData['time-threshold'] = {"dfnID": "time-threshold", "url": "#time-threshold", "dfnText": "time-threshold", "refSections": [{"refs": [{"id": "ref-for-time-threshold"}], "title": "5.2.5. Enforce An input-protection Directive"}], "external": false};
-window.dfnpanelData['visible-margin'] = {"dfnID": "visible-margin", "url": "#visible-margin", "dfnText": "visible-margin", "refSections": [{"refs": [{"id": "ref-for-visible-margin"}], "title": "4.1.1. Directive Value"}, {"refs": [{"id": "ref-for-visible-margin\u2460"}], "title": "5.2.5. Enforce An input-protection Directive"}], "external": false};
-window.dfnpanelData['browsing-context-visibilityobservertaskqueued'] = {"dfnID": "browsing-context-visibilityobservertaskqueued", "url": "#browsing-context-visibilityobservertaskqueued", "dfnText": "VisibilityObserverTaskQueued", "refSections": [{"refs": [{"id": "ref-for-browsing-context-visibilityobservertaskqueued"}, {"id": "ref-for-browsing-context-visibilityobservertaskqueued\u2460"}], "title": "5.2.1. Queue a VisibilityObserver Task"}, {"refs": [{"id": "ref-for-browsing-context-visibilityobservertaskqueued\u2461"}], "title": "5.2.2. Notify VisibilityObservers"}], "external": false};
-window.dfnpanelData['dom-element-inputprotectionobservers-slot'] = {"dfnID": "dom-element-inputprotectionobservers-slot", "url": "#dom-element-inputprotectionobservers-slot", "dfnText": "[[InputProtectionObservers]]", "refSections": [{"refs": [{"id": "ref-for-dom-element-inputprotectionobservers-slot"}], "title": "5.2.5. Enforce An input-protection Directive"}], "external": false};
-window.dfnpanelData['dom-document-registeredvisibilityobservers-slot'] = {"dfnID": "dom-document-registeredvisibilityobservers-slot", "url": "#dom-document-registeredvisibilityobservers-slot", "dfnText": "[[RegisteredVisibilityObservers]]", "refSections": [{"refs": [{"id": "ref-for-dom-document-registeredvisibilityobservers-slot"}, {"id": "ref-for-dom-document-registeredvisibilityobservers-slot\u2460"}], "title": "3.3. The VisibilityObserver Interface"}, {"refs": [{"id": "ref-for-dom-document-registeredvisibilityobservers-slot\u2461"}], "title": "5.2.2. Notify VisibilityObservers"}, {"refs": [{"id": "ref-for-dom-document-registeredvisibilityobservers-slot\u2462"}, {"id": "ref-for-dom-document-registeredvisibilityobservers-slot\u2463"}, {"id": "ref-for-dom-document-registeredvisibilityobservers-slot\u2464"}, {"id": "ref-for-dom-document-registeredvisibilityobservers-slot\u2465"}], "title": "5.2.4. Promote Observed GraphicsLayers"}], "external": false};
-window.dfnpanelData['dom-document-inputprotectionrequested-slot'] = {"dfnID": "dom-document-inputprotectionrequested-slot", "url": "#dom-document-inputprotectionrequested-slot", "dfnText": "[[InputProtectionRequested]]", "refSections": [{"refs": [{"id": "ref-for-dom-document-inputprotectionrequested-slot"}], "title": "5.2.5. Enforce An input-protection Directive"}], "external": false};
-window.dfnpanelData['dom-visibilityobserver-queuedentries-slot'] = {"dfnID": "dom-visibilityobserver-queuedentries-slot", "url": "#dom-visibilityobserver-queuedentries-slot", "dfnText": "[[QueuedEntries]]", "refSections": [{"refs": [{"id": "ref-for-dom-visibilityobserver-queuedentries-slot"}, {"id": "ref-for-dom-visibilityobserver-queuedentries-slot\u2460"}], "title": "3.3. The VisibilityObserver Interface"}, {"refs": [{"id": "ref-for-dom-visibilityobserver-queuedentries-slot\u2461"}, {"id": "ref-for-dom-visibilityobserver-queuedentries-slot\u2462"}, {"id": "ref-for-dom-visibilityobserver-queuedentries-slot\u2463"}], "title": "5.2.2. Notify VisibilityObservers"}, {"refs": [{"id": "ref-for-dom-visibilityobserver-queuedentries-slot\u2464"}], "title": "5.2.3. Queue a VisibilityObserverEntry"}, {"refs": [{"id": "ref-for-dom-visibilityobserver-queuedentries-slot\u2465"}], "title": "5.2.5. Enforce An input-protection Directive"}], "external": false};
-window.dfnpanelData['dom-visibilityobserver-previousvisibleratio-slot'] = {"dfnID": "dom-visibilityobserver-previousvisibleratio-slot", "url": "#dom-visibilityobserver-previousvisibleratio-slot", "dfnText": "[[previousVisibleRatio]]", "refSections": [{"refs": [{"id": "ref-for-dom-visibilityobserver-previousvisibleratio-slot"}, {"id": "ref-for-dom-visibilityobserver-previousvisibleratio-slot\u2460"}], "title": "5.2.4. Promote Observed GraphicsLayers"}, {"refs": [{"id": "ref-for-dom-visibilityobserver-previousvisibleratio-slot\u2461"}, {"id": "ref-for-dom-visibilityobserver-previousvisibleratio-slot\u2462"}], "title": "5.2.5. Enforce An input-protection Directive"}], "external": false};
-window.dfnpanelData['dom-visibilityobserver-previousglobalviewportposition-slot'] = {"dfnID": "dom-visibilityobserver-previousglobalviewportposition-slot", "url": "#dom-visibilityobserver-previousglobalviewportposition-slot", "dfnText": "[[previousGlobalViewportPosition]]", "refSections": [{"refs": [{"id": "ref-for-dom-visibilityobserver-previousglobalviewportposition-slot"}, {"id": "ref-for-dom-visibilityobserver-previousglobalviewportposition-slot\u2460"}], "title": "5.2.4. Promote Observed GraphicsLayers"}], "external": false};
-window.dfnpanelData['dom-visibilityobserver-callback-slot'] = {"dfnID": "dom-visibilityobserver-callback-slot", "url": "#dom-visibilityobserver-callback-slot", "dfnText": "[[callback]]", "refSections": [{"refs": [{"id": "ref-for-dom-visibilityobserver-callback-slot"}], "title": "3.3. The VisibilityObserver Interface"}, {"refs": [{"id": "ref-for-dom-visibilityobserver-callback-slot\u2460"}], "title": "5.2.5. Enforce An input-protection Directive"}], "external": false};
-window.dfnpanelData['dom-visibilityobserver-areathreshold-slot'] = {"dfnID": "dom-visibilityobserver-areathreshold-slot", "url": "#dom-visibilityobserver-areathreshold-slot", "dfnText": "[[areaThreshold]]", "refSections": [{"refs": [{"id": "ref-for-dom-visibilityobserver-areathreshold-slot"}, {"id": "ref-for-dom-visibilityobserver-areathreshold-slot\u2460"}], "title": "5.2.4. Promote Observed GraphicsLayers"}, {"refs": [{"id": "ref-for-dom-visibilityobserver-areathreshold-slot\u2461"}, {"id": "ref-for-dom-visibilityobserver-areathreshold-slot\u2462"}, {"id": "ref-for-dom-visibilityobserver-areathreshold-slot\u2463"}], "title": "5.2.5. Enforce An input-protection Directive"}], "external": false};
-window.dfnpanelData['dom-visibilityobserver-displacementaware-slot'] = {"dfnID": "dom-visibilityobserver-displacementaware-slot", "url": "#dom-visibilityobserver-displacementaware-slot", "dfnText": "[[displacementAware]]", "refSections": [{"refs": [{"id": "ref-for-dom-visibilityobserver-displacementaware-slot"}], "title": "5.2.4. Promote Observed GraphicsLayers"}, {"refs": [{"id": "ref-for-dom-visibilityobserver-displacementaware-slot\u2460"}], "title": "5.2.5. Enforce An input-protection Directive"}], "external": false};
-window.dfnpanelData['dom-visibilityobserver-visiblemargin-slot'] = {"dfnID": "dom-visibilityobserver-visiblemargin-slot", "url": "#dom-visibilityobserver-visiblemargin-slot", "dfnText": "[[visibleMargin]]", "refSections": [{"refs": [{"id": "ref-for-dom-visibilityobserver-visiblemargin-slot"}], "title": "5.2.4. Promote Observed GraphicsLayers"}, {"refs": [{"id": "ref-for-dom-visibilityobserver-visiblemargin-slot\u2460"}], "title": "5.2.5. Enforce An input-protection Directive"}], "external": false};
-window.dfnpanelData['dom-visibilityobserver-observedelement-slot'] = {"dfnID": "dom-visibilityobserver-observedelement-slot", "url": "#dom-visibilityobserver-observedelement-slot", "dfnText": "[[observedElement]]", "refSections": [{"refs": [{"id": "ref-for-dom-visibilityobserver-observedelement-slot"}], "title": "3.4. The VisibilityObserverInit dictionary"}, {"refs": [{"id": "ref-for-dom-visibilityobserver-observedelement-slot\u2460"}], "title": "5.2.4. Promote Observed GraphicsLayers"}, {"refs": [{"id": "ref-for-dom-visibilityobserver-observedelement-slot\u2461"}], "title": "5.2.5. Enforce An input-protection Directive"}], "external": false};
-window.dfnpanelData['dom-visibilityobserver-timethreshold-slot'] = {"dfnID": "dom-visibilityobserver-timethreshold-slot", "url": "#dom-visibilityobserver-timethreshold-slot", "dfnText": "[[timeThreshold]]", "refSections": [{"refs": [{"id": "ref-for-dom-visibilityobserver-timethreshold-slot"}, {"id": "ref-for-dom-visibilityobserver-timethreshold-slot\u2460"}], "title": "5.2.5. Enforce An input-protection Directive"}], "external": false};
-window.dfnpanelData['dom-visibilityobserver-associatedcontentsecuritypolicy-slot'] = {"dfnID": "dom-visibilityobserver-associatedcontentsecuritypolicy-slot", "url": "#dom-visibilityobserver-associatedcontentsecuritypolicy-slot", "dfnText": "[[associatedContentSecurityPolicy]]", "refSections": [{"refs": [{"id": "ref-for-dom-visibilityobserver-associatedcontentsecuritypolicy-slot"}], "title": "5.2.5. Enforce An input-protection Directive"}, {"refs": [{"id": "ref-for-dom-visibilityobserver-associatedcontentsecuritypolicy-slot\u2460"}], "title": "5.2.6. Handle a Violation"}], "external": false};
-window.dfnpanelData['queue-a-visibility-observer-task'] = {"dfnID": "queue-a-visibility-observer-task", "url": "#queue-a-visibility-observer-task", "dfnText": "queue a visibility observer task", "refSections": [{"refs": [{"id": "ref-for-queue-a-visibility-observer-task"}], "title": "5.2.3. Queue a VisibilityObserverEntry"}], "external": false};
-window.dfnpanelData['notify-visibility-observers'] = {"dfnID": "notify-visibility-observers", "url": "#notify-visibility-observers", "dfnText": "notify visibility observers", "refSections": [{"refs": [{"id": "ref-for-notify-visibility-observers"}, {"id": "ref-for-notify-visibility-observers\u2460"}], "title": "5.2.1. Queue a VisibilityObserver Task"}], "external": false};
-window.dfnpanelData['queue-a-visibilityobserverentry'] = {"dfnID": "queue-a-visibilityobserverentry", "url": "#queue-a-visibilityobserverentry", "dfnText": "queue a VisibilityObserverEntry", "refSections": [{"refs": [{"id": "ref-for-queue-a-visibilityobserverentry"}], "title": "5.2.4. Promote Observed GraphicsLayers"}], "external": false};
-window.dfnpanelData['graphicslayer'] = {"dfnID": "graphicslayer", "url": "#graphicslayer", "dfnText": "GraphicsLayer", "refSections": [{"refs": [{"id": "ref-for-graphicslayer"}, {"id": "ref-for-graphicslayer\u2460"}, {"id": "ref-for-graphicslayer\u2461"}, {"id": "ref-for-graphicslayer\u2462"}, {"id": "ref-for-graphicslayer\u2463"}], "title": "5.2.4. Promote Observed GraphicsLayers"}], "external": false};
-window.dfnpanelData['promote-observed-graphicslayers'] = {"dfnID": "promote-observed-graphicslayers", "url": "#promote-observed-graphicslayers", "dfnText": "promote observed graphicsLayers", "refSections": [{"refs": [{"id": "ref-for-promote-observed-graphicslayers"}], "title": "5.2.4. Promote Observed GraphicsLayers"}, {"refs": [{"id": "ref-for-promote-observed-graphicslayers\u2460"}], "title": "5.3.1. HTML Processing Model: Event Loop"}], "external": false};
-window.dfnpanelData['enforce-an-input-protection-directive'] = {"dfnID": "enforce-an-input-protection-directive", "url": "#enforce-an-input-protection-directive", "dfnText": "enforce an input-protection directive", "refSections": [{"refs": [{"id": "ref-for-enforce-an-input-protection-directive"}], "title": "5.3.2. DOM: Dispatching Events"}], "external": false};
-window.dfnpanelData['handle-a-violation'] = {"dfnID": "handle-a-violation", "url": "#handle-a-violation", "dfnText": "handle a violation", "refSections": [{"refs": [{"id": "ref-for-handle-a-violation"}, {"id": "ref-for-handle-a-violation\u2460"}, {"id": "ref-for-handle-a-violation\u2461"}], "title": "5.2.5. Enforce An input-protection Directive"}], "external": false};
-window.dfnpanelData['dom-event-isunsafe'] = {"dfnID": "dom-event-isunsafe", "url": "#dom-event-isunsafe", "dfnText": "isUnsafe", "refSections": [{"refs": [{"id": "ref-for-dom-event-isunsafe"}], "title": "5.2.6. Handle a Violation"}, {"refs": [{"id": "ref-for-dom-event-isunsafe\u2460"}], "title": "5.3.3. isUnsafe Attribute"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -2242,283 +1778,748 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"3b11702b": {"dfnID":"3b11702b","dfnText":"DOMHighResTimeStamp","external":true,"refSections":[{"refs":[{"id":"ref-for-domhighrestimestamp"},{"id":"ref-for-domhighrestimestamp\u2460"},{"id":"ref-for-domhighrestimestamp\u2461"}],"title":"3.2. The VisibilityObserverEntry interface"}],"url":"http://www.w3.org/TR/hr-time/#domhighrestimestamp"},
+"382d14c8": {"dfnID":"382d14c8","dfnText":"callback this value","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-callback-this-value"}],"title":"5.2.2. Notify VisibilityObservers"}],"url":"https://html.spec.whatwg.org/multipage/infrastructure.html#dfn-callback-this-value"},
+"2e634af1": {"dfnID":"2e634af1","dfnText":"cancelled flag","external":true,"refSections":[{"refs":[{"id":"ref-for-cancelled-flag"}],"title":"5.2.6. Handle a Violation"}],"url":"https://dom.spec.whatwg.org/#cancelled-flag"},
+"2a4aec04": {"dfnID":"2a4aec04","dfnText":"dispatching events","external":true,"refSections":[{"refs":[{"id":"ref-for-dispatching-events"}],"title":"5.2.5. Enforce An input-protection Directive"},{"refs":[{"id":"db982b430"}],"title":"5.3.2. DOM: Dispatching Events"}],"url":"https://dom.spec.whatwg.org/#dispatching-events"},
+"84162264": {"dfnID":"84162264","dfnText":"list of idle request callbacks","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-list-of-idle-request-callbacks"}],"title":"5.2.1. Queue a VisibilityObserver Task"}],"url":"http://w3c.github.io/requestidlecallback/#dfn-list-of-idle-request-callbacks"},
+"a8958262": {"dfnID":"a8958262","dfnText":"parent browsing context","external":true,"refSections":[{"refs":[{"id":"ref-for-parent-browsing-context"}],"title":"5.2.4. Promote Observed GraphicsLayers"}],"url":"https://html.spec.whatwg.org/multipage/browsers.html#parent-browsing-context"},
+"04e154c5": {"dfnID":"04e154c5","dfnText":"report the exception","external":true,"refSections":[{"refs":[{"id":"ref-for-report-the-exception"}],"title":"5.2.2. Notify VisibilityObservers"}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#report-the-exception"},
+"e41477a7": {"dfnID":"e41477a7","dfnText":"unit of related similar-origin browsing contexts","external":true,"refSections":[{"refs":[{"id":"ref-for-unit-of-related-similar-origin-browsing-contexts"}],"title":"5.1.1. Browsing Contexts"},{"refs":[{"id":"ref-for-unit-of-related-similar-origin-browsing-contexts\u2460"}],"title":"5.2.1. Queue a VisibilityObserver Task"},{"refs":[{"id":"ref-for-unit-of-related-similar-origin-browsing-contexts\u2461"}],"title":"5.2.2. Notify VisibilityObservers"},{"refs":[{"id":"ref-for-unit-of-related-similar-origin-browsing-contexts\u2462"}],"title":"5.2.3. Queue a VisibilityObserverEntry"}],"url":"https://html.spec.whatwg.org/multipage/browsers.html#unit-of-related-similar-origin-browsing-contexts"},
+"253362bb": {"dfnID":"253362bb","dfnText":"margin","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-margin"}],"title":"3.4. The VisibilityObserverInit dictionary"}],"url":"https://www.w3.org/TR/css-box-4/#propdef-margin"},
+"9f97cd15": {"dfnID":"9f97cd15","dfnText":"getBoundingClientRect()","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-element-getboundingclientrect"},{"id":"ref-for-dom-element-getboundingclientrect\u2460"}],"title":"3.4. The VisibilityObserverInit dictionary"},{"refs":[{"id":"ref-for-dom-element-getboundingclientrect\u2461"}],"title":"4.1.1. Directive Value"},{"refs":[{"id":"ref-for-dom-element-getboundingclientrect\u2462"},{"id":"ref-for-dom-element-getboundingclientrect\u2463"}],"title":"5.2.4. Promote Observed GraphicsLayers"}],"url":"https://www.w3.org/TR/cssom-view-1/#dom-element-getboundingclientrect"},
+"85394472": {"dfnID":"85394472","dfnText":"Document","external":true,"refSections":[{"refs":[{"id":"ref-for-document"}],"title":"3.4. The VisibilityObserverInit dictionary"},{"refs":[{"id":"ref-for-document\u2460"}],"title":"4.1.1. Directive Value"},{"refs":[{"id":"ref-for-document\u2461"}],"title":"5.1.3. Document"},{"refs":[{"id":"ref-for-document\u2462"}],"title":"5.1.4. VisibilityObserver"},{"refs":[{"id":"ref-for-document\u2463"}],"title":"5.2.2. Notify VisibilityObservers"},{"refs":[{"id":"ref-for-document\u2464"},{"id":"ref-for-document\u2465"},{"id":"ref-for-document\u2466"}],"title":"5.2.4. Promote Observed GraphicsLayers"},{"refs":[{"id":"ref-for-document\u2467"}],"title":"5.2.5. Enforce An input-protection Directive"}],"url":"https://dom.spec.whatwg.org/#document"},
+"296f3551": {"dfnID":"296f3551","dfnText":"Element","external":true,"refSections":[{"refs":[{"id":"ref-for-element"},{"id":"ref-for-element\u2460"}],"title":"3.4. The VisibilityObserverInit dictionary"},{"refs":[{"id":"ref-for-element\u2461"}],"title":"4.1.1. Directive Value"},{"refs":[{"id":"ref-for-element\u2462"}],"title":"5.1.2. Element"},{"refs":[{"id":"ref-for-element\u2463"},{"id":"ref-for-element\u2464"}],"title":"5.2.5. Enforce An input-protection Directive"}],"url":"https://dom.spec.whatwg.org/#element"},
+"129bdae8": {"dfnID":"129bdae8","dfnText":"Event","external":true,"refSections":[{"refs":[{"id":"ref-for-event"}],"title":"5.2.5. Enforce An input-protection Directive"},{"refs":[{"id":"ref-for-event\u2460"}],"title":"5.3.3. isUnsafe Attribute"}],"url":"https://dom.spec.whatwg.org/#event"},
+"c7af4825": {"dfnID":"c7af4825","dfnText":"getElementById(elementId)","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-nonelementparentnode-getelementbyid"}],"title":"4.1.1. Directive Value"},{"refs":[{"id":"ref-for-dom-nonelementparentnode-getelementbyid\u2460"}],"title":"5.2.5. Enforce An input-protection Directive"}],"url":"https://dom.spec.whatwg.org/#dom-nonelementparentnode-getelementbyid"},
+"c89908b4": {"dfnID":"c89908b4","dfnText":"stop propagation flag","external":true,"refSections":[{"refs":[{"id":"ref-for-stop-propagation-flag"}],"title":"5.2.6. Handle a Violation"}],"url":"https://dom.spec.whatwg.org/#stop-propagation-flag"},
+"d11c73d6": {"dfnID":"d11c73d6","dfnText":"DOMRect","external":true,"refSections":[{"refs":[{"id":"ref-for-domrect"},{"id":"ref-for-domrect\u2460"}],"title":"3.2. The VisibilityObserverEntry interface"}],"url":"https://www.w3.org/TR/geometry-1/#domrect"},
+"5a9ab3ba": {"dfnID":"5a9ab3ba","dfnText":"DOMRectInit","external":true,"refSections":[{"refs":[{"id":"ref-for-dictdef-domrectinit"},{"id":"ref-for-dictdef-domrectinit\u2460"}],"title":"3.2. The VisibilityObserverEntry interface"}],"url":"https://www.w3.org/TR/geometry-1/#dictdef-domrectinit"},
+"224fa1d7": {"dfnID":"224fa1d7","dfnText":"DOMRectReadOnly","external":true,"refSections":[{"refs":[{"id":"ref-for-domrectreadonly"},{"id":"ref-for-domrectreadonly\u2460"}],"title":"3.2. The VisibilityObserverEntry interface"}],"url":"https://www.w3.org/TR/geometry-1/#domrectreadonly"},
+"8855a9aa": {"dfnID":"8855a9aa","dfnText":"DOMString","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-DOMString"}],"title":"3.4. The VisibilityObserverInit dictionary"},{"refs":[{"id":"ref-for-idl-DOMString\u2460"}],"title":"4.1.1. Directive Value"}],"url":"https://webidl.spec.whatwg.org/#idl-DOMString"},
+"889e932f": {"dfnID":"889e932f","dfnText":"Exposed","external":true,"refSections":[{"refs":[{"id":"ref-for-Exposed"}],"title":"3.2. The VisibilityObserverEntry interface"},{"refs":[{"id":"ref-for-Exposed\u2460"}],"title":"3.3. The VisibilityObserver Interface"}],"url":"https://webidl.spec.whatwg.org/#Exposed"},
+"5372cca8": {"dfnID":"5372cca8","dfnText":"boolean","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-boolean"}],"title":"3.4. The VisibilityObserverInit dictionary"},{"refs":[{"id":"ref-for-idl-boolean\u2460"},{"id":"ref-for-idl-boolean\u2461"}],"title":"5.3.3. isUnsafe Attribute"}],"url":"https://webidl.spec.whatwg.org/#idl-boolean"},
+"8c800cdf": {"dfnID":"8c800cdf","dfnText":"double","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-double"},{"id":"ref-for-idl-double\u2460"}],"title":"3.4. The VisibilityObserverInit dictionary"}],"url":"https://webidl.spec.whatwg.org/#idl-double"},
+"9cce47fd": {"dfnID":"9cce47fd","dfnText":"sequence","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-sequence"}],"title":"3.1. The VisibilityObserverCallback"},{"refs":[{"id":"ref-for-idl-sequence\u2460"}],"title":"3.3. The VisibilityObserver Interface"},{"refs":[{"id":"ref-for-idl-sequence\u2461"}],"title":"3.4. The VisibilityObserverInit dictionary"}],"url":"https://webidl.spec.whatwg.org/#idl-sequence"},
+"callbackdef-visibilityobservercallback": {"dfnID":"callbackdef-visibilityobservercallback","dfnText":"VisibilityObserverCallback","external":false,"refSections":[{"refs":[{"id":"ref-for-callbackdef-visibilityobservercallback"}],"title":"3.2. The VisibilityObserverEntry interface"},{"refs":[{"id":"ref-for-callbackdef-visibilityobservercallback\u2460"}],"title":"3.3. The VisibilityObserver Interface"}],"url":"#callbackdef-visibilityobservercallback"},
+"visibilityobserverentry": {"dfnID":"visibilityobserverentry","dfnText":"VisibilityObserverEntry","external":false,"refSections":[{"refs":[{"id":"ref-for-visibilityobserverentry"}],"title":"3.1. The VisibilityObserverCallback"},{"refs":[{"id":"ref-for-visibilityobserverentry\u2460"}],"title":"3.3. The VisibilityObserver Interface"},{"refs":[{"id":"ref-for-visibilityobserverentry\u2461"}],"title":"5.2.5. Enforce An input-protection Directive"}],"url":"#visibilityobserverentry"},
+"dictdef-visibilityobserverentryinit": {"dfnID":"dictdef-visibilityobserverentryinit","dfnText":"VisibilityObserverEntryInit","external":false,"refSections":[{"refs":[{"id":"ref-for-dictdef-visibilityobserverentryinit"}],"title":"3.2. The VisibilityObserverEntry interface"}],"url":"#dictdef-visibilityobserverentryinit"},
+"dom-visibilityobserverentry-globalvisiblebounds": {"dfnID":"dom-visibilityobserverentry-globalvisiblebounds","dfnText":"globalVisibleBounds","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-visibilityobserverentry-globalvisiblebounds"},{"id":"ref-for-dom-visibilityobserverentry-globalvisiblebounds\u2460"},{"id":"ref-for-dom-visibilityobserverentry-globalvisiblebounds\u2461"}],"title":"3.2. The VisibilityObserverEntry interface"}],"url":"#dom-visibilityobserverentry-globalvisiblebounds"},
+"dom-visibilityobserverentry-visiblebounds": {"dfnID":"dom-visibilityobserverentry-visiblebounds","dfnText":"visibleBounds","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-visibilityobserverentry-visiblebounds"}],"title":"3.2. The VisibilityObserverEntry interface"}],"url":"#dom-visibilityobserverentry-visiblebounds"},
+"dom-visibilityobserverentry-time": {"dfnID":"dom-visibilityobserverentry-time","dfnText":"time","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-visibilityobserverentry-time"}],"title":"3.2. The VisibilityObserverEntry interface"},{"refs":[{"id":"ref-for-dom-visibilityobserverentry-time\u2460"}],"title":"5.2.5. Enforce An input-protection Directive"}],"url":"#dom-visibilityobserverentry-time"},
+"visibilityobserver": {"dfnID":"visibilityobserver","dfnText":"VisibilityObserver","external":false,"refSections":[{"refs":[{"id":"ref-for-visibilityobserver"}],"title":"3.1. The VisibilityObserverCallback"},{"refs":[{"id":"ref-for-visibilityobserver\u2460"}],"title":"3.3. The VisibilityObserver Interface"},{"refs":[{"id":"ref-for-visibilityobserver\u2461"}],"title":"5.1.4. VisibilityObserver"},{"refs":[{"id":"ref-for-visibilityobserver\u2462"}],"title":"5.2.2. Notify VisibilityObservers"},{"refs":[{"id":"ref-for-visibilityobserver\u2463"}],"title":"5.2.5. Enforce An input-protection Directive"}],"url":"#visibilityobserver"},
+"dom-visibilityobserver-visibilityobserver": {"dfnID":"dom-visibilityobserver-visibilityobserver","dfnText":"new VisibilityObserver(callback, options)","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-visibilityobserver-visibilityobserver"}],"title":"5.1.4. VisibilityObserver"}],"url":"#dom-visibilityobserver-visibilityobserver"},
+"dom-visibilityobserver-observe": {"dfnID":"dom-visibilityobserver-observe","dfnText":"observe()","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-visibilityobserver-observe"}],"title":"3.3. The VisibilityObserver Interface"}],"url":"#dom-visibilityobserver-observe"},
+"dom-visibilityobserver-unobserve": {"dfnID":"dom-visibilityobserver-unobserve","dfnText":"unobserve()","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-visibilityobserver-unobserve"}],"title":"3.3. The VisibilityObserver Interface"}],"url":"#dom-visibilityobserver-unobserve"},
+"dom-visibilityobserver-takerecords": {"dfnID":"dom-visibilityobserver-takerecords","dfnText":"takeRecords()","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-visibilityobserver-takerecords"}],"title":"3.3. The VisibilityObserver Interface"}],"url":"#dom-visibilityobserver-takerecords"},
+"dictdef-visibilityobserverinit": {"dfnID":"dictdef-visibilityobserverinit","dfnText":"VisibilityObserverInit","external":false,"refSections":[{"refs":[{"id":"ref-for-dictdef-visibilityobserverinit"}],"title":"5.1.4. VisibilityObserver"}],"url":"#dictdef-visibilityobserverinit"},
+"dom-visibilityobserverinit-areathreshold": {"dfnID":"dom-visibilityobserverinit-areathreshold","dfnText":"areaThreshold","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-visibilityobserverinit-areathreshold"}],"title":"3.4. The VisibilityObserverInit dictionary"}],"url":"#dom-visibilityobserverinit-areathreshold"},
+"dom-visibilityobserverinit-displacementaware": {"dfnID":"dom-visibilityobserverinit-displacementaware","dfnText":"displacementAware","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-visibilityobserverinit-displacementaware"}],"title":"3.4. The VisibilityObserverInit dictionary"}],"url":"#dom-visibilityobserverinit-displacementaware"},
+"dom-visibilityobserverinit-visiblemargin": {"dfnID":"dom-visibilityobserverinit-visiblemargin","dfnText":"visibleMargin","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-visibilityobserverinit-visiblemargin"}],"title":"3.4. The VisibilityObserverInit dictionary"},{"refs":[{"id":"ref-for-dom-visibilityobserverinit-visiblemargin\u2460"}],"title":"4.1.1. Directive Value"}],"url":"#dom-visibilityobserverinit-visiblemargin"},
+"dom-visibilityobserverinit-observedelement": {"dfnID":"dom-visibilityobserverinit-observedelement","dfnText":"observedElement","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-visibilityobserverinit-observedelement"}],"title":"3.4. The VisibilityObserverInit dictionary"}],"url":"#dom-visibilityobserverinit-observedelement"},
+"input-protection-directive": {"dfnID":"input-protection-directive","dfnText":"input-protection Directive","external":false,"refSections":[{"refs":[{"id":"ref-for-input-protection-directive"}],"title":"5.1.4. VisibilityObserver"},{"refs":[{"id":"ref-for-input-protection-directive\u2460"}],"title":"5.2.5. Enforce An input-protection Directive"},{"refs":[{"id":"ref-for-input-protection-directive\u2461"}],"title":"5.2.6. Handle a Violation"}],"url":"#input-protection-directive"},
+"area-threshold": {"dfnID":"area-threshold","dfnText":"area-threshold","external":false,"refSections":[{"refs":[{"id":"ref-for-area-threshold"}],"title":"5.2.5. Enforce An input-protection Directive"}],"url":"#area-threshold"},
+"protected-element": {"dfnID":"protected-element","dfnText":"protected-element","external":false,"refSections":[{"refs":[{"id":"ref-for-protected-element"}],"title":"3.4. The VisibilityObserverInit dictionary"},{"refs":[{"id":"ref-for-protected-element\u2460"}],"title":"4.1.1. Directive Value"},{"refs":[{"id":"ref-for-protected-element\u2461"}],"title":"5.2.5. Enforce An input-protection Directive"}],"url":"#protected-element"},
+"time-threshold": {"dfnID":"time-threshold","dfnText":"time-threshold","external":false,"refSections":[{"refs":[{"id":"ref-for-time-threshold"}],"title":"5.2.5. Enforce An input-protection Directive"}],"url":"#time-threshold"},
+"visible-margin": {"dfnID":"visible-margin","dfnText":"visible-margin","external":false,"refSections":[{"refs":[{"id":"ref-for-visible-margin"}],"title":"4.1.1. Directive Value"},{"refs":[{"id":"ref-for-visible-margin\u2460"}],"title":"5.2.5. Enforce An input-protection Directive"}],"url":"#visible-margin"},
+"browsing-context-visibilityobservertaskqueued": {"dfnID":"browsing-context-visibilityobservertaskqueued","dfnText":"VisibilityObserverTaskQueued","external":false,"refSections":[{"refs":[{"id":"ref-for-browsing-context-visibilityobservertaskqueued"},{"id":"ref-for-browsing-context-visibilityobservertaskqueued\u2460"}],"title":"5.2.1. Queue a VisibilityObserver Task"},{"refs":[{"id":"ref-for-browsing-context-visibilityobservertaskqueued\u2461"}],"title":"5.2.2. Notify VisibilityObservers"}],"url":"#browsing-context-visibilityobservertaskqueued"},
+"dom-element-inputprotectionobservers-slot": {"dfnID":"dom-element-inputprotectionobservers-slot","dfnText":"[[InputProtectionObservers]]","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-element-inputprotectionobservers-slot"}],"title":"5.2.5. Enforce An input-protection Directive"}],"url":"#dom-element-inputprotectionobservers-slot"},
+"dom-document-registeredvisibilityobservers-slot": {"dfnID":"dom-document-registeredvisibilityobservers-slot","dfnText":"[[RegisteredVisibilityObservers]]","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-document-registeredvisibilityobservers-slot"},{"id":"ref-for-dom-document-registeredvisibilityobservers-slot\u2460"}],"title":"3.3. The VisibilityObserver Interface"},{"refs":[{"id":"ref-for-dom-document-registeredvisibilityobservers-slot\u2461"}],"title":"5.2.2. Notify VisibilityObservers"},{"refs":[{"id":"ref-for-dom-document-registeredvisibilityobservers-slot\u2462"},{"id":"ref-for-dom-document-registeredvisibilityobservers-slot\u2463"},{"id":"ref-for-dom-document-registeredvisibilityobservers-slot\u2464"},{"id":"ref-for-dom-document-registeredvisibilityobservers-slot\u2465"}],"title":"5.2.4. Promote Observed GraphicsLayers"}],"url":"#dom-document-registeredvisibilityobservers-slot"},
+"dom-document-inputprotectionrequested-slot": {"dfnID":"dom-document-inputprotectionrequested-slot","dfnText":"[[InputProtectionRequested]]","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-document-inputprotectionrequested-slot"}],"title":"5.2.5. Enforce An input-protection Directive"}],"url":"#dom-document-inputprotectionrequested-slot"},
+"dom-visibilityobserver-queuedentries-slot": {"dfnID":"dom-visibilityobserver-queuedentries-slot","dfnText":"[[QueuedEntries]]","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-visibilityobserver-queuedentries-slot"},{"id":"ref-for-dom-visibilityobserver-queuedentries-slot\u2460"}],"title":"3.3. The VisibilityObserver Interface"},{"refs":[{"id":"ref-for-dom-visibilityobserver-queuedentries-slot\u2461"},{"id":"ref-for-dom-visibilityobserver-queuedentries-slot\u2462"},{"id":"ref-for-dom-visibilityobserver-queuedentries-slot\u2463"}],"title":"5.2.2. Notify VisibilityObservers"},{"refs":[{"id":"ref-for-dom-visibilityobserver-queuedentries-slot\u2464"}],"title":"5.2.3. Queue a VisibilityObserverEntry"},{"refs":[{"id":"ref-for-dom-visibilityobserver-queuedentries-slot\u2465"}],"title":"5.2.5. Enforce An input-protection Directive"}],"url":"#dom-visibilityobserver-queuedentries-slot"},
+"dom-visibilityobserver-previousvisibleratio-slot": {"dfnID":"dom-visibilityobserver-previousvisibleratio-slot","dfnText":"[[previousVisibleRatio]]","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-visibilityobserver-previousvisibleratio-slot"},{"id":"ref-for-dom-visibilityobserver-previousvisibleratio-slot\u2460"}],"title":"5.2.4. Promote Observed GraphicsLayers"},{"refs":[{"id":"ref-for-dom-visibilityobserver-previousvisibleratio-slot\u2461"},{"id":"ref-for-dom-visibilityobserver-previousvisibleratio-slot\u2462"}],"title":"5.2.5. Enforce An input-protection Directive"}],"url":"#dom-visibilityobserver-previousvisibleratio-slot"},
+"dom-visibilityobserver-previousglobalviewportposition-slot": {"dfnID":"dom-visibilityobserver-previousglobalviewportposition-slot","dfnText":"[[previousGlobalViewportPosition]]","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-visibilityobserver-previousglobalviewportposition-slot"},{"id":"ref-for-dom-visibilityobserver-previousglobalviewportposition-slot\u2460"}],"title":"5.2.4. Promote Observed GraphicsLayers"}],"url":"#dom-visibilityobserver-previousglobalviewportposition-slot"},
+"dom-visibilityobserver-callback-slot": {"dfnID":"dom-visibilityobserver-callback-slot","dfnText":"[[callback]]","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-visibilityobserver-callback-slot"}],"title":"3.3. The VisibilityObserver Interface"},{"refs":[{"id":"ref-for-dom-visibilityobserver-callback-slot\u2460"}],"title":"5.2.5. Enforce An input-protection Directive"}],"url":"#dom-visibilityobserver-callback-slot"},
+"dom-visibilityobserver-areathreshold-slot": {"dfnID":"dom-visibilityobserver-areathreshold-slot","dfnText":"[[areaThreshold]]","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-visibilityobserver-areathreshold-slot"},{"id":"ref-for-dom-visibilityobserver-areathreshold-slot\u2460"}],"title":"5.2.4. Promote Observed GraphicsLayers"},{"refs":[{"id":"ref-for-dom-visibilityobserver-areathreshold-slot\u2461"},{"id":"ref-for-dom-visibilityobserver-areathreshold-slot\u2462"},{"id":"ref-for-dom-visibilityobserver-areathreshold-slot\u2463"}],"title":"5.2.5. Enforce An input-protection Directive"}],"url":"#dom-visibilityobserver-areathreshold-slot"},
+"dom-visibilityobserver-displacementaware-slot": {"dfnID":"dom-visibilityobserver-displacementaware-slot","dfnText":"[[displacementAware]]","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-visibilityobserver-displacementaware-slot"}],"title":"5.2.4. Promote Observed GraphicsLayers"},{"refs":[{"id":"ref-for-dom-visibilityobserver-displacementaware-slot\u2460"}],"title":"5.2.5. Enforce An input-protection Directive"}],"url":"#dom-visibilityobserver-displacementaware-slot"},
+"dom-visibilityobserver-visiblemargin-slot": {"dfnID":"dom-visibilityobserver-visiblemargin-slot","dfnText":"[[visibleMargin]]","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-visibilityobserver-visiblemargin-slot"}],"title":"5.2.4. Promote Observed GraphicsLayers"},{"refs":[{"id":"ref-for-dom-visibilityobserver-visiblemargin-slot\u2460"}],"title":"5.2.5. Enforce An input-protection Directive"}],"url":"#dom-visibilityobserver-visiblemargin-slot"},
+"dom-visibilityobserver-observedelement-slot": {"dfnID":"dom-visibilityobserver-observedelement-slot","dfnText":"[[observedElement]]","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-visibilityobserver-observedelement-slot"}],"title":"3.4. The VisibilityObserverInit dictionary"},{"refs":[{"id":"ref-for-dom-visibilityobserver-observedelement-slot\u2460"}],"title":"5.2.4. Promote Observed GraphicsLayers"},{"refs":[{"id":"ref-for-dom-visibilityobserver-observedelement-slot\u2461"}],"title":"5.2.5. Enforce An input-protection Directive"}],"url":"#dom-visibilityobserver-observedelement-slot"},
+"dom-visibilityobserver-timethreshold-slot": {"dfnID":"dom-visibilityobserver-timethreshold-slot","dfnText":"[[timeThreshold]]","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-visibilityobserver-timethreshold-slot"},{"id":"ref-for-dom-visibilityobserver-timethreshold-slot\u2460"}],"title":"5.2.5. Enforce An input-protection Directive"}],"url":"#dom-visibilityobserver-timethreshold-slot"},
+"dom-visibilityobserver-associatedcontentsecuritypolicy-slot": {"dfnID":"dom-visibilityobserver-associatedcontentsecuritypolicy-slot","dfnText":"[[associatedContentSecurityPolicy]]","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-visibilityobserver-associatedcontentsecuritypolicy-slot"}],"title":"5.2.5. Enforce An input-protection Directive"},{"refs":[{"id":"ref-for-dom-visibilityobserver-associatedcontentsecuritypolicy-slot\u2460"}],"title":"5.2.6. Handle a Violation"}],"url":"#dom-visibilityobserver-associatedcontentsecuritypolicy-slot"},
+"queue-a-visibility-observer-task": {"dfnID":"queue-a-visibility-observer-task","dfnText":"queue a visibility observer task","external":false,"refSections":[{"refs":[{"id":"ref-for-queue-a-visibility-observer-task"}],"title":"5.2.3. Queue a VisibilityObserverEntry"}],"url":"#queue-a-visibility-observer-task"},
+"notify-visibility-observers": {"dfnID":"notify-visibility-observers","dfnText":"notify visibility observers","external":false,"refSections":[{"refs":[{"id":"ref-for-notify-visibility-observers"},{"id":"ref-for-notify-visibility-observers\u2460"}],"title":"5.2.1. Queue a VisibilityObserver Task"}],"url":"#notify-visibility-observers"},
+"queue-a-visibilityobserverentry": {"dfnID":"queue-a-visibilityobserverentry","dfnText":"queue a VisibilityObserverEntry","external":false,"refSections":[{"refs":[{"id":"ref-for-queue-a-visibilityobserverentry"}],"title":"5.2.4. Promote Observed GraphicsLayers"}],"url":"#queue-a-visibilityobserverentry"},
+"graphicslayer": {"dfnID":"graphicslayer","dfnText":"GraphicsLayer","external":false,"refSections":[{"refs":[{"id":"ref-for-graphicslayer"},{"id":"ref-for-graphicslayer\u2460"},{"id":"ref-for-graphicslayer\u2461"},{"id":"ref-for-graphicslayer\u2462"},{"id":"ref-for-graphicslayer\u2463"}],"title":"5.2.4. Promote Observed GraphicsLayers"}],"url":"#graphicslayer"},
+"promote-observed-graphicslayers": {"dfnID":"promote-observed-graphicslayers","dfnText":"promote observed graphicsLayers","external":false,"refSections":[{"refs":[{"id":"ref-for-promote-observed-graphicslayers"}],"title":"5.2.4. Promote Observed GraphicsLayers"},{"refs":[{"id":"ref-for-promote-observed-graphicslayers\u2460"}],"title":"5.3.1. HTML Processing Model: Event Loop"}],"url":"#promote-observed-graphicslayers"},
+"enforce-an-input-protection-directive": {"dfnID":"enforce-an-input-protection-directive","dfnText":"enforce an input-protection directive","external":false,"refSections":[{"refs":[{"id":"ref-for-enforce-an-input-protection-directive"}],"title":"5.3.2. DOM: Dispatching Events"}],"url":"#enforce-an-input-protection-directive"},
+"handle-a-violation": {"dfnID":"handle-a-violation","dfnText":"handle a violation","external":false,"refSections":[{"refs":[{"id":"ref-for-handle-a-violation"},{"id":"ref-for-handle-a-violation\u2460"},{"id":"ref-for-handle-a-violation\u2461"}],"title":"5.2.5. Enforce An input-protection Directive"}],"url":"#handle-a-violation"},
+"dom-event-isunsafe": {"dfnID":"dom-event-isunsafe","dfnText":"isUnsafe","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-event-isunsafe"}],"title":"5.2.6. Handle a Violation"},{"refs":[{"id":"ref-for-dom-event-isunsafe\u2460"}],"title":"5.3.3. isUnsafe Attribute"}],"url":"#dom-event-isunsafe"},
+};
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+const typeFormatters = {
+    'dfn': (text) => `[=${text}=]`,
+    'abstract-op': (text) => `[\$${text}\$]`,
+    'value': (text) => `''${text}''`,
+    'http-header': (text) => `[:${text}:]`,
+    'idl': (text) => `{{${text}}}`,
+    'interface': 'idl',
+    'constructor': 'idl',
+    'method': 'idl',
+    'argument': 'idl',
+    'attribute': 'idl',
+    'callback': 'idl',
+    'dictionary': 'idl',
+    'dict-member': 'idl',
+    'enum': 'idl',
+    'enum-value': 'idl',
+    'exception': 'idl',
+    'const': 'idl',
+    'typedef': 'idl',
+    'stringifier': 'idl',
+    'serializer': 'idl',
+    'iterator': 'idl',
+    'maplike': 'idl',
+    'setlike': 'idl',
+    'extended-attribute': 'idl',
+    'event': 'idl',
+    'element': (element) => `<{${element}}>`,
+    'element-state': 'element',
+    'element-attr': 'element',
+    'attr-value': 'element',
+    'scheme': 'dfn',
+    'permission': 'dfn',
+    'grammar': (text) => `${text} (within a <pre class=prod>)`,
+    'type': (text)=> `<<${text}>>`,
+    'property': (text) => `'${text}'`,
+    'descriptor': 'property',
+    'function': 'value',
+    'at-rule': 'value',
+    'selector': 'value',
+};
+const typesUsingFor = new Set(
+    [
+        "descriptor",
+        "value",
+        "element-attr",
+        "attr-value",
+        "element-state",
+        "method",
+        "constructor",
+        "argument",
+        "attribute",
+        "const",
+        "dict-member",
+        "event",
+        "enum-value",
+        "stringifier",
+        "serializer",
+        "iterator",
+        "maplike",
+        "setlike",
+        "state",
+        "mode",
+        "context",
+        "facet",
+    ],
+)
+const typesNotUsingFor = new Set(
+    [
+        "property",
+        "element",
+        "interface",
+        "namespace",
+        "callback",
+        "dictionary",
+        "enum",
+        "exception",
+        "typedef",
+        "http-header",
+        "permission",
+    ],
+)
+function linkFormatterFromType(type) {
+    const fnOrType = typeFormatters[type];
+    if(typeof fnOrType === 'string') {
+        // follow the alias
+        return linkFormatterFromType(fnOrType);
+    }
+    return fnOrType;
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!typesUsingFor.has(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!typesNotUsingFor.has(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
+
+function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+    dfnPanel.forDfn = dfn;
+    if(!dfn) { console.log(dfnPanel); }
+    return dfnPanel;
+}
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        const panel = genDfnPanel({ ...panelData, dfn });
+        append(document.body, panel);
+        insertDfnPopupAction(panel)
+    }
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+})
+
+function hideAllDfnPanels() {
+    // Turn off any currently "on" or "activated" panels.
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
+}
+
+function showDfnPanel(dfnPanel) {
+    hideAllDfnPanels(); // Only display one at this time.
+
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "true");
+
+    dfnPanel.classList.add("on");
+    positionDfnPanel(dfnPanel);
+
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    // Increment tabindex for each anchor and button tags in panel
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.style.position = "absolute"; // unfix it
+    dfnPanel.classList.remove("on");
+    dfnPanel.classList.remove("activated");
+}
+
+function toggleDfnPanel(dfnPanel) {
+    if(dfnPanel.classList.contains("on")) {
+        hideDfnPanel(dfnPanel);
+    } else {
+        showDfnPanel(dfnPanel);
+    }
+}
+
+function insertDfnPopupAction(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        showDfnPanel(dfnPanel);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfnPanel);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel(dfnPanel, dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    })
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
 }
 </script>
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
+let refsData = {
+"https://webidl.spec.whatwg.org/#idl-sequence": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"sequence","type":"dfn","url":"https://webidl.spec.whatwg.org/#idl-sequence"},
+"#visibilityobserverentry": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"VisibilityObserverEntry","type":"interface","url":"#visibilityobserverentry"},
+"#visibilityobserver": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"VisibilityObserver","type":"interface","url":"#visibilityobserver"},
+"#callbackdef-visibilityobservercallback": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"VisibilityObserverCallback","type":"callback","url":"#callbackdef-visibilityobservercallback"},
+"#dictdef-visibilityobserverentryinit": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"VisibilityObserverEntryInit","type":"dictionary","url":"#dictdef-visibilityobserverentryinit"},
+"https://webidl.spec.whatwg.org/#Exposed": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"Exposed","type":"extended-attribute","url":"https://webidl.spec.whatwg.org/#Exposed"},
+"https://www.w3.org/TR/geometry-1/#domrectreadonly": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"geometry","spec":"geometry-1","status":"snapshot","text":"DOMRectReadOnly","type":"interface","url":"https://www.w3.org/TR/geometry-1/#domrectreadonly"},
+"#dom-visibilityobserverentry-globalvisiblebounds": {"export":true,"for_":["VisibilityObserverEntry"],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"globalVisibleBounds","type":"attribute","url":"#dom-visibilityobserverentry-globalvisiblebounds"},
+"#dom-visibilityobserverentry-visiblebounds": {"export":true,"for_":["VisibilityObserverEntry"],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"visibleBounds","type":"attribute","url":"#dom-visibilityobserverentry-visiblebounds"},
+"http://www.w3.org/TR/hr-time/#domhighrestimestamp": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"ui security","spec":"","status":"anchor-block","text":"DOMHighResTimeStamp","type":"typedef","url":"http://www.w3.org/TR/hr-time/#domhighrestimestamp"},
+"#dom-visibilityobserverentry-time": {"export":true,"for_":["VisibilityObserverEntry"],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"time","type":"attribute","url":"#dom-visibilityobserverentry-time"},
+"https://www.w3.org/TR/geometry-1/#dictdef-domrectinit": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"geometry","spec":"geometry-1","status":"snapshot","text":"DOMRectInit","type":"dictionary","url":"https://www.w3.org/TR/geometry-1/#dictdef-domrectinit"},
+"https://www.w3.org/TR/geometry-1/#domrect": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"geometry","spec":"geometry-1","status":"snapshot","text":"DOMRect","type":"interface","url":"https://www.w3.org/TR/geometry-1/#domrect"},
+"#dom-visibilityobserver-observe": {"export":true,"for_":["VisibilityObserver"],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"observe()","type":"method","url":"#dom-visibilityobserver-observe"},
+"#dom-visibilityobserver-unobserve": {"export":true,"for_":["VisibilityObserver"],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"unobserve()","type":"method","url":"#dom-visibilityobserver-unobserve"},
+"#dom-visibilityobserver-takerecords": {"export":true,"for_":["VisibilityObserver"],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"takeRecords()","type":"method","url":"#dom-visibilityobserver-takerecords"},
+"#dom-visibilityobserver-callback-slot": {"export":true,"for_":["VisibilityObserver"],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"[[callback]]","type":"attribute","url":"#dom-visibilityobserver-callback-slot"},
+"#dom-document-registeredvisibilityobservers-slot": {"export":true,"for_":["Document"],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"[[RegisteredVisibilityObservers]]","type":"attribute","url":"#dom-document-registeredvisibilityobservers-slot"},
+"#dom-visibilityobserver-queuedentries-slot": {"export":true,"for_":["VisibilityObserver"],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"[[QueuedEntries]]","type":"attribute","url":"#dom-visibilityobserver-queuedentries-slot"},
+"https://webidl.spec.whatwg.org/#idl-double": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"double","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-double"},
+"#dom-visibilityobserverinit-areathreshold": {"export":true,"for_":["VisibilityObserverInit"],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"areaThreshold","type":"dict-member","url":"#dom-visibilityobserverinit-areathreshold"},
+"https://webidl.spec.whatwg.org/#idl-boolean": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"boolean","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-boolean"},
+"#dom-visibilityobserverinit-displacementaware": {"export":true,"for_":["VisibilityObserverInit"],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"displacementAware","type":"dict-member","url":"#dom-visibilityobserverinit-displacementaware"},
+"https://webidl.spec.whatwg.org/#idl-DOMString": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"DOMString","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-DOMString"},
+"#dom-visibilityobserverinit-visiblemargin": {"export":true,"for_":["VisibilityObserverInit"],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"visibleMargin","type":"dict-member","url":"#dom-visibilityobserverinit-visiblemargin"},
+"https://dom.spec.whatwg.org/#element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"Element","type":"interface","url":"https://dom.spec.whatwg.org/#element"},
+"#dom-visibilityobserverinit-observedelement": {"export":true,"for_":["VisibilityObserverInit"],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"observedElement","type":"dict-member","url":"#dom-visibilityobserverinit-observedelement"},
+"https://www.w3.org/TR/cssom-view-1/#dom-element-getboundingclientrect": {"export":true,"for_":["Element"],"level":"1","normative":true,"shortname":"cssom-view","spec":"cssom-view-1","status":"snapshot","text":"getBoundingClientRect()","type":"method","url":"https://www.w3.org/TR/cssom-view-1/#dom-element-getboundingclientrect"},
+"#dom-visibilityobserver-observedelement-slot": {"export":true,"for_":["VisibilityObserver"],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"[[observedElement]]","type":"attribute","url":"#dom-visibilityobserver-observedelement-slot"},
+"https://www.w3.org/TR/css-box-4/#propdef-margin": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"snapshot","text":"margin","type":"property","url":"https://www.w3.org/TR/css-box-4/#propdef-margin"},
+"#protected-element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"protected-element","type":"dfn","url":"#protected-element"},
+"https://dom.spec.whatwg.org/#document": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"Document","type":"interface","url":"https://dom.spec.whatwg.org/#document"},
+"#visible-margin": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"visible-margin","type":"dfn","url":"#visible-margin"},
+"https://dom.spec.whatwg.org/#dom-nonelementparentnode-getelementbyid": {"export":true,"for_":["NonElementParentNode"],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"getElementById(elementId)","type":"method","url":"https://dom.spec.whatwg.org/#dom-nonelementparentnode-getelementbyid"},
+"https://html.spec.whatwg.org/multipage/browsers.html#unit-of-related-similar-origin-browsing-contexts": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"ui security","spec":"","status":"anchor-block","text":"unit of related similar-origin browsing contexts","type":"dfn","url":"https://html.spec.whatwg.org/multipage/browsers.html#unit-of-related-similar-origin-browsing-contexts"},
+"#dom-visibilityobserver-visibilityobserver": {"export":true,"for_":["VisibilityObserver"],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"VisibilityObserver(callback, options)","type":"constructor","url":"#dom-visibilityobserver-visibilityobserver"},
+"#dictdef-visibilityobserverinit": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"VisibilityObserverInit","type":"dictionary","url":"#dictdef-visibilityobserverinit"},
+"#input-protection-directive": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"input-protection directive","type":"dfn","url":"#input-protection-directive"},
+"#browsing-context-visibilityobservertaskqueued": {"export":true,"for_":["browsing context"],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"visibilityobservertaskqueued","type":"dfn","url":"#browsing-context-visibilityobservertaskqueued"},
+"#notify-visibility-observers": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"notify visibility observers","type":"dfn","url":"#notify-visibility-observers"},
+"http://w3c.github.io/requestidlecallback/#dfn-list-of-idle-request-callbacks": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"ui security","spec":"","status":"anchor-block","text":"list of idle request callbacks","type":"dfn","url":"http://w3c.github.io/requestidlecallback/#dfn-list-of-idle-request-callbacks"},
+"https://html.spec.whatwg.org/multipage/infrastructure.html#dfn-callback-this-value": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"ui security","spec":"","status":"anchor-block","text":"callback this value","type":"dfn","url":"https://html.spec.whatwg.org/multipage/infrastructure.html#dfn-callback-this-value"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#report-the-exception": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"ui security","spec":"","status":"anchor-block","text":"report the exception","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#report-the-exception"},
+"#queue-a-visibility-observer-task": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"queue a visibility observer task","type":"dfn","url":"#queue-a-visibility-observer-task"},
+"#graphicslayer": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"graphicslayer","type":"dfn","url":"#graphicslayer"},
+"#promote-observed-graphicslayers": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"promote observed graphicslayers","type":"dfn","url":"#promote-observed-graphicslayers"},
+"https://html.spec.whatwg.org/multipage/browsers.html#parent-browsing-context": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"ui security","spec":"","status":"anchor-block","text":"parent browsing context","type":"dfn","url":"https://html.spec.whatwg.org/multipage/browsers.html#parent-browsing-context"},
+"#dom-visibilityobserver-visiblemargin-slot": {"export":true,"for_":["VisibilityObserver"],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"[[visibleMargin]]","type":"attribute","url":"#dom-visibilityobserver-visiblemargin-slot"},
+"#dom-visibilityobserver-areathreshold-slot": {"export":true,"for_":["VisibilityObserver"],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"[[areaThreshold]]","type":"attribute","url":"#dom-visibilityobserver-areathreshold-slot"},
+"#dom-visibilityobserver-previousvisibleratio-slot": {"export":true,"for_":["VisibilityObserver"],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"[[previousVisibleRatio]]","type":"attribute","url":"#dom-visibilityobserver-previousvisibleratio-slot"},
+"#dom-visibilityobserver-previousglobalviewportposition-slot": {"export":true,"for_":["VisibilityObserver"],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"[[previousGlobalViewportPosition]]","type":"attribute","url":"#dom-visibilityobserver-previousglobalviewportposition-slot"},
+"#dom-visibilityobserver-displacementaware-slot": {"export":true,"for_":["VisibilityObserver"],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"[[displacementAware]]","type":"attribute","url":"#dom-visibilityobserver-displacementaware-slot"},
+"#queue-a-visibilityobserverentry": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"queue a visibilityobserverentry","type":"dfn","url":"#queue-a-visibilityobserverentry"},
+"#dom-document-inputprotectionrequested-slot": {"export":true,"for_":["Document"],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"[[InputProtectionRequested]]","type":"attribute","url":"#dom-document-inputprotectionrequested-slot"},
+"#area-threshold": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"area-threshold","type":"dfn","url":"#area-threshold"},
+"#dom-visibilityobserver-timethreshold-slot": {"export":true,"for_":["VisibilityObserver"],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"[[timeThreshold]]","type":"attribute","url":"#dom-visibilityobserver-timethreshold-slot"},
+"#time-threshold": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"time-threshold","type":"dfn","url":"#time-threshold"},
+"#dom-visibilityobserver-associatedcontentsecuritypolicy-slot": {"export":true,"for_":["VisibilityObserver"],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"[[associatedContentSecurityPolicy]]","type":"attribute","url":"#dom-visibilityobserver-associatedcontentsecuritypolicy-slot"},
+"https://dom.spec.whatwg.org/#dispatching-events": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"ui security","spec":"","status":"anchor-block","text":"dispatching events","type":"dfn","url":"https://dom.spec.whatwg.org/#dispatching-events"},
+"https://dom.spec.whatwg.org/#event": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"Event","type":"interface","url":"https://dom.spec.whatwg.org/#event"},
+"#dom-element-inputprotectionobservers-slot": {"export":true,"for_":["Element"],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"[[InputProtectionObservers]]","type":"attribute","url":"#dom-element-inputprotectionobservers-slot"},
+"#handle-a-violation": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"handle a violation","type":"dfn","url":"#handle-a-violation"},
+"https://dom.spec.whatwg.org/#cancelled-flag": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"ui security","spec":"","status":"anchor-block","text":"cancelled flag","type":"dfn","url":"https://dom.spec.whatwg.org/#cancelled-flag"},
+"https://dom.spec.whatwg.org/#stop-propagation-flag": {"export":true,"for_":["Event"],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"stop propagation flag","type":"dfn","url":"https://dom.spec.whatwg.org/#stop-propagation-flag"},
+"#dom-event-isunsafe": {"export":true,"for_":["Event"],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"isUnsafe","type":"attribute","url":"#dom-event-isunsafe"},
+"#enforce-an-input-protection-directive": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"ui security","spec":"ui security-1","status":"local","text":"enforce an input-protection directive","type":"dfn","url":"#enforce-an-input-protection-directive"},
+};
+
+function genRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "DFN: "),
+                mk.code({ class: "dfn-text" }, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    const forListElements = forList.length === 0 ? '' : mk.li({},
+        mk.b({}, "For: "),
+        mk.ul({},
+            ...forList.map(forItem =>
                 mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
-            mk.b({}, "For: "),
-            mk.ul({},
-                ...forList.map(forItem =>
-                    mk.li({},
-                        mk.span({}, `${forItem}`)
-                    ),
+                    mk.span({}, `${forItem}`)
                 ),
             ),
-        );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+        ),
+    );
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
-    }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    return hintPanel;
+}
+function genAllRefHints() {
+    for(const refData of Object.values(refsData)) {
+        const refUrl = refData.url;
+        const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+        if (links.length == 0) {
+            console.log(`Can't find link href="${refUrl}".`, refData);
+            continue;
+        }
+        for(const link of links) {
+            if(link.classList.contains("dfn-link")) continue;
+            const hint = genRefHint(link, refData);
+            append(document.body, hint);
+            insertLinkPopupAction(hint)
         }
     }
+}
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+function hideAllRefHints() {
+    queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    refHint.style.position = "absolute"; // unfix it
+    refHint.classList.remove("on");
+    const teardown = refHint.teardownEventListeners;
+    if (teardown) {
+        refHint.teardownEventListeners = undefined;
+        teardown();
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+function showRefHint(refHint) {
+    hideAllRefHints(); // Only display one at this time.
+
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "true");
+    refHint.classList.add("on");
+    positionRefHint(refHint);
+    setupRefHintEventListeners(refHint);
+}
+
+function setupRefHintEventListeners(refHint) {
+    if (refHint.teardownEventListeners) return;
+    const link = refHint.forLink;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
 
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
 
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+function insertLinkPopupAction(refHint) {
+    const link = refHint.forLink;
+    // link.setAttribute('role', 'button');
+    link.setAttribute('aria-expanded', 'false')
+    link.classList.add('has-ref-hint');
+    link.addEventListener('mouseover', (event) => {
+        showRefHint(refHint);
     });
+    link.addEventListener('focus', (event) => {
+        showRefHint(refHint);
+    })
+}
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+document.addEventListener("DOMContentLoaded", () => {
+    genAllRefHints();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
-window.refsData['#visibilityobserverentry'] = {"text": "VisibilityObserverEntry", "type": "interface", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#visibilityobserverentry", "export": true, "normative": true, "for_": []};
-window.refsData['#visibilityobserver'] = {"text": "VisibilityObserver", "type": "interface", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#visibilityobserver", "export": true, "normative": true, "for_": []};
-window.refsData['#callbackdef-visibilityobservercallback'] = {"text": "VisibilityObserverCallback", "type": "callback", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#callbackdef-visibilityobservercallback", "export": true, "normative": true, "for_": []};
-window.refsData['#dictdef-visibilityobserverentryinit'] = {"text": "VisibilityObserverEntryInit", "type": "dictionary", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dictdef-visibilityobserverentryinit", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/geometry-1/#domrectreadonly'] = {"text": "DOMRectReadOnly", "type": "interface", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "snapshot", "url": "https://www.w3.org/TR/geometry-1/#domrectreadonly", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-visibilityobserverentry-globalvisiblebounds'] = {"text": "globalVisibleBounds", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserverentry-globalvisiblebounds", "export": true, "normative": true, "for_": ["VisibilityObserverEntry"]};
-window.refsData['#dom-visibilityobserverentry-visiblebounds'] = {"text": "visibleBounds", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserverentry-visiblebounds", "export": true, "normative": true, "for_": ["VisibilityObserverEntry"]};
-window.refsData['http://www.w3.org/TR/hr-time/#domhighrestimestamp'] = {"text": "DOMHighResTimeStamp", "type": "typedef", "spec": "", "shortname": "ui security", "level": "1", "status": "anchor-block", "url": "http://www.w3.org/TR/hr-time/#domhighrestimestamp", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-visibilityobserverentry-time'] = {"text": "time", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserverentry-time", "export": true, "normative": true, "for_": ["VisibilityObserverEntry"]};
-window.refsData['https://www.w3.org/TR/geometry-1/#dictdef-domrectinit'] = {"text": "DOMRectInit", "type": "dictionary", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "snapshot", "url": "https://www.w3.org/TR/geometry-1/#dictdef-domrectinit", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/geometry-1/#domrect'] = {"text": "DOMRect", "type": "interface", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "snapshot", "url": "https://www.w3.org/TR/geometry-1/#domrect", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-visibilityobserver-observe'] = {"text": "observe()", "type": "method", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserver-observe", "export": true, "normative": true, "for_": ["VisibilityObserver"]};
-window.refsData['#dom-visibilityobserver-unobserve'] = {"text": "unobserve()", "type": "method", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserver-unobserve", "export": true, "normative": true, "for_": ["VisibilityObserver"]};
-window.refsData['#dom-visibilityobserver-takerecords'] = {"text": "takeRecords()", "type": "method", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserver-takerecords", "export": true, "normative": true, "for_": ["VisibilityObserver"]};
-window.refsData['#dom-visibilityobserver-callback-slot'] = {"text": "[[callback]]", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserver-callback-slot", "export": true, "normative": true, "for_": ["VisibilityObserver"]};
-window.refsData['#dom-document-registeredvisibilityobservers-slot'] = {"text": "[[RegisteredVisibilityObservers]]", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-document-registeredvisibilityobservers-slot", "export": true, "normative": true, "for_": ["Document"]};
-window.refsData['#dom-visibilityobserver-queuedentries-slot'] = {"text": "[[QueuedEntries]]", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserver-queuedentries-slot", "export": true, "normative": true, "for_": ["VisibilityObserver"]};
-window.refsData['https://webidl.spec.whatwg.org/#idl-double'] = {"text": "double", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-double", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-visibilityobserverinit-areathreshold'] = {"text": "areaThreshold", "type": "dict-member", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserverinit-areathreshold", "export": true, "normative": true, "for_": ["VisibilityObserverInit"]};
-window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-visibilityobserverinit-displacementaware'] = {"text": "displacementAware", "type": "dict-member", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserverinit-displacementaware", "export": true, "normative": true, "for_": ["VisibilityObserverInit"]};
-window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-visibilityobserverinit-visiblemargin'] = {"text": "visibleMargin", "type": "dict-member", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserverinit-visiblemargin", "export": true, "normative": true, "for_": ["VisibilityObserverInit"]};
-window.refsData['https://dom.spec.whatwg.org/#element'] = {"text": "Element", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#element", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-visibilityobserverinit-observedelement'] = {"text": "observedElement", "type": "dict-member", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserverinit-observedelement", "export": true, "normative": true, "for_": ["VisibilityObserverInit"]};
-window.refsData['https://www.w3.org/TR/cssom-view-1/#dom-element-getboundingclientrect'] = {"text": "getBoundingClientRect()", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "snapshot", "url": "https://www.w3.org/TR/cssom-view-1/#dom-element-getboundingclientrect", "export": true, "normative": true, "for_": ["Element"]};
-window.refsData['#dom-visibilityobserver-observedelement-slot'] = {"text": "[[observedElement]]", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserver-observedelement-slot", "export": true, "normative": true, "for_": ["VisibilityObserver"]};
-window.refsData['https://www.w3.org/TR/css-box-4/#propdef-margin'] = {"text": "margin", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-box-4/#propdef-margin", "export": true, "normative": true, "for_": []};
-window.refsData['#protected-element'] = {"text": "protected-element", "type": "dfn", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#protected-element", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
-window.refsData['#visible-margin'] = {"text": "visible-margin", "type": "dfn", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#visible-margin", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#dom-nonelementparentnode-getelementbyid'] = {"text": "getElementById(elementId)", "type": "method", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-nonelementparentnode-getelementbyid", "export": true, "normative": true, "for_": ["NonElementParentNode"]};
-window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#unit-of-related-similar-origin-browsing-contexts'] = {"text": "unit of related similar-origin browsing contexts", "type": "dfn", "spec": "", "shortname": "ui security", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#unit-of-related-similar-origin-browsing-contexts", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-visibilityobserver-visibilityobserver'] = {"text": "VisibilityObserver(callback, options)", "type": "constructor", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserver-visibilityobserver", "export": true, "normative": true, "for_": ["VisibilityObserver"]};
-window.refsData['#dictdef-visibilityobserverinit'] = {"text": "VisibilityObserverInit", "type": "dictionary", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dictdef-visibilityobserverinit", "export": true, "normative": true, "for_": []};
-window.refsData['#input-protection-directive'] = {"text": "input-protection directive", "type": "dfn", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#input-protection-directive", "export": true, "normative": true, "for_": []};
-window.refsData['#browsing-context-visibilityobservertaskqueued'] = {"text": "visibilityobservertaskqueued", "type": "dfn", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#browsing-context-visibilityobservertaskqueued", "export": true, "normative": true, "for_": ["browsing context"]};
-window.refsData['#notify-visibility-observers'] = {"text": "notify visibility observers", "type": "dfn", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#notify-visibility-observers", "export": true, "normative": true, "for_": []};
-window.refsData['http://w3c.github.io/requestidlecallback/#dfn-list-of-idle-request-callbacks'] = {"text": "list of idle request callbacks", "type": "dfn", "spec": "", "shortname": "ui security", "level": "1", "status": "anchor-block", "url": "http://w3c.github.io/requestidlecallback/#dfn-list-of-idle-request-callbacks", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#dfn-callback-this-value'] = {"text": "callback this value", "type": "dfn", "spec": "", "shortname": "ui security", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#dfn-callback-this-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#report-the-exception'] = {"text": "report the exception", "type": "dfn", "spec": "", "shortname": "ui security", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#report-the-exception", "export": true, "normative": true, "for_": []};
-window.refsData['#queue-a-visibility-observer-task'] = {"text": "queue a visibility observer task", "type": "dfn", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#queue-a-visibility-observer-task", "export": true, "normative": true, "for_": []};
-window.refsData['#graphicslayer'] = {"text": "graphicslayer", "type": "dfn", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#graphicslayer", "export": true, "normative": true, "for_": []};
-window.refsData['#promote-observed-graphicslayers'] = {"text": "promote observed graphicslayers", "type": "dfn", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#promote-observed-graphicslayers", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#parent-browsing-context'] = {"text": "parent browsing context", "type": "dfn", "spec": "", "shortname": "ui security", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#parent-browsing-context", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-visibilityobserver-visiblemargin-slot'] = {"text": "[[visibleMargin]]", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserver-visiblemargin-slot", "export": true, "normative": true, "for_": ["VisibilityObserver"]};
-window.refsData['#dom-visibilityobserver-areathreshold-slot'] = {"text": "[[areaThreshold]]", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserver-areathreshold-slot", "export": true, "normative": true, "for_": ["VisibilityObserver"]};
-window.refsData['#dom-visibilityobserver-previousvisibleratio-slot'] = {"text": "[[previousVisibleRatio]]", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserver-previousvisibleratio-slot", "export": true, "normative": true, "for_": ["VisibilityObserver"]};
-window.refsData['#dom-visibilityobserver-previousglobalviewportposition-slot'] = {"text": "[[previousGlobalViewportPosition]]", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserver-previousglobalviewportposition-slot", "export": true, "normative": true, "for_": ["VisibilityObserver"]};
-window.refsData['#dom-visibilityobserver-displacementaware-slot'] = {"text": "[[displacementAware]]", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserver-displacementaware-slot", "export": true, "normative": true, "for_": ["VisibilityObserver"]};
-window.refsData['#queue-a-visibilityobserverentry'] = {"text": "queue a visibilityobserverentry", "type": "dfn", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#queue-a-visibilityobserverentry", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-document-inputprotectionrequested-slot'] = {"text": "[[InputProtectionRequested]]", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-document-inputprotectionrequested-slot", "export": true, "normative": true, "for_": ["Document"]};
-window.refsData['#area-threshold'] = {"text": "area-threshold", "type": "dfn", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#area-threshold", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-visibilityobserver-timethreshold-slot'] = {"text": "[[timeThreshold]]", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserver-timethreshold-slot", "export": true, "normative": true, "for_": ["VisibilityObserver"]};
-window.refsData['#time-threshold'] = {"text": "time-threshold", "type": "dfn", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#time-threshold", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-visibilityobserver-associatedcontentsecuritypolicy-slot'] = {"text": "[[associatedContentSecurityPolicy]]", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserver-associatedcontentsecuritypolicy-slot", "export": true, "normative": true, "for_": ["VisibilityObserver"]};
-window.refsData['https://dom.spec.whatwg.org/#dispatching-events'] = {"text": "dispatching events", "type": "dfn", "spec": "", "shortname": "ui security", "level": "1", "status": "anchor-block", "url": "https://dom.spec.whatwg.org/#dispatching-events", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#event'] = {"text": "Event", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#event", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-element-inputprotectionobservers-slot'] = {"text": "[[InputProtectionObservers]]", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-element-inputprotectionobservers-slot", "export": true, "normative": true, "for_": ["Element"]};
-window.refsData['#handle-a-violation'] = {"text": "handle a violation", "type": "dfn", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#handle-a-violation", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#cancelled-flag'] = {"text": "cancelled flag", "type": "dfn", "spec": "", "shortname": "ui security", "level": "1", "status": "anchor-block", "url": "https://dom.spec.whatwg.org/#cancelled-flag", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#stop-propagation-flag'] = {"text": "stop propagation flag", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#stop-propagation-flag", "export": true, "normative": true, "for_": ["Event"]};
-window.refsData['#dom-event-isunsafe'] = {"text": "isUnsafe", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-event-isunsafe", "export": true, "normative": true, "for_": ["Event"]};
-window.refsData['#enforce-an-input-protection-directive'] = {"text": "enforce an input-protection directive", "type": "dfn", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#enforce-an-input-protection-directive", "export": true, "normative": true, "for_": []};
 </script>

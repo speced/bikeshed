@@ -1741,525 +1741,8 @@ if ("serviceWorker" in navigator) {
    <dt id="biblio-storage">[STORAGE]
    <dd>Anne van Kesteren. <a href="https://storage.spec.whatwg.org/"><cite>Storage Standard</cite></a>. Living Standard. URL: <a href="https://storage.spec.whatwg.org/">https://storage.spec.whatwg.org/</a>
   </dl>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['8b3dfc64'] = {"dfnID": "8b3dfc64", "url": "https://tc39.github.io/ecma262/#sec-json.parse", "dfnText": "%json.parse%", "refSections": [{"refs": [{"id": "ref-for-sec-json.parse"}, {"id": "ref-for-sec-json.parse\u2460"}], "title": "6. JSON"}], "external": true};
-window.dfnpanelData['ca4a8997'] = {"dfnID": "ca4a8997", "url": "https://tc39.github.io/ecma262/#sec-json.stringify", "dfnText": "%json.stringify%", "refSections": [{"refs": [{"id": "ref-for-sec-json.stringify"}, {"id": "ref-for-sec-json.stringify\u2460"}, {"id": "ref-for-sec-json.stringify\u2461"}, {"id": "ref-for-sec-json.stringify\u2462"}], "title": "6. JSON"}], "external": true};
-window.dfnpanelData['437d21ea'] = {"dfnID": "437d21ea", "url": "https://tc39.github.io/ecma262/#sec-arraycreate", "dfnText": "ArrayCreate", "refSections": [{"refs": [{"id": "ref-for-sec-arraycreate"}], "title": "6. JSON"}], "external": true};
-window.dfnpanelData['1010768b'] = {"dfnID": "1010768b", "url": "https://tc39.github.io/ecma262/#sec-call", "dfnText": "Call", "refSections": [{"refs": [{"id": "ref-for-sec-call"}, {"id": "ref-for-sec-call\u2460"}, {"id": "ref-for-sec-call\u2461"}, {"id": "ref-for-sec-call\u2462"}], "title": "6. JSON"}], "external": true};
-window.dfnpanelData['cef3e940'] = {"dfnID": "cef3e940", "url": "https://tc39.github.io/ecma262/#sec-createdatapropertyorthrow", "dfnText": "CreateDataPropertyOrThrow", "refSections": [{"refs": [{"id": "ref-for-sec-createdatapropertyorthrow"}, {"id": "ref-for-sec-createdatapropertyorthrow\u2460"}], "title": "6. JSON"}], "external": true};
-window.dfnpanelData['0d804898'] = {"dfnID": "0d804898", "url": "https://tc39.github.io/ecma262/#sec-get-o-p", "dfnText": "Get", "refSections": [{"refs": [{"id": "ref-for-sec-get-o-p"}, {"id": "ref-for-sec-get-o-p\u2460"}, {"id": "ref-for-sec-get-o-p\u2461"}], "title": "6. JSON"}], "external": true};
-window.dfnpanelData['41110b4b'] = {"dfnID": "41110b4b", "url": "https://tc39.github.io/ecma262/#sec-isarray", "dfnText": "IsArray", "refSections": [{"refs": [{"id": "ref-for-sec-isarray"}], "title": "6. JSON"}], "external": true};
-window.dfnpanelData['cb213548'] = {"dfnID": "cb213548", "url": "https://tc39.github.io/ecma262/#sec-ordinaryobjectcreate", "dfnText": "OrdinaryObjectCreate", "refSections": [{"refs": [{"id": "ref-for-sec-ordinaryobjectcreate"}], "title": "6. JSON"}], "external": true};
-window.dfnpanelData['d8530df1'] = {"dfnID": "d8530df1", "url": "https://tc39.github.io/ecma262/#sec-tolength", "dfnText": "ToLength", "refSections": [{"refs": [{"id": "ref-for-sec-tolength"}], "title": "6. JSON"}], "external": true};
-window.dfnpanelData['d5bd3770'] = {"dfnID": "d5bd3770", "url": "https://tc39.github.io/ecma262/#sec-tostring", "dfnText": "ToString", "refSections": [{"refs": [{"id": "ref-for-sec-tostring"}, {"id": "ref-for-sec-tostring\u2460"}], "title": "6. JSON"}], "external": true};
-window.dfnpanelData['c9258c1d'] = {"dfnID": "c9258c1d", "url": "https://tc39.github.io/ecma262/#sec-ecmascript-data-types-and-values", "dfnText": "Type", "refSections": [{"refs": [{"id": "ref-for-sec-ecmascript-data-types-and-values"}], "title": "6. JSON"}], "external": true};
-window.dfnpanelData['66553159'] = {"dfnID": "66553159", "url": "https://tc39.github.io/ecma262/#sec-list-and-record-specification-type", "dfnText": "list", "refSections": [{"refs": [{"id": "ref-for-sec-list-and-record-specification-type"}, {"id": "ref-for-sec-list-and-record-specification-type\u2460"}], "title": "5.1. Lists"}], "external": true};
-window.dfnpanelData['db6dbae4'] = {"dfnID": "db6dbae4", "url": "https://tc39.github.io/ecma262/#realm", "dfnText": "realm", "refSections": [{"refs": [{"id": "ref-for-realm"}], "title": "6. JSON"}], "external": true};
-window.dfnpanelData['b7ef7f32'] = {"dfnID": "b7ef7f32", "url": "https://tc39.github.io/ecma262/#sec-array.prototype.sort", "dfnText": "sort()", "refSections": [{"refs": [{"id": "ref-for-sec-array.prototype.sort"}], "title": "4.6. Strings"}], "external": true};
-window.dfnpanelData['1d2f9726'] = {"dfnID": "1d2f9726", "url": "https://tc39.github.io/ecma262/#sec-ecmascript-language-types-string-type", "dfnText": "the string type", "refSections": [{"refs": [{"id": "ref-for-sec-ecmascript-language-types-string-type"}], "title": "4.6. Strings"}], "external": true};
-window.dfnpanelData['b0fcb8d7'] = {"dfnID": "b0fcb8d7", "url": "https://encoding.spec.whatwg.org/#utf-8-decode", "dfnText": "utf-8 decode", "refSections": [{"refs": [{"id": "ref-for-utf-8-decode"}], "title": "3.4. Variables"}, {"refs": [{"id": "ref-for-utf-8-decode\u2460"}], "title": "4.3. Bytes"}, {"refs": [{"id": "ref-for-utf-8-decode\u2461"}], "title": "4.6. Strings"}, {"refs": [{"id": "ref-for-utf-8-decode\u2462"}, {"id": "ref-for-utf-8-decode\u2463"}], "title": "6. JSON"}], "external": true};
-window.dfnpanelData['0303e8e5'] = {"dfnID": "0303e8e5", "url": "https://encoding.spec.whatwg.org/#utf-8-encode", "dfnText": "utf-8 encode", "refSections": [{"refs": [{"id": "ref-for-utf-8-encode"}], "title": "4.4. Byte sequences"}, {"refs": [{"id": "ref-for-utf-8-encode\u2460"}, {"id": "ref-for-utf-8-encode\u2461"}], "title": "4.6. Strings"}, {"refs": [{"id": "ref-for-utf-8-encode\u2462"}, {"id": "ref-for-utf-8-encode\u2463"}], "title": "6. JSON"}], "external": true};
-window.dfnpanelData['82ca3efc'] = {"dfnID": "82ca3efc", "url": "https://webidl.spec.whatwg.org/#exceptiondef-typeerror", "dfnText": "TypeError", "refSections": [{"refs": [{"id": "ref-for-exceptiondef-typeerror"}], "title": "6. JSON"}], "external": true};
-window.dfnpanelData['willful-violation'] = {"dfnID": "willful-violation", "url": "#willful-violation", "dfnText": "willful violation", "refSections": [{"refs": [{"id": "ref-for-willful-violation"}], "title": "2.1. Conformance"}, {"refs": [{"id": "ref-for-willful-violation\u2460"}], "title": "2.2. Compliance with other specifications"}], "external": false};
-window.dfnpanelData['user-agent'] = {"dfnID": "user-agent", "url": "#user-agent", "dfnText": "user agent", "refSections": [{"refs": [{"id": "ref-for-user-agent"}, {"id": "ref-for-user-agent\u2460"}, {"id": "ref-for-user-agent\u2461"}, {"id": "ref-for-user-agent\u2462"}], "title": "2.3. Terminology"}], "external": false};
-window.dfnpanelData['implementation-defined'] = {"dfnID": "implementation-defined", "url": "#implementation-defined", "dfnText": "implementation-defined", "refSections": [{"refs": [{"id": "ref-for-implementation-defined"}, {"id": "ref-for-implementation-defined\u2460"}], "title": "2.3. Terminology"}], "external": false};
-window.dfnpanelData['abort-when'] = {"dfnID": "abort-when", "url": "#abort-when", "dfnText": "abort when", "refSections": [{"refs": [{"id": "ref-for-abort-when"}, {"id": "ref-for-abort-when\u2460"}], "title": "3.6. Conditional abort"}], "external": false};
-window.dfnpanelData['if-aborted'] = {"dfnID": "if-aborted", "url": "#if-aborted", "dfnText": "if aborted", "refSections": [{"refs": [{"id": "ref-for-if-aborted"}], "title": "3.6. Conditional abort"}], "external": false};
-window.dfnpanelData['iteration-while'] = {"dfnID": "iteration-while", "url": "#iteration-while", "dfnText": "While", "refSections": [{"refs": [{"id": "ref-for-iteration-while"}], "title": "4.4. Byte sequences"}, {"refs": [{"id": "ref-for-iteration-while\u2460"}], "title": "4.6. Strings"}, {"refs": [{"id": "ref-for-iteration-while\u2461"}], "title": "5.1.1. Stacks"}, {"refs": [{"id": "ref-for-iteration-while\u2462"}], "title": "5.1.2. Queues"}], "external": false};
-window.dfnpanelData['iteration-continue'] = {"dfnID": "iteration-continue", "url": "#iteration-continue", "dfnText": "continue", "refSections": [{"refs": [{"id": "ref-for-iteration-continue"}, {"id": "ref-for-iteration-continue\u2460"}], "title": "3.7. Iteration"}], "external": false};
-window.dfnpanelData['iteration-break'] = {"dfnID": "iteration-break", "url": "#iteration-break", "dfnText": "break", "refSections": [{"refs": [{"id": "ref-for-iteration-break"}, {"id": "ref-for-iteration-break\u2460"}], "title": "3.7. Iteration"}], "external": false};
-window.dfnpanelData['assert'] = {"dfnID": "assert", "url": "#assert", "dfnText": "Assert", "refSections": [{"refs": [{"id": "ref-for-assert"}], "title": "3.4. Variables"}, {"refs": [{"id": "ref-for-assert\u2460"}], "title": "3.8. Assertions"}, {"refs": [{"id": "ref-for-assert\u2461"}, {"id": "ref-for-assert\u2462"}, {"id": "ref-for-assert\u2463"}, {"id": "ref-for-assert\u2464"}, {"id": "ref-for-assert\u2465"}], "title": "4.6. Strings"}, {"refs": [{"id": "ref-for-assert\u2466"}, {"id": "ref-for-assert\u2467"}], "title": "5.1. Lists"}, {"refs": [{"id": "ref-for-assert\u2468"}], "title": "6. JSON"}], "external": false};
-window.dfnpanelData['boolean'] = {"dfnID": "boolean", "url": "#boolean", "dfnText": "boolean", "refSections": [{"refs": [{"id": "ref-for-boolean"}, {"id": "ref-for-boolean\u2460"}], "title": "3.3. Parameters"}, {"refs": [{"id": "ref-for-boolean\u2461"}, {"id": "ref-for-boolean\u2462"}, {"id": "ref-for-boolean\u2463"}, {"id": "ref-for-boolean\u2464"}], "title": "6. JSON"}], "external": false};
-window.dfnpanelData['byte'] = {"dfnID": "byte", "url": "#byte", "dfnText": "byte", "refSections": [{"refs": [{"id": "ref-for-byte"}, {"id": "ref-for-byte\u2460"}, {"id": "ref-for-byte\u2461"}], "title": "4.3. Bytes"}, {"refs": [{"id": "ref-for-byte\u2462"}, {"id": "ref-for-byte\u2463"}, {"id": "ref-for-byte\u2464"}, {"id": "ref-for-byte\u2465"}, {"id": "ref-for-byte\u2466"}, {"id": "ref-for-byte\u2467"}, {"id": "ref-for-byte\u2468"}, {"id": "ref-for-byte\u2460\u24ea"}], "title": "4.4. Byte sequences"}, {"refs": [{"id": "ref-for-byte\u2460\u2460"}], "title": "4.6. Strings"}], "external": false};
-window.dfnpanelData['byte-value'] = {"dfnID": "byte-value", "url": "#byte-value", "dfnText": "value", "refSections": [{"refs": [{"id": "ref-for-byte-value"}], "title": "4.3. Bytes"}, {"refs": [{"id": "ref-for-byte-value\u2460"}], "title": "4.4. Byte sequences"}, {"refs": [{"id": "ref-for-byte-value\u2461"}], "title": "4.6. Strings"}], "external": false};
-window.dfnpanelData['ascii-byte'] = {"dfnID": "ascii-byte", "url": "#ascii-byte", "dfnText": "ASCII byte", "refSections": [{"refs": [{"id": "ref-for-ascii-byte"}], "title": "4.3. Bytes"}, {"refs": [{"id": "ref-for-ascii-byte\u2460"}], "title": "4.6. Strings"}], "external": false};
-window.dfnpanelData['byte-sequence'] = {"dfnID": "byte-sequence", "url": "#byte-sequence", "dfnText": "byte sequence", "refSections": [{"refs": [{"id": "ref-for-byte-sequence"}, {"id": "ref-for-byte-sequence\u2460"}, {"id": "ref-for-byte-sequence\u2461"}], "title": "3.2. Declaration"}, {"refs": [{"id": "ref-for-byte-sequence\u2462"}, {"id": "ref-for-byte-sequence\u2463"}, {"id": "ref-for-byte-sequence\u2464"}, {"id": "ref-for-byte-sequence\u2465"}, {"id": "ref-for-byte-sequence\u2466"}, {"id": "ref-for-byte-sequence\u2467"}, {"id": "ref-for-byte-sequence\u2468"}, {"id": "ref-for-byte-sequence\u2460\u24ea"}, {"id": "ref-for-byte-sequence\u2460\u2460"}, {"id": "ref-for-byte-sequence\u2460\u2461"}, {"id": "ref-for-byte-sequence\u2460\u2462"}, {"id": "ref-for-byte-sequence\u2460\u2463"}], "title": "4.4. Byte sequences"}, {"refs": [{"id": "ref-for-byte-sequence\u2460\u2464"}, {"id": "ref-for-byte-sequence\u2460\u2465"}, {"id": "ref-for-byte-sequence\u2460\u2466"}], "title": "4.6. Strings"}, {"refs": [{"id": "ref-for-byte-sequence\u2460\u2467"}], "title": "5.2. Maps"}, {"refs": [{"id": "ref-for-byte-sequence\u2460\u2468"}, {"id": "ref-for-byte-sequence\u2461\u24ea"}], "title": "6. JSON"}, {"refs": [{"id": "ref-for-byte-sequence\u2461\u2460"}, {"id": "ref-for-byte-sequence\u2461\u2461"}], "title": "7. Forgiving base64"}], "external": false};
-window.dfnpanelData['byte-sequence-length'] = {"dfnID": "byte-sequence-length", "url": "#byte-sequence-length", "dfnText": "length", "refSections": [{"refs": [{"id": "ref-for-byte-sequence-length"}, {"id": "ref-for-byte-sequence-length\u2460"}, {"id": "ref-for-byte-sequence-length\u2461"}], "title": "4.4. Byte sequences"}, {"refs": [{"id": "ref-for-byte-sequence-length\u2462"}], "title": "4.6. Strings"}], "external": false};
-window.dfnpanelData['byte-lowercase'] = {"dfnID": "byte-lowercase", "url": "#byte-lowercase", "dfnText": "byte-lowercase", "refSections": [{"refs": [{"id": "ref-for-byte-lowercase"}, {"id": "ref-for-byte-lowercase\u2460"}], "title": "4.4. Byte sequences"}], "external": false};
-window.dfnpanelData['byte-sequence-prefix'] = {"dfnID": "byte-sequence-prefix", "url": "#byte-sequence-prefix", "dfnText": "prefix", "refSections": [{"refs": [{"id": "ref-for-byte-sequence-prefix"}, {"id": "ref-for-byte-sequence-prefix\u2460"}, {"id": "ref-for-byte-sequence-prefix\u2461"}], "title": "4.4. Byte sequences"}], "external": false};
-window.dfnpanelData['isomorphic-decode'] = {"dfnID": "isomorphic-decode", "url": "#isomorphic-decode", "dfnText": "isomorphic decode", "refSections": [{"refs": [{"id": "ref-for-isomorphic-decode"}], "title": "3.2. Declaration"}, {"refs": [{"id": "ref-for-isomorphic-decode\u2460"}, {"id": "ref-for-isomorphic-decode\u2461"}], "title": "4.6. Strings"}], "external": false};
-window.dfnpanelData['code-point'] = {"dfnID": "code-point", "url": "#code-point", "dfnText": "code point", "refSections": [{"refs": [{"id": "ref-for-code-point"}], "title": "4.3. Bytes"}, {"refs": [{"id": "ref-for-code-point\u2460"}], "title": "4.4. Byte sequences"}, {"refs": [{"id": "ref-for-code-point\u2461"}, {"id": "ref-for-code-point\u2462"}, {"id": "ref-for-code-point\u2463"}, {"id": "ref-for-code-point\u2464"}, {"id": "ref-for-code-point\u2465"}, {"id": "ref-for-code-point\u2466"}, {"id": "ref-for-code-point\u2467"}, {"id": "ref-for-code-point\u2468"}, {"id": "ref-for-code-point\u2460\u24ea"}, {"id": "ref-for-code-point\u2460\u2460"}, {"id": "ref-for-code-point\u2460\u2461"}, {"id": "ref-for-code-point\u2460\u2462"}, {"id": "ref-for-code-point\u2460\u2463"}, {"id": "ref-for-code-point\u2460\u2464"}, {"id": "ref-for-code-point\u2460\u2465"}, {"id": "ref-for-code-point\u2460\u2466"}, {"id": "ref-for-code-point\u2460\u2467"}, {"id": "ref-for-code-point\u2460\u2468"}, {"id": "ref-for-code-point\u2461\u24ea"}, {"id": "ref-for-code-point\u2461\u2460"}], "title": "4.5. Code points"}, {"refs": [{"id": "ref-for-code-point\u2461\u2461"}, {"id": "ref-for-code-point\u2461\u2462"}, {"id": "ref-for-code-point\u2461\u2463"}, {"id": "ref-for-code-point\u2461\u2464"}, {"id": "ref-for-code-point\u2461\u2465"}, {"id": "ref-for-code-point\u2461\u2466"}, {"id": "ref-for-code-point\u2461\u2467"}, {"id": "ref-for-code-point\u2461\u2468"}, {"id": "ref-for-code-point\u2462\u24ea"}, {"id": "ref-for-code-point\u2462\u2460"}, {"id": "ref-for-code-point\u2462\u2461"}, {"id": "ref-for-code-point\u2462\u2462"}, {"id": "ref-for-code-point\u2462\u2463"}, {"id": "ref-for-code-point\u2462\u2464"}, {"id": "ref-for-code-point\u2462\u2465"}, {"id": "ref-for-code-point\u2462\u2466"}, {"id": "ref-for-code-point\u2462\u2467"}, {"id": "ref-for-code-point\u2462\u2468"}, {"id": "ref-for-code-point\u2463\u24ea"}, {"id": "ref-for-code-point\u2463\u2460"}, {"id": "ref-for-code-point\u2463\u2461"}, {"id": "ref-for-code-point\u2463\u2462"}, {"id": "ref-for-code-point\u2463\u2463"}, {"id": "ref-for-code-point\u2463\u2464"}, {"id": "ref-for-code-point\u2463\u2465"}, {"id": "ref-for-code-point\u2463\u2466"}, {"id": "ref-for-code-point\u2463\u2467"}, {"id": "ref-for-code-point\u2463\u2468"}], "title": "4.6. Strings"}, {"refs": [{"id": "ref-for-code-point\u2464\u24ea"}, {"id": "ref-for-code-point\u2464\u2460"}, {"id": "ref-for-code-point\u2464\u2461"}], "title": "7. Forgiving base64"}], "external": false};
-window.dfnpanelData['code-point-value'] = {"dfnID": "code-point-value", "url": "#code-point-value", "dfnText": "value", "refSections": [{"refs": [{"id": "ref-for-code-point-value"}], "title": "4.4. Byte sequences"}, {"refs": [{"id": "ref-for-code-point-value\u2460"}], "title": "4.6. Strings"}], "external": false};
-window.dfnpanelData['surrogate'] = {"dfnID": "surrogate", "url": "#surrogate", "dfnText": "surrogate", "refSections": [{"refs": [{"id": "ref-for-surrogate"}], "title": "4.5. Code points"}, {"refs": [{"id": "ref-for-surrogate\u2460"}, {"id": "ref-for-surrogate\u2461"}], "title": "4.6. Strings"}], "external": false};
-window.dfnpanelData['scalar-value'] = {"dfnID": "scalar-value", "url": "#scalar-value", "dfnText": "scalar value", "refSections": [{"refs": [{"id": "ref-for-scalar-value"}, {"id": "ref-for-scalar-value\u2460"}, {"id": "ref-for-scalar-value\u2461"}], "title": "4.6. Strings"}], "external": false};
-window.dfnpanelData['ascii-code-point'] = {"dfnID": "ascii-code-point", "url": "#ascii-code-point", "dfnText": "ASCII code point", "refSections": [{"refs": [{"id": "ref-for-ascii-code-point"}], "title": "4.6. Strings"}], "external": false};
-window.dfnpanelData['ascii-whitespace'] = {"dfnID": "ascii-whitespace", "url": "#ascii-whitespace", "dfnText": "ASCII whitespace", "refSections": [{"refs": [{"id": "ref-for-ascii-whitespace"}, {"id": "ref-for-ascii-whitespace\u2460"}, {"id": "ref-for-ascii-whitespace\u2461"}, {"id": "ref-for-ascii-whitespace\u2462"}, {"id": "ref-for-ascii-whitespace\u2463"}, {"id": "ref-for-ascii-whitespace\u2464"}], "title": "4.6. Strings"}, {"refs": [{"id": "ref-for-ascii-whitespace\u2465"}], "title": "7. Forgiving base64"}], "external": false};
-window.dfnpanelData['c0-control'] = {"dfnID": "c0-control", "url": "#c0-control", "dfnText": "C0 control", "refSections": [{"refs": [{"id": "ref-for-c0-control"}, {"id": "ref-for-c0-control\u2460"}], "title": "4.5. Code points"}], "external": false};
-window.dfnpanelData['ascii-digit'] = {"dfnID": "ascii-digit", "url": "#ascii-digit", "dfnText": "ASCII digit", "refSections": [{"refs": [{"id": "ref-for-ascii-digit"}, {"id": "ref-for-ascii-digit\u2460"}, {"id": "ref-for-ascii-digit\u2461"}], "title": "4.5. Code points"}], "external": false};
-window.dfnpanelData['ascii-upper-hex-digit'] = {"dfnID": "ascii-upper-hex-digit", "url": "#ascii-upper-hex-digit", "dfnText": "ASCII upper hex digit", "refSections": [{"refs": [{"id": "ref-for-ascii-upper-hex-digit"}], "title": "4.3. Bytes"}, {"refs": [{"id": "ref-for-ascii-upper-hex-digit\u2460"}, {"id": "ref-for-ascii-upper-hex-digit\u2461"}], "title": "4.5. Code points"}], "external": false};
-window.dfnpanelData['ascii-lower-hex-digit'] = {"dfnID": "ascii-lower-hex-digit", "url": "#ascii-lower-hex-digit", "dfnText": "ASCII lower hex digit", "refSections": [{"refs": [{"id": "ref-for-ascii-lower-hex-digit"}], "title": "4.5. Code points"}], "external": false};
-window.dfnpanelData['ascii-upper-alpha'] = {"dfnID": "ascii-upper-alpha", "url": "#ascii-upper-alpha", "dfnText": "ASCII upper alpha", "refSections": [{"refs": [{"id": "ref-for-ascii-upper-alpha"}], "title": "4.5. Code points"}, {"refs": [{"id": "ref-for-ascii-upper-alpha\u2460"}, {"id": "ref-for-ascii-upper-alpha\u2461"}], "title": "4.6. Strings"}], "external": false};
-window.dfnpanelData['ascii-lower-alpha'] = {"dfnID": "ascii-lower-alpha", "url": "#ascii-lower-alpha", "dfnText": "ASCII lower alpha", "refSections": [{"refs": [{"id": "ref-for-ascii-lower-alpha"}], "title": "4.5. Code points"}, {"refs": [{"id": "ref-for-ascii-lower-alpha\u2460"}, {"id": "ref-for-ascii-lower-alpha\u2461"}], "title": "4.6. Strings"}], "external": false};
-window.dfnpanelData['ascii-alpha'] = {"dfnID": "ascii-alpha", "url": "#ascii-alpha", "dfnText": "ASCII alpha", "refSections": [{"refs": [{"id": "ref-for-ascii-alpha"}], "title": "4.5. Code points"}], "external": false};
-window.dfnpanelData['ascii-alphanumeric'] = {"dfnID": "ascii-alphanumeric", "url": "#ascii-alphanumeric", "dfnText": "ASCII alphanumeric", "refSections": [{"refs": [{"id": "ref-for-ascii-alphanumeric"}], "title": "7. Forgiving base64"}], "external": false};
-window.dfnpanelData['string'] = {"dfnID": "string", "url": "#string", "dfnText": "string", "refSections": [{"refs": [{"id": "ref-for-string"}], "title": "3.2. Declaration"}, {"refs": [{"id": "ref-for-string\u2460"}, {"id": "ref-for-string\u2461"}], "title": "3.4. Variables"}, {"refs": [{"id": "ref-for-string\u2462"}, {"id": "ref-for-string\u2463"}, {"id": "ref-for-string\u2464"}], "title": "4.4. Byte sequences"}, {"refs": [{"id": "ref-for-string\u2465"}, {"id": "javascript-string"}, {"id": "ref-for-string\u2466"}, {"id": "ref-for-string\u2467"}, {"id": "ref-for-string\u2468"}, {"id": "ref-for-string\u2460\u24ea"}, {"id": "ref-for-string\u2460\u2460"}, {"id": "ref-for-string\u2460\u2461"}, {"id": "ref-for-string\u2460\u2462"}, {"id": "ref-for-string\u2460\u2463"}, {"id": "ref-for-string\u2460\u2464"}, {"id": "ref-for-string\u2460\u2465"}, {"id": "ref-for-string\u2460\u2466"}, {"id": "ref-for-string\u2460\u2467"}, {"id": "ref-for-string\u2460\u2468"}, {"id": "ref-for-string\u2461\u24ea"}, {"id": "ref-for-string\u2461\u2460"}, {"id": "ref-for-string\u2461\u2461"}, {"id": "ref-for-string\u2461\u2462"}, {"id": "ref-for-string\u2461\u2463"}, {"id": "ref-for-string\u2461\u2464"}, {"id": "ref-for-string\u2461\u2465"}, {"id": "ref-for-string\u2461\u2466"}, {"id": "ref-for-string\u2461\u2467"}, {"id": "ref-for-string\u2461\u2468"}, {"id": "ref-for-string\u2462\u24ea"}, {"id": "ref-for-string\u2462\u2460"}, {"id": "ref-for-string\u2462\u2461"}, {"id": "ref-for-string\u2462\u2462"}, {"id": "ref-for-string\u2462\u2463"}, {"id": "ref-for-string\u2462\u2464"}, {"id": "ref-for-string\u2462\u2465"}, {"id": "ref-for-string\u2462\u2466"}, {"id": "ref-for-string\u2462\u2467"}, {"id": "ref-for-string\u2462\u2468"}, {"id": "ref-for-string\u2463\u24ea"}, {"id": "ref-for-string\u2463\u2460"}, {"id": "ref-for-string\u2463\u2461"}, {"id": "ref-for-string\u2463\u2462"}, {"id": "ref-for-string\u2463\u2463"}, {"id": "ref-for-string\u2463\u2464"}, {"id": "ref-for-string\u2463\u2465"}, {"id": "ref-for-string\u2463\u2466"}, {"id": "ref-for-string\u2463\u2467"}, {"id": "ref-for-string\u2463\u2468"}, {"id": "ref-for-string\u2464\u24ea"}, {"id": "ref-for-string\u2464\u2460"}, {"id": "ref-for-string\u2464\u2461"}, {"id": "ref-for-string\u2464\u2462"}], "title": "4.6. Strings"}, {"refs": [{"id": "ref-for-string\u2464\u2463"}, {"id": "ref-for-string\u2464\u2464"}, {"id": "ref-for-string\u2464\u2465"}], "title": "5.1. Lists"}, {"refs": [{"id": "ref-for-string\u2464\u2466"}, {"id": "ref-for-string\u2464\u2467"}, {"id": "ref-for-string\u2464\u2468"}, {"id": "ref-for-string\u2465\u24ea"}, {"id": "ref-for-string\u2465\u2460"}, {"id": "ref-for-string\u2465\u2461"}, {"id": "ref-for-string\u2465\u2462"}, {"id": "ref-for-string\u2465\u2463"}, {"id": "ref-for-string\u2465\u2464"}, {"id": "ref-for-string\u2465\u2465"}], "title": "6. JSON"}], "external": false};
-window.dfnpanelData['code-unit'] = {"dfnID": "code-unit", "url": "#code-unit", "dfnText": "code units", "refSections": [{"refs": [{"id": "ref-for-code-unit"}, {"id": "ref-for-code-unit\u2460"}, {"id": "ref-for-code-unit\u2461"}, {"id": "ref-for-code-unit\u2462"}, {"id": "ref-for-code-unit\u2463"}, {"id": "ref-for-code-unit\u2464"}, {"id": "ref-for-code-unit\u2465"}], "title": "4.6. Strings"}], "external": false};
-window.dfnpanelData['string-length'] = {"dfnID": "string-length", "url": "#string-length", "dfnText": "length", "refSections": [{"refs": [{"id": "ref-for-string-length"}, {"id": "ref-for-string-length\u2460"}], "title": "4.6. Strings"}], "external": false};
-window.dfnpanelData['string-code-point-length'] = {"dfnID": "string-code-point-length", "url": "#string-code-point-length", "dfnText": "code point length", "refSections": [{"refs": [{"id": "ref-for-string-code-point-length"}], "title": "4.4. Byte sequences"}, {"refs": [{"id": "ref-for-string-code-point-length\u2460"}], "title": "4.6. Strings"}, {"refs": [{"id": "ref-for-string-code-point-length\u2461"}, {"id": "ref-for-string-code-point-length\u2462"}], "title": "7. Forgiving base64"}], "external": false};
-window.dfnpanelData['scalar-value-string'] = {"dfnID": "scalar-value-string", "url": "#scalar-value-string", "dfnText": "scalar value string", "refSections": [{"refs": [{"id": "ref-for-scalar-value-string"}, {"id": "ref-for-scalar-value-string\u2460"}, {"id": "ref-for-scalar-value-string\u2461"}, {"id": "ref-for-scalar-value-string\u2462"}, {"id": "ref-for-scalar-value-string\u2463"}, {"id": "ref-for-scalar-value-string\u2464"}], "title": "4.6. Strings"}], "external": false};
-window.dfnpanelData['javascript-string-convert'] = {"dfnID": "javascript-string-convert", "url": "#javascript-string-convert", "dfnText": "convert", "refSections": [{"refs": [{"id": "ref-for-javascript-string-convert"}], "title": "4.6. Strings"}], "external": false};
-window.dfnpanelData['string-is'] = {"dfnID": "string-is", "url": "#string-is", "dfnText": "is", "refSections": [{"refs": [{"id": "ref-for-string-is"}, {"id": "ref-for-string-is\u2460"}, {"id": "ref-for-string-is\u2461"}, {"id": "ref-for-string-is\u2462"}], "title": "4.6. Strings"}], "external": false};
-window.dfnpanelData['code-unit-prefix'] = {"dfnID": "code-unit-prefix", "url": "#code-unit-prefix", "dfnText": "code unit prefix", "refSections": [{"refs": [{"id": "ref-for-code-unit-prefix"}, {"id": "ref-for-code-unit-prefix\u2460"}, {"id": "ref-for-code-unit-prefix\u2461"}, {"id": "ref-for-code-unit-prefix\u2462"}], "title": "4.6. Strings"}], "external": false};
-window.dfnpanelData['string-starts-with'] = {"dfnID": "string-starts-with", "url": "#string-starts-with", "dfnText": "starts with", "refSections": [{"refs": [{"id": "ref-for-string-starts-with"}], "title": "4.6. Strings"}], "external": false};
-window.dfnpanelData['code-unit-less-than'] = {"dfnID": "code-unit-less-than", "url": "#code-unit-less-than", "dfnText": "code unit less than", "refSections": [{"refs": [{"id": "ref-for-code-unit-less-than"}], "title": "5.1. Lists"}], "external": false};
-window.dfnpanelData['isomorphic-encode'] = {"dfnID": "isomorphic-encode", "url": "#isomorphic-encode", "dfnText": "isomorphic encode", "refSections": [{"refs": [{"id": "ref-for-isomorphic-encode"}], "title": "4.4. Byte sequences"}, {"refs": [{"id": "ref-for-isomorphic-encode\u2460"}, {"id": "ref-for-isomorphic-encode\u2461"}], "title": "4.6. Strings"}], "external": false};
-window.dfnpanelData['ascii-string'] = {"dfnID": "ascii-string", "url": "#ascii-string", "dfnText": "ASCII string", "refSections": [{"refs": [{"id": "ref-for-ascii-string"}], "title": "4.6. Strings"}], "external": false};
-window.dfnpanelData['ascii-lowercase'] = {"dfnID": "ascii-lowercase", "url": "#ascii-lowercase", "dfnText": "ASCII lowercase", "refSections": [{"refs": [{"id": "ref-for-ascii-lowercase"}, {"id": "ref-for-ascii-lowercase\u2460"}], "title": "4.6. Strings"}], "external": false};
-window.dfnpanelData['ascii-uppercase'] = {"dfnID": "ascii-uppercase", "url": "#ascii-uppercase", "dfnText": "ASCII uppercase", "refSections": [{"refs": [{"id": "ref-for-ascii-uppercase"}], "title": "3.2. Declaration"}, {"refs": [{"id": "ref-for-ascii-uppercase\u2460"}], "title": "4.5. Code points"}], "external": false};
-window.dfnpanelData['strip-leading-and-trailing-ascii-whitespace'] = {"dfnID": "strip-leading-and-trailing-ascii-whitespace", "url": "#strip-leading-and-trailing-ascii-whitespace", "dfnText": "strip leading and trailing ASCII whitespace", "refSections": [{"refs": [{"id": "ref-for-strip-leading-and-trailing-ascii-whitespace"}], "title": "4.6. Strings"}], "external": false};
-window.dfnpanelData['collect-a-sequence-of-code-points'] = {"dfnID": "collect-a-sequence-of-code-points", "url": "#collect-a-sequence-of-code-points", "dfnText": "collect a sequence of code points", "refSections": [{"refs": [{"id": "ref-for-collect-a-sequence-of-code-points"}, {"id": "ref-for-collect-a-sequence-of-code-points\u2460"}, {"id": "ref-for-collect-a-sequence-of-code-points\u2461"}, {"id": "ref-for-collect-a-sequence-of-code-points\u2462"}, {"id": "ref-for-collect-a-sequence-of-code-points\u2463"}], "title": "4.6. Strings"}], "external": false};
-window.dfnpanelData['string-position-variable'] = {"dfnID": "string-position-variable", "url": "#string-position-variable", "dfnText": "position variable", "refSections": [{"refs": [{"id": "ref-for-string-position-variable"}, {"id": "ref-for-string-position-variable\u2460"}, {"id": "ref-for-string-position-variable\u2461"}, {"id": "ref-for-string-position-variable\u2462"}, {"id": "ref-for-string-position-variable\u2463"}], "title": "4.6. Strings"}, {"refs": [{"id": "ref-for-string-position-variable\u2464"}], "title": "7. Forgiving base64"}], "external": false};
-window.dfnpanelData['skip-ascii-whitespace'] = {"dfnID": "skip-ascii-whitespace", "url": "#skip-ascii-whitespace", "dfnText": "skip ASCII whitespace", "refSections": [{"refs": [{"id": "ref-for-skip-ascii-whitespace"}, {"id": "ref-for-skip-ascii-whitespace\u2460"}], "title": "4.6. Strings"}], "external": false};
-window.dfnpanelData['split-on-ascii-whitespace'] = {"dfnID": "split-on-ascii-whitespace", "url": "#split-on-ascii-whitespace", "dfnText": "split a\nstring input on ASCII whitespace", "refSections": [{"refs": [{"id": "ref-for-split-on-ascii-whitespace"}], "title": "4.6. Strings"}], "external": false};
-window.dfnpanelData['split-on-commas'] = {"dfnID": "split-on-commas", "url": "#split-on-commas", "dfnText": "split a string\ninput on commas", "refSections": [{"refs": [{"id": "ref-for-split-on-commas"}], "title": "4.6. Strings"}], "external": false};
-window.dfnpanelData['string-concatenate'] = {"dfnID": "string-concatenate", "url": "#string-concatenate", "dfnText": "concatenate", "refSections": [{"refs": [{"id": "ref-for-string-concatenate"}], "title": "4.6. Strings"}], "external": false};
-window.dfnpanelData['list'] = {"dfnID": "list", "url": "#list", "dfnText": "list", "refSections": [{"refs": [{"id": "ref-for-list"}], "title": "3.4. Variables"}, {"refs": [{"id": "ref-for-list\u2460"}, {"id": "ref-for-list\u2461"}], "title": "3.6. Conditional abort"}, {"refs": [{"id": "ref-for-list\u2462"}], "title": "3.7. Iteration"}, {"refs": [{"id": "ref-for-list\u2463"}, {"id": "ref-for-list\u2464"}, {"id": "ref-for-list\u2465"}, {"id": "ref-for-list\u2466"}], "title": "4.6. Strings"}, {"refs": [{"id": "ref-for-list\u2467"}, {"id": "ref-for-list\u2468"}, {"id": "ref-for-list\u2460\u24ea"}, {"id": "ref-for-list\u2460\u2460"}, {"id": "ref-for-list\u2460\u2461"}, {"id": "ref-for-list\u2460\u2462"}, {"id": "ref-for-list\u2460\u2463"}, {"id": "ref-for-list\u2460\u2464"}, {"id": "ref-for-list\u2460\u2465"}, {"id": "ref-for-list\u2460\u2466"}, {"id": "ref-for-list\u2460\u2467"}, {"id": "ref-for-list\u2460\u2468"}, {"id": "ref-for-list\u2461\u24ea"}, {"id": "ref-for-list\u2461\u2460"}, {"id": "ref-for-list\u2461\u2461"}, {"id": "ref-for-list\u2461\u2462"}, {"id": "ref-for-list\u2461\u2463"}, {"id": "ref-for-list\u2461\u2464"}, {"id": "ref-for-list\u2461\u2465"}, {"id": "ref-for-list\u2461\u2466"}, {"id": "ref-for-list\u2461\u2467"}, {"id": "ref-for-list\u2461\u2468"}, {"id": "ref-for-list\u2462\u24ea"}, {"id": "ref-for-list\u2462\u2460"}, {"id": "ref-for-list\u2462\u2461"}, {"id": "ref-for-list\u2462\u2462"}, {"id": "ref-for-list\u2462\u2463"}, {"id": "ref-for-list\u2462\u2464"}], "title": "5.1. Lists"}, {"refs": [{"id": "ref-for-list\u2462\u2465"}, {"id": "ref-for-list\u2462\u2466"}, {"id": "ref-for-list\u2462\u2467"}], "title": "5.1.1. Stacks"}, {"refs": [{"id": "ref-for-list\u2462\u2468"}, {"id": "ref-for-list\u2463\u24ea"}, {"id": "ref-for-list\u2463\u2460"}], "title": "5.1.2. Queues"}, {"refs": [{"id": "ref-for-list\u2463\u2461"}, {"id": "ref-for-list\u2463\u2462"}, {"id": "ref-for-list\u2463\u2463"}, {"id": "ref-for-list\u2463\u2464"}], "title": "5.1.3. Sets"}, {"refs": [{"id": "ref-for-list\u2463\u2465"}, {"id": "ref-for-list\u2463\u2466"}], "title": "5.2. Maps"}, {"refs": [{"id": "ref-for-list\u2463\u2467"}, {"id": "ref-for-list\u2463\u2468"}, {"id": "ref-for-list\u2464\u24ea"}, {"id": "ref-for-list\u2464\u2460"}, {"id": "ref-for-list\u2464\u2461"}], "title": "6. JSON"}], "external": false};
-window.dfnpanelData['list-item'] = {"dfnID": "list-item", "url": "#list-item", "dfnText": "items", "refSections": [{"refs": [{"id": "ref-for-list-item"}], "title": "4.6. Strings"}, {"refs": [{"id": "ref-for-list-item\u2460"}], "title": "5. Data structures"}, {"refs": [{"id": "ref-for-list-item\u2461"}, {"id": "ref-for-list-item\u2462"}, {"id": "ref-for-list-item\u2463"}, {"id": "ref-for-list-item\u2464"}, {"id": "ref-for-list-item\u2465"}, {"id": "ref-for-list-item\u2466"}, {"id": "ref-for-list-item\u2467"}, {"id": "ref-for-list-item\u2468"}, {"id": "ref-for-list-item\u2460\u24ea"}, {"id": "ref-for-list-item\u2460\u2460"}, {"id": "ref-for-list-item\u2460\u2461"}, {"id": "ref-for-list-item\u2460\u2462"}, {"id": "ref-for-list-item\u2460\u2463"}, {"id": "ref-for-list-item\u2460\u2464"}], "title": "5.1. Lists"}, {"refs": [{"id": "ref-for-list-item\u2460\u2465"}], "title": "5.1.1. Stacks"}, {"refs": [{"id": "ref-for-list-item\u2460\u2466"}], "title": "5.1.2. Queues"}, {"refs": [{"id": "ref-for-list-item\u2460\u2467"}, {"id": "ref-for-list-item\u2460\u2468"}, {"id": "ref-for-list-item\u2461\u24ea"}], "title": "5.1.3. Sets"}, {"refs": [{"id": "ref-for-list-item\u2461\u2460"}, {"id": "ref-for-list-item\u2461\u2461"}], "title": "5.2. Maps"}], "external": false};
-window.dfnpanelData['list-append'] = {"dfnID": "list-append", "url": "#list-append", "dfnText": "append", "refSections": [{"refs": [{"id": "ref-for-list-append"}, {"id": "ref-for-list-append\u2460"}, {"id": "ref-for-list-append\u2461"}, {"id": "ref-for-list-append\u2462"}, {"id": "ref-for-list-append\u2463"}, {"id": "ref-for-list-append\u2464"}, {"id": "ref-for-list-append\u2465"}, {"id": "ref-for-list-append\u2466"}], "title": "3.6. Conditional abort"}, {"refs": [{"id": "ref-for-list-append\u2467"}, {"id": "ref-for-list-append\u2468"}, {"id": "ref-for-list-append\u2460\u24ea"}, {"id": "ref-for-list-append\u2460\u2460"}], "title": "4.6. Strings"}, {"refs": [{"id": "ref-for-list-append\u2460\u2461"}, {"id": "ref-for-list-append\u2460\u2462"}], "title": "5.1. Lists"}, {"refs": [{"id": "ref-for-list-append\u2460\u2463"}, {"id": "ref-for-list-append\u2460\u2464"}], "title": "5.1.1. Stacks"}, {"refs": [{"id": "ref-for-list-append\u2460\u2465"}, {"id": "ref-for-list-append\u2460\u2466"}], "title": "5.1.2. Queues"}, {"refs": [{"id": "ref-for-list-append\u2460\u2467"}], "title": "5.1.3. Sets"}, {"refs": [{"id": "ref-for-list-append\u2460\u2468"}], "title": "5.2. Maps"}, {"refs": [{"id": "ref-for-list-append\u2461\u24ea"}], "title": "6. JSON"}], "external": false};
-window.dfnpanelData['list-extend'] = {"dfnID": "list-extend", "url": "#list-extend", "dfnText": "extend", "refSections": [{"refs": [{"id": "ref-for-list-extend"}], "title": "5.1. Lists"}], "external": false};
-window.dfnpanelData['list-prepend'] = {"dfnID": "list-prepend", "url": "#list-prepend", "dfnText": "prepend", "refSections": [{"refs": [{"id": "ref-for-list-prepend"}], "title": "5.1. Lists"}, {"refs": [{"id": "ref-for-list-prepend\u2460"}], "title": "5.1.1. Stacks"}, {"refs": [{"id": "ref-for-list-prepend\u2461"}], "title": "5.1.2. Queues"}, {"refs": [{"id": "ref-for-list-prepend\u2462"}], "title": "5.1.3. Sets"}], "external": false};
-window.dfnpanelData['list-remove'] = {"dfnID": "list-remove", "url": "#list-remove", "dfnText": "remove", "refSections": [{"refs": [{"id": "ref-for-list-remove"}, {"id": "ref-for-list-remove\u2460"}, {"id": "ref-for-list-remove\u2461"}], "title": "5.1. Lists"}, {"refs": [{"id": "ref-for-list-remove\u2462"}, {"id": "ref-for-list-remove\u2463"}], "title": "5.1.1. Stacks"}, {"refs": [{"id": "ref-for-list-remove\u2464"}, {"id": "ref-for-list-remove\u2465"}], "title": "5.1.2. Queues"}, {"refs": [{"id": "ref-for-list-remove\u2466"}], "title": "5.1.3. Sets"}], "external": false};
-window.dfnpanelData['list-contain'] = {"dfnID": "list-contain", "url": "#list-contain", "dfnText": "contains", "refSections": [{"refs": [{"id": "ref-for-list-contain"}], "title": "5. Data structures"}, {"refs": [{"id": "ref-for-list-contain\u2460"}, {"id": "ref-for-list-contain\u2461"}, {"id": "ref-for-list-contain\u2462"}, {"id": "ref-for-list-contain\u2463"}], "title": "5.1. Lists"}, {"refs": [{"id": "ref-for-list-contain\u2464"}, {"id": "ref-for-list-contain\u2465"}, {"id": "ref-for-list-contain\u2466"}, {"id": "ref-for-list-contain\u2467"}, {"id": "ref-for-list-contain\u2468"}], "title": "5.1.3. Sets"}], "external": false};
-window.dfnpanelData['list-size'] = {"dfnID": "list-size", "url": "#list-size", "dfnText": "size", "refSections": [{"refs": [{"id": "ref-for-list-size"}, {"id": "ref-for-list-size\u2460"}], "title": "5.1. Lists"}, {"refs": [{"id": "ref-for-list-size\u2461"}], "title": "5.2. Maps"}], "external": false};
-window.dfnpanelData['list-is-empty'] = {"dfnID": "list-is-empty", "url": "#list-is-empty", "dfnText": "is empty", "refSections": [{"refs": [{"id": "ref-for-list-is-empty"}], "title": "4.6. Strings"}, {"refs": [{"id": "ref-for-list-is-empty\u2460"}], "title": "5.1.1. Stacks"}, {"refs": [{"id": "ref-for-list-is-empty\u2461"}], "title": "5.1.2. Queues"}], "external": false};
-window.dfnpanelData['list-iterate'] = {"dfnID": "list-iterate", "url": "#list-iterate", "dfnText": "iterate", "refSections": [{"refs": [{"id": "ref-for-list-iterate"}, {"id": "ref-for-list-iterate\u2460"}, {"id": "ref-for-list-iterate\u2461"}, {"id": "ref-for-list-iterate\u2462"}], "title": "3.7. Iteration"}, {"refs": [{"id": "ref-for-list-iterate\u2463"}, {"id": "ref-for-list-iterate\u2464"}, {"id": "ref-for-list-iterate\u2465"}], "title": "5.1. Lists"}, {"refs": [{"id": "ref-for-list-iterate\u2466"}], "title": "5.1.1. Stacks"}, {"refs": [{"id": "ref-for-list-iterate\u2467"}], "title": "5.1.2. Queues"}, {"refs": [{"id": "ref-for-list-iterate\u2468"}, {"id": "ref-for-list-iterate\u2460\u24ea"}, {"id": "ref-for-list-iterate\u2460\u2460"}, {"id": "ref-for-list-iterate\u2460\u2461"}], "title": "5.1.3. Sets"}, {"refs": [{"id": "ref-for-list-iterate\u2460\u2462"}, {"id": "ref-for-list-iterate\u2460\u2463"}, {"id": "ref-for-list-iterate\u2460\u2464"}, {"id": "ref-for-list-iterate\u2460\u2465"}], "title": "6. JSON"}], "external": false};
-window.dfnpanelData['list-clone'] = {"dfnID": "list-clone", "url": "#list-clone", "dfnText": "clone", "refSections": [{"refs": [{"id": "ref-for-list-clone"}], "title": "5.1. Lists"}, {"refs": [{"id": "ref-for-list-clone\u2460"}], "title": "5.1.3. Sets"}, {"refs": [{"id": "ref-for-list-clone\u2461"}], "title": "5.2. Maps"}], "external": false};
-window.dfnpanelData['list-sort-in-ascending-order'] = {"dfnID": "list-sort-in-ascending-order", "url": "#list-sort-in-ascending-order", "dfnText": "sort in ascending order", "refSections": [{"refs": [{"id": "ref-for-list-sort-in-ascending-order"}], "title": "5.1. Lists"}], "external": false};
-window.dfnpanelData['stack'] = {"dfnID": "stack", "url": "#stack", "dfnText": "stacks", "refSections": [{"refs": [{"id": "ref-for-stack"}, {"id": "ref-for-stack\u2460"}, {"id": "ref-for-stack\u2461"}, {"id": "ref-for-stack\u2462"}], "title": "5.1.1. Stacks"}], "external": false};
-window.dfnpanelData['stack-pop'] = {"dfnID": "stack-pop", "url": "#stack-pop", "dfnText": "pop", "refSections": [{"refs": [{"id": "ref-for-stack-pop"}], "title": "5.1.1. Stacks"}], "external": false};
-window.dfnpanelData['queue'] = {"dfnID": "queue", "url": "#queue", "dfnText": "queues", "refSections": [{"refs": [{"id": "ref-for-queue"}, {"id": "ref-for-queue\u2460"}, {"id": "ref-for-queue\u2461"}, {"id": "ref-for-queue\u2462"}], "title": "5.1.2. Queues"}], "external": false};
-window.dfnpanelData['queue-dequeue'] = {"dfnID": "queue-dequeue", "url": "#queue-dequeue", "dfnText": "dequeue", "refSections": [{"refs": [{"id": "ref-for-queue-dequeue"}], "title": "5.1.2. Queues"}], "external": false};
-window.dfnpanelData['ordered-set'] = {"dfnID": "ordered-set", "url": "#ordered-set", "dfnText": "ordered sets", "refSections": [{"refs": [{"id": "ref-for-ordered-set"}], "title": "5. Data structures"}, {"refs": [{"id": "ref-for-ordered-set\u2460"}, {"id": "ref-for-ordered-set\u2461"}, {"id": "ref-for-ordered-set\u2462"}, {"id": "ref-for-ordered-set\u2463"}, {"id": "ref-for-ordered-set\u2464"}, {"id": "ref-for-ordered-set\u2465"}], "title": "5.1. Lists"}, {"refs": [{"id": "ref-for-ordered-set\u2466"}, {"id": "ref-for-ordered-set\u2467"}, {"id": "ref-for-ordered-set\u2468"}, {"id": "ref-for-ordered-set\u2460\u24ea"}, {"id": "ref-for-ordered-set\u2460\u2460"}, {"id": "ref-for-ordered-set\u2460\u2461"}, {"id": "ref-for-ordered-set\u2460\u2462"}, {"id": "ref-for-ordered-set\u2460\u2463"}, {"id": "ref-for-ordered-set\u2460\u2464"}, {"id": "ref-for-ordered-set\u2460\u2465"}, {"id": "ref-for-ordered-set\u2460\u2466"}], "title": "5.1.3. Sets"}, {"refs": [{"id": "ref-for-ordered-set\u2460\u2467"}, {"id": "ref-for-ordered-set\u2460\u2468"}], "title": "5.2. Maps"}], "external": false};
-window.dfnpanelData['set-append'] = {"dfnID": "set-append", "url": "#set-append", "dfnText": "append", "refSections": [{"refs": [{"id": "ref-for-set-append"}], "title": "5. Data structures"}, {"refs": [{"id": "ref-for-set-append\u2460"}], "title": "5.1. Lists"}, {"refs": [{"id": "ref-for-set-append\u2461"}, {"id": "ref-for-set-append\u2462"}], "title": "5.1.3. Sets"}], "external": false};
-window.dfnpanelData['set-prepend'] = {"dfnID": "set-prepend", "url": "#set-prepend", "dfnText": "prepend", "refSections": [{"refs": [{"id": "ref-for-set-prepend"}], "title": "5.1. Lists"}], "external": false};
-window.dfnpanelData['set-replace'] = {"dfnID": "set-replace", "url": "#set-replace", "dfnText": "replace", "refSections": [{"refs": [{"id": "ref-for-set-replace"}, {"id": "ref-for-set-replace\u2460"}], "title": "5.1. Lists"}, {"refs": [{"id": "ref-for-set-replace\u2461"}], "title": "5.1.3. Sets"}], "external": false};
-window.dfnpanelData['set-subset'] = {"dfnID": "set-subset", "url": "#set-subset", "dfnText": "subset", "refSections": [{"refs": [{"id": "ref-for-set-subset"}], "title": "5.1.3. Sets"}], "external": false};
-window.dfnpanelData['set-superset'] = {"dfnID": "set-superset", "url": "#set-superset", "dfnText": "superset", "refSections": [{"refs": [{"id": "ref-for-set-superset"}], "title": "5.1.3. Sets"}], "external": false};
-window.dfnpanelData['the-range'] = {"dfnID": "the-range", "url": "#the-range", "dfnText": "The range", "refSections": [{"refs": [{"id": "ref-for-the-range"}], "title": "5.1.3. Sets"}, {"refs": [{"id": "ref-for-the-range\u2460"}], "title": "6. JSON"}], "external": false};
-window.dfnpanelData['ordered-map'] = {"dfnID": "ordered-map", "url": "#ordered-map", "dfnText": "ordered map", "refSections": [{"refs": [{"id": "ref-for-ordered-map"}], "title": "5. Data structures"}, {"refs": [{"id": "ref-for-ordered-map\u2460"}, {"id": "ref-for-ordered-map\u2461"}, {"id": "ref-for-ordered-map\u2462"}, {"id": "ref-for-ordered-map\u2463"}, {"id": "ref-for-ordered-map\u2464"}, {"id": "ref-for-ordered-map\u2465"}, {"id": "ref-for-ordered-map\u2466"}, {"id": "ref-for-ordered-map\u2467"}, {"id": "ref-for-ordered-map\u2468"}, {"id": "ref-for-ordered-map\u2460\u24ea"}, {"id": "ref-for-ordered-map\u2460\u2460"}, {"id": "ref-for-ordered-map\u2460\u2461"}, {"id": "ref-for-ordered-map\u2460\u2462"}, {"id": "ref-for-ordered-map\u2460\u2463"}, {"id": "ref-for-ordered-map\u2460\u2464"}, {"id": "ref-for-ordered-map\u2460\u2465"}, {"id": "ref-for-ordered-map\u2460\u2466"}, {"id": "ref-for-ordered-map\u2460\u2467"}, {"id": "ref-for-ordered-map\u2460\u2468"}, {"id": "ref-for-ordered-map\u2461\u24ea"}, {"id": "ref-for-ordered-map\u2461\u2460"}, {"id": "ref-for-ordered-map\u2461\u2461"}, {"id": "ref-for-ordered-map\u2461\u2462"}, {"id": "ref-for-ordered-map\u2461\u2463"}], "title": "5.2. Maps"}, {"refs": [{"id": "ref-for-ordered-map\u2461\u2464"}, {"id": "ref-for-ordered-map\u2461\u2465"}, {"id": "ref-for-ordered-map\u2461\u2466"}, {"id": "ref-for-ordered-map\u2461\u2467"}, {"id": "ref-for-ordered-map\u2461\u2468"}], "title": "6. JSON"}], "external": false};
-window.dfnpanelData['map-key'] = {"dfnID": "map-key", "url": "#map-key", "dfnText": "key", "refSections": [{"refs": [{"id": "ref-for-map-key"}, {"id": "ref-for-map-key\u2460"}, {"id": "ref-for-map-key\u2461"}, {"id": "ref-for-map-key\u2462"}, {"id": "ref-for-map-key\u2463"}, {"id": "ref-for-map-key\u2464"}, {"id": "ref-for-map-key\u2465"}, {"id": "ref-for-map-key\u2466"}], "title": "5.2. Maps"}], "external": false};
-window.dfnpanelData['map-value'] = {"dfnID": "map-value", "url": "#map-value", "dfnText": "value", "refSections": [{"refs": [{"id": "ref-for-map-value"}, {"id": "ref-for-map-value\u2460"}, {"id": "ref-for-map-value\u2461"}, {"id": "ref-for-map-value\u2462"}, {"id": "ref-for-map-value\u2463"}], "title": "5.2. Maps"}], "external": false};
-window.dfnpanelData['map-entry'] = {"dfnID": "map-entry", "url": "#map-entry", "dfnText": "entry", "refSections": [{"refs": [{"id": "ref-for-map-entry"}, {"id": "ref-for-map-entry\u2460"}, {"id": "ref-for-map-entry\u2461"}, {"id": "ref-for-map-entry\u2462"}, {"id": "ref-for-map-entry\u2463"}, {"id": "ref-for-map-entry\u2464"}, {"id": "ref-for-map-entry\u2465"}, {"id": "ref-for-map-entry\u2466"}, {"id": "ref-for-map-entry\u2467"}, {"id": "ref-for-map-entry\u2468"}, {"id": "ref-for-map-entry\u2460\u24ea"}], "title": "5.2. Maps"}], "external": false};
-window.dfnpanelData['map-get'] = {"dfnID": "map-get", "url": "#map-get", "dfnText": "get the value of an entry", "refSections": [{"refs": [{"id": "ref-for-map-get"}], "title": "5.2. Maps"}], "external": false};
-window.dfnpanelData['map-set'] = {"dfnID": "map-set", "url": "#map-set", "dfnText": "set the value of an entry", "refSections": [{"refs": [{"id": "ref-for-map-set"}, {"id": "ref-for-map-set\u2460"}, {"id": "ref-for-map-set\u2461"}], "title": "5.2. Maps"}, {"refs": [{"id": "ref-for-map-set\u2462"}], "title": "6. JSON"}], "external": false};
-window.dfnpanelData['map-remove'] = {"dfnID": "map-remove", "url": "#map-remove", "dfnText": "remove an entry", "refSections": [{"refs": [{"id": "ref-for-map-remove"}], "title": "5.2. Maps"}], "external": false};
-window.dfnpanelData['map-exists'] = {"dfnID": "map-exists", "url": "#map-exists", "dfnText": "contains an\nentry with a given key", "refSections": [{"refs": [{"id": "ref-for-map-exists"}, {"id": "ref-for-map-exists\u2460"}, {"id": "ref-for-map-exists\u2461"}, {"id": "ref-for-map-exists\u2462"}], "title": "5.2. Maps"}], "external": false};
-window.dfnpanelData['map-getting-the-keys'] = {"dfnID": "map-getting-the-keys", "url": "#map-getting-the-keys", "dfnText": "get the keys", "refSections": [{"refs": [{"id": "ref-for-map-getting-the-keys"}], "title": "5.2. Maps"}], "external": false};
-window.dfnpanelData['map-size'] = {"dfnID": "map-size", "url": "#map-size", "dfnText": "size", "refSections": [{"refs": [{"id": "ref-for-map-size"}], "title": "5.2. Maps"}], "external": false};
-window.dfnpanelData['map-iterate'] = {"dfnID": "map-iterate", "url": "#map-iterate", "dfnText": "iterate", "refSections": [{"refs": [{"id": "ref-for-map-iterate"}], "title": "3.7. Iteration"}, {"refs": [{"id": "ref-for-map-iterate\u2460"}, {"id": "ref-for-map-iterate\u2461"}], "title": "5.2. Maps"}], "external": false};
-window.dfnpanelData['struct'] = {"dfnID": "struct", "url": "#struct", "dfnText": "struct", "refSections": [{"refs": [{"id": "ref-for-struct"}], "title": "3.3. Parameters"}, {"refs": [{"id": "ref-for-struct\u2460"}, {"id": "ref-for-struct\u2461"}], "title": "5.3. Structs"}], "external": false};
-window.dfnpanelData['struct-item'] = {"dfnID": "struct-item", "url": "#struct-item", "dfnText": "items", "refSections": [{"refs": [{"id": "ref-for-struct-item"}, {"id": "ref-for-struct-item\u2460"}], "title": "5.1. Lists"}, {"refs": [{"id": "ref-for-struct-item\u2461"}, {"id": "ref-for-struct-item\u2462"}, {"id": "ref-for-struct-item\u2463"}], "title": "5.3. Structs"}], "external": false};
-window.dfnpanelData['struct-name'] = {"dfnID": "struct-name", "url": "#struct-name", "dfnText": "name", "refSections": [{"refs": [{"id": "ref-for-struct-name"}, {"id": "ref-for-struct-name\u2460"}], "title": "5.3. Structs"}], "external": false};
-window.dfnpanelData['tuple'] = {"dfnID": "tuple", "url": "#tuple", "dfnText": "tuples", "refSections": [{"refs": [{"id": "ref-for-tuple"}, {"id": "ref-for-tuple\u2460"}, {"id": "ref-for-tuple\u2461"}, {"id": "ref-for-tuple\u2462"}, {"id": "ref-for-tuple\u2463"}], "title": "5.3. Structs"}], "external": false};
-window.dfnpanelData['pair'] = {"dfnID": "pair", "url": "#pair", "dfnText": "pairs", "refSections": [{"refs": [{"id": "ref-for-pair"}], "title": "5.3. Structs"}], "external": false};
-window.dfnpanelData['parse-a-json-string-to-a-javascript-value'] = {"dfnID": "parse-a-json-string-to-a-javascript-value", "url": "#parse-a-json-string-to-a-javascript-value", "dfnText": "parse a JSON string to a JavaScript value", "refSections": [{"refs": [{"id": "ref-for-parse-a-json-string-to-a-javascript-value"}], "title": "6. JSON"}], "external": false};
-window.dfnpanelData['serialize-a-javascript-value-to-a-json-string'] = {"dfnID": "serialize-a-javascript-value-to-a-json-string", "url": "#serialize-a-javascript-value-to-a-json-string", "dfnText": "serialize a JavaScript value to a JSON string", "refSections": [{"refs": [{"id": "ref-for-serialize-a-javascript-value-to-a-json-string"}], "title": "6. JSON"}], "external": false};
-window.dfnpanelData['parse-a-json-string-to-an-infra-value'] = {"dfnID": "parse-a-json-string-to-an-infra-value", "url": "#parse-a-json-string-to-an-infra-value", "dfnText": "parse a JSON string to an Infra value", "refSections": [{"refs": [{"id": "ref-for-parse-a-json-string-to-an-infra-value"}], "title": "6. JSON"}], "external": false};
-window.dfnpanelData['convert-a-json-derived-javascript-value-to-an-infra-value'] = {"dfnID": "convert-a-json-derived-javascript-value-to-an-infra-value", "url": "#convert-a-json-derived-javascript-value-to-an-infra-value", "dfnText": "convert a JSON-derived JavaScript value to an Infra value", "refSections": [{"refs": [{"id": "ref-for-convert-a-json-derived-javascript-value-to-an-infra-value"}, {"id": "ref-for-convert-a-json-derived-javascript-value-to-an-infra-value\u2460"}, {"id": "ref-for-convert-a-json-derived-javascript-value-to-an-infra-value\u2461"}], "title": "6. JSON"}], "external": false};
-window.dfnpanelData['serialize-an-infra-value-to-a-json-string'] = {"dfnID": "serialize-an-infra-value-to-a-json-string", "url": "#serialize-an-infra-value-to-a-json-string", "dfnText": "serialize an Infra value to a JSON string", "refSections": [{"refs": [{"id": "ref-for-serialize-an-infra-value-to-a-json-string"}], "title": "6. JSON"}], "external": false};
-window.dfnpanelData['convert-an-infra-value-to-a-json-compatible-javascript-value'] = {"dfnID": "convert-an-infra-value-to-a-json-compatible-javascript-value", "url": "#convert-an-infra-value-to-a-json-compatible-javascript-value", "dfnText": "convert an Infra value to a JSON-compatible JavaScript value", "refSections": [{"refs": [{"id": "ref-for-convert-an-infra-value-to-a-json-compatible-javascript-value"}, {"id": "ref-for-convert-an-infra-value-to-a-json-compatible-javascript-value\u2460"}, {"id": "ref-for-convert-an-infra-value-to-a-json-compatible-javascript-value\u2461"}], "title": "6. JSON"}], "external": false};
-window.dfnpanelData['forgiving-base64-encode'] = {"dfnID": "forgiving-base64-encode", "url": "#forgiving-base64-encode", "dfnText": "forgiving-base64 encode", "refSections": [{"refs": [{"id": "ref-for-forgiving-base64-encode"}], "title": "7. Forgiving base64"}], "external": false};
-window.dfnpanelData['forgiving-base64-decode'] = {"dfnID": "forgiving-base64-decode", "url": "#forgiving-base64-decode", "dfnText": "forgiving-base64 decode", "refSections": [{"refs": [{"id": "ref-for-forgiving-base64-decode"}], "title": "7. Forgiving base64"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -2453,335 +1936,852 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"8b3dfc64": {"dfnID":"8b3dfc64","dfnText":"%json.parse%","external":true,"refSections":[{"refs":[{"id":"ref-for-sec-json.parse"},{"id":"ref-for-sec-json.parse\u2460"}],"title":"6. JSON"}],"url":"https://tc39.github.io/ecma262/#sec-json.parse"},
+"ca4a8997": {"dfnID":"ca4a8997","dfnText":"%json.stringify%","external":true,"refSections":[{"refs":[{"id":"ref-for-sec-json.stringify"},{"id":"ref-for-sec-json.stringify\u2460"},{"id":"ref-for-sec-json.stringify\u2461"},{"id":"ref-for-sec-json.stringify\u2462"}],"title":"6. JSON"}],"url":"https://tc39.github.io/ecma262/#sec-json.stringify"},
+"437d21ea": {"dfnID":"437d21ea","dfnText":"ArrayCreate","external":true,"refSections":[{"refs":[{"id":"ref-for-sec-arraycreate"}],"title":"6. JSON"}],"url":"https://tc39.github.io/ecma262/#sec-arraycreate"},
+"1010768b": {"dfnID":"1010768b","dfnText":"Call","external":true,"refSections":[{"refs":[{"id":"ref-for-sec-call"},{"id":"ref-for-sec-call\u2460"},{"id":"ref-for-sec-call\u2461"},{"id":"ref-for-sec-call\u2462"}],"title":"6. JSON"}],"url":"https://tc39.github.io/ecma262/#sec-call"},
+"cef3e940": {"dfnID":"cef3e940","dfnText":"CreateDataPropertyOrThrow","external":true,"refSections":[{"refs":[{"id":"ref-for-sec-createdatapropertyorthrow"},{"id":"ref-for-sec-createdatapropertyorthrow\u2460"}],"title":"6. JSON"}],"url":"https://tc39.github.io/ecma262/#sec-createdatapropertyorthrow"},
+"0d804898": {"dfnID":"0d804898","dfnText":"Get","external":true,"refSections":[{"refs":[{"id":"ref-for-sec-get-o-p"},{"id":"ref-for-sec-get-o-p\u2460"},{"id":"ref-for-sec-get-o-p\u2461"}],"title":"6. JSON"}],"url":"https://tc39.github.io/ecma262/#sec-get-o-p"},
+"41110b4b": {"dfnID":"41110b4b","dfnText":"IsArray","external":true,"refSections":[{"refs":[{"id":"ref-for-sec-isarray"}],"title":"6. JSON"}],"url":"https://tc39.github.io/ecma262/#sec-isarray"},
+"cb213548": {"dfnID":"cb213548","dfnText":"OrdinaryObjectCreate","external":true,"refSections":[{"refs":[{"id":"ref-for-sec-ordinaryobjectcreate"}],"title":"6. JSON"}],"url":"https://tc39.github.io/ecma262/#sec-ordinaryobjectcreate"},
+"d8530df1": {"dfnID":"d8530df1","dfnText":"ToLength","external":true,"refSections":[{"refs":[{"id":"ref-for-sec-tolength"}],"title":"6. JSON"}],"url":"https://tc39.github.io/ecma262/#sec-tolength"},
+"d5bd3770": {"dfnID":"d5bd3770","dfnText":"ToString","external":true,"refSections":[{"refs":[{"id":"ref-for-sec-tostring"},{"id":"ref-for-sec-tostring\u2460"}],"title":"6. JSON"}],"url":"https://tc39.github.io/ecma262/#sec-tostring"},
+"c9258c1d": {"dfnID":"c9258c1d","dfnText":"Type","external":true,"refSections":[{"refs":[{"id":"ref-for-sec-ecmascript-data-types-and-values"}],"title":"6. JSON"}],"url":"https://tc39.github.io/ecma262/#sec-ecmascript-data-types-and-values"},
+"66553159": {"dfnID":"66553159","dfnText":"list","external":true,"refSections":[{"refs":[{"id":"ref-for-sec-list-and-record-specification-type"},{"id":"ref-for-sec-list-and-record-specification-type\u2460"}],"title":"5.1. Lists"}],"url":"https://tc39.github.io/ecma262/#sec-list-and-record-specification-type"},
+"db6dbae4": {"dfnID":"db6dbae4","dfnText":"realm","external":true,"refSections":[{"refs":[{"id":"ref-for-realm"}],"title":"6. JSON"}],"url":"https://tc39.github.io/ecma262/#realm"},
+"b7ef7f32": {"dfnID":"b7ef7f32","dfnText":"sort()","external":true,"refSections":[{"refs":[{"id":"ref-for-sec-array.prototype.sort"}],"title":"4.6. Strings"}],"url":"https://tc39.github.io/ecma262/#sec-array.prototype.sort"},
+"1d2f9726": {"dfnID":"1d2f9726","dfnText":"the string type","external":true,"refSections":[{"refs":[{"id":"ref-for-sec-ecmascript-language-types-string-type"}],"title":"4.6. Strings"}],"url":"https://tc39.github.io/ecma262/#sec-ecmascript-language-types-string-type"},
+"b0fcb8d7": {"dfnID":"b0fcb8d7","dfnText":"utf-8 decode","external":true,"refSections":[{"refs":[{"id":"ref-for-utf-8-decode"}],"title":"3.4. Variables"},{"refs":[{"id":"ref-for-utf-8-decode\u2460"}],"title":"4.3. Bytes"},{"refs":[{"id":"ref-for-utf-8-decode\u2461"}],"title":"4.6. Strings"},{"refs":[{"id":"ref-for-utf-8-decode\u2462"},{"id":"ref-for-utf-8-decode\u2463"}],"title":"6. JSON"}],"url":"https://encoding.spec.whatwg.org/#utf-8-decode"},
+"0303e8e5": {"dfnID":"0303e8e5","dfnText":"utf-8 encode","external":true,"refSections":[{"refs":[{"id":"ref-for-utf-8-encode"}],"title":"4.4. Byte sequences"},{"refs":[{"id":"ref-for-utf-8-encode\u2460"},{"id":"ref-for-utf-8-encode\u2461"}],"title":"4.6. Strings"},{"refs":[{"id":"ref-for-utf-8-encode\u2462"},{"id":"ref-for-utf-8-encode\u2463"}],"title":"6. JSON"}],"url":"https://encoding.spec.whatwg.org/#utf-8-encode"},
+"82ca3efc": {"dfnID":"82ca3efc","dfnText":"TypeError","external":true,"refSections":[{"refs":[{"id":"ref-for-exceptiondef-typeerror"}],"title":"6. JSON"}],"url":"https://webidl.spec.whatwg.org/#exceptiondef-typeerror"},
+"willful-violation": {"dfnID":"willful-violation","dfnText":"willful violation","external":false,"refSections":[{"refs":[{"id":"ref-for-willful-violation"}],"title":"2.1. Conformance"},{"refs":[{"id":"ref-for-willful-violation\u2460"}],"title":"2.2. Compliance with other specifications"}],"url":"#willful-violation"},
+"user-agent": {"dfnID":"user-agent","dfnText":"user agent","external":false,"refSections":[{"refs":[{"id":"ref-for-user-agent"},{"id":"ref-for-user-agent\u2460"},{"id":"ref-for-user-agent\u2461"},{"id":"ref-for-user-agent\u2462"}],"title":"2.3. Terminology"}],"url":"#user-agent"},
+"implementation-defined": {"dfnID":"implementation-defined","dfnText":"implementation-defined","external":false,"refSections":[{"refs":[{"id":"ref-for-implementation-defined"},{"id":"ref-for-implementation-defined\u2460"}],"title":"2.3. Terminology"}],"url":"#implementation-defined"},
+"abort-when": {"dfnID":"abort-when","dfnText":"abort when","external":false,"refSections":[{"refs":[{"id":"ref-for-abort-when"},{"id":"ref-for-abort-when\u2460"}],"title":"3.6. Conditional abort"}],"url":"#abort-when"},
+"if-aborted": {"dfnID":"if-aborted","dfnText":"if aborted","external":false,"refSections":[{"refs":[{"id":"ref-for-if-aborted"}],"title":"3.6. Conditional abort"}],"url":"#if-aborted"},
+"iteration-while": {"dfnID":"iteration-while","dfnText":"While","external":false,"refSections":[{"refs":[{"id":"ref-for-iteration-while"}],"title":"4.4. Byte sequences"},{"refs":[{"id":"ref-for-iteration-while\u2460"}],"title":"4.6. Strings"},{"refs":[{"id":"ref-for-iteration-while\u2461"}],"title":"5.1.1. Stacks"},{"refs":[{"id":"ref-for-iteration-while\u2462"}],"title":"5.1.2. Queues"}],"url":"#iteration-while"},
+"iteration-continue": {"dfnID":"iteration-continue","dfnText":"continue","external":false,"refSections":[{"refs":[{"id":"ref-for-iteration-continue"},{"id":"ref-for-iteration-continue\u2460"}],"title":"3.7. Iteration"}],"url":"#iteration-continue"},
+"iteration-break": {"dfnID":"iteration-break","dfnText":"break","external":false,"refSections":[{"refs":[{"id":"ref-for-iteration-break"},{"id":"ref-for-iteration-break\u2460"}],"title":"3.7. Iteration"}],"url":"#iteration-break"},
+"assert": {"dfnID":"assert","dfnText":"Assert","external":false,"refSections":[{"refs":[{"id":"ref-for-assert"}],"title":"3.4. Variables"},{"refs":[{"id":"ref-for-assert\u2460"}],"title":"3.8. Assertions"},{"refs":[{"id":"ref-for-assert\u2461"},{"id":"ref-for-assert\u2462"},{"id":"ref-for-assert\u2463"},{"id":"ref-for-assert\u2464"},{"id":"ref-for-assert\u2465"}],"title":"4.6. Strings"},{"refs":[{"id":"ref-for-assert\u2466"},{"id":"ref-for-assert\u2467"}],"title":"5.1. Lists"},{"refs":[{"id":"ref-for-assert\u2468"}],"title":"6. JSON"}],"url":"#assert"},
+"boolean": {"dfnID":"boolean","dfnText":"boolean","external":false,"refSections":[{"refs":[{"id":"ref-for-boolean"},{"id":"ref-for-boolean\u2460"}],"title":"3.3. Parameters"},{"refs":[{"id":"ref-for-boolean\u2461"},{"id":"ref-for-boolean\u2462"},{"id":"ref-for-boolean\u2463"},{"id":"ref-for-boolean\u2464"}],"title":"6. JSON"}],"url":"#boolean"},
+"byte": {"dfnID":"byte","dfnText":"byte","external":false,"refSections":[{"refs":[{"id":"ref-for-byte"},{"id":"ref-for-byte\u2460"},{"id":"ref-for-byte\u2461"}],"title":"4.3. Bytes"},{"refs":[{"id":"ref-for-byte\u2462"},{"id":"ref-for-byte\u2463"},{"id":"ref-for-byte\u2464"},{"id":"ref-for-byte\u2465"},{"id":"ref-for-byte\u2466"},{"id":"ref-for-byte\u2467"},{"id":"ref-for-byte\u2468"},{"id":"ref-for-byte\u2460\u24ea"}],"title":"4.4. Byte sequences"},{"refs":[{"id":"ref-for-byte\u2460\u2460"}],"title":"4.6. Strings"}],"url":"#byte"},
+"byte-value": {"dfnID":"byte-value","dfnText":"value","external":false,"refSections":[{"refs":[{"id":"ref-for-byte-value"}],"title":"4.3. Bytes"},{"refs":[{"id":"ref-for-byte-value\u2460"}],"title":"4.4. Byte sequences"},{"refs":[{"id":"ref-for-byte-value\u2461"}],"title":"4.6. Strings"}],"url":"#byte-value"},
+"ascii-byte": {"dfnID":"ascii-byte","dfnText":"ASCII byte","external":false,"refSections":[{"refs":[{"id":"ref-for-ascii-byte"}],"title":"4.3. Bytes"},{"refs":[{"id":"ref-for-ascii-byte\u2460"}],"title":"4.6. Strings"}],"url":"#ascii-byte"},
+"byte-sequence": {"dfnID":"byte-sequence","dfnText":"byte sequence","external":false,"refSections":[{"refs":[{"id":"ref-for-byte-sequence"},{"id":"ref-for-byte-sequence\u2460"},{"id":"ref-for-byte-sequence\u2461"}],"title":"3.2. Declaration"},{"refs":[{"id":"ref-for-byte-sequence\u2462"},{"id":"ref-for-byte-sequence\u2463"},{"id":"ref-for-byte-sequence\u2464"},{"id":"ref-for-byte-sequence\u2465"},{"id":"ref-for-byte-sequence\u2466"},{"id":"ref-for-byte-sequence\u2467"},{"id":"ref-for-byte-sequence\u2468"},{"id":"ref-for-byte-sequence\u2460\u24ea"},{"id":"ref-for-byte-sequence\u2460\u2460"},{"id":"ref-for-byte-sequence\u2460\u2461"},{"id":"ref-for-byte-sequence\u2460\u2462"},{"id":"ref-for-byte-sequence\u2460\u2463"}],"title":"4.4. Byte sequences"},{"refs":[{"id":"ref-for-byte-sequence\u2460\u2464"},{"id":"ref-for-byte-sequence\u2460\u2465"},{"id":"ref-for-byte-sequence\u2460\u2466"}],"title":"4.6. Strings"},{"refs":[{"id":"ref-for-byte-sequence\u2460\u2467"}],"title":"5.2. Maps"},{"refs":[{"id":"ref-for-byte-sequence\u2460\u2468"},{"id":"ref-for-byte-sequence\u2461\u24ea"}],"title":"6. JSON"},{"refs":[{"id":"ref-for-byte-sequence\u2461\u2460"},{"id":"ref-for-byte-sequence\u2461\u2461"}],"title":"7. Forgiving base64"}],"url":"#byte-sequence"},
+"byte-sequence-length": {"dfnID":"byte-sequence-length","dfnText":"length","external":false,"refSections":[{"refs":[{"id":"ref-for-byte-sequence-length"},{"id":"ref-for-byte-sequence-length\u2460"},{"id":"ref-for-byte-sequence-length\u2461"}],"title":"4.4. Byte sequences"},{"refs":[{"id":"ref-for-byte-sequence-length\u2462"}],"title":"4.6. Strings"}],"url":"#byte-sequence-length"},
+"byte-lowercase": {"dfnID":"byte-lowercase","dfnText":"byte-lowercase","external":false,"refSections":[{"refs":[{"id":"ref-for-byte-lowercase"},{"id":"ref-for-byte-lowercase\u2460"}],"title":"4.4. Byte sequences"}],"url":"#byte-lowercase"},
+"byte-sequence-prefix": {"dfnID":"byte-sequence-prefix","dfnText":"prefix","external":false,"refSections":[{"refs":[{"id":"ref-for-byte-sequence-prefix"},{"id":"ref-for-byte-sequence-prefix\u2460"},{"id":"ref-for-byte-sequence-prefix\u2461"}],"title":"4.4. Byte sequences"}],"url":"#byte-sequence-prefix"},
+"isomorphic-decode": {"dfnID":"isomorphic-decode","dfnText":"isomorphic decode","external":false,"refSections":[{"refs":[{"id":"ref-for-isomorphic-decode"}],"title":"3.2. Declaration"},{"refs":[{"id":"ref-for-isomorphic-decode\u2460"},{"id":"ref-for-isomorphic-decode\u2461"}],"title":"4.6. Strings"}],"url":"#isomorphic-decode"},
+"code-point": {"dfnID":"code-point","dfnText":"code point","external":false,"refSections":[{"refs":[{"id":"ref-for-code-point"}],"title":"4.3. Bytes"},{"refs":[{"id":"ref-for-code-point\u2460"}],"title":"4.4. Byte sequences"},{"refs":[{"id":"ref-for-code-point\u2461"},{"id":"ref-for-code-point\u2462"},{"id":"ref-for-code-point\u2463"},{"id":"ref-for-code-point\u2464"},{"id":"ref-for-code-point\u2465"},{"id":"ref-for-code-point\u2466"},{"id":"ref-for-code-point\u2467"},{"id":"ref-for-code-point\u2468"},{"id":"ref-for-code-point\u2460\u24ea"},{"id":"ref-for-code-point\u2460\u2460"},{"id":"ref-for-code-point\u2460\u2461"},{"id":"ref-for-code-point\u2460\u2462"},{"id":"ref-for-code-point\u2460\u2463"},{"id":"ref-for-code-point\u2460\u2464"},{"id":"ref-for-code-point\u2460\u2465"},{"id":"ref-for-code-point\u2460\u2466"},{"id":"ref-for-code-point\u2460\u2467"},{"id":"ref-for-code-point\u2460\u2468"},{"id":"ref-for-code-point\u2461\u24ea"},{"id":"ref-for-code-point\u2461\u2460"}],"title":"4.5. Code points"},{"refs":[{"id":"ref-for-code-point\u2461\u2461"},{"id":"ref-for-code-point\u2461\u2462"},{"id":"ref-for-code-point\u2461\u2463"},{"id":"ref-for-code-point\u2461\u2464"},{"id":"ref-for-code-point\u2461\u2465"},{"id":"ref-for-code-point\u2461\u2466"},{"id":"ref-for-code-point\u2461\u2467"},{"id":"ref-for-code-point\u2461\u2468"},{"id":"ref-for-code-point\u2462\u24ea"},{"id":"ref-for-code-point\u2462\u2460"},{"id":"ref-for-code-point\u2462\u2461"},{"id":"ref-for-code-point\u2462\u2462"},{"id":"ref-for-code-point\u2462\u2463"},{"id":"ref-for-code-point\u2462\u2464"},{"id":"ref-for-code-point\u2462\u2465"},{"id":"ref-for-code-point\u2462\u2466"},{"id":"ref-for-code-point\u2462\u2467"},{"id":"ref-for-code-point\u2462\u2468"},{"id":"ref-for-code-point\u2463\u24ea"},{"id":"ref-for-code-point\u2463\u2460"},{"id":"ref-for-code-point\u2463\u2461"},{"id":"ref-for-code-point\u2463\u2462"},{"id":"ref-for-code-point\u2463\u2463"},{"id":"ref-for-code-point\u2463\u2464"},{"id":"ref-for-code-point\u2463\u2465"},{"id":"ref-for-code-point\u2463\u2466"},{"id":"ref-for-code-point\u2463\u2467"},{"id":"ref-for-code-point\u2463\u2468"}],"title":"4.6. Strings"},{"refs":[{"id":"ref-for-code-point\u2464\u24ea"},{"id":"ref-for-code-point\u2464\u2460"},{"id":"ref-for-code-point\u2464\u2461"}],"title":"7. Forgiving base64"}],"url":"#code-point"},
+"code-point-value": {"dfnID":"code-point-value","dfnText":"value","external":false,"refSections":[{"refs":[{"id":"ref-for-code-point-value"}],"title":"4.4. Byte sequences"},{"refs":[{"id":"ref-for-code-point-value\u2460"}],"title":"4.6. Strings"}],"url":"#code-point-value"},
+"surrogate": {"dfnID":"surrogate","dfnText":"surrogate","external":false,"refSections":[{"refs":[{"id":"ref-for-surrogate"}],"title":"4.5. Code points"},{"refs":[{"id":"ref-for-surrogate\u2460"},{"id":"ref-for-surrogate\u2461"}],"title":"4.6. Strings"}],"url":"#surrogate"},
+"scalar-value": {"dfnID":"scalar-value","dfnText":"scalar value","external":false,"refSections":[{"refs":[{"id":"ref-for-scalar-value"},{"id":"ref-for-scalar-value\u2460"},{"id":"ref-for-scalar-value\u2461"}],"title":"4.6. Strings"}],"url":"#scalar-value"},
+"ascii-code-point": {"dfnID":"ascii-code-point","dfnText":"ASCII code point","external":false,"refSections":[{"refs":[{"id":"ref-for-ascii-code-point"}],"title":"4.6. Strings"}],"url":"#ascii-code-point"},
+"ascii-whitespace": {"dfnID":"ascii-whitespace","dfnText":"ASCII whitespace","external":false,"refSections":[{"refs":[{"id":"ref-for-ascii-whitespace"},{"id":"ref-for-ascii-whitespace\u2460"},{"id":"ref-for-ascii-whitespace\u2461"},{"id":"ref-for-ascii-whitespace\u2462"},{"id":"ref-for-ascii-whitespace\u2463"},{"id":"ref-for-ascii-whitespace\u2464"}],"title":"4.6. Strings"},{"refs":[{"id":"ref-for-ascii-whitespace\u2465"}],"title":"7. Forgiving base64"}],"url":"#ascii-whitespace"},
+"c0-control": {"dfnID":"c0-control","dfnText":"C0 control","external":false,"refSections":[{"refs":[{"id":"ref-for-c0-control"},{"id":"ref-for-c0-control\u2460"}],"title":"4.5. Code points"}],"url":"#c0-control"},
+"ascii-digit": {"dfnID":"ascii-digit","dfnText":"ASCII digit","external":false,"refSections":[{"refs":[{"id":"ref-for-ascii-digit"},{"id":"ref-for-ascii-digit\u2460"},{"id":"ref-for-ascii-digit\u2461"}],"title":"4.5. Code points"}],"url":"#ascii-digit"},
+"ascii-upper-hex-digit": {"dfnID":"ascii-upper-hex-digit","dfnText":"ASCII upper hex digit","external":false,"refSections":[{"refs":[{"id":"ref-for-ascii-upper-hex-digit"}],"title":"4.3. Bytes"},{"refs":[{"id":"ref-for-ascii-upper-hex-digit\u2460"},{"id":"ref-for-ascii-upper-hex-digit\u2461"}],"title":"4.5. Code points"}],"url":"#ascii-upper-hex-digit"},
+"ascii-lower-hex-digit": {"dfnID":"ascii-lower-hex-digit","dfnText":"ASCII lower hex digit","external":false,"refSections":[{"refs":[{"id":"ref-for-ascii-lower-hex-digit"}],"title":"4.5. Code points"}],"url":"#ascii-lower-hex-digit"},
+"ascii-upper-alpha": {"dfnID":"ascii-upper-alpha","dfnText":"ASCII upper alpha","external":false,"refSections":[{"refs":[{"id":"ref-for-ascii-upper-alpha"}],"title":"4.5. Code points"},{"refs":[{"id":"ref-for-ascii-upper-alpha\u2460"},{"id":"ref-for-ascii-upper-alpha\u2461"}],"title":"4.6. Strings"}],"url":"#ascii-upper-alpha"},
+"ascii-lower-alpha": {"dfnID":"ascii-lower-alpha","dfnText":"ASCII lower alpha","external":false,"refSections":[{"refs":[{"id":"ref-for-ascii-lower-alpha"}],"title":"4.5. Code points"},{"refs":[{"id":"ref-for-ascii-lower-alpha\u2460"},{"id":"ref-for-ascii-lower-alpha\u2461"}],"title":"4.6. Strings"}],"url":"#ascii-lower-alpha"},
+"ascii-alpha": {"dfnID":"ascii-alpha","dfnText":"ASCII alpha","external":false,"refSections":[{"refs":[{"id":"ref-for-ascii-alpha"}],"title":"4.5. Code points"}],"url":"#ascii-alpha"},
+"ascii-alphanumeric": {"dfnID":"ascii-alphanumeric","dfnText":"ASCII alphanumeric","external":false,"refSections":[{"refs":[{"id":"ref-for-ascii-alphanumeric"}],"title":"7. Forgiving base64"}],"url":"#ascii-alphanumeric"},
+"string": {"dfnID":"string","dfnText":"string","external":false,"refSections":[{"refs":[{"id":"ref-for-string"}],"title":"3.2. Declaration"},{"refs":[{"id":"ref-for-string\u2460"},{"id":"ref-for-string\u2461"}],"title":"3.4. Variables"},{"refs":[{"id":"ref-for-string\u2462"},{"id":"ref-for-string\u2463"},{"id":"ref-for-string\u2464"}],"title":"4.4. Byte sequences"},{"refs":[{"id":"ref-for-string\u2465"},{"id":"javascript-string"},{"id":"ref-for-string\u2466"},{"id":"ref-for-string\u2467"},{"id":"ref-for-string\u2468"},{"id":"ref-for-string\u2460\u24ea"},{"id":"ref-for-string\u2460\u2460"},{"id":"ref-for-string\u2460\u2461"},{"id":"ref-for-string\u2460\u2462"},{"id":"ref-for-string\u2460\u2463"},{"id":"ref-for-string\u2460\u2464"},{"id":"ref-for-string\u2460\u2465"},{"id":"ref-for-string\u2460\u2466"},{"id":"ref-for-string\u2460\u2467"},{"id":"ref-for-string\u2460\u2468"},{"id":"ref-for-string\u2461\u24ea"},{"id":"ref-for-string\u2461\u2460"},{"id":"ref-for-string\u2461\u2461"},{"id":"ref-for-string\u2461\u2462"},{"id":"ref-for-string\u2461\u2463"},{"id":"ref-for-string\u2461\u2464"},{"id":"ref-for-string\u2461\u2465"},{"id":"ref-for-string\u2461\u2466"},{"id":"ref-for-string\u2461\u2467"},{"id":"ref-for-string\u2461\u2468"},{"id":"ref-for-string\u2462\u24ea"},{"id":"ref-for-string\u2462\u2460"},{"id":"ref-for-string\u2462\u2461"},{"id":"ref-for-string\u2462\u2462"},{"id":"ref-for-string\u2462\u2463"},{"id":"ref-for-string\u2462\u2464"},{"id":"ref-for-string\u2462\u2465"},{"id":"ref-for-string\u2462\u2466"},{"id":"ref-for-string\u2462\u2467"},{"id":"ref-for-string\u2462\u2468"},{"id":"ref-for-string\u2463\u24ea"},{"id":"ref-for-string\u2463\u2460"},{"id":"ref-for-string\u2463\u2461"},{"id":"ref-for-string\u2463\u2462"},{"id":"ref-for-string\u2463\u2463"},{"id":"ref-for-string\u2463\u2464"},{"id":"ref-for-string\u2463\u2465"},{"id":"ref-for-string\u2463\u2466"},{"id":"ref-for-string\u2463\u2467"},{"id":"ref-for-string\u2463\u2468"},{"id":"ref-for-string\u2464\u24ea"},{"id":"ref-for-string\u2464\u2460"},{"id":"ref-for-string\u2464\u2461"},{"id":"ref-for-string\u2464\u2462"}],"title":"4.6. Strings"},{"refs":[{"id":"ref-for-string\u2464\u2463"},{"id":"ref-for-string\u2464\u2464"},{"id":"ref-for-string\u2464\u2465"}],"title":"5.1. Lists"},{"refs":[{"id":"ref-for-string\u2464\u2466"},{"id":"ref-for-string\u2464\u2467"},{"id":"ref-for-string\u2464\u2468"},{"id":"ref-for-string\u2465\u24ea"},{"id":"ref-for-string\u2465\u2460"},{"id":"ref-for-string\u2465\u2461"},{"id":"ref-for-string\u2465\u2462"},{"id":"ref-for-string\u2465\u2463"},{"id":"ref-for-string\u2465\u2464"},{"id":"ref-for-string\u2465\u2465"}],"title":"6. JSON"}],"url":"#string"},
+"code-unit": {"dfnID":"code-unit","dfnText":"code units","external":false,"refSections":[{"refs":[{"id":"ref-for-code-unit"},{"id":"ref-for-code-unit\u2460"},{"id":"ref-for-code-unit\u2461"},{"id":"ref-for-code-unit\u2462"},{"id":"ref-for-code-unit\u2463"},{"id":"ref-for-code-unit\u2464"},{"id":"ref-for-code-unit\u2465"}],"title":"4.6. Strings"}],"url":"#code-unit"},
+"string-length": {"dfnID":"string-length","dfnText":"length","external":false,"refSections":[{"refs":[{"id":"ref-for-string-length"},{"id":"ref-for-string-length\u2460"}],"title":"4.6. Strings"}],"url":"#string-length"},
+"string-code-point-length": {"dfnID":"string-code-point-length","dfnText":"code point length","external":false,"refSections":[{"refs":[{"id":"ref-for-string-code-point-length"}],"title":"4.4. Byte sequences"},{"refs":[{"id":"ref-for-string-code-point-length\u2460"}],"title":"4.6. Strings"},{"refs":[{"id":"ref-for-string-code-point-length\u2461"},{"id":"ref-for-string-code-point-length\u2462"}],"title":"7. Forgiving base64"}],"url":"#string-code-point-length"},
+"scalar-value-string": {"dfnID":"scalar-value-string","dfnText":"scalar value string","external":false,"refSections":[{"refs":[{"id":"ref-for-scalar-value-string"},{"id":"ref-for-scalar-value-string\u2460"},{"id":"ref-for-scalar-value-string\u2461"},{"id":"ref-for-scalar-value-string\u2462"},{"id":"ref-for-scalar-value-string\u2463"},{"id":"ref-for-scalar-value-string\u2464"}],"title":"4.6. Strings"}],"url":"#scalar-value-string"},
+"javascript-string-convert": {"dfnID":"javascript-string-convert","dfnText":"convert","external":false,"refSections":[{"refs":[{"id":"ref-for-javascript-string-convert"}],"title":"4.6. Strings"}],"url":"#javascript-string-convert"},
+"string-is": {"dfnID":"string-is","dfnText":"is","external":false,"refSections":[{"refs":[{"id":"ref-for-string-is"},{"id":"ref-for-string-is\u2460"},{"id":"ref-for-string-is\u2461"},{"id":"ref-for-string-is\u2462"}],"title":"4.6. Strings"}],"url":"#string-is"},
+"code-unit-prefix": {"dfnID":"code-unit-prefix","dfnText":"code unit prefix","external":false,"refSections":[{"refs":[{"id":"ref-for-code-unit-prefix"},{"id":"ref-for-code-unit-prefix\u2460"},{"id":"ref-for-code-unit-prefix\u2461"},{"id":"ref-for-code-unit-prefix\u2462"}],"title":"4.6. Strings"}],"url":"#code-unit-prefix"},
+"string-starts-with": {"dfnID":"string-starts-with","dfnText":"starts with","external":false,"refSections":[{"refs":[{"id":"ref-for-string-starts-with"}],"title":"4.6. Strings"}],"url":"#string-starts-with"},
+"code-unit-less-than": {"dfnID":"code-unit-less-than","dfnText":"code unit less than","external":false,"refSections":[{"refs":[{"id":"ref-for-code-unit-less-than"}],"title":"5.1. Lists"}],"url":"#code-unit-less-than"},
+"isomorphic-encode": {"dfnID":"isomorphic-encode","dfnText":"isomorphic encode","external":false,"refSections":[{"refs":[{"id":"ref-for-isomorphic-encode"}],"title":"4.4. Byte sequences"},{"refs":[{"id":"ref-for-isomorphic-encode\u2460"},{"id":"ref-for-isomorphic-encode\u2461"}],"title":"4.6. Strings"}],"url":"#isomorphic-encode"},
+"ascii-string": {"dfnID":"ascii-string","dfnText":"ASCII string","external":false,"refSections":[{"refs":[{"id":"ref-for-ascii-string"}],"title":"4.6. Strings"}],"url":"#ascii-string"},
+"ascii-lowercase": {"dfnID":"ascii-lowercase","dfnText":"ASCII lowercase","external":false,"refSections":[{"refs":[{"id":"ref-for-ascii-lowercase"},{"id":"ref-for-ascii-lowercase\u2460"}],"title":"4.6. Strings"}],"url":"#ascii-lowercase"},
+"ascii-uppercase": {"dfnID":"ascii-uppercase","dfnText":"ASCII uppercase","external":false,"refSections":[{"refs":[{"id":"ref-for-ascii-uppercase"}],"title":"3.2. Declaration"},{"refs":[{"id":"ref-for-ascii-uppercase\u2460"}],"title":"4.5. Code points"}],"url":"#ascii-uppercase"},
+"strip-leading-and-trailing-ascii-whitespace": {"dfnID":"strip-leading-and-trailing-ascii-whitespace","dfnText":"strip leading and trailing ASCII whitespace","external":false,"refSections":[{"refs":[{"id":"ref-for-strip-leading-and-trailing-ascii-whitespace"}],"title":"4.6. Strings"}],"url":"#strip-leading-and-trailing-ascii-whitespace"},
+"collect-a-sequence-of-code-points": {"dfnID":"collect-a-sequence-of-code-points","dfnText":"collect a sequence of code points","external":false,"refSections":[{"refs":[{"id":"ref-for-collect-a-sequence-of-code-points"},{"id":"ref-for-collect-a-sequence-of-code-points\u2460"},{"id":"ref-for-collect-a-sequence-of-code-points\u2461"},{"id":"ref-for-collect-a-sequence-of-code-points\u2462"},{"id":"ref-for-collect-a-sequence-of-code-points\u2463"}],"title":"4.6. Strings"}],"url":"#collect-a-sequence-of-code-points"},
+"string-position-variable": {"dfnID":"string-position-variable","dfnText":"position variable","external":false,"refSections":[{"refs":[{"id":"ref-for-string-position-variable"},{"id":"ref-for-string-position-variable\u2460"},{"id":"ref-for-string-position-variable\u2461"},{"id":"ref-for-string-position-variable\u2462"},{"id":"ref-for-string-position-variable\u2463"}],"title":"4.6. Strings"},{"refs":[{"id":"ref-for-string-position-variable\u2464"}],"title":"7. Forgiving base64"}],"url":"#string-position-variable"},
+"skip-ascii-whitespace": {"dfnID":"skip-ascii-whitespace","dfnText":"skip ASCII whitespace","external":false,"refSections":[{"refs":[{"id":"ref-for-skip-ascii-whitespace"},{"id":"ref-for-skip-ascii-whitespace\u2460"}],"title":"4.6. Strings"}],"url":"#skip-ascii-whitespace"},
+"split-on-ascii-whitespace": {"dfnID":"split-on-ascii-whitespace","dfnText":"split a\nstring input on ASCII whitespace","external":false,"refSections":[{"refs":[{"id":"ref-for-split-on-ascii-whitespace"}],"title":"4.6. Strings"}],"url":"#split-on-ascii-whitespace"},
+"split-on-commas": {"dfnID":"split-on-commas","dfnText":"split a string\ninput on commas","external":false,"refSections":[{"refs":[{"id":"ref-for-split-on-commas"}],"title":"4.6. Strings"}],"url":"#split-on-commas"},
+"string-concatenate": {"dfnID":"string-concatenate","dfnText":"concatenate","external":false,"refSections":[{"refs":[{"id":"ref-for-string-concatenate"}],"title":"4.6. Strings"}],"url":"#string-concatenate"},
+"list": {"dfnID":"list","dfnText":"list","external":false,"refSections":[{"refs":[{"id":"ref-for-list"}],"title":"3.4. Variables"},{"refs":[{"id":"ref-for-list\u2460"},{"id":"ref-for-list\u2461"}],"title":"3.6. Conditional abort"},{"refs":[{"id":"ref-for-list\u2462"}],"title":"3.7. Iteration"},{"refs":[{"id":"ref-for-list\u2463"},{"id":"ref-for-list\u2464"},{"id":"ref-for-list\u2465"},{"id":"ref-for-list\u2466"}],"title":"4.6. Strings"},{"refs":[{"id":"ref-for-list\u2467"},{"id":"ref-for-list\u2468"},{"id":"ref-for-list\u2460\u24ea"},{"id":"ref-for-list\u2460\u2460"},{"id":"ref-for-list\u2460\u2461"},{"id":"ref-for-list\u2460\u2462"},{"id":"ref-for-list\u2460\u2463"},{"id":"ref-for-list\u2460\u2464"},{"id":"ref-for-list\u2460\u2465"},{"id":"ref-for-list\u2460\u2466"},{"id":"ref-for-list\u2460\u2467"},{"id":"ref-for-list\u2460\u2468"},{"id":"ref-for-list\u2461\u24ea"},{"id":"ref-for-list\u2461\u2460"},{"id":"ref-for-list\u2461\u2461"},{"id":"ref-for-list\u2461\u2462"},{"id":"ref-for-list\u2461\u2463"},{"id":"ref-for-list\u2461\u2464"},{"id":"ref-for-list\u2461\u2465"},{"id":"ref-for-list\u2461\u2466"},{"id":"ref-for-list\u2461\u2467"},{"id":"ref-for-list\u2461\u2468"},{"id":"ref-for-list\u2462\u24ea"},{"id":"ref-for-list\u2462\u2460"},{"id":"ref-for-list\u2462\u2461"},{"id":"ref-for-list\u2462\u2462"},{"id":"ref-for-list\u2462\u2463"},{"id":"ref-for-list\u2462\u2464"}],"title":"5.1. Lists"},{"refs":[{"id":"ref-for-list\u2462\u2465"},{"id":"ref-for-list\u2462\u2466"},{"id":"ref-for-list\u2462\u2467"}],"title":"5.1.1. Stacks"},{"refs":[{"id":"ref-for-list\u2462\u2468"},{"id":"ref-for-list\u2463\u24ea"},{"id":"ref-for-list\u2463\u2460"}],"title":"5.1.2. Queues"},{"refs":[{"id":"ref-for-list\u2463\u2461"},{"id":"ref-for-list\u2463\u2462"},{"id":"ref-for-list\u2463\u2463"},{"id":"ref-for-list\u2463\u2464"}],"title":"5.1.3. Sets"},{"refs":[{"id":"ref-for-list\u2463\u2465"},{"id":"ref-for-list\u2463\u2466"}],"title":"5.2. Maps"},{"refs":[{"id":"ref-for-list\u2463\u2467"},{"id":"ref-for-list\u2463\u2468"},{"id":"ref-for-list\u2464\u24ea"},{"id":"ref-for-list\u2464\u2460"},{"id":"ref-for-list\u2464\u2461"}],"title":"6. JSON"}],"url":"#list"},
+"list-item": {"dfnID":"list-item","dfnText":"items","external":false,"refSections":[{"refs":[{"id":"ref-for-list-item"}],"title":"4.6. Strings"},{"refs":[{"id":"ref-for-list-item\u2460"}],"title":"5. Data structures"},{"refs":[{"id":"ref-for-list-item\u2461"},{"id":"ref-for-list-item\u2462"},{"id":"ref-for-list-item\u2463"},{"id":"ref-for-list-item\u2464"},{"id":"ref-for-list-item\u2465"},{"id":"ref-for-list-item\u2466"},{"id":"ref-for-list-item\u2467"},{"id":"ref-for-list-item\u2468"},{"id":"ref-for-list-item\u2460\u24ea"},{"id":"ref-for-list-item\u2460\u2460"},{"id":"ref-for-list-item\u2460\u2461"},{"id":"ref-for-list-item\u2460\u2462"},{"id":"ref-for-list-item\u2460\u2463"},{"id":"ref-for-list-item\u2460\u2464"}],"title":"5.1. Lists"},{"refs":[{"id":"ref-for-list-item\u2460\u2465"}],"title":"5.1.1. Stacks"},{"refs":[{"id":"ref-for-list-item\u2460\u2466"}],"title":"5.1.2. Queues"},{"refs":[{"id":"ref-for-list-item\u2460\u2467"},{"id":"ref-for-list-item\u2460\u2468"},{"id":"ref-for-list-item\u2461\u24ea"}],"title":"5.1.3. Sets"},{"refs":[{"id":"ref-for-list-item\u2461\u2460"},{"id":"ref-for-list-item\u2461\u2461"}],"title":"5.2. Maps"}],"url":"#list-item"},
+"list-append": {"dfnID":"list-append","dfnText":"append","external":false,"refSections":[{"refs":[{"id":"ref-for-list-append"},{"id":"ref-for-list-append\u2460"},{"id":"ref-for-list-append\u2461"},{"id":"ref-for-list-append\u2462"},{"id":"ref-for-list-append\u2463"},{"id":"ref-for-list-append\u2464"},{"id":"ref-for-list-append\u2465"},{"id":"ref-for-list-append\u2466"}],"title":"3.6. Conditional abort"},{"refs":[{"id":"ref-for-list-append\u2467"},{"id":"ref-for-list-append\u2468"},{"id":"ref-for-list-append\u2460\u24ea"},{"id":"ref-for-list-append\u2460\u2460"}],"title":"4.6. Strings"},{"refs":[{"id":"ref-for-list-append\u2460\u2461"},{"id":"ref-for-list-append\u2460\u2462"}],"title":"5.1. Lists"},{"refs":[{"id":"ref-for-list-append\u2460\u2463"},{"id":"ref-for-list-append\u2460\u2464"}],"title":"5.1.1. Stacks"},{"refs":[{"id":"ref-for-list-append\u2460\u2465"},{"id":"ref-for-list-append\u2460\u2466"}],"title":"5.1.2. Queues"},{"refs":[{"id":"ref-for-list-append\u2460\u2467"}],"title":"5.1.3. Sets"},{"refs":[{"id":"ref-for-list-append\u2460\u2468"}],"title":"5.2. Maps"},{"refs":[{"id":"ref-for-list-append\u2461\u24ea"}],"title":"6. JSON"}],"url":"#list-append"},
+"list-extend": {"dfnID":"list-extend","dfnText":"extend","external":false,"refSections":[{"refs":[{"id":"ref-for-list-extend"}],"title":"5.1. Lists"}],"url":"#list-extend"},
+"list-prepend": {"dfnID":"list-prepend","dfnText":"prepend","external":false,"refSections":[{"refs":[{"id":"ref-for-list-prepend"}],"title":"5.1. Lists"},{"refs":[{"id":"ref-for-list-prepend\u2460"}],"title":"5.1.1. Stacks"},{"refs":[{"id":"ref-for-list-prepend\u2461"}],"title":"5.1.2. Queues"},{"refs":[{"id":"ref-for-list-prepend\u2462"}],"title":"5.1.3. Sets"}],"url":"#list-prepend"},
+"list-remove": {"dfnID":"list-remove","dfnText":"remove","external":false,"refSections":[{"refs":[{"id":"ref-for-list-remove"},{"id":"ref-for-list-remove\u2460"},{"id":"ref-for-list-remove\u2461"}],"title":"5.1. Lists"},{"refs":[{"id":"ref-for-list-remove\u2462"},{"id":"ref-for-list-remove\u2463"}],"title":"5.1.1. Stacks"},{"refs":[{"id":"ref-for-list-remove\u2464"},{"id":"ref-for-list-remove\u2465"}],"title":"5.1.2. Queues"},{"refs":[{"id":"ref-for-list-remove\u2466"}],"title":"5.1.3. Sets"}],"url":"#list-remove"},
+"list-contain": {"dfnID":"list-contain","dfnText":"contains","external":false,"refSections":[{"refs":[{"id":"ref-for-list-contain"}],"title":"5. Data structures"},{"refs":[{"id":"ref-for-list-contain\u2460"},{"id":"ref-for-list-contain\u2461"},{"id":"ref-for-list-contain\u2462"},{"id":"ref-for-list-contain\u2463"}],"title":"5.1. Lists"},{"refs":[{"id":"ref-for-list-contain\u2464"},{"id":"ref-for-list-contain\u2465"},{"id":"ref-for-list-contain\u2466"},{"id":"ref-for-list-contain\u2467"},{"id":"ref-for-list-contain\u2468"}],"title":"5.1.3. Sets"}],"url":"#list-contain"},
+"list-size": {"dfnID":"list-size","dfnText":"size","external":false,"refSections":[{"refs":[{"id":"ref-for-list-size"},{"id":"ref-for-list-size\u2460"}],"title":"5.1. Lists"},{"refs":[{"id":"ref-for-list-size\u2461"}],"title":"5.2. Maps"}],"url":"#list-size"},
+"list-is-empty": {"dfnID":"list-is-empty","dfnText":"is empty","external":false,"refSections":[{"refs":[{"id":"ref-for-list-is-empty"}],"title":"4.6. Strings"},{"refs":[{"id":"ref-for-list-is-empty\u2460"}],"title":"5.1.1. Stacks"},{"refs":[{"id":"ref-for-list-is-empty\u2461"}],"title":"5.1.2. Queues"}],"url":"#list-is-empty"},
+"list-iterate": {"dfnID":"list-iterate","dfnText":"iterate","external":false,"refSections":[{"refs":[{"id":"ref-for-list-iterate"},{"id":"ref-for-list-iterate\u2460"},{"id":"ref-for-list-iterate\u2461"},{"id":"ref-for-list-iterate\u2462"}],"title":"3.7. Iteration"},{"refs":[{"id":"ref-for-list-iterate\u2463"},{"id":"ref-for-list-iterate\u2464"},{"id":"ref-for-list-iterate\u2465"}],"title":"5.1. Lists"},{"refs":[{"id":"ref-for-list-iterate\u2466"}],"title":"5.1.1. Stacks"},{"refs":[{"id":"ref-for-list-iterate\u2467"}],"title":"5.1.2. Queues"},{"refs":[{"id":"ref-for-list-iterate\u2468"},{"id":"ref-for-list-iterate\u2460\u24ea"},{"id":"ref-for-list-iterate\u2460\u2460"},{"id":"ref-for-list-iterate\u2460\u2461"}],"title":"5.1.3. Sets"},{"refs":[{"id":"ref-for-list-iterate\u2460\u2462"},{"id":"ref-for-list-iterate\u2460\u2463"},{"id":"ref-for-list-iterate\u2460\u2464"},{"id":"ref-for-list-iterate\u2460\u2465"}],"title":"6. JSON"}],"url":"#list-iterate"},
+"list-clone": {"dfnID":"list-clone","dfnText":"clone","external":false,"refSections":[{"refs":[{"id":"ref-for-list-clone"}],"title":"5.1. Lists"},{"refs":[{"id":"ref-for-list-clone\u2460"}],"title":"5.1.3. Sets"},{"refs":[{"id":"ref-for-list-clone\u2461"}],"title":"5.2. Maps"}],"url":"#list-clone"},
+"list-sort-in-ascending-order": {"dfnID":"list-sort-in-ascending-order","dfnText":"sort in ascending order","external":false,"refSections":[{"refs":[{"id":"ref-for-list-sort-in-ascending-order"}],"title":"5.1. Lists"}],"url":"#list-sort-in-ascending-order"},
+"stack": {"dfnID":"stack","dfnText":"stacks","external":false,"refSections":[{"refs":[{"id":"ref-for-stack"},{"id":"ref-for-stack\u2460"},{"id":"ref-for-stack\u2461"},{"id":"ref-for-stack\u2462"}],"title":"5.1.1. Stacks"}],"url":"#stack"},
+"stack-pop": {"dfnID":"stack-pop","dfnText":"pop","external":false,"refSections":[{"refs":[{"id":"ref-for-stack-pop"}],"title":"5.1.1. Stacks"}],"url":"#stack-pop"},
+"queue": {"dfnID":"queue","dfnText":"queues","external":false,"refSections":[{"refs":[{"id":"ref-for-queue"},{"id":"ref-for-queue\u2460"},{"id":"ref-for-queue\u2461"},{"id":"ref-for-queue\u2462"}],"title":"5.1.2. Queues"}],"url":"#queue"},
+"queue-dequeue": {"dfnID":"queue-dequeue","dfnText":"dequeue","external":false,"refSections":[{"refs":[{"id":"ref-for-queue-dequeue"}],"title":"5.1.2. Queues"}],"url":"#queue-dequeue"},
+"ordered-set": {"dfnID":"ordered-set","dfnText":"ordered sets","external":false,"refSections":[{"refs":[{"id":"ref-for-ordered-set"}],"title":"5. Data structures"},{"refs":[{"id":"ref-for-ordered-set\u2460"},{"id":"ref-for-ordered-set\u2461"},{"id":"ref-for-ordered-set\u2462"},{"id":"ref-for-ordered-set\u2463"},{"id":"ref-for-ordered-set\u2464"},{"id":"ref-for-ordered-set\u2465"}],"title":"5.1. Lists"},{"refs":[{"id":"ref-for-ordered-set\u2466"},{"id":"ref-for-ordered-set\u2467"},{"id":"ref-for-ordered-set\u2468"},{"id":"ref-for-ordered-set\u2460\u24ea"},{"id":"ref-for-ordered-set\u2460\u2460"},{"id":"ref-for-ordered-set\u2460\u2461"},{"id":"ref-for-ordered-set\u2460\u2462"},{"id":"ref-for-ordered-set\u2460\u2463"},{"id":"ref-for-ordered-set\u2460\u2464"},{"id":"ref-for-ordered-set\u2460\u2465"},{"id":"ref-for-ordered-set\u2460\u2466"}],"title":"5.1.3. Sets"},{"refs":[{"id":"ref-for-ordered-set\u2460\u2467"},{"id":"ref-for-ordered-set\u2460\u2468"}],"title":"5.2. Maps"}],"url":"#ordered-set"},
+"set-append": {"dfnID":"set-append","dfnText":"append","external":false,"refSections":[{"refs":[{"id":"ref-for-set-append"}],"title":"5. Data structures"},{"refs":[{"id":"ref-for-set-append\u2460"}],"title":"5.1. Lists"},{"refs":[{"id":"ref-for-set-append\u2461"},{"id":"ref-for-set-append\u2462"}],"title":"5.1.3. Sets"}],"url":"#set-append"},
+"set-prepend": {"dfnID":"set-prepend","dfnText":"prepend","external":false,"refSections":[{"refs":[{"id":"ref-for-set-prepend"}],"title":"5.1. Lists"}],"url":"#set-prepend"},
+"set-replace": {"dfnID":"set-replace","dfnText":"replace","external":false,"refSections":[{"refs":[{"id":"ref-for-set-replace"},{"id":"ref-for-set-replace\u2460"}],"title":"5.1. Lists"},{"refs":[{"id":"ref-for-set-replace\u2461"}],"title":"5.1.3. Sets"}],"url":"#set-replace"},
+"set-subset": {"dfnID":"set-subset","dfnText":"subset","external":false,"refSections":[{"refs":[{"id":"ref-for-set-subset"}],"title":"5.1.3. Sets"}],"url":"#set-subset"},
+"set-superset": {"dfnID":"set-superset","dfnText":"superset","external":false,"refSections":[{"refs":[{"id":"ref-for-set-superset"}],"title":"5.1.3. Sets"}],"url":"#set-superset"},
+"the-range": {"dfnID":"the-range","dfnText":"The range","external":false,"refSections":[{"refs":[{"id":"ref-for-the-range"}],"title":"5.1.3. Sets"},{"refs":[{"id":"ref-for-the-range\u2460"}],"title":"6. JSON"}],"url":"#the-range"},
+"ordered-map": {"dfnID":"ordered-map","dfnText":"ordered map","external":false,"refSections":[{"refs":[{"id":"ref-for-ordered-map"}],"title":"5. Data structures"},{"refs":[{"id":"ref-for-ordered-map\u2460"},{"id":"ref-for-ordered-map\u2461"},{"id":"ref-for-ordered-map\u2462"},{"id":"ref-for-ordered-map\u2463"},{"id":"ref-for-ordered-map\u2464"},{"id":"ref-for-ordered-map\u2465"},{"id":"ref-for-ordered-map\u2466"},{"id":"ref-for-ordered-map\u2467"},{"id":"ref-for-ordered-map\u2468"},{"id":"ref-for-ordered-map\u2460\u24ea"},{"id":"ref-for-ordered-map\u2460\u2460"},{"id":"ref-for-ordered-map\u2460\u2461"},{"id":"ref-for-ordered-map\u2460\u2462"},{"id":"ref-for-ordered-map\u2460\u2463"},{"id":"ref-for-ordered-map\u2460\u2464"},{"id":"ref-for-ordered-map\u2460\u2465"},{"id":"ref-for-ordered-map\u2460\u2466"},{"id":"ref-for-ordered-map\u2460\u2467"},{"id":"ref-for-ordered-map\u2460\u2468"},{"id":"ref-for-ordered-map\u2461\u24ea"},{"id":"ref-for-ordered-map\u2461\u2460"},{"id":"ref-for-ordered-map\u2461\u2461"},{"id":"ref-for-ordered-map\u2461\u2462"},{"id":"ref-for-ordered-map\u2461\u2463"}],"title":"5.2. Maps"},{"refs":[{"id":"ref-for-ordered-map\u2461\u2464"},{"id":"ref-for-ordered-map\u2461\u2465"},{"id":"ref-for-ordered-map\u2461\u2466"},{"id":"ref-for-ordered-map\u2461\u2467"},{"id":"ref-for-ordered-map\u2461\u2468"}],"title":"6. JSON"}],"url":"#ordered-map"},
+"map-key": {"dfnID":"map-key","dfnText":"key","external":false,"refSections":[{"refs":[{"id":"ref-for-map-key"},{"id":"ref-for-map-key\u2460"},{"id":"ref-for-map-key\u2461"},{"id":"ref-for-map-key\u2462"},{"id":"ref-for-map-key\u2463"},{"id":"ref-for-map-key\u2464"},{"id":"ref-for-map-key\u2465"},{"id":"ref-for-map-key\u2466"}],"title":"5.2. Maps"}],"url":"#map-key"},
+"map-value": {"dfnID":"map-value","dfnText":"value","external":false,"refSections":[{"refs":[{"id":"ref-for-map-value"},{"id":"ref-for-map-value\u2460"},{"id":"ref-for-map-value\u2461"},{"id":"ref-for-map-value\u2462"},{"id":"ref-for-map-value\u2463"}],"title":"5.2. Maps"}],"url":"#map-value"},
+"map-entry": {"dfnID":"map-entry","dfnText":"entry","external":false,"refSections":[{"refs":[{"id":"ref-for-map-entry"},{"id":"ref-for-map-entry\u2460"},{"id":"ref-for-map-entry\u2461"},{"id":"ref-for-map-entry\u2462"},{"id":"ref-for-map-entry\u2463"},{"id":"ref-for-map-entry\u2464"},{"id":"ref-for-map-entry\u2465"},{"id":"ref-for-map-entry\u2466"},{"id":"ref-for-map-entry\u2467"},{"id":"ref-for-map-entry\u2468"},{"id":"ref-for-map-entry\u2460\u24ea"}],"title":"5.2. Maps"}],"url":"#map-entry"},
+"map-get": {"dfnID":"map-get","dfnText":"get the value of an entry","external":false,"refSections":[{"refs":[{"id":"ref-for-map-get"}],"title":"5.2. Maps"}],"url":"#map-get"},
+"map-set": {"dfnID":"map-set","dfnText":"set the value of an entry","external":false,"refSections":[{"refs":[{"id":"ref-for-map-set"},{"id":"ref-for-map-set\u2460"},{"id":"ref-for-map-set\u2461"}],"title":"5.2. Maps"},{"refs":[{"id":"ref-for-map-set\u2462"}],"title":"6. JSON"}],"url":"#map-set"},
+"map-remove": {"dfnID":"map-remove","dfnText":"remove an entry","external":false,"refSections":[{"refs":[{"id":"ref-for-map-remove"}],"title":"5.2. Maps"}],"url":"#map-remove"},
+"map-exists": {"dfnID":"map-exists","dfnText":"contains an\nentry with a given key","external":false,"refSections":[{"refs":[{"id":"ref-for-map-exists"},{"id":"ref-for-map-exists\u2460"},{"id":"ref-for-map-exists\u2461"},{"id":"ref-for-map-exists\u2462"}],"title":"5.2. Maps"}],"url":"#map-exists"},
+"map-getting-the-keys": {"dfnID":"map-getting-the-keys","dfnText":"get the keys","external":false,"refSections":[{"refs":[{"id":"ref-for-map-getting-the-keys"}],"title":"5.2. Maps"}],"url":"#map-getting-the-keys"},
+"map-size": {"dfnID":"map-size","dfnText":"size","external":false,"refSections":[{"refs":[{"id":"ref-for-map-size"}],"title":"5.2. Maps"}],"url":"#map-size"},
+"map-iterate": {"dfnID":"map-iterate","dfnText":"iterate","external":false,"refSections":[{"refs":[{"id":"ref-for-map-iterate"}],"title":"3.7. Iteration"},{"refs":[{"id":"ref-for-map-iterate\u2460"},{"id":"ref-for-map-iterate\u2461"}],"title":"5.2. Maps"}],"url":"#map-iterate"},
+"struct": {"dfnID":"struct","dfnText":"struct","external":false,"refSections":[{"refs":[{"id":"ref-for-struct"}],"title":"3.3. Parameters"},{"refs":[{"id":"ref-for-struct\u2460"},{"id":"ref-for-struct\u2461"}],"title":"5.3. Structs"}],"url":"#struct"},
+"struct-item": {"dfnID":"struct-item","dfnText":"items","external":false,"refSections":[{"refs":[{"id":"ref-for-struct-item"},{"id":"ref-for-struct-item\u2460"}],"title":"5.1. Lists"},{"refs":[{"id":"ref-for-struct-item\u2461"},{"id":"ref-for-struct-item\u2462"},{"id":"ref-for-struct-item\u2463"}],"title":"5.3. Structs"}],"url":"#struct-item"},
+"struct-name": {"dfnID":"struct-name","dfnText":"name","external":false,"refSections":[{"refs":[{"id":"ref-for-struct-name"},{"id":"ref-for-struct-name\u2460"}],"title":"5.3. Structs"}],"url":"#struct-name"},
+"tuple": {"dfnID":"tuple","dfnText":"tuples","external":false,"refSections":[{"refs":[{"id":"ref-for-tuple"},{"id":"ref-for-tuple\u2460"},{"id":"ref-for-tuple\u2461"},{"id":"ref-for-tuple\u2462"},{"id":"ref-for-tuple\u2463"}],"title":"5.3. Structs"}],"url":"#tuple"},
+"pair": {"dfnID":"pair","dfnText":"pairs","external":false,"refSections":[{"refs":[{"id":"ref-for-pair"}],"title":"5.3. Structs"}],"url":"#pair"},
+"parse-a-json-string-to-a-javascript-value": {"dfnID":"parse-a-json-string-to-a-javascript-value","dfnText":"parse a JSON string to a JavaScript value","external":false,"refSections":[{"refs":[{"id":"ref-for-parse-a-json-string-to-a-javascript-value"}],"title":"6. JSON"}],"url":"#parse-a-json-string-to-a-javascript-value"},
+"serialize-a-javascript-value-to-a-json-string": {"dfnID":"serialize-a-javascript-value-to-a-json-string","dfnText":"serialize a JavaScript value to a JSON string","external":false,"refSections":[{"refs":[{"id":"ref-for-serialize-a-javascript-value-to-a-json-string"}],"title":"6. JSON"}],"url":"#serialize-a-javascript-value-to-a-json-string"},
+"parse-a-json-string-to-an-infra-value": {"dfnID":"parse-a-json-string-to-an-infra-value","dfnText":"parse a JSON string to an Infra value","external":false,"refSections":[{"refs":[{"id":"ref-for-parse-a-json-string-to-an-infra-value"}],"title":"6. JSON"}],"url":"#parse-a-json-string-to-an-infra-value"},
+"convert-a-json-derived-javascript-value-to-an-infra-value": {"dfnID":"convert-a-json-derived-javascript-value-to-an-infra-value","dfnText":"convert a JSON-derived JavaScript value to an Infra value","external":false,"refSections":[{"refs":[{"id":"ref-for-convert-a-json-derived-javascript-value-to-an-infra-value"},{"id":"ref-for-convert-a-json-derived-javascript-value-to-an-infra-value\u2460"},{"id":"ref-for-convert-a-json-derived-javascript-value-to-an-infra-value\u2461"}],"title":"6. JSON"}],"url":"#convert-a-json-derived-javascript-value-to-an-infra-value"},
+"serialize-an-infra-value-to-a-json-string": {"dfnID":"serialize-an-infra-value-to-a-json-string","dfnText":"serialize an Infra value to a JSON string","external":false,"refSections":[{"refs":[{"id":"ref-for-serialize-an-infra-value-to-a-json-string"}],"title":"6. JSON"}],"url":"#serialize-an-infra-value-to-a-json-string"},
+"convert-an-infra-value-to-a-json-compatible-javascript-value": {"dfnID":"convert-an-infra-value-to-a-json-compatible-javascript-value","dfnText":"convert an Infra value to a JSON-compatible JavaScript value","external":false,"refSections":[{"refs":[{"id":"ref-for-convert-an-infra-value-to-a-json-compatible-javascript-value"},{"id":"ref-for-convert-an-infra-value-to-a-json-compatible-javascript-value\u2460"},{"id":"ref-for-convert-an-infra-value-to-a-json-compatible-javascript-value\u2461"}],"title":"6. JSON"}],"url":"#convert-an-infra-value-to-a-json-compatible-javascript-value"},
+"forgiving-base64-encode": {"dfnID":"forgiving-base64-encode","dfnText":"forgiving-base64 encode","external":false,"refSections":[{"refs":[{"id":"ref-for-forgiving-base64-encode"}],"title":"7. Forgiving base64"}],"url":"#forgiving-base64-encode"},
+"forgiving-base64-decode": {"dfnID":"forgiving-base64-decode","dfnText":"forgiving-base64 decode","external":false,"refSections":[{"refs":[{"id":"ref-for-forgiving-base64-decode"}],"title":"7. Forgiving base64"}],"url":"#forgiving-base64-decode"},
+};
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+const typeFormatters = {
+    'dfn': (text) => `[=${text}=]`,
+    'abstract-op': (text) => `[\$${text}\$]`,
+    'value': (text) => `''${text}''`,
+    'http-header': (text) => `[:${text}:]`,
+    'idl': (text) => `{{${text}}}`,
+    'interface': 'idl',
+    'constructor': 'idl',
+    'method': 'idl',
+    'argument': 'idl',
+    'attribute': 'idl',
+    'callback': 'idl',
+    'dictionary': 'idl',
+    'dict-member': 'idl',
+    'enum': 'idl',
+    'enum-value': 'idl',
+    'exception': 'idl',
+    'const': 'idl',
+    'typedef': 'idl',
+    'stringifier': 'idl',
+    'serializer': 'idl',
+    'iterator': 'idl',
+    'maplike': 'idl',
+    'setlike': 'idl',
+    'extended-attribute': 'idl',
+    'event': 'idl',
+    'element': (element) => `<{${element}}>`,
+    'element-state': 'element',
+    'element-attr': 'element',
+    'attr-value': 'element',
+    'scheme': 'dfn',
+    'permission': 'dfn',
+    'grammar': (text) => `${text} (within a <pre class=prod>)`,
+    'type': (text)=> `<<${text}>>`,
+    'property': (text) => `'${text}'`,
+    'descriptor': 'property',
+    'function': 'value',
+    'at-rule': 'value',
+    'selector': 'value',
+};
+const typesUsingFor = new Set(
+    [
+        "descriptor",
+        "value",
+        "element-attr",
+        "attr-value",
+        "element-state",
+        "method",
+        "constructor",
+        "argument",
+        "attribute",
+        "const",
+        "dict-member",
+        "event",
+        "enum-value",
+        "stringifier",
+        "serializer",
+        "iterator",
+        "maplike",
+        "setlike",
+        "state",
+        "mode",
+        "context",
+        "facet",
+    ],
+)
+const typesNotUsingFor = new Set(
+    [
+        "property",
+        "element",
+        "interface",
+        "namespace",
+        "callback",
+        "dictionary",
+        "enum",
+        "exception",
+        "typedef",
+        "http-header",
+        "permission",
+    ],
+)
+function linkFormatterFromType(type) {
+    const fnOrType = typeFormatters[type];
+    if(typeof fnOrType === 'string') {
+        // follow the alias
+        return linkFormatterFromType(fnOrType);
+    }
+    return fnOrType;
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!typesUsingFor.has(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!typesNotUsingFor.has(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
+
+function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+    dfnPanel.forDfn = dfn;
+    if(!dfn) { console.log(dfnPanel); }
+    return dfnPanel;
+}
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        const panel = genDfnPanel({ ...panelData, dfn });
+        append(document.body, panel);
+        insertDfnPopupAction(panel)
+    }
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+})
+
+function hideAllDfnPanels() {
+    // Turn off any currently "on" or "activated" panels.
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
+}
+
+function showDfnPanel(dfnPanel) {
+    hideAllDfnPanels(); // Only display one at this time.
+
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "true");
+
+    dfnPanel.classList.add("on");
+    positionDfnPanel(dfnPanel);
+
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    // Increment tabindex for each anchor and button tags in panel
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.style.position = "absolute"; // unfix it
+    dfnPanel.classList.remove("on");
+    dfnPanel.classList.remove("activated");
+}
+
+function toggleDfnPanel(dfnPanel) {
+    if(dfnPanel.classList.contains("on")) {
+        hideDfnPanel(dfnPanel);
+    } else {
+        showDfnPanel(dfnPanel);
+    }
+}
+
+function insertDfnPopupAction(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        showDfnPanel(dfnPanel);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfnPanel);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel(dfnPanel, dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    })
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
 }
 </script>
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
+let refsData = {
+"#willful-violation": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"willful violation","type":"dfn","url":"#willful-violation"},
+"#user-agent": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"implementation","type":"dfn","url":"#user-agent"},
+"#implementation-defined": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"implementation-defined","type":"dfn","url":"#implementation-defined"},
+"#byte-sequence": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"byte sequence","type":"dfn","url":"#byte-sequence"},
+"#string": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"string","type":"dfn","url":"#string"},
+"#ascii-uppercase": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"ascii uppercase","type":"dfn","url":"#ascii-uppercase"},
+"#isomorphic-decode": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"isomorphic decode","type":"dfn","url":"#isomorphic-decode"},
+"#boolean": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"boolean","type":"dfn","url":"#boolean"},
+"#struct": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"struct","type":"dfn","url":"#struct"},
+"#list": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"list","type":"dfn","url":"#list"},
+"https://encoding.spec.whatwg.org/#utf-8-decode": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"encoding","spec":"encoding","status":"current","text":"utf-8 decode","type":"dfn","url":"https://encoding.spec.whatwg.org/#utf-8-decode"},
+"#assert": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"assert","type":"dfn","url":"#assert"},
+"#abort-when": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"abort when","type":"dfn","url":"#abort-when"},
+"#list-append": {"export":true,"for_":["list"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"append","type":"dfn","url":"#list-append"},
+"#if-aborted": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"if aborted","type":"dfn","url":"#if-aborted"},
+"#list-iterate": {"export":true,"for_":["list","set"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"for each","type":"dfn","url":"#list-iterate"},
+"#map-iterate": {"export":true,"for_":["map"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"for each","type":"dfn","url":"#map-iterate"},
+"#iteration-continue": {"export":true,"for_":["iteration"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"continue","type":"dfn","url":"#iteration-continue"},
+"#iteration-break": {"export":true,"for_":["iteration"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"break","type":"dfn","url":"#iteration-break"},
+"#ascii-upper-hex-digit": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"ascii upper hex digit","type":"dfn","url":"#ascii-upper-hex-digit"},
+"#byte": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"byte","type":"dfn","url":"#byte"},
+"#byte-value": {"export":true,"for_":["byte"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"value","type":"dfn","url":"#byte-value"},
+"#ascii-byte": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"ascii byte","type":"dfn","url":"#ascii-byte"},
+"#code-point": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"code point","type":"dfn","url":"#code-point"},
+"https://encoding.spec.whatwg.org/#utf-8-encode": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"encoding","spec":"encoding","status":"current","text":"utf-8 encode","type":"dfn","url":"https://encoding.spec.whatwg.org/#utf-8-encode"},
+"#isomorphic-encode": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"isomorphic encode","type":"dfn","url":"#isomorphic-encode"},
+"#byte-lowercase": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"byte-lowercase","type":"dfn","url":"#byte-lowercase"},
+"#iteration-while": {"export":true,"for_":["iteration"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"while","type":"dfn","url":"#iteration-while"},
+"#byte-sequence-length": {"export":true,"for_":["byte sequence"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"length","type":"dfn","url":"#byte-sequence-length"},
+"#byte-sequence-prefix": {"export":true,"for_":["byte sequence"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"prefix","type":"dfn","url":"#byte-sequence-prefix"},
+"#string-code-point-length": {"export":true,"for_":["JavaScript string","scalar value string","string"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"code point length","type":"dfn","url":"#string-code-point-length"},
+"#code-point-value": {"export":true,"for_":["code point"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"value","type":"dfn","url":"#code-point-value"},
+"#surrogate": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"surrogate","type":"dfn","url":"#surrogate"},
+"#c0-control": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"c0 control","type":"dfn","url":"#c0-control"},
+"#ascii-digit": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"ascii digit","type":"dfn","url":"#ascii-digit"},
+"#ascii-lower-hex-digit": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"ascii lower hex digit","type":"dfn","url":"#ascii-lower-hex-digit"},
+"#ascii-upper-alpha": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"ascii upper alpha","type":"dfn","url":"#ascii-upper-alpha"},
+"#ascii-lower-alpha": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"ascii lower alpha","type":"dfn","url":"#ascii-lower-alpha"},
+"#ascii-alpha": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"ascii alpha","type":"dfn","url":"#ascii-alpha"},
+"https://tc39.github.io/ecma262/#sec-ecmascript-language-types-string-type": {"export":true,"for_":[],"level":"262","normative":true,"shortname":"ecma","spec":"ecma-262","status":"anchor-block","text":"the string type","type":"dfn","url":"https://tc39.github.io/ecma262/#sec-ecmascript-language-types-string-type"},
+"#scalar-value": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"scalar value","type":"dfn","url":"#scalar-value"},
+"#code-unit": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"code unit","type":"dfn","url":"#code-unit"},
+"#scalar-value-string": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"scalar value string","type":"dfn","url":"#scalar-value-string"},
+"#javascript-string-convert": {"export":true,"for_":["JavaScript string","string"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"convert","type":"dfn","url":"#javascript-string-convert"},
+"#string-is": {"export":true,"for_":["string"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"identical to","type":"dfn","url":"#string-is"},
+"#string-length": {"export":true,"for_":["JavaScript string","scalar value string","string"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"length","type":"dfn","url":"#string-length"},
+"#code-unit-prefix": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"code unit prefix","type":"dfn","url":"#code-unit-prefix"},
+"#string-starts-with": {"export":true,"for_":["string"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"starts with","type":"dfn","url":"#string-starts-with"},
+"https://tc39.github.io/ecma262/#sec-array.prototype.sort": {"export":true,"for_":["Array"],"level":"262","normative":true,"shortname":"ecma","spec":"ecma-262","status":"anchor-block","text":"sort()","type":"method","url":"https://tc39.github.io/ecma262/#sec-array.prototype.sort"},
+"#ascii-code-point": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"ascii code point","type":"dfn","url":"#ascii-code-point"},
+"#ascii-lowercase": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"ascii lowercase","type":"dfn","url":"#ascii-lowercase"},
+"#ascii-string": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"ascii string","type":"dfn","url":"#ascii-string"},
+"#ascii-whitespace": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"ascii whitespace","type":"dfn","url":"#ascii-whitespace"},
+"#string-position-variable": {"export":true,"for_":["string"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"position variable","type":"dfn","url":"#string-position-variable"},
+"#collect-a-sequence-of-code-points": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"collect a sequence of code points","type":"dfn","url":"#collect-a-sequence-of-code-points"},
+"#split-on-ascii-whitespace": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"split on ascii whitespace","type":"dfn","url":"#split-on-ascii-whitespace"},
+"#split-on-commas": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"split on commas","type":"dfn","url":"#split-on-commas"},
+"#skip-ascii-whitespace": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"skip ascii whitespace","type":"dfn","url":"#skip-ascii-whitespace"},
+"#strip-leading-and-trailing-ascii-whitespace": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"strip leading and trailing ascii whitespace","type":"dfn","url":"#strip-leading-and-trailing-ascii-whitespace"},
+"#list-is-empty": {"export":true,"for_":["list","queue","set","stack"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"is empty","type":"dfn","url":"#list-is-empty"},
+"#list-item": {"export":true,"for_":["list","queue","set","stack"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"item","type":"dfn","url":"#list-item"},
+"#string-concatenate": {"export":true,"for_":["string"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"concatenation","type":"dfn","url":"#string-concatenate"},
+"#set-append": {"export":true,"for_":["set"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"append","type":"dfn","url":"#set-append"},
+"#ordered-set": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"ordered set","type":"dfn","url":"#ordered-set"},
+"#list-contain": {"export":true,"for_":["list","queue","set","stack"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"contain","type":"dfn","url":"#list-contain"},
+"#ordered-map": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"ordered map","type":"dfn","url":"#ordered-map"},
+"#list-extend": {"export":true,"for_":["list"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"extend","type":"dfn","url":"#list-extend"},
+"#list-size": {"export":true,"for_":["list","queue","set","stack"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"size","type":"dfn","url":"#list-size"},
+"#set-prepend": {"export":true,"for_":["set"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"prepend","type":"dfn","url":"#set-prepend"},
+"#set-replace": {"export":true,"for_":["set"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"replace","type":"dfn","url":"#set-replace"},
+"#list-prepend": {"export":true,"for_":["list"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"prepend","type":"dfn","url":"#list-prepend"},
+"#list-remove": {"export":true,"for_":["list","set"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"remove","type":"dfn","url":"#list-remove"},
+"#list-clone": {"export":true,"for_":["list","queue","set","stack"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"clone","type":"dfn","url":"#list-clone"},
+"#list-sort-in-ascending-order": {"export":true,"for_":["list","queue","set","stack"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"sorting","type":"dfn","url":"#list-sort-in-ascending-order"},
+"#struct-item": {"export":true,"for_":["pair","struct","tuple"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"item","type":"dfn","url":"#struct-item"},
+"#code-unit-less-than": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"code unit less than","type":"dfn","url":"#code-unit-less-than"},
+"https://tc39.github.io/ecma262/#sec-list-and-record-specification-type": {"export":true,"for_":[],"level":"262","normative":true,"shortname":"ecma","spec":"ecma-262","status":"anchor-block","text":"list","type":"dfn","url":"https://tc39.github.io/ecma262/#sec-list-and-record-specification-type"},
+"#stack": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"stack","type":"dfn","url":"#stack"},
+"#stack-pop": {"export":true,"for_":["stack"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"pop","type":"dfn","url":"#stack-pop"},
+"#queue": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"queue","type":"dfn","url":"#queue"},
+"#queue-dequeue": {"export":true,"for_":["queue"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"dequeue","type":"dfn","url":"#queue-dequeue"},
+"#set-subset": {"export":true,"for_":["set"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"subset","type":"dfn","url":"#set-subset"},
+"#set-superset": {"export":true,"for_":["set"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"superset","type":"dfn","url":"#set-superset"},
+"#the-range": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"the range","type":"dfn","url":"#the-range"},
+"#map-entry": {"export":true,"for_":["map"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"entry","type":"dfn","url":"#map-entry"},
+"#map-key": {"export":true,"for_":["map"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"key","type":"dfn","url":"#map-key"},
+"#map-exists": {"export":true,"for_":["map"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"contain","type":"dfn","url":"#map-exists"},
+"#map-value": {"export":true,"for_":["map"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"value","type":"dfn","url":"#map-value"},
+"#map-get": {"export":true,"for_":["map"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"get","type":"dfn","url":"#map-get"},
+"#map-set": {"export":true,"for_":["map"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"set","type":"dfn","url":"#map-set"},
+"#map-remove": {"export":true,"for_":["map"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"remove","type":"dfn","url":"#map-remove"},
+"#map-getting-the-keys": {"export":true,"for_":["map"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"get the keys","type":"dfn","url":"#map-getting-the-keys"},
+"#map-size": {"export":true,"for_":["map"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"size","type":"dfn","url":"#map-size"},
+"#tuple": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"tuple","type":"dfn","url":"#tuple"},
+"#struct-name": {"export":true,"for_":["pair","struct","tuple"],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"name","type":"dfn","url":"#struct-name"},
+"#pair": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"pair","type":"dfn","url":"#pair"},
+"https://tc39.github.io/ecma262/#sec-call": {"export":true,"for_":[],"level":"262","normative":true,"shortname":"ecma","spec":"ecma-262","status":"anchor-block","text":"Call","type":"abstract-op","url":"https://tc39.github.io/ecma262/#sec-call"},
+"https://tc39.github.io/ecma262/#sec-json.parse": {"export":true,"for_":[],"level":"262","normative":true,"shortname":"ecma","spec":"ecma-262","status":"anchor-block","text":"%json.parse%","type":"dfn","url":"https://tc39.github.io/ecma262/#sec-json.parse"},
+"#parse-a-json-string-to-a-javascript-value": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"parsing a json string to a javascript value","type":"dfn","url":"#parse-a-json-string-to-a-javascript-value"},
+"https://tc39.github.io/ecma262/#sec-json.stringify": {"export":true,"for_":[],"level":"262","normative":true,"shortname":"ecma","spec":"ecma-262","status":"anchor-block","text":"%json.stringify%","type":"dfn","url":"https://tc39.github.io/ecma262/#sec-json.stringify"},
+"https://webidl.spec.whatwg.org/#exceptiondef-typeerror": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"TypeError","type":"exception","url":"https://webidl.spec.whatwg.org/#exceptiondef-typeerror"},
+"#serialize-a-javascript-value-to-a-json-string": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"serializing a javascript value to a json string","type":"dfn","url":"#serialize-a-javascript-value-to-a-json-string"},
+"https://tc39.github.io/ecma262/#realm": {"export":true,"for_":[],"level":"262","normative":true,"shortname":"ecma","spec":"ecma-262","status":"anchor-block","text":"realm","type":"dfn","url":"https://tc39.github.io/ecma262/#realm"},
+"#convert-a-json-derived-javascript-value-to-an-infra-value": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"converting a json-derived javascript value to an infra value","type":"dfn","url":"#convert-a-json-derived-javascript-value-to-an-infra-value"},
+"#parse-a-json-string-to-an-infra-value": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"parsing a json string to an infra value","type":"dfn","url":"#parse-a-json-string-to-an-infra-value"},
+"https://tc39.github.io/ecma262/#sec-ecmascript-data-types-and-values": {"export":true,"for_":[],"level":"262","normative":true,"shortname":"ecma","spec":"ecma-262","status":"anchor-block","text":"Type","type":"abstract-op","url":"https://tc39.github.io/ecma262/#sec-ecmascript-data-types-and-values"},
+"https://tc39.github.io/ecma262/#sec-isarray": {"export":true,"for_":[],"level":"262","normative":true,"shortname":"ecma","spec":"ecma-262","status":"anchor-block","text":"IsArray","type":"abstract-op","url":"https://tc39.github.io/ecma262/#sec-isarray"},
+"https://tc39.github.io/ecma262/#sec-tolength": {"export":true,"for_":[],"level":"262","normative":true,"shortname":"ecma","spec":"ecma-262","status":"anchor-block","text":"ToLength","type":"abstract-op","url":"https://tc39.github.io/ecma262/#sec-tolength"},
+"https://tc39.github.io/ecma262/#sec-get-o-p": {"export":true,"for_":[],"level":"262","normative":true,"shortname":"ecma","spec":"ecma-262","status":"anchor-block","text":"Get","type":"abstract-op","url":"https://tc39.github.io/ecma262/#sec-get-o-p"},
+"https://tc39.github.io/ecma262/#sec-tostring": {"export":true,"for_":[],"level":"262","normative":true,"shortname":"ecma","spec":"ecma-262","status":"anchor-block","text":"ToString","type":"abstract-op","url":"https://tc39.github.io/ecma262/#sec-tostring"},
+"#convert-an-infra-value-to-a-json-compatible-javascript-value": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"converting an infra value to a json-compatible javascript value","type":"dfn","url":"#convert-an-infra-value-to-a-json-compatible-javascript-value"},
+"#serialize-an-infra-value-to-a-json-string": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"serializing an infra value to a json string","type":"dfn","url":"#serialize-an-infra-value-to-a-json-string"},
+"https://tc39.github.io/ecma262/#sec-arraycreate": {"export":true,"for_":[],"level":"262","normative":true,"shortname":"ecma","spec":"ecma-262","status":"anchor-block","text":"ArrayCreate","type":"abstract-op","url":"https://tc39.github.io/ecma262/#sec-arraycreate"},
+"https://tc39.github.io/ecma262/#sec-createdatapropertyorthrow": {"export":true,"for_":[],"level":"262","normative":true,"shortname":"ecma","spec":"ecma-262","status":"anchor-block","text":"CreateDataPropertyOrThrow","type":"abstract-op","url":"https://tc39.github.io/ecma262/#sec-createdatapropertyorthrow"},
+"https://tc39.github.io/ecma262/#sec-ordinaryobjectcreate": {"export":true,"for_":[],"level":"262","normative":true,"shortname":"ecma","spec":"ecma-262","status":"anchor-block","text":"OrdinaryObjectCreate","type":"abstract-op","url":"https://tc39.github.io/ecma262/#sec-ordinaryobjectcreate"},
+"#forgiving-base64-encode": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"forgiving-base64 encode","type":"dfn","url":"#forgiving-base64-encode"},
+"#forgiving-base64-decode": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"forgiving-base64 decode","type":"dfn","url":"#forgiving-base64-decode"},
+"#ascii-alphanumeric": {"export":true,"for_":[],"level":"","normative":true,"shortname":"infra","spec":"infra","status":"local","text":"ascii alphanumeric","type":"dfn","url":"#ascii-alphanumeric"},
+};
+
+function genRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "DFN: "),
+                mk.code({ class: "dfn-text" }, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    const forListElements = forList.length === 0 ? '' : mk.li({},
+        mk.b({}, "For: "),
+        mk.ul({},
+            ...forList.map(forItem =>
                 mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
-            mk.b({}, "For: "),
-            mk.ul({},
-                ...forList.map(forItem =>
-                    mk.li({},
-                        mk.span({}, `${forItem}`)
-                    ),
+                    mk.span({}, `${forItem}`)
                 ),
             ),
-        );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+        ),
+    );
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
-    }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    return hintPanel;
+}
+function genAllRefHints() {
+    for(const refData of Object.values(refsData)) {
+        const refUrl = refData.url;
+        const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+        if (links.length == 0) {
+            console.log(`Can't find link href="${refUrl}".`, refData);
+            continue;
+        }
+        for(const link of links) {
+            if(link.classList.contains("dfn-link")) continue;
+            const hint = genRefHint(link, refData);
+            append(document.body, hint);
+            insertLinkPopupAction(hint)
         }
     }
+}
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+function hideAllRefHints() {
+    queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    refHint.style.position = "absolute"; // unfix it
+    refHint.classList.remove("on");
+    const teardown = refHint.teardownEventListeners;
+    if (teardown) {
+        refHint.teardownEventListeners = undefined;
+        teardown();
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+function showRefHint(refHint) {
+    hideAllRefHints(); // Only display one at this time.
+
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "true");
+    refHint.classList.add("on");
+    positionRefHint(refHint);
+    setupRefHintEventListeners(refHint);
+}
+
+function setupRefHintEventListeners(refHint) {
+    if (refHint.teardownEventListeners) return;
+    const link = refHint.forLink;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
 
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
 
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+function insertLinkPopupAction(refHint) {
+    const link = refHint.forLink;
+    // link.setAttribute('role', 'button');
+    link.setAttribute('aria-expanded', 'false')
+    link.classList.add('has-ref-hint');
+    link.addEventListener('mouseover', (event) => {
+        showRefHint(refHint);
     });
+    link.addEventListener('focus', (event) => {
+        showRefHint(refHint);
+    })
+}
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+document.addEventListener("DOMContentLoaded", () => {
+    genAllRefHints();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['#willful-violation'] = {"text": "willful violation", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#willful-violation", "export": true, "normative": true, "for_": []};
-window.refsData['#user-agent'] = {"text": "implementation", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#user-agent", "export": true, "normative": true, "for_": []};
-window.refsData['#implementation-defined'] = {"text": "implementation-defined", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#implementation-defined", "export": true, "normative": true, "for_": []};
-window.refsData['#byte-sequence'] = {"text": "byte sequence", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#byte-sequence", "export": true, "normative": true, "for_": []};
-window.refsData['#string'] = {"text": "string", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#string", "export": true, "normative": true, "for_": []};
-window.refsData['#ascii-uppercase'] = {"text": "ascii uppercase", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#ascii-uppercase", "export": true, "normative": true, "for_": []};
-window.refsData['#isomorphic-decode'] = {"text": "isomorphic decode", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#isomorphic-decode", "export": true, "normative": true, "for_": []};
-window.refsData['#boolean'] = {"text": "boolean", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#boolean", "export": true, "normative": true, "for_": []};
-window.refsData['#struct'] = {"text": "struct", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#struct", "export": true, "normative": true, "for_": []};
-window.refsData['#list'] = {"text": "list", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#list", "export": true, "normative": true, "for_": []};
-window.refsData['https://encoding.spec.whatwg.org/#utf-8-decode'] = {"text": "utf-8 decode", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "1", "status": "current", "url": "https://encoding.spec.whatwg.org/#utf-8-decode", "export": true, "normative": true, "for_": []};
-window.refsData['#assert'] = {"text": "assert", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#assert", "export": true, "normative": true, "for_": []};
-window.refsData['#abort-when'] = {"text": "abort when", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#abort-when", "export": true, "normative": true, "for_": []};
-window.refsData['#list-append'] = {"text": "append", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#list-append", "export": true, "normative": true, "for_": ["list"]};
-window.refsData['#if-aborted'] = {"text": "if aborted", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#if-aborted", "export": true, "normative": true, "for_": []};
-window.refsData['#list-iterate'] = {"text": "for each", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#list-iterate", "export": true, "normative": true, "for_": ["list", "set"]};
-window.refsData['#map-iterate'] = {"text": "for each", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#map-iterate", "export": true, "normative": true, "for_": ["map"]};
-window.refsData['#iteration-continue'] = {"text": "continue", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#iteration-continue", "export": true, "normative": true, "for_": ["iteration"]};
-window.refsData['#iteration-break'] = {"text": "break", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#iteration-break", "export": true, "normative": true, "for_": ["iteration"]};
-window.refsData['#ascii-upper-hex-digit'] = {"text": "ascii upper hex digit", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#ascii-upper-hex-digit", "export": true, "normative": true, "for_": []};
-window.refsData['#byte'] = {"text": "byte", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#byte", "export": true, "normative": true, "for_": []};
-window.refsData['#byte-value'] = {"text": "value", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#byte-value", "export": true, "normative": true, "for_": ["byte"]};
-window.refsData['#ascii-byte'] = {"text": "ascii byte", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#ascii-byte", "export": true, "normative": true, "for_": []};
-window.refsData['#code-point'] = {"text": "code point", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#code-point", "export": true, "normative": true, "for_": []};
-window.refsData['https://encoding.spec.whatwg.org/#utf-8-encode'] = {"text": "utf-8 encode", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "1", "status": "current", "url": "https://encoding.spec.whatwg.org/#utf-8-encode", "export": true, "normative": true, "for_": []};
-window.refsData['#isomorphic-encode'] = {"text": "isomorphic encode", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#isomorphic-encode", "export": true, "normative": true, "for_": []};
-window.refsData['#byte-lowercase'] = {"text": "byte-lowercase", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#byte-lowercase", "export": true, "normative": true, "for_": []};
-window.refsData['#iteration-while'] = {"text": "while", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#iteration-while", "export": true, "normative": true, "for_": ["iteration"]};
-window.refsData['#byte-sequence-length'] = {"text": "length", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#byte-sequence-length", "export": true, "normative": true, "for_": ["byte sequence"]};
-window.refsData['#byte-sequence-prefix'] = {"text": "prefix", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#byte-sequence-prefix", "export": true, "normative": true, "for_": ["byte sequence"]};
-window.refsData['#string-code-point-length'] = {"text": "code point length", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#string-code-point-length", "export": true, "normative": true, "for_": ["JavaScript string", "scalar value string", "string"]};
-window.refsData['#code-point-value'] = {"text": "value", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#code-point-value", "export": true, "normative": true, "for_": ["code point"]};
-window.refsData['#surrogate'] = {"text": "surrogate", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#surrogate", "export": true, "normative": true, "for_": []};
-window.refsData['#c0-control'] = {"text": "c0 control", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#c0-control", "export": true, "normative": true, "for_": []};
-window.refsData['#ascii-digit'] = {"text": "ascii digit", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#ascii-digit", "export": true, "normative": true, "for_": []};
-window.refsData['#ascii-lower-hex-digit'] = {"text": "ascii lower hex digit", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#ascii-lower-hex-digit", "export": true, "normative": true, "for_": []};
-window.refsData['#ascii-upper-alpha'] = {"text": "ascii upper alpha", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#ascii-upper-alpha", "export": true, "normative": true, "for_": []};
-window.refsData['#ascii-lower-alpha'] = {"text": "ascii lower alpha", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#ascii-lower-alpha", "export": true, "normative": true, "for_": []};
-window.refsData['#ascii-alpha'] = {"text": "ascii alpha", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#ascii-alpha", "export": true, "normative": true, "for_": []};
-window.refsData['https://tc39.github.io/ecma262/#sec-ecmascript-language-types-string-type'] = {"text": "the string type", "type": "dfn", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-ecmascript-language-types-string-type", "export": true, "normative": true, "for_": []};
-window.refsData['#scalar-value'] = {"text": "scalar value", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#scalar-value", "export": true, "normative": true, "for_": []};
-window.refsData['#code-unit'] = {"text": "code unit", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#code-unit", "export": true, "normative": true, "for_": []};
-window.refsData['#scalar-value-string'] = {"text": "scalar value string", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#scalar-value-string", "export": true, "normative": true, "for_": []};
-window.refsData['#javascript-string-convert'] = {"text": "convert", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#javascript-string-convert", "export": true, "normative": true, "for_": ["JavaScript string", "string"]};
-window.refsData['#string-is'] = {"text": "identical to", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#string-is", "export": true, "normative": true, "for_": ["string"]};
-window.refsData['#string-length'] = {"text": "length", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#string-length", "export": true, "normative": true, "for_": ["JavaScript string", "scalar value string", "string"]};
-window.refsData['#code-unit-prefix'] = {"text": "code unit prefix", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#code-unit-prefix", "export": true, "normative": true, "for_": []};
-window.refsData['#string-starts-with'] = {"text": "starts with", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#string-starts-with", "export": true, "normative": true, "for_": ["string"]};
-window.refsData['https://tc39.github.io/ecma262/#sec-array.prototype.sort'] = {"text": "sort()", "type": "method", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-array.prototype.sort", "export": true, "normative": true, "for_": ["Array"]};
-window.refsData['#ascii-code-point'] = {"text": "ascii code point", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#ascii-code-point", "export": true, "normative": true, "for_": []};
-window.refsData['#ascii-lowercase'] = {"text": "ascii lowercase", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#ascii-lowercase", "export": true, "normative": true, "for_": []};
-window.refsData['#ascii-string'] = {"text": "ascii string", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#ascii-string", "export": true, "normative": true, "for_": []};
-window.refsData['#ascii-whitespace'] = {"text": "ascii whitespace", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#ascii-whitespace", "export": true, "normative": true, "for_": []};
-window.refsData['#string-position-variable'] = {"text": "position variable", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#string-position-variable", "export": true, "normative": true, "for_": ["string"]};
-window.refsData['#collect-a-sequence-of-code-points'] = {"text": "collect a sequence of code points", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#collect-a-sequence-of-code-points", "export": true, "normative": true, "for_": []};
-window.refsData['#split-on-ascii-whitespace'] = {"text": "split on ascii whitespace", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#split-on-ascii-whitespace", "export": true, "normative": true, "for_": []};
-window.refsData['#split-on-commas'] = {"text": "split on commas", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#split-on-commas", "export": true, "normative": true, "for_": []};
-window.refsData['#skip-ascii-whitespace'] = {"text": "skip ascii whitespace", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#skip-ascii-whitespace", "export": true, "normative": true, "for_": []};
-window.refsData['#strip-leading-and-trailing-ascii-whitespace'] = {"text": "strip leading and trailing ascii whitespace", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#strip-leading-and-trailing-ascii-whitespace", "export": true, "normative": true, "for_": []};
-window.refsData['#list-is-empty'] = {"text": "is empty", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#list-is-empty", "export": true, "normative": true, "for_": ["list", "queue", "set", "stack"]};
-window.refsData['#list-item'] = {"text": "item", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#list-item", "export": true, "normative": true, "for_": ["list", "queue", "set", "stack"]};
-window.refsData['#string-concatenate'] = {"text": "concatenation", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#string-concatenate", "export": true, "normative": true, "for_": ["string"]};
-window.refsData['#set-append'] = {"text": "append", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#set-append", "export": true, "normative": true, "for_": ["set"]};
-window.refsData['#ordered-set'] = {"text": "ordered set", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#ordered-set", "export": true, "normative": true, "for_": []};
-window.refsData['#list-contain'] = {"text": "contain", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#list-contain", "export": true, "normative": true, "for_": ["list", "queue", "set", "stack"]};
-window.refsData['#ordered-map'] = {"text": "ordered map", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#ordered-map", "export": true, "normative": true, "for_": []};
-window.refsData['#list-extend'] = {"text": "extend", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#list-extend", "export": true, "normative": true, "for_": ["list"]};
-window.refsData['#list-size'] = {"text": "size", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#list-size", "export": true, "normative": true, "for_": ["list", "queue", "set", "stack"]};
-window.refsData['#set-prepend'] = {"text": "prepend", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#set-prepend", "export": true, "normative": true, "for_": ["set"]};
-window.refsData['#set-replace'] = {"text": "replace", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#set-replace", "export": true, "normative": true, "for_": ["set"]};
-window.refsData['#list-prepend'] = {"text": "prepend", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#list-prepend", "export": true, "normative": true, "for_": ["list"]};
-window.refsData['#list-remove'] = {"text": "remove", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#list-remove", "export": true, "normative": true, "for_": ["list", "set"]};
-window.refsData['#list-clone'] = {"text": "clone", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#list-clone", "export": true, "normative": true, "for_": ["list", "queue", "set", "stack"]};
-window.refsData['#list-sort-in-ascending-order'] = {"text": "sorting", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#list-sort-in-ascending-order", "export": true, "normative": true, "for_": ["list", "queue", "set", "stack"]};
-window.refsData['#struct-item'] = {"text": "item", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#struct-item", "export": true, "normative": true, "for_": ["pair", "struct", "tuple"]};
-window.refsData['#code-unit-less-than'] = {"text": "code unit less than", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#code-unit-less-than", "export": true, "normative": true, "for_": []};
-window.refsData['https://tc39.github.io/ecma262/#sec-list-and-record-specification-type'] = {"text": "list", "type": "dfn", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-list-and-record-specification-type", "export": true, "normative": true, "for_": []};
-window.refsData['#stack'] = {"text": "stack", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#stack", "export": true, "normative": true, "for_": []};
-window.refsData['#stack-pop'] = {"text": "pop", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#stack-pop", "export": true, "normative": true, "for_": ["stack"]};
-window.refsData['#queue'] = {"text": "queue", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#queue", "export": true, "normative": true, "for_": []};
-window.refsData['#queue-dequeue'] = {"text": "dequeue", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#queue-dequeue", "export": true, "normative": true, "for_": ["queue"]};
-window.refsData['#set-subset'] = {"text": "subset", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#set-subset", "export": true, "normative": true, "for_": ["set"]};
-window.refsData['#set-superset'] = {"text": "superset", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#set-superset", "export": true, "normative": true, "for_": ["set"]};
-window.refsData['#the-range'] = {"text": "the range", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#the-range", "export": true, "normative": true, "for_": []};
-window.refsData['#map-entry'] = {"text": "entry", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#map-entry", "export": true, "normative": true, "for_": ["map"]};
-window.refsData['#map-key'] = {"text": "key", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#map-key", "export": true, "normative": true, "for_": ["map"]};
-window.refsData['#map-exists'] = {"text": "contain", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#map-exists", "export": true, "normative": true, "for_": ["map"]};
-window.refsData['#map-value'] = {"text": "value", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#map-value", "export": true, "normative": true, "for_": ["map"]};
-window.refsData['#map-get'] = {"text": "get", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#map-get", "export": true, "normative": true, "for_": ["map"]};
-window.refsData['#map-set'] = {"text": "set", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#map-set", "export": true, "normative": true, "for_": ["map"]};
-window.refsData['#map-remove'] = {"text": "remove", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#map-remove", "export": true, "normative": true, "for_": ["map"]};
-window.refsData['#map-getting-the-keys'] = {"text": "get the keys", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#map-getting-the-keys", "export": true, "normative": true, "for_": ["map"]};
-window.refsData['#map-size'] = {"text": "size", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#map-size", "export": true, "normative": true, "for_": ["map"]};
-window.refsData['#tuple'] = {"text": "tuple", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#tuple", "export": true, "normative": true, "for_": []};
-window.refsData['#struct-name'] = {"text": "name", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#struct-name", "export": true, "normative": true, "for_": ["pair", "struct", "tuple"]};
-window.refsData['#pair'] = {"text": "pair", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#pair", "export": true, "normative": true, "for_": []};
-window.refsData['https://tc39.github.io/ecma262/#sec-call'] = {"text": "Call", "type": "abstract-op", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-call", "export": true, "normative": true, "for_": []};
-window.refsData['https://tc39.github.io/ecma262/#sec-json.parse'] = {"text": "%json.parse%", "type": "dfn", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-json.parse", "export": true, "normative": true, "for_": []};
-window.refsData['#parse-a-json-string-to-a-javascript-value'] = {"text": "parsing a json string to a javascript value", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#parse-a-json-string-to-a-javascript-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://tc39.github.io/ecma262/#sec-json.stringify'] = {"text": "%json.stringify%", "type": "dfn", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-json.stringify", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#exceptiondef-typeerror'] = {"text": "TypeError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#exceptiondef-typeerror", "export": true, "normative": true, "for_": []};
-window.refsData['#serialize-a-javascript-value-to-a-json-string'] = {"text": "serializing a javascript value to a json string", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#serialize-a-javascript-value-to-a-json-string", "export": true, "normative": true, "for_": []};
-window.refsData['https://tc39.github.io/ecma262/#realm'] = {"text": "realm", "type": "dfn", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#realm", "export": true, "normative": true, "for_": []};
-window.refsData['#convert-a-json-derived-javascript-value-to-an-infra-value'] = {"text": "converting a json-derived javascript value to an infra value", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#convert-a-json-derived-javascript-value-to-an-infra-value", "export": true, "normative": true, "for_": []};
-window.refsData['#parse-a-json-string-to-an-infra-value'] = {"text": "parsing a json string to an infra value", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#parse-a-json-string-to-an-infra-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://tc39.github.io/ecma262/#sec-ecmascript-data-types-and-values'] = {"text": "Type", "type": "abstract-op", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-ecmascript-data-types-and-values", "export": true, "normative": true, "for_": []};
-window.refsData['https://tc39.github.io/ecma262/#sec-isarray'] = {"text": "IsArray", "type": "abstract-op", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-isarray", "export": true, "normative": true, "for_": []};
-window.refsData['https://tc39.github.io/ecma262/#sec-tolength'] = {"text": "ToLength", "type": "abstract-op", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-tolength", "export": true, "normative": true, "for_": []};
-window.refsData['https://tc39.github.io/ecma262/#sec-get-o-p'] = {"text": "Get", "type": "abstract-op", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-get-o-p", "export": true, "normative": true, "for_": []};
-window.refsData['https://tc39.github.io/ecma262/#sec-tostring'] = {"text": "ToString", "type": "abstract-op", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-tostring", "export": true, "normative": true, "for_": []};
-window.refsData['#convert-an-infra-value-to-a-json-compatible-javascript-value'] = {"text": "converting an infra value to a json-compatible javascript value", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#convert-an-infra-value-to-a-json-compatible-javascript-value", "export": true, "normative": true, "for_": []};
-window.refsData['#serialize-an-infra-value-to-a-json-string'] = {"text": "serializing an infra value to a json string", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#serialize-an-infra-value-to-a-json-string", "export": true, "normative": true, "for_": []};
-window.refsData['https://tc39.github.io/ecma262/#sec-arraycreate'] = {"text": "ArrayCreate", "type": "abstract-op", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-arraycreate", "export": true, "normative": true, "for_": []};
-window.refsData['https://tc39.github.io/ecma262/#sec-createdatapropertyorthrow'] = {"text": "CreateDataPropertyOrThrow", "type": "abstract-op", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-createdatapropertyorthrow", "export": true, "normative": true, "for_": []};
-window.refsData['https://tc39.github.io/ecma262/#sec-ordinaryobjectcreate'] = {"text": "OrdinaryObjectCreate", "type": "abstract-op", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-ordinaryobjectcreate", "export": true, "normative": true, "for_": []};
-window.refsData['#forgiving-base64-encode'] = {"text": "forgiving-base64 encode", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#forgiving-base64-encode", "export": true, "normative": true, "for_": []};
-window.refsData['#forgiving-base64-decode'] = {"text": "forgiving-base64 decode", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#forgiving-base64-decode", "export": true, "normative": true, "for_": []};
-window.refsData['#ascii-alphanumeric'] = {"text": "ascii alphanumeric", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#ascii-alphanumeric", "export": true, "normative": true, "for_": []};
 </script>

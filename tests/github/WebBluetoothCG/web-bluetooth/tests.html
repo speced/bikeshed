@@ -83,7 +83,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -457,6 +456,11 @@ figcaption:not(.no-marker)::before {
     }
 }
 </style>
+<style>/* Boilerplate: style-idl-highlighting */
+pre.idl.highlight {
+    background: var(--borderedblock-bg, var(--def-bg));
+}
+</style>
 <style>/* Boilerplate: style-issues */
 a[href].issue-return {
     float: right;
@@ -514,7 +518,6 @@ a[href].issue-return {
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -574,7 +577,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -631,7 +633,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -1128,448 +1129,8 @@ Chromium developers are interested
 in updating and collaborating on this document when the next tested
 implementation begins development. <a class="issue-return" href="#issue-4d7cfd5e" title="Jump to section">↵</a></div>
   </div>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['7a46e3df'] = {"dfnID": "7a46e3df", "url": "https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.gap.device_name.xml#", "dfnText": "org.bluetooth.characteristic.gap.device_name", "refSections": [{"refs": [{"id": "ref-for-something\u2467"}], "title": "4.1.6. MissingDescriptorGenericAccessDevice"}, {"refs": [{"id": "ref-for-something\u2468"}], "title": "4.1.7. GenericAccessDevice"}], "external": true};
-window.dfnpanelData['6e89b264'] = {"dfnID": "6e89b264", "url": "https://developer.bluetooth.org/gatt/descriptors/Pages/DescriptorViewer.aspx?u=org.bluetooth.descriptor.gatt.characteristic_extended_properties.xml#", "dfnText": "org.bluetooth.descriptor.gatt.characteristic_extended_properties", "refSections": [{"refs": [{"id": "ref-for-something\u2460\u24ea"}], "title": "4.1.7. GenericAccessDevice"}], "external": true};
-window.dfnpanelData['3e46ba0c'] = {"dfnID": "3e46ba0c", "url": "https://developer.bluetooth.org/gatt/descriptors/Pages/DescriptorViewer.aspx?u=org.bluetooth.descriptor.gatt.characteristic_user_description.xml#", "dfnText": "org.bluetooth.descriptor.gatt.characteristic_user_description", "refSections": [{"refs": [{"id": "ref-for-something\u2460\u2460"}], "title": "4.1.7. GenericAccessDevice"}], "external": true};
-window.dfnpanelData['4e7240a2'] = {"dfnID": "4e7240a2", "url": "https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.battery_service.xml#", "dfnText": "org.bluetooth.service.battery_service", "refSections": [{"refs": [{"id": "ref-for-something\u2461"}], "title": "4.1. setBluetoothMockDataSet"}, {"refs": [{"id": "ref-for-something\u2462"}], "title": "4.1.1. BatteryDevice"}], "external": true};
-window.dfnpanelData['2bd3054a'] = {"dfnID": "2bd3054a", "url": "https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.generic_access.xml#", "dfnText": "org.bluetooth.service.generic_access", "refSections": [{"refs": [{"id": "ref-for-something\u2465"}], "title": "4.1.5. MissingCharacteristicGenericAccessDevice"}, {"refs": [{"id": "ref-for-something\u2466"}], "title": "4.1.6. MissingDescriptorGenericAccessDevice"}], "external": true};
-window.dfnpanelData['7a4f8f14'] = {"dfnID": "7a4f8f14", "url": "https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.glucose.xml#", "dfnText": "org.bluetooth.service.glucose", "refSections": [{"refs": [{"id": "ref-for-something"}], "title": "4.1. setBluetoothMockDataSet"}, {"refs": [{"id": "ref-for-something\u2463"}], "title": "4.1.2. GlucoseDevice"}], "external": true};
-window.dfnpanelData['1c5e2349'] = {"dfnID": "1c5e2349", "url": "https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.heart_rate.xml#", "dfnText": "org.bluetooth.service.heart_rate", "refSections": [{"refs": [{"id": "ref-for-something\u2460"}], "title": "4.1. setBluetoothMockDataSet"}, {"refs": [{"id": "ref-for-something\u2464"}], "title": "4.1.3. HeartRateDevice"}], "external": true};
-window.dfnpanelData['5fd23811'] = {"dfnID": "5fd23811", "url": "https://dom.spec.whatwg.org/#concept-event-fire", "dfnText": "fire an event", "refSections": [{"refs": [{"id": "ref-for-concept-event-fire"}], "title": "5. eventSender"}], "external": true};
-window.dfnpanelData['5d7209e9'] = {"dfnID": "5d7209e9", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window", "dfnText": "Window", "refSections": [{"refs": [{"id": "ref-for-window"}], "title": "3. Testing interfaces"}], "external": true};
-window.dfnpanelData['c51ad875'] = {"dfnID": "c51ad875", "url": "https://html.spec.whatwg.org/multipage/dom.html#the-body-element-2", "dfnText": "the body element", "refSections": [{"refs": [{"id": "ref-for-the-body-element-2"}], "title": "5. eventSender"}], "external": true};
-window.dfnpanelData['6f386cdc'] = {"dfnID": "6f386cdc", "url": "https://www.w3.org/TR/uievents/#widl-KeyboardEvent-key", "dfnText": "key", "refSections": [{"refs": [{"id": "ref-for-widl-KeyboardEvent-key"}], "title": "5. eventSender"}], "external": true};
-window.dfnpanelData['c19ba40a'] = {"dfnID": "c19ba40a", "url": "https://www.w3.org/TR/uievents/#event-type-keypress", "dfnText": "keypress", "refSections": [{"refs": [{"id": "ref-for-event-type-keypress"}], "title": "5. eventSender"}], "external": true};
-window.dfnpanelData['b9ddee63'] = {"dfnID": "b9ddee63", "url": "https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetoothdevice-id", "dfnText": "id", "refSections": [{"refs": [{"id": "ref-for-dom-bluetoothdevice-id"}, {"id": "ref-for-dom-bluetoothdevice-id\u2460"}], "title": "4.3. getBluetoothManualChooserEvents(callback)"}, {"refs": [{"id": "ref-for-dom-bluetoothdevice-id\u2461"}], "title": "4.4. sendBluetoothManualChooserEvent(event, argument)"}], "external": true};
-window.dfnpanelData['9b1a4a10'] = {"dfnID": "9b1a4a10", "url": "https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetoothdevice-name", "dfnText": "name", "refSections": [{"refs": [{"id": "ref-for-dom-bluetoothdevice-name"}], "title": "4.3. getBluetoothManualChooserEvents(callback)"}], "external": true};
-window.dfnpanelData['2239c7c4'] = {"dfnID": "2239c7c4", "url": "https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetooth-requestdevice", "dfnText": "requestDevice()", "refSections": [{"refs": [{"id": "ref-for-dom-bluetooth-requestdevice"}], "title": "4.1. setBluetoothMockDataSet"}, {"refs": [{"id": "ref-for-dom-bluetooth-requestdevice\u2460"}], "title": "4.2. setBluetoothManualChooser()"}], "external": true};
-window.dfnpanelData['3ddd075d'] = {"dfnID": "3ddd075d", "url": "https://webbluetoothcg.github.io/web-bluetooth/#valid-uuid", "dfnText": "valid uuid", "refSections": [{"refs": [{"id": "ref-for-valid-uuid"}], "title": "4.1.8. FailingGATTOperationsDevice"}], "external": true};
-window.dfnpanelData['8855a9aa'] = {"dfnID": "8855a9aa", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "dfnText": "DOMString", "refSections": [{"refs": [{"id": "ref-for-idl-DOMString"}, {"id": "ref-for-idl-DOMString\u2460"}, {"id": "ref-for-idl-DOMString\u2461"}, {"id": "ref-for-idl-DOMString\u2462"}], "title": "4. testRunner"}, {"refs": [{"id": "ref-for-idl-DOMString\u2463"}], "title": "5. eventSender"}], "external": true};
-window.dfnpanelData['9cce47fd'] = {"dfnID": "9cce47fd", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "dfnText": "sequence", "refSections": [{"refs": [{"id": "ref-for-idl-sequence"}], "title": "4. testRunner"}], "external": true};
-window.dfnpanelData['5f90bbfb'] = {"dfnID": "5f90bbfb", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "dfnText": "undefined", "refSections": [{"refs": [{"id": "ref-for-idl-undefined"}, {"id": "ref-for-idl-undefined\u2460"}, {"id": "ref-for-idl-undefined\u2461"}, {"id": "ref-for-idl-undefined\u2462"}, {"id": "ref-for-idl-undefined\u2463"}], "title": "4. testRunner"}, {"refs": [{"id": "ref-for-idl-undefined\u2464"}], "title": "5. eventSender"}], "external": true};
-window.dfnpanelData['callbackdef-bluetoothmanualchoosereventscallback'] = {"dfnID": "callbackdef-bluetoothmanualchoosereventscallback", "url": "#callbackdef-bluetoothmanualchoosereventscallback", "dfnText": "BluetoothManualChooserEventsCallback", "refSections": [{"refs": [{"id": "ref-for-callbackdef-bluetoothmanualchoosereventscallback"}], "title": "4. testRunner"}], "external": false};
-window.dfnpanelData['testrunner'] = {"dfnID": "testrunner", "url": "#testrunner", "dfnText": "TestRunner", "refSections": [{"refs": [{"id": "ref-for-testrunner"}], "title": "3. Testing interfaces"}], "external": false};
-window.dfnpanelData['dom-testrunner-setbluetoothmockdataset-datasetname-datasetname'] = {"dfnID": "dom-testrunner-setbluetoothmockdataset-datasetname-datasetname", "url": "#dom-testrunner-setbluetoothmockdataset-datasetname-datasetname", "dfnText": "dataSetName", "refSections": [{"refs": [{"id": "ref-for-dom-testrunner-setbluetoothmockdataset-datasetname-datasetname"}], "title": "4.1. setBluetoothMockDataSet"}], "external": false};
-window.dfnpanelData['dom-testrunner-sendbluetoothmanualchooserevent-event-argument-event'] = {"dfnID": "dom-testrunner-sendbluetoothmanualchooserevent-event-argument-event", "url": "#dom-testrunner-sendbluetoothmanualchooserevent-event-argument-event", "dfnText": "event", "refSections": [{"refs": [{"id": "ref-for-dom-testrunner-sendbluetoothmanualchooserevent-event-argument-event"}], "title": "4.4. sendBluetoothManualChooserEvent(event, argument)"}], "external": false};
-window.dfnpanelData['dom-testrunner-sendbluetoothmanualchooserevent-event-argument-argument'] = {"dfnID": "dom-testrunner-sendbluetoothmanualchooserevent-event-argument-argument", "url": "#dom-testrunner-sendbluetoothmanualchooserevent-event-argument-argument", "dfnText": "argument", "refSections": [{"refs": [{"id": "ref-for-dom-testrunner-sendbluetoothmanualchooserevent-event-argument-argument"}], "title": "4.4. sendBluetoothManualChooserEvent(event, argument)"}], "external": false};
-window.dfnpanelData['dom-testrunner-setbluetoothmockdataset'] = {"dfnID": "dom-testrunner-setbluetoothmockdataset", "url": "#dom-testrunner-setbluetoothmockdataset", "dfnText": "setBluetoothMockDataSet(dataSetName)", "refSections": [{"refs": [{"id": "ref-for-dom-testrunner-setbluetoothmockdataset"}], "title": "4. testRunner"}], "external": false};
-window.dfnpanelData['batterydevice'] = {"dfnID": "batterydevice", "url": "#batterydevice", "dfnText": "4.1.1. BatteryDevice", "refSections": [{"refs": [{"id": "ref-for-batterydevice"}], "title": "4.1. setBluetoothMockDataSet"}, {"refs": [{"id": "ref-for-batterydevice"}], "title": "4.1.1. BatteryDevice"}], "external": false};
-window.dfnpanelData['glucosedevice'] = {"dfnID": "glucosedevice", "url": "#glucosedevice", "dfnText": "4.1.2. GlucoseDevice", "refSections": [{"refs": [{"id": "ref-for-glucosedevice"}], "title": "4.1. setBluetoothMockDataSet"}, {"refs": [{"id": "ref-for-glucosedevice"}], "title": "4.1.2. GlucoseDevice"}], "external": false};
-window.dfnpanelData['heartratedevice'] = {"dfnID": "heartratedevice", "url": "#heartratedevice", "dfnText": "4.1.3. HeartRateDevice", "refSections": [{"refs": [{"id": "ref-for-heartratedevice"}, {"id": "ref-for-heartratedevice\u2460"}], "title": "4.1. setBluetoothMockDataSet"}, {"refs": [{"id": "ref-for-heartratedevice"}], "title": "4.1.3. HeartRateDevice"}], "external": false};
-window.dfnpanelData['missingservicegenericaccessdevice'] = {"dfnID": "missingservicegenericaccessdevice", "url": "#missingservicegenericaccessdevice", "dfnText": "4.1.4. MissingServiceGenericAccessDevice", "refSections": [{"refs": [{"id": "ref-for-missingservicegenericaccessdevice"}], "title": "4.1. setBluetoothMockDataSet"}, {"refs": [{"id": "ref-for-missingservicegenericaccessdevice"}], "title": "4.1.4. MissingServiceGenericAccessDevice"}, {"refs": [{"id": "ref-for-missingservicegenericaccessdevice\u2460"}], "title": "4.1.5. MissingCharacteristicGenericAccessDevice"}], "external": false};
-window.dfnpanelData['missingcharacteristicgenericaccessdevice'] = {"dfnID": "missingcharacteristicgenericaccessdevice", "url": "#missingcharacteristicgenericaccessdevice", "dfnText": "4.1.5. MissingCharacteristicGenericAccessDevice", "refSections": [{"refs": [{"id": "ref-for-missingcharacteristicgenericaccessdevice"}], "title": "4.1. setBluetoothMockDataSet"}, {"refs": [{"id": "ref-for-missingcharacteristicgenericaccessdevice"}], "title": "4.1.5. MissingCharacteristicGenericAccessDevice"}, {"refs": [{"id": "ref-for-missingcharacteristicgenericaccessdevice\u2460"}], "title": "4.1.6. MissingDescriptorGenericAccessDevice"}], "external": false};
-window.dfnpanelData['missingdescriptorgenericaccessdevice'] = {"dfnID": "missingdescriptorgenericaccessdevice", "url": "#missingdescriptorgenericaccessdevice", "dfnText": "4.1.6. MissingDescriptorGenericAccessDevice", "refSections": [{"refs": [{"id": "ref-for-missingdescriptorgenericaccessdevice"}], "title": "4.1. setBluetoothMockDataSet"}, {"refs": [{"id": "ref-for-missingdescriptorgenericaccessdevice"}], "title": "4.1.6. MissingDescriptorGenericAccessDevice"}, {"refs": [{"id": "ref-for-missingdescriptorgenericaccessdevice\u2460"}], "title": "4.1.7. GenericAccessDevice"}], "external": false};
-window.dfnpanelData['genericaccessdevice'] = {"dfnID": "genericaccessdevice", "url": "#genericaccessdevice", "dfnText": "4.1.7. GenericAccessDevice", "refSections": [{"refs": [{"id": "ref-for-genericaccessdevice"}], "title": "4.1. setBluetoothMockDataSet"}, {"refs": [{"id": "ref-for-genericaccessdevice"}], "title": "4.1.7. GenericAccessDevice"}], "external": false};
-window.dfnpanelData['failinggattoperationsdevice'] = {"dfnID": "failinggattoperationsdevice", "url": "#failinggattoperationsdevice", "dfnText": "4.1.8. FailingGATTOperationsDevice", "refSections": [{"refs": [{"id": "ref-for-failinggattoperationsdevice"}], "title": "4.1. setBluetoothMockDataSet"}, {"refs": [{"id": "ref-for-failinggattoperationsdevice"}, {"id": "ref-for-failinggattoperationsdevice\u2460"}], "title": "4.1.8. FailingGATTOperationsDevice"}], "external": false};
-window.dfnpanelData['abstract-opdef-erroruuid'] = {"dfnID": "abstract-opdef-erroruuid", "url": "#abstract-opdef-erroruuid", "dfnText": "errorUUID", "refSections": [{"refs": [{"id": "ref-for-abstract-opdef-erroruuid"}, {"id": "ref-for-abstract-opdef-erroruuid\u2460"}, {"id": "ref-for-abstract-opdef-erroruuid\u2461"}, {"id": "ref-for-abstract-opdef-erroruuid\u2462"}], "title": "4.1.8. FailingGATTOperationsDevice"}], "external": false};
-window.dfnpanelData['dom-testrunner-setbluetoothmanualchooser'] = {"dfnID": "dom-testrunner-setbluetoothmanualchooser", "url": "#dom-testrunner-setbluetoothmanualchooser", "dfnText": "4.2. setBluetoothManualChooser()", "refSections": [{"refs": [{"id": "ref-for-dom-testrunner-setbluetoothmanualchooser"}], "title": "4. testRunner"}, {"refs": [{"id": "ref-for-dom-testrunner-setbluetoothmanualchooser"}, {"id": "ref-for-dom-testrunner-setbluetoothmanualchooser\u2460"}], "title": "4.2. setBluetoothManualChooser()"}], "external": false};
-window.dfnpanelData['manual-chooser'] = {"dfnID": "manual-chooser", "url": "#manual-chooser", "dfnText": "manual chooser", "refSections": [{"refs": [{"id": "ref-for-manual-chooser"}], "title": "4.3. getBluetoothManualChooserEvents(callback)"}, {"refs": [{"id": "ref-for-manual-chooser\u2460"}], "title": "4.4. sendBluetoothManualChooserEvent(event, argument)"}], "external": false};
-window.dfnpanelData['dom-testrunner-getbluetoothmanualchooserevents'] = {"dfnID": "dom-testrunner-getbluetoothmanualchooserevents", "url": "#dom-testrunner-getbluetoothmanualchooserevents", "dfnText": "4.3. getBluetoothManualChooserEvents(callback)", "refSections": [{"refs": [{"id": "ref-for-dom-testrunner-getbluetoothmanualchooserevents"}], "title": "4. testRunner"}, {"refs": [{"id": "ref-for-dom-testrunner-getbluetoothmanualchooserevents\u2460"}], "title": "4.2. setBluetoothManualChooser()"}, {"refs": [{"id": "ref-for-dom-testrunner-getbluetoothmanualchooserevents"}, {"id": "ref-for-dom-testrunner-getbluetoothmanualchooserevents\u2461"}, {"id": "ref-for-dom-testrunner-getbluetoothmanualchooserevents\u2462"}], "title": "4.3. getBluetoothManualChooserEvents(callback)"}], "external": false};
-window.dfnpanelData['dom-testrunner-sendbluetoothmanualchooserevent'] = {"dfnID": "dom-testrunner-sendbluetoothmanualchooserevent", "url": "#dom-testrunner-sendbluetoothmanualchooserevent", "dfnText": "4.4. sendBluetoothManualChooserEvent(event, argument)", "refSections": [{"refs": [{"id": "ref-for-dom-testrunner-sendbluetoothmanualchooserevent"}], "title": "4. testRunner"}, {"refs": [{"id": "ref-for-dom-testrunner-sendbluetoothmanualchooserevent\u2460"}], "title": "4.2. setBluetoothManualChooser()"}, {"refs": [{"id": "ref-for-dom-testrunner-sendbluetoothmanualchooserevent"}, {"id": "ref-for-dom-testrunner-sendbluetoothmanualchooserevent\u2461"}], "title": "4.4. sendBluetoothManualChooserEvent(event, argument)"}], "external": false};
-window.dfnpanelData['eventsender'] = {"dfnID": "eventsender", "url": "#eventsender", "dfnText": "EventSender", "refSections": [{"refs": [{"id": "ref-for-eventsender"}], "title": "3. Testing interfaces"}], "external": false};
-window.dfnpanelData['dom-eventsender-keydown-code-code'] = {"dfnID": "dom-eventsender-keydown-code-code", "url": "#dom-eventsender-keydown-code-code", "dfnText": "code", "refSections": [{"refs": [{"id": "ref-for-dom-eventsender-keydown-code-code"}], "title": "5. eventSender"}], "external": false};
-window.dfnpanelData['dom-eventsender-keydown'] = {"dfnID": "dom-eventsender-keydown", "url": "#dom-eventsender-keydown", "dfnText": "keyDown(code)", "refSections": [{"refs": [{"id": "ref-for-dom-eventsender-keydown"}], "title": "5. eventSender"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -1763,258 +1324,698 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"7a46e3df": {"dfnID":"7a46e3df","dfnText":"org.bluetooth.characteristic.gap.device_name","external":true,"refSections":[{"refs":[{"id":"ref-for-something\u2467"}],"title":"4.1.6. MissingDescriptorGenericAccessDevice"},{"refs":[{"id":"ref-for-something\u2468"}],"title":"4.1.7. GenericAccessDevice"}],"url":"https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.gap.device_name.xml#"},
+"6e89b264": {"dfnID":"6e89b264","dfnText":"org.bluetooth.descriptor.gatt.characteristic_extended_properties","external":true,"refSections":[{"refs":[{"id":"ref-for-something\u2460\u24ea"}],"title":"4.1.7. GenericAccessDevice"}],"url":"https://developer.bluetooth.org/gatt/descriptors/Pages/DescriptorViewer.aspx?u=org.bluetooth.descriptor.gatt.characteristic_extended_properties.xml#"},
+"3e46ba0c": {"dfnID":"3e46ba0c","dfnText":"org.bluetooth.descriptor.gatt.characteristic_user_description","external":true,"refSections":[{"refs":[{"id":"ref-for-something\u2460\u2460"}],"title":"4.1.7. GenericAccessDevice"}],"url":"https://developer.bluetooth.org/gatt/descriptors/Pages/DescriptorViewer.aspx?u=org.bluetooth.descriptor.gatt.characteristic_user_description.xml#"},
+"4e7240a2": {"dfnID":"4e7240a2","dfnText":"org.bluetooth.service.battery_service","external":true,"refSections":[{"refs":[{"id":"ref-for-something\u2461"}],"title":"4.1. setBluetoothMockDataSet"},{"refs":[{"id":"ref-for-something\u2462"}],"title":"4.1.1. BatteryDevice"}],"url":"https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.battery_service.xml#"},
+"2bd3054a": {"dfnID":"2bd3054a","dfnText":"org.bluetooth.service.generic_access","external":true,"refSections":[{"refs":[{"id":"ref-for-something\u2465"}],"title":"4.1.5. MissingCharacteristicGenericAccessDevice"},{"refs":[{"id":"ref-for-something\u2466"}],"title":"4.1.6. MissingDescriptorGenericAccessDevice"}],"url":"https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.generic_access.xml#"},
+"7a4f8f14": {"dfnID":"7a4f8f14","dfnText":"org.bluetooth.service.glucose","external":true,"refSections":[{"refs":[{"id":"ref-for-something"}],"title":"4.1. setBluetoothMockDataSet"},{"refs":[{"id":"ref-for-something\u2463"}],"title":"4.1.2. GlucoseDevice"}],"url":"https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.glucose.xml#"},
+"1c5e2349": {"dfnID":"1c5e2349","dfnText":"org.bluetooth.service.heart_rate","external":true,"refSections":[{"refs":[{"id":"ref-for-something\u2460"}],"title":"4.1. setBluetoothMockDataSet"},{"refs":[{"id":"ref-for-something\u2464"}],"title":"4.1.3. HeartRateDevice"}],"url":"https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.heart_rate.xml#"},
+"5fd23811": {"dfnID":"5fd23811","dfnText":"fire an event","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-event-fire"}],"title":"5. eventSender"}],"url":"https://dom.spec.whatwg.org/#concept-event-fire"},
+"5d7209e9": {"dfnID":"5d7209e9","dfnText":"Window","external":true,"refSections":[{"refs":[{"id":"ref-for-window"}],"title":"3. Testing interfaces"}],"url":"https://html.spec.whatwg.org/multipage/nav-history-apis.html#window"},
+"c51ad875": {"dfnID":"c51ad875","dfnText":"the body element","external":true,"refSections":[{"refs":[{"id":"ref-for-the-body-element-2"}],"title":"5. eventSender"}],"url":"https://html.spec.whatwg.org/multipage/dom.html#the-body-element-2"},
+"6f386cdc": {"dfnID":"6f386cdc","dfnText":"key","external":true,"refSections":[{"refs":[{"id":"ref-for-widl-KeyboardEvent-key"}],"title":"5. eventSender"}],"url":"https://www.w3.org/TR/uievents/#widl-KeyboardEvent-key"},
+"c19ba40a": {"dfnID":"c19ba40a","dfnText":"keypress","external":true,"refSections":[{"refs":[{"id":"ref-for-event-type-keypress"}],"title":"5. eventSender"}],"url":"https://www.w3.org/TR/uievents/#event-type-keypress"},
+"b9ddee63": {"dfnID":"b9ddee63","dfnText":"id","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-bluetoothdevice-id"},{"id":"ref-for-dom-bluetoothdevice-id\u2460"}],"title":"4.3. getBluetoothManualChooserEvents(callback)"},{"refs":[{"id":"ref-for-dom-bluetoothdevice-id\u2461"}],"title":"4.4. sendBluetoothManualChooserEvent(event, argument)"}],"url":"https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetoothdevice-id"},
+"9b1a4a10": {"dfnID":"9b1a4a10","dfnText":"name","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-bluetoothdevice-name"}],"title":"4.3. getBluetoothManualChooserEvents(callback)"}],"url":"https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetoothdevice-name"},
+"2239c7c4": {"dfnID":"2239c7c4","dfnText":"requestDevice()","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-bluetooth-requestdevice"}],"title":"4.1. setBluetoothMockDataSet"},{"refs":[{"id":"ref-for-dom-bluetooth-requestdevice\u2460"}],"title":"4.2. setBluetoothManualChooser()"}],"url":"https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetooth-requestdevice"},
+"3ddd075d": {"dfnID":"3ddd075d","dfnText":"valid uuid","external":true,"refSections":[{"refs":[{"id":"ref-for-valid-uuid"}],"title":"4.1.8. FailingGATTOperationsDevice"}],"url":"https://webbluetoothcg.github.io/web-bluetooth/#valid-uuid"},
+"8855a9aa": {"dfnID":"8855a9aa","dfnText":"DOMString","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-DOMString"},{"id":"ref-for-idl-DOMString\u2460"},{"id":"ref-for-idl-DOMString\u2461"},{"id":"ref-for-idl-DOMString\u2462"}],"title":"4. testRunner"},{"refs":[{"id":"ref-for-idl-DOMString\u2463"}],"title":"5. eventSender"}],"url":"https://webidl.spec.whatwg.org/#idl-DOMString"},
+"9cce47fd": {"dfnID":"9cce47fd","dfnText":"sequence","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-sequence"}],"title":"4. testRunner"}],"url":"https://webidl.spec.whatwg.org/#idl-sequence"},
+"5f90bbfb": {"dfnID":"5f90bbfb","dfnText":"undefined","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-undefined"},{"id":"ref-for-idl-undefined\u2460"},{"id":"ref-for-idl-undefined\u2461"},{"id":"ref-for-idl-undefined\u2462"},{"id":"ref-for-idl-undefined\u2463"}],"title":"4. testRunner"},{"refs":[{"id":"ref-for-idl-undefined\u2464"}],"title":"5. eventSender"}],"url":"https://webidl.spec.whatwg.org/#idl-undefined"},
+"callbackdef-bluetoothmanualchoosereventscallback": {"dfnID":"callbackdef-bluetoothmanualchoosereventscallback","dfnText":"BluetoothManualChooserEventsCallback","external":false,"refSections":[{"refs":[{"id":"ref-for-callbackdef-bluetoothmanualchoosereventscallback"}],"title":"4. testRunner"}],"url":"#callbackdef-bluetoothmanualchoosereventscallback"},
+"testrunner": {"dfnID":"testrunner","dfnText":"TestRunner","external":false,"refSections":[{"refs":[{"id":"ref-for-testrunner"}],"title":"3. Testing interfaces"}],"url":"#testrunner"},
+"dom-testrunner-setbluetoothmockdataset-datasetname-datasetname": {"dfnID":"dom-testrunner-setbluetoothmockdataset-datasetname-datasetname","dfnText":"dataSetName","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-testrunner-setbluetoothmockdataset-datasetname-datasetname"}],"title":"4.1. setBluetoothMockDataSet"}],"url":"#dom-testrunner-setbluetoothmockdataset-datasetname-datasetname"},
+"dom-testrunner-sendbluetoothmanualchooserevent-event-argument-event": {"dfnID":"dom-testrunner-sendbluetoothmanualchooserevent-event-argument-event","dfnText":"event","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-testrunner-sendbluetoothmanualchooserevent-event-argument-event"}],"title":"4.4. sendBluetoothManualChooserEvent(event, argument)"}],"url":"#dom-testrunner-sendbluetoothmanualchooserevent-event-argument-event"},
+"dom-testrunner-sendbluetoothmanualchooserevent-event-argument-argument": {"dfnID":"dom-testrunner-sendbluetoothmanualchooserevent-event-argument-argument","dfnText":"argument","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-testrunner-sendbluetoothmanualchooserevent-event-argument-argument"}],"title":"4.4. sendBluetoothManualChooserEvent(event, argument)"}],"url":"#dom-testrunner-sendbluetoothmanualchooserevent-event-argument-argument"},
+"dom-testrunner-setbluetoothmockdataset": {"dfnID":"dom-testrunner-setbluetoothmockdataset","dfnText":"setBluetoothMockDataSet(dataSetName)","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-testrunner-setbluetoothmockdataset"}],"title":"4. testRunner"}],"url":"#dom-testrunner-setbluetoothmockdataset"},
+"batterydevice": {"dfnID":"batterydevice","dfnText":"4.1.1. BatteryDevice","external":false,"refSections":[{"refs":[{"id":"ref-for-batterydevice"}],"title":"4.1. setBluetoothMockDataSet"},{"refs":[{"id":"ref-for-batterydevice"}],"title":"4.1.1. BatteryDevice"}],"url":"#batterydevice"},
+"glucosedevice": {"dfnID":"glucosedevice","dfnText":"4.1.2. GlucoseDevice","external":false,"refSections":[{"refs":[{"id":"ref-for-glucosedevice"}],"title":"4.1. setBluetoothMockDataSet"},{"refs":[{"id":"ref-for-glucosedevice"}],"title":"4.1.2. GlucoseDevice"}],"url":"#glucosedevice"},
+"heartratedevice": {"dfnID":"heartratedevice","dfnText":"4.1.3. HeartRateDevice","external":false,"refSections":[{"refs":[{"id":"ref-for-heartratedevice"},{"id":"ref-for-heartratedevice\u2460"}],"title":"4.1. setBluetoothMockDataSet"},{"refs":[{"id":"ref-for-heartratedevice"}],"title":"4.1.3. HeartRateDevice"}],"url":"#heartratedevice"},
+"missingservicegenericaccessdevice": {"dfnID":"missingservicegenericaccessdevice","dfnText":"4.1.4. MissingServiceGenericAccessDevice","external":false,"refSections":[{"refs":[{"id":"ref-for-missingservicegenericaccessdevice"}],"title":"4.1. setBluetoothMockDataSet"},{"refs":[{"id":"ref-for-missingservicegenericaccessdevice"}],"title":"4.1.4. MissingServiceGenericAccessDevice"},{"refs":[{"id":"ref-for-missingservicegenericaccessdevice\u2460"}],"title":"4.1.5. MissingCharacteristicGenericAccessDevice"}],"url":"#missingservicegenericaccessdevice"},
+"missingcharacteristicgenericaccessdevice": {"dfnID":"missingcharacteristicgenericaccessdevice","dfnText":"4.1.5. MissingCharacteristicGenericAccessDevice","external":false,"refSections":[{"refs":[{"id":"ref-for-missingcharacteristicgenericaccessdevice"}],"title":"4.1. setBluetoothMockDataSet"},{"refs":[{"id":"ref-for-missingcharacteristicgenericaccessdevice"}],"title":"4.1.5. MissingCharacteristicGenericAccessDevice"},{"refs":[{"id":"ref-for-missingcharacteristicgenericaccessdevice\u2460"}],"title":"4.1.6. MissingDescriptorGenericAccessDevice"}],"url":"#missingcharacteristicgenericaccessdevice"},
+"missingdescriptorgenericaccessdevice": {"dfnID":"missingdescriptorgenericaccessdevice","dfnText":"4.1.6. MissingDescriptorGenericAccessDevice","external":false,"refSections":[{"refs":[{"id":"ref-for-missingdescriptorgenericaccessdevice"}],"title":"4.1. setBluetoothMockDataSet"},{"refs":[{"id":"ref-for-missingdescriptorgenericaccessdevice"}],"title":"4.1.6. MissingDescriptorGenericAccessDevice"},{"refs":[{"id":"ref-for-missingdescriptorgenericaccessdevice\u2460"}],"title":"4.1.7. GenericAccessDevice"}],"url":"#missingdescriptorgenericaccessdevice"},
+"genericaccessdevice": {"dfnID":"genericaccessdevice","dfnText":"4.1.7. GenericAccessDevice","external":false,"refSections":[{"refs":[{"id":"ref-for-genericaccessdevice"}],"title":"4.1. setBluetoothMockDataSet"},{"refs":[{"id":"ref-for-genericaccessdevice"}],"title":"4.1.7. GenericAccessDevice"}],"url":"#genericaccessdevice"},
+"failinggattoperationsdevice": {"dfnID":"failinggattoperationsdevice","dfnText":"4.1.8. FailingGATTOperationsDevice","external":false,"refSections":[{"refs":[{"id":"ref-for-failinggattoperationsdevice"}],"title":"4.1. setBluetoothMockDataSet"},{"refs":[{"id":"ref-for-failinggattoperationsdevice"},{"id":"ref-for-failinggattoperationsdevice\u2460"}],"title":"4.1.8. FailingGATTOperationsDevice"}],"url":"#failinggattoperationsdevice"},
+"abstract-opdef-erroruuid": {"dfnID":"abstract-opdef-erroruuid","dfnText":"errorUUID","external":false,"refSections":[{"refs":[{"id":"ref-for-abstract-opdef-erroruuid"},{"id":"ref-for-abstract-opdef-erroruuid\u2460"},{"id":"ref-for-abstract-opdef-erroruuid\u2461"},{"id":"ref-for-abstract-opdef-erroruuid\u2462"}],"title":"4.1.8. FailingGATTOperationsDevice"}],"url":"#abstract-opdef-erroruuid"},
+"dom-testrunner-setbluetoothmanualchooser": {"dfnID":"dom-testrunner-setbluetoothmanualchooser","dfnText":"4.2. setBluetoothManualChooser()","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-testrunner-setbluetoothmanualchooser"}],"title":"4. testRunner"},{"refs":[{"id":"ref-for-dom-testrunner-setbluetoothmanualchooser"},{"id":"ref-for-dom-testrunner-setbluetoothmanualchooser\u2460"}],"title":"4.2. setBluetoothManualChooser()"}],"url":"#dom-testrunner-setbluetoothmanualchooser"},
+"manual-chooser": {"dfnID":"manual-chooser","dfnText":"manual chooser","external":false,"refSections":[{"refs":[{"id":"ref-for-manual-chooser"}],"title":"4.3. getBluetoothManualChooserEvents(callback)"},{"refs":[{"id":"ref-for-manual-chooser\u2460"}],"title":"4.4. sendBluetoothManualChooserEvent(event, argument)"}],"url":"#manual-chooser"},
+"dom-testrunner-getbluetoothmanualchooserevents": {"dfnID":"dom-testrunner-getbluetoothmanualchooserevents","dfnText":"4.3. getBluetoothManualChooserEvents(callback)","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-testrunner-getbluetoothmanualchooserevents"}],"title":"4. testRunner"},{"refs":[{"id":"ref-for-dom-testrunner-getbluetoothmanualchooserevents\u2460"}],"title":"4.2. setBluetoothManualChooser()"},{"refs":[{"id":"ref-for-dom-testrunner-getbluetoothmanualchooserevents"},{"id":"ref-for-dom-testrunner-getbluetoothmanualchooserevents\u2461"},{"id":"ref-for-dom-testrunner-getbluetoothmanualchooserevents\u2462"}],"title":"4.3. getBluetoothManualChooserEvents(callback)"}],"url":"#dom-testrunner-getbluetoothmanualchooserevents"},
+"dom-testrunner-sendbluetoothmanualchooserevent": {"dfnID":"dom-testrunner-sendbluetoothmanualchooserevent","dfnText":"4.4. sendBluetoothManualChooserEvent(event, argument)","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-testrunner-sendbluetoothmanualchooserevent"}],"title":"4. testRunner"},{"refs":[{"id":"ref-for-dom-testrunner-sendbluetoothmanualchooserevent\u2460"}],"title":"4.2. setBluetoothManualChooser()"},{"refs":[{"id":"ref-for-dom-testrunner-sendbluetoothmanualchooserevent"},{"id":"ref-for-dom-testrunner-sendbluetoothmanualchooserevent\u2461"}],"title":"4.4. sendBluetoothManualChooserEvent(event, argument)"}],"url":"#dom-testrunner-sendbluetoothmanualchooserevent"},
+"eventsender": {"dfnID":"eventsender","dfnText":"EventSender","external":false,"refSections":[{"refs":[{"id":"ref-for-eventsender"}],"title":"3. Testing interfaces"}],"url":"#eventsender"},
+"dom-eventsender-keydown-code-code": {"dfnID":"dom-eventsender-keydown-code-code","dfnText":"code","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-eventsender-keydown-code-code"}],"title":"5. eventSender"}],"url":"#dom-eventsender-keydown-code-code"},
+"dom-eventsender-keydown": {"dfnID":"dom-eventsender-keydown","dfnText":"keyDown(code)","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-eventsender-keydown"}],"title":"5. eventSender"}],"url":"#dom-eventsender-keydown"},
+};
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+const typeFormatters = {
+    'dfn': (text) => `[=${text}=]`,
+    'abstract-op': (text) => `[\$${text}\$]`,
+    'value': (text) => `''${text}''`,
+    'http-header': (text) => `[:${text}:]`,
+    'idl': (text) => `{{${text}}}`,
+    'interface': 'idl',
+    'constructor': 'idl',
+    'method': 'idl',
+    'argument': 'idl',
+    'attribute': 'idl',
+    'callback': 'idl',
+    'dictionary': 'idl',
+    'dict-member': 'idl',
+    'enum': 'idl',
+    'enum-value': 'idl',
+    'exception': 'idl',
+    'const': 'idl',
+    'typedef': 'idl',
+    'stringifier': 'idl',
+    'serializer': 'idl',
+    'iterator': 'idl',
+    'maplike': 'idl',
+    'setlike': 'idl',
+    'extended-attribute': 'idl',
+    'event': 'idl',
+    'element': (element) => `<{${element}}>`,
+    'element-state': 'element',
+    'element-attr': 'element',
+    'attr-value': 'element',
+    'scheme': 'dfn',
+    'permission': 'dfn',
+    'grammar': (text) => `${text} (within a <pre class=prod>)`,
+    'type': (text)=> `<<${text}>>`,
+    'property': (text) => `'${text}'`,
+    'descriptor': 'property',
+    'function': 'value',
+    'at-rule': 'value',
+    'selector': 'value',
+};
+const typesUsingFor = new Set(
+    [
+        "descriptor",
+        "value",
+        "element-attr",
+        "attr-value",
+        "element-state",
+        "method",
+        "constructor",
+        "argument",
+        "attribute",
+        "const",
+        "dict-member",
+        "event",
+        "enum-value",
+        "stringifier",
+        "serializer",
+        "iterator",
+        "maplike",
+        "setlike",
+        "state",
+        "mode",
+        "context",
+        "facet",
+    ],
+)
+const typesNotUsingFor = new Set(
+    [
+        "property",
+        "element",
+        "interface",
+        "namespace",
+        "callback",
+        "dictionary",
+        "enum",
+        "exception",
+        "typedef",
+        "http-header",
+        "permission",
+    ],
+)
+function linkFormatterFromType(type) {
+    const fnOrType = typeFormatters[type];
+    if(typeof fnOrType === 'string') {
+        // follow the alias
+        return linkFormatterFromType(fnOrType);
+    }
+    return fnOrType;
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!typesUsingFor.has(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!typesNotUsingFor.has(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
+
+function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+    dfnPanel.forDfn = dfn;
+    if(!dfn) { console.log(dfnPanel); }
+    return dfnPanel;
+}
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        const panel = genDfnPanel({ ...panelData, dfn });
+        append(document.body, panel);
+        insertDfnPopupAction(panel)
+    }
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+})
+
+function hideAllDfnPanels() {
+    // Turn off any currently "on" or "activated" panels.
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
+}
+
+function showDfnPanel(dfnPanel) {
+    hideAllDfnPanels(); // Only display one at this time.
+
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "true");
+
+    dfnPanel.classList.add("on");
+    positionDfnPanel(dfnPanel);
+
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    // Increment tabindex for each anchor and button tags in panel
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.style.position = "absolute"; // unfix it
+    dfnPanel.classList.remove("on");
+    dfnPanel.classList.remove("activated");
+}
+
+function toggleDfnPanel(dfnPanel) {
+    if(dfnPanel.classList.contains("on")) {
+        hideDfnPanel(dfnPanel);
+    } else {
+        showDfnPanel(dfnPanel);
+    }
+}
+
+function insertDfnPopupAction(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        showDfnPanel(dfnPanel);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfnPanel);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel(dfnPanel, dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    })
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
 }
 </script>
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
+let refsData = {
+"https://html.spec.whatwg.org/multipage/nav-history-apis.html#window": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"Window","type":"interface","url":"https://html.spec.whatwg.org/multipage/nav-history-apis.html#window"},
+"#testrunner": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"testing-web-bluetooth","spec":"testing-web-bluetooth-1","status":"local","text":"TestRunner","type":"interface","url":"#testrunner"},
+"#eventsender": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"testing-web-bluetooth","spec":"testing-web-bluetooth-1","status":"local","text":"EventSender","type":"interface","url":"#eventsender"},
+"https://webidl.spec.whatwg.org/#idl-undefined": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"undefined","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-undefined"},
+"https://webidl.spec.whatwg.org/#idl-sequence": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"sequence","type":"dfn","url":"https://webidl.spec.whatwg.org/#idl-sequence"},
+"https://webidl.spec.whatwg.org/#idl-DOMString": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"DOMString","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-DOMString"},
+"#dom-testrunner-setbluetoothmockdataset": {"export":true,"for_":["TestRunner"],"level":"1","normative":true,"shortname":"testing-web-bluetooth","spec":"testing-web-bluetooth-1","status":"local","text":"setBluetoothMockDataSet(dataSetName)","type":"method","url":"#dom-testrunner-setbluetoothmockdataset"},
+"#dom-testrunner-setbluetoothmanualchooser": {"export":true,"for_":["TestRunner"],"level":"1","normative":true,"shortname":"testing-web-bluetooth","spec":"testing-web-bluetooth-1","status":"local","text":"setBluetoothManualChooser()","type":"method","url":"#dom-testrunner-setbluetoothmanualchooser"},
+"#dom-testrunner-getbluetoothmanualchooserevents": {"export":true,"for_":["TestRunner"],"level":"1","normative":true,"shortname":"testing-web-bluetooth","spec":"testing-web-bluetooth-1","status":"local","text":"getBluetoothManualChooserEvents(callback)","type":"method","url":"#dom-testrunner-getbluetoothmanualchooserevents"},
+"#callbackdef-bluetoothmanualchoosereventscallback": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"testing-web-bluetooth","spec":"testing-web-bluetooth-1","status":"local","text":"BluetoothManualChooserEventsCallback","type":"callback","url":"#callbackdef-bluetoothmanualchoosereventscallback"},
+"#dom-testrunner-sendbluetoothmanualchooserevent": {"export":true,"for_":["TestRunner"],"level":"1","normative":true,"shortname":"testing-web-bluetooth","spec":"testing-web-bluetooth-1","status":"local","text":"sendBluetoothManualChooserEvent(event, argument)","type":"method","url":"#dom-testrunner-sendbluetoothmanualchooserevent"},
+"https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetooth-requestdevice": {"export":true,"for_":["Bluetooth"],"level":"1","normative":true,"shortname":"web-bluetooth","spec":"web-bluetooth","status":"current","text":"requestDevice()","type":"method","url":"https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetooth-requestdevice"},
+"#dom-testrunner-setbluetoothmockdataset-datasetname-datasetname": {"export":true,"for_":["TestRunner/setBluetoothMockDataSet(dataSetName)"],"level":"1","normative":true,"shortname":"testing-web-bluetooth","spec":"testing-web-bluetooth-1","status":"local","text":"dataSetName","type":"argument","url":"#dom-testrunner-setbluetoothmockdataset-datasetname-datasetname"},
+"https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.glucose.xml#": {"export":true,"for_":[],"level":"","normative":true,"shortname":"bluetooth-assigned","spec":"bluetooth-assigned","status":"anchor-block","text":"org.bluetooth.service.glucose","type":"enum","url":"https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.glucose.xml#"},
+"https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.heart_rate.xml#": {"export":true,"for_":[],"level":"","normative":true,"shortname":"bluetooth-assigned","spec":"bluetooth-assigned","status":"anchor-block","text":"org.bluetooth.service.heart_rate","type":"enum","url":"https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.heart_rate.xml#"},
+"https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.battery_service.xml#": {"export":true,"for_":[],"level":"","normative":true,"shortname":"bluetooth-assigned","spec":"bluetooth-assigned","status":"anchor-block","text":"org.bluetooth.service.battery_service","type":"enum","url":"https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.battery_service.xml#"},
+"#batterydevice": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"testing-web-bluetooth","spec":"testing-web-bluetooth-1","status":"local","text":"batterydevice","type":"dfn","url":"#batterydevice"},
+"#heartratedevice": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"testing-web-bluetooth","spec":"testing-web-bluetooth-1","status":"local","text":"heartratedevice","type":"dfn","url":"#heartratedevice"},
+"#glucosedevice": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"testing-web-bluetooth","spec":"testing-web-bluetooth-1","status":"local","text":"glucosedevice","type":"dfn","url":"#glucosedevice"},
+"#missingservicegenericaccessdevice": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"testing-web-bluetooth","spec":"testing-web-bluetooth-1","status":"local","text":"missingservicegenericaccessdevice","type":"dfn","url":"#missingservicegenericaccessdevice"},
+"#missingcharacteristicgenericaccessdevice": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"testing-web-bluetooth","spec":"testing-web-bluetooth-1","status":"local","text":"missingcharacteristicgenericaccessdevice","type":"dfn","url":"#missingcharacteristicgenericaccessdevice"},
+"#missingdescriptorgenericaccessdevice": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"testing-web-bluetooth","spec":"testing-web-bluetooth-1","status":"local","text":"missingdescriptorgenericaccessdevice","type":"dfn","url":"#missingdescriptorgenericaccessdevice"},
+"#genericaccessdevice": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"testing-web-bluetooth","spec":"testing-web-bluetooth-1","status":"local","text":"genericaccessdevice","type":"dfn","url":"#genericaccessdevice"},
+"#failinggattoperationsdevice": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"testing-web-bluetooth","spec":"testing-web-bluetooth-1","status":"local","text":"failinggattoperationsdevice","type":"dfn","url":"#failinggattoperationsdevice"},
+"https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.generic_access.xml#": {"export":true,"for_":[],"level":"","normative":true,"shortname":"bluetooth-assigned","spec":"bluetooth-assigned","status":"anchor-block","text":"org.bluetooth.service.generic_access","type":"enum","url":"https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.generic_access.xml#"},
+"https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.gap.device_name.xml#": {"export":true,"for_":[],"level":"","normative":true,"shortname":"bluetooth-assigned","spec":"bluetooth-assigned","status":"anchor-block","text":"org.bluetooth.characteristic.gap.device_name","type":"enum","url":"https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.gap.device_name.xml#"},
+"https://developer.bluetooth.org/gatt/descriptors/Pages/DescriptorViewer.aspx?u=org.bluetooth.descriptor.gatt.characteristic_extended_properties.xml#": {"export":true,"for_":[],"level":"","normative":true,"shortname":"bluetooth-assigned","spec":"bluetooth-assigned","status":"anchor-block","text":"org.bluetooth.descriptor.gatt.characteristic_extended_properties","type":"enum","url":"https://developer.bluetooth.org/gatt/descriptors/Pages/DescriptorViewer.aspx?u=org.bluetooth.descriptor.gatt.characteristic_extended_properties.xml#"},
+"https://developer.bluetooth.org/gatt/descriptors/Pages/DescriptorViewer.aspx?u=org.bluetooth.descriptor.gatt.characteristic_user_description.xml#": {"export":true,"for_":[],"level":"","normative":true,"shortname":"bluetooth-assigned","spec":"bluetooth-assigned","status":"anchor-block","text":"org.bluetooth.descriptor.gatt.characteristic_user_description","type":"enum","url":"https://developer.bluetooth.org/gatt/descriptors/Pages/DescriptorViewer.aspx?u=org.bluetooth.descriptor.gatt.characteristic_user_description.xml#"},
+"https://webbluetoothcg.github.io/web-bluetooth/#valid-uuid": {"export":false,"for_":[],"level":"1","normative":true,"shortname":"web-bluetooth","spec":"web-bluetooth","status":"current","text":"valid uuid","type":"dfn","url":"https://webbluetoothcg.github.io/web-bluetooth/#valid-uuid"},
+"#abstract-opdef-erroruuid": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"testing-web-bluetooth","spec":"testing-web-bluetooth-1","status":"local","text":"errorUUID","type":"abstract-op","url":"#abstract-opdef-erroruuid"},
+"#manual-chooser": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"testing-web-bluetooth","spec":"testing-web-bluetooth-1","status":"local","text":"manual chooser","type":"dfn","url":"#manual-chooser"},
+"https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetoothdevice-id": {"export":true,"for_":["BluetoothDevice"],"level":"1","normative":false,"shortname":"web-bluetooth","spec":"web-bluetooth","status":"current","text":"id","type":"attribute","url":"https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetoothdevice-id"},
+"https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetoothdevice-name": {"export":true,"for_":["BluetoothDevice"],"level":"1","normative":false,"shortname":"web-bluetooth","spec":"web-bluetooth","status":"current","text":"name","type":"attribute","url":"https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetoothdevice-name"},
+"#dom-testrunner-sendbluetoothmanualchooserevent-event-argument-event": {"export":true,"for_":["TestRunner/sendBluetoothManualChooserEvent(event, argument)"],"level":"1","normative":true,"shortname":"testing-web-bluetooth","spec":"testing-web-bluetooth-1","status":"local","text":"event","type":"argument","url":"#dom-testrunner-sendbluetoothmanualchooserevent-event-argument-event"},
+"#dom-testrunner-sendbluetoothmanualchooserevent-event-argument-argument": {"export":true,"for_":["TestRunner/sendBluetoothManualChooserEvent(event, argument)"],"level":"1","normative":true,"shortname":"testing-web-bluetooth","spec":"testing-web-bluetooth-1","status":"local","text":"argument","type":"argument","url":"#dom-testrunner-sendbluetoothmanualchooserevent-event-argument-argument"},
+"#dom-eventsender-keydown": {"export":true,"for_":["EventSender"],"level":"1","normative":true,"shortname":"testing-web-bluetooth","spec":"testing-web-bluetooth-1","status":"local","text":"keyDown(code)","type":"method","url":"#dom-eventsender-keydown"},
+"https://dom.spec.whatwg.org/#concept-event-fire": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"fire an event","type":"dfn","url":"https://dom.spec.whatwg.org/#concept-event-fire"},
+"https://www.w3.org/TR/uievents/#event-type-keypress": {"export":true,"for_":[],"level":"","normative":true,"shortname":"ui-events","spec":"ui-events","status":"anchor-block","text":"keypress","type":"event","url":"https://www.w3.org/TR/uievents/#event-type-keypress"},
+"https://html.spec.whatwg.org/multipage/dom.html#the-body-element-2": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"the body element","type":"dfn","url":"https://html.spec.whatwg.org/multipage/dom.html#the-body-element-2"},
+"https://www.w3.org/TR/uievents/#widl-KeyboardEvent-key": {"export":true,"for_":["KeyboardEvent"],"level":"","normative":true,"shortname":"ui-events","spec":"ui-events","status":"anchor-block","text":"key","type":"attribute","url":"https://www.w3.org/TR/uievents/#widl-KeyboardEvent-key"},
+"#dom-eventsender-keydown-code-code": {"export":true,"for_":["EventSender/keyDown(code)"],"level":"1","normative":true,"shortname":"testing-web-bluetooth","spec":"testing-web-bluetooth-1","status":"local","text":"code","type":"argument","url":"#dom-eventsender-keydown-code-code"},
+};
+
+function genRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "DFN: "),
+                mk.code({ class: "dfn-text" }, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    const forListElements = forList.length === 0 ? '' : mk.li({},
+        mk.b({}, "For: "),
+        mk.ul({},
+            ...forList.map(forItem =>
                 mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
-            mk.b({}, "For: "),
-            mk.ul({},
-                ...forList.map(forItem =>
-                    mk.li({},
-                        mk.span({}, `${forItem}`)
-                    ),
+                    mk.span({}, `${forItem}`)
                 ),
             ),
-        );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+        ),
+    );
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
-    }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    return hintPanel;
+}
+function genAllRefHints() {
+    for(const refData of Object.values(refsData)) {
+        const refUrl = refData.url;
+        const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+        if (links.length == 0) {
+            console.log(`Can't find link href="${refUrl}".`, refData);
+            continue;
+        }
+        for(const link of links) {
+            if(link.classList.contains("dfn-link")) continue;
+            const hint = genRefHint(link, refData);
+            append(document.body, hint);
+            insertLinkPopupAction(hint)
         }
     }
+}
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+function hideAllRefHints() {
+    queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    refHint.style.position = "absolute"; // unfix it
+    refHint.classList.remove("on");
+    const teardown = refHint.teardownEventListeners;
+    if (teardown) {
+        refHint.teardownEventListeners = undefined;
+        teardown();
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+function showRefHint(refHint) {
+    hideAllRefHints(); // Only display one at this time.
+
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "true");
+    refHint.classList.add("on");
+    positionRefHint(refHint);
+    setupRefHintEventListeners(refHint);
+}
+
+function setupRefHintEventListeners(refHint) {
+    if (refHint.teardownEventListeners) return;
+    const link = refHint.forLink;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
 
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
 
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+function insertLinkPopupAction(refHint) {
+    const link = refHint.forLink;
+    // link.setAttribute('role', 'button');
+    link.setAttribute('aria-expanded', 'false')
+    link.classList.add('has-ref-hint');
+    link.addEventListener('mouseover', (event) => {
+        showRefHint(refHint);
     });
+    link.addEventListener('focus', (event) => {
+        showRefHint(refHint);
+    })
+}
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+document.addEventListener("DOMContentLoaded", () => {
+    genAllRefHints();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#window'] = {"text": "Window", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window", "export": true, "normative": true, "for_": []};
-window.refsData['#testrunner'] = {"text": "TestRunner", "type": "interface", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#testrunner", "export": true, "normative": true, "for_": []};
-window.refsData['#eventsender'] = {"text": "EventSender", "type": "interface", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#eventsender", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-testrunner-setbluetoothmockdataset'] = {"text": "setBluetoothMockDataSet(dataSetName)", "type": "method", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#dom-testrunner-setbluetoothmockdataset", "export": true, "normative": true, "for_": ["TestRunner"]};
-window.refsData['#dom-testrunner-setbluetoothmanualchooser'] = {"text": "setBluetoothManualChooser()", "type": "method", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#dom-testrunner-setbluetoothmanualchooser", "export": true, "normative": true, "for_": ["TestRunner"]};
-window.refsData['#dom-testrunner-getbluetoothmanualchooserevents'] = {"text": "getBluetoothManualChooserEvents(callback)", "type": "method", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#dom-testrunner-getbluetoothmanualchooserevents", "export": true, "normative": true, "for_": ["TestRunner"]};
-window.refsData['#callbackdef-bluetoothmanualchoosereventscallback'] = {"text": "BluetoothManualChooserEventsCallback", "type": "callback", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#callbackdef-bluetoothmanualchoosereventscallback", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-testrunner-sendbluetoothmanualchooserevent'] = {"text": "sendBluetoothManualChooserEvent(event, argument)", "type": "method", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#dom-testrunner-sendbluetoothmanualchooserevent", "export": true, "normative": true, "for_": ["TestRunner"]};
-window.refsData['https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetooth-requestdevice'] = {"text": "requestDevice()", "type": "method", "spec": "web-bluetooth", "shortname": "web-bluetooth", "level": "1", "status": "current", "url": "https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetooth-requestdevice", "export": true, "normative": true, "for_": ["Bluetooth"]};
-window.refsData['#dom-testrunner-setbluetoothmockdataset-datasetname-datasetname'] = {"text": "dataSetName", "type": "argument", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#dom-testrunner-setbluetoothmockdataset-datasetname-datasetname", "export": true, "normative": true, "for_": ["TestRunner/setBluetoothMockDataSet(dataSetName)"]};
-window.refsData['https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.glucose.xml#'] = {"text": "org.bluetooth.service.glucose", "type": "enum", "spec": "bluetooth-assigned", "shortname": "bluetooth-assigned", "level": "", "status": "anchor-block", "url": "https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.glucose.xml#", "export": true, "normative": true, "for_": []};
-window.refsData['https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.heart_rate.xml#'] = {"text": "org.bluetooth.service.heart_rate", "type": "enum", "spec": "bluetooth-assigned", "shortname": "bluetooth-assigned", "level": "", "status": "anchor-block", "url": "https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.heart_rate.xml#", "export": true, "normative": true, "for_": []};
-window.refsData['https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.battery_service.xml#'] = {"text": "org.bluetooth.service.battery_service", "type": "enum", "spec": "bluetooth-assigned", "shortname": "bluetooth-assigned", "level": "", "status": "anchor-block", "url": "https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.battery_service.xml#", "export": true, "normative": true, "for_": []};
-window.refsData['#batterydevice'] = {"text": "batterydevice", "type": "dfn", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#batterydevice", "export": true, "normative": true, "for_": []};
-window.refsData['#heartratedevice'] = {"text": "heartratedevice", "type": "dfn", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#heartratedevice", "export": true, "normative": true, "for_": []};
-window.refsData['#glucosedevice'] = {"text": "glucosedevice", "type": "dfn", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#glucosedevice", "export": true, "normative": true, "for_": []};
-window.refsData['#missingservicegenericaccessdevice'] = {"text": "missingservicegenericaccessdevice", "type": "dfn", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#missingservicegenericaccessdevice", "export": true, "normative": true, "for_": []};
-window.refsData['#missingcharacteristicgenericaccessdevice'] = {"text": "missingcharacteristicgenericaccessdevice", "type": "dfn", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#missingcharacteristicgenericaccessdevice", "export": true, "normative": true, "for_": []};
-window.refsData['#missingdescriptorgenericaccessdevice'] = {"text": "missingdescriptorgenericaccessdevice", "type": "dfn", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#missingdescriptorgenericaccessdevice", "export": true, "normative": true, "for_": []};
-window.refsData['#genericaccessdevice'] = {"text": "genericaccessdevice", "type": "dfn", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#genericaccessdevice", "export": true, "normative": true, "for_": []};
-window.refsData['#failinggattoperationsdevice'] = {"text": "failinggattoperationsdevice", "type": "dfn", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#failinggattoperationsdevice", "export": true, "normative": true, "for_": []};
-window.refsData['https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.generic_access.xml#'] = {"text": "org.bluetooth.service.generic_access", "type": "enum", "spec": "bluetooth-assigned", "shortname": "bluetooth-assigned", "level": "", "status": "anchor-block", "url": "https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.generic_access.xml#", "export": true, "normative": true, "for_": []};
-window.refsData['https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.gap.device_name.xml#'] = {"text": "org.bluetooth.characteristic.gap.device_name", "type": "enum", "spec": "bluetooth-assigned", "shortname": "bluetooth-assigned", "level": "", "status": "anchor-block", "url": "https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.gap.device_name.xml#", "export": true, "normative": true, "for_": []};
-window.refsData['https://developer.bluetooth.org/gatt/descriptors/Pages/DescriptorViewer.aspx?u=org.bluetooth.descriptor.gatt.characteristic_extended_properties.xml#'] = {"text": "org.bluetooth.descriptor.gatt.characteristic_extended_properties", "type": "enum", "spec": "bluetooth-assigned", "shortname": "bluetooth-assigned", "level": "", "status": "anchor-block", "url": "https://developer.bluetooth.org/gatt/descriptors/Pages/DescriptorViewer.aspx?u=org.bluetooth.descriptor.gatt.characteristic_extended_properties.xml#", "export": true, "normative": true, "for_": []};
-window.refsData['https://developer.bluetooth.org/gatt/descriptors/Pages/DescriptorViewer.aspx?u=org.bluetooth.descriptor.gatt.characteristic_user_description.xml#'] = {"text": "org.bluetooth.descriptor.gatt.characteristic_user_description", "type": "enum", "spec": "bluetooth-assigned", "shortname": "bluetooth-assigned", "level": "", "status": "anchor-block", "url": "https://developer.bluetooth.org/gatt/descriptors/Pages/DescriptorViewer.aspx?u=org.bluetooth.descriptor.gatt.characteristic_user_description.xml#", "export": true, "normative": true, "for_": []};
-window.refsData['https://webbluetoothcg.github.io/web-bluetooth/#valid-uuid'] = {"text": "valid uuid", "type": "dfn", "spec": "web-bluetooth", "shortname": "web-bluetooth", "level": "1", "status": "current", "url": "https://webbluetoothcg.github.io/web-bluetooth/#valid-uuid", "export": false, "normative": true, "for_": []};
-window.refsData['#abstract-opdef-erroruuid'] = {"text": "errorUUID", "type": "abstract-op", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#abstract-opdef-erroruuid", "export": true, "normative": true, "for_": []};
-window.refsData['#manual-chooser'] = {"text": "manual chooser", "type": "dfn", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#manual-chooser", "export": true, "normative": true, "for_": []};
-window.refsData['https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetoothdevice-id'] = {"text": "id", "type": "attribute", "spec": "web-bluetooth", "shortname": "web-bluetooth", "level": "1", "status": "current", "url": "https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetoothdevice-id", "export": true, "normative": false, "for_": ["BluetoothDevice"]};
-window.refsData['https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetoothdevice-name'] = {"text": "name", "type": "attribute", "spec": "web-bluetooth", "shortname": "web-bluetooth", "level": "1", "status": "current", "url": "https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetoothdevice-name", "export": true, "normative": false, "for_": ["BluetoothDevice"]};
-window.refsData['#dom-testrunner-sendbluetoothmanualchooserevent-event-argument-event'] = {"text": "event", "type": "argument", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#dom-testrunner-sendbluetoothmanualchooserevent-event-argument-event", "export": true, "normative": true, "for_": ["TestRunner/sendBluetoothManualChooserEvent(event, argument)"]};
-window.refsData['#dom-testrunner-sendbluetoothmanualchooserevent-event-argument-argument'] = {"text": "argument", "type": "argument", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#dom-testrunner-sendbluetoothmanualchooserevent-event-argument-argument", "export": true, "normative": true, "for_": ["TestRunner/sendBluetoothManualChooserEvent(event, argument)"]};
-window.refsData['#dom-eventsender-keydown'] = {"text": "keyDown(code)", "type": "method", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#dom-eventsender-keydown", "export": true, "normative": true, "for_": ["EventSender"]};
-window.refsData['https://dom.spec.whatwg.org/#concept-event-fire'] = {"text": "fire an event", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-event-fire", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/uievents/#event-type-keypress'] = {"text": "keypress", "type": "event", "spec": "ui-events", "shortname": "ui-events", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/uievents/#event-type-keypress", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/dom.html#the-body-element-2'] = {"text": "the body element", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dom.html#the-body-element-2", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/uievents/#widl-KeyboardEvent-key'] = {"text": "key", "type": "attribute", "spec": "ui-events", "shortname": "ui-events", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/uievents/#widl-KeyboardEvent-key", "export": true, "normative": true, "for_": ["KeyboardEvent"]};
-window.refsData['#dom-eventsender-keydown-code-code'] = {"text": "code", "type": "argument", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#dom-eventsender-keydown-code-code", "export": true, "normative": true, "for_": ["EventSender/keyDown(code)"]};
 </script>

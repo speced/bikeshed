@@ -79,7 +79,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -730,7 +729,6 @@ a[href].issue-return {
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -2558,509 +2556,8 @@ on screen, on paper, etc.
     </div>
    </div>
   </details>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['a4cd8a8d'] = {"dfnID": "a4cd8a8d", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-image", "dfnText": "border-image", "refSections": [{"refs": [{"id": "ref-for-propdef-border-image"}, {"id": "ref-for-propdef-border-image\u2460"}], "title": "5.4. \nFragmented Borders and Backgrounds: the box-decoration-break property"}, {"refs": [{"id": "ref-for-propdef-border-image\u2461"}], "title": "5.4.1. \nJoining Boxes for slice"}], "external": true};
-window.dfnpanelData['5f1a81e7'] = {"dfnID": "5f1a81e7", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-radius", "dfnText": "border-radius", "refSections": [{"refs": [{"id": "ref-for-propdef-border-radius"}, {"id": "ref-for-propdef-border-radius\u2460"}], "title": "5.4. \nFragmented Borders and Backgrounds: the box-decoration-break property"}], "external": true};
-window.dfnpanelData['6916104d'] = {"dfnID": "6916104d", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-box-shadow", "dfnText": "box-shadow", "refSections": [{"refs": [{"id": "ref-for-propdef-box-shadow"}], "title": "5.4. \nFragmented Borders and Backgrounds: the box-decoration-break property"}], "external": true};
-window.dfnpanelData['4a57c942'] = {"dfnID": "4a57c942", "url": "https://drafts.csswg.org/css-box-4/#border-area", "dfnText": "border area", "refSections": [{"refs": [{"id": "ref-for-border-area"}], "title": "2. \nFragmentation Model and Terminology"}], "external": true};
-window.dfnpanelData['54aa64f0'] = {"dfnID": "54aa64f0", "url": "https://drafts.csswg.org/css-box-4/#margin", "dfnText": "margin", "refSections": [{"refs": [{"id": "ref-for-margin"}], "title": "5.2. \nAdjoining Margins at Breaks: the margin-break property"}], "external": true};
-window.dfnpanelData['62dcf741'] = {"dfnID": "62dcf741", "url": "https://drafts.csswg.org/css-box-4/#margin-area", "dfnText": "margin area", "refSections": [{"refs": [{"id": "ref-for-margin-area"}], "title": "2. \nFragmentation Model and Terminology"}], "external": true};
-window.dfnpanelData['d657c27f'] = {"dfnID": "d657c27f", "url": "https://drafts.csswg.org/css-box-4/#propdef-margin-trim", "dfnText": "margin-trim", "refSections": [{"refs": [{"id": "ref-for-propdef-margin-trim"}], "title": "5.2. \nAdjoining Margins at Breaks: the margin-break property"}], "external": true};
-window.dfnpanelData['e511deaa'] = {"dfnID": "e511deaa", "url": "https://drafts.csswg.org/css-box-4/#padding-area", "dfnText": "padding area", "refSections": [{"refs": [{"id": "ref-for-padding-area"}], "title": "2. \nFragmentation Model and Terminology"}], "external": true};
-window.dfnpanelData['9cd25054'] = {"dfnID": "9cd25054", "url": "https://drafts.csswg.org/css-cascade-5/#computed-value", "dfnText": "computed value", "refSections": [{"refs": [{"id": "ref-for-computed-value"}], "title": "3.1.1. \nChild\u2192Parent Break Propagation"}], "external": true};
-window.dfnpanelData['1364cc84'] = {"dfnID": "1364cc84", "url": "https://drafts.csswg.org/css-cascade-5/#legacy-shorthand", "dfnText": "legacy shorthand", "refSections": [{"refs": [{"id": "ref-for-legacy-shorthand"}], "title": "3.4. \nPage Break Aliases: the page-break-before, page-break-after, and page-break-inside properties"}], "external": true};
-window.dfnpanelData['9f3d4f17'] = {"dfnID": "9f3d4f17", "url": "https://drafts.csswg.org/css-display-4/#block-container", "dfnText": "block container", "refSections": [{"refs": [{"id": "ref-for-block-container"}], "title": "3.3. \nBreaks Between Lines: orphans, widows"}, {"refs": [{"id": "ref-for-block-container\u2460"}], "title": "5.4. \nFragmented Borders and Backgrounds: the box-decoration-break property"}], "external": true};
-window.dfnpanelData['fd9aa8f7'] = {"dfnID": "fd9aa8f7", "url": "https://drafts.csswg.org/css-display-4/#block-level-box", "dfnText": "block-level box", "refSections": [{"refs": [{"id": "ref-for-block-level-box"}], "title": "5.4. \nFragmented Borders and Backgrounds: the box-decoration-break property"}], "external": true};
-window.dfnpanelData['09cd65e4'] = {"dfnID": "09cd65e4", "url": "https://drafts.csswg.org/css-display-4/#display-type", "dfnText": "display type", "refSections": [{"refs": [{"id": "ref-for-display-type"}], "title": "2. \nFragmentation Model and Terminology"}, {"refs": [{"id": "ref-for-display-type\u2460"}], "title": "4.1. \nPossible Break Points"}, {"refs": [{"id": "ref-for-display-type\u2461"}], "title": "5.4. \nFragmented Borders and Backgrounds: the box-decoration-break property"}], "external": true};
-window.dfnpanelData['0bc73d68'] = {"dfnID": "0bc73d68", "url": "https://drafts.csswg.org/css-display-4/#formatting-context", "dfnText": "formatting context", "refSections": [{"refs": [{"id": "ref-for-formatting-context"}, {"id": "ref-for-formatting-context\u2460"}, {"id": "ref-for-formatting-context\u2461"}], "title": "2.1. \nParallel Fragmentation Flows"}], "external": true};
-window.dfnpanelData['99cabd32'] = {"dfnID": "99cabd32", "url": "https://drafts.csswg.org/css-display-4/#in-flow", "dfnText": "in-flow", "refSections": [{"refs": [{"id": "ref-for-in-flow"}, {"id": "ref-for-in-flow\u2460"}], "title": "3.1.1. \nChild\u2192Parent Break Propagation"}], "external": true};
-window.dfnpanelData['8141cabb'] = {"dfnID": "8141cabb", "url": "https://drafts.csswg.org/css-display-4/#independent-formatting-context", "dfnText": "independent formatting context", "refSections": [{"refs": [{"id": "ref-for-independent-formatting-context"}], "title": "4.1. \nPossible Break Points"}], "external": true};
-window.dfnpanelData['083ffe5f'] = {"dfnID": "083ffe5f", "url": "https://drafts.csswg.org/css-display-4/#inline-box", "dfnText": "inline box", "refSections": [{"refs": [{"id": "ref-for-inline-box"}], "title": "5.4. \nFragmented Borders and Backgrounds: the box-decoration-break property"}], "external": true};
-window.dfnpanelData['b8f126f1'] = {"dfnID": "b8f126f1", "url": "https://drafts.csswg.org/css-display-4/#inline-formatting-context", "dfnText": "inline formatting context", "refSections": [{"refs": [{"id": "ref-for-inline-formatting-context"}], "title": "3.3. \nBreaks Between Lines: orphans, widows"}], "external": true};
-window.dfnpanelData['e33664cd'] = {"dfnID": "e33664cd", "url": "https://drafts.csswg.org/css-display-4/#valdef-display-inline-block", "dfnText": "inline-block", "refSections": [{"refs": [{"id": "ref-for-valdef-display-inline-block"}], "title": "4.1. \nPossible Break Points"}], "external": true};
-window.dfnpanelData['4225558e'] = {"dfnID": "4225558e", "url": "https://drafts.csswg.org/css-display-4/#valdef-display-inline-table", "dfnText": "inline-table", "refSections": [{"refs": [{"id": "ref-for-valdef-display-inline-table"}], "title": "4.1. \nPossible Break Points"}], "external": true};
-window.dfnpanelData['80eb9508'] = {"dfnID": "80eb9508", "url": "https://drafts.csswg.org/css-display-4/#principal-box", "dfnText": "principal box", "refSections": [{"refs": [{"id": "ref-for-principal-box"}, {"id": "ref-for-principal-box\u2460"}], "title": "\nGeneric Break Values"}], "external": true};
-window.dfnpanelData['65b081ea'] = {"dfnID": "65b081ea", "url": "https://drafts.fxtf.org/css-masking-1/#mask-positioning-area", "dfnText": "mask positioning area", "refSections": [{"refs": [{"id": "ref-for-mask-positioning-area"}], "title": "5.4. \nFragmented Borders and Backgrounds: the box-decoration-break property"}], "external": true};
-window.dfnpanelData['521eb6d4'] = {"dfnID": "521eb6d4", "url": "https://drafts.csswg.org/css-multicol-1/#multi-column-container", "dfnText": "multi-column container", "refSections": [{"refs": [{"id": "ref-for-multi-column-container"}, {"id": "ref-for-multi-column-container\u2460"}, {"id": "ref-for-multi-column-container\u2461"}, {"id": "ref-for-multi-column-container\u2462"}, {"id": "ref-for-multi-column-container\u2463"}, {"id": "ref-for-multi-column-container\u2464"}], "title": "\nGeneric Break Values"}], "external": true};
-window.dfnpanelData['18499cc8'] = {"dfnID": "18499cc8", "url": "https://drafts.csswg.org/css-multicol-1/#multi-column-layout", "dfnText": "multi-column layout", "refSections": [{"refs": [{"id": "ref-for-multi-column-layout"}], "title": "5.2. \nAdjoining Margins at Breaks: the margin-break property"}], "external": true};
-window.dfnpanelData['8b3ca704'] = {"dfnID": "8b3ca704", "url": "https://drafts.csswg.org/css-overflow-3/#valdef-overflow-auto", "dfnText": "auto", "refSections": [{"refs": [{"id": "ref-for-valdef-overflow-auto"}], "title": "4.1. \nPossible Break Points"}], "external": true};
-window.dfnpanelData['86928bde'] = {"dfnID": "86928bde", "url": "https://drafts.csswg.org/css-overflow-3/#propdef-overflow", "dfnText": "overflow", "refSections": [{"refs": [{"id": "ref-for-propdef-overflow"}, {"id": "ref-for-propdef-overflow\u2460"}], "title": "4.1. \nPossible Break Points"}], "external": true};
-window.dfnpanelData['e7ab0d6a'] = {"dfnID": "e7ab0d6a", "url": "https://drafts.csswg.org/css-overflow-3/#valdef-overflow-scroll", "dfnText": "scroll", "refSections": [{"refs": [{"id": "ref-for-valdef-overflow-scroll"}], "title": "4.1. \nPossible Break Points"}], "external": true};
-window.dfnpanelData['decf3b99'] = {"dfnID": "decf3b99", "url": "https://drafts.csswg.org/css-page-3/#propdef-page", "dfnText": "page", "refSections": [{"refs": [{"id": "ref-for-propdef-page"}], "title": "4.3. \nForced Breaks"}], "external": true};
-window.dfnpanelData['46080d3b'] = {"dfnID": "46080d3b", "url": "https://drafts.csswg.org/css-page-3/#page-progression", "dfnText": "page progression", "refSections": [{"refs": [{"id": "ref-for-page-progression"}, {"id": "ref-for-page-progression\u2460"}], "title": "\nPage Break Values"}], "external": true};
-window.dfnpanelData['e1483d91'] = {"dfnID": "e1483d91", "url": "https://drafts.csswg.org/css-position-3/#propdef-top", "dfnText": "top", "refSections": [{"refs": [{"id": "ref-for-propdef-top"}], "title": "5.1. \nBreaking into Varying-size Fragmentainers"}], "external": true};
-window.dfnpanelData['175a39e9'] = {"dfnID": "175a39e9", "url": "https://drafts.csswg.org/css-shapes-1/#basic-shape-reference-box", "dfnText": "reference box", "refSections": [{"refs": [{"id": "ref-for-basic-shape-reference-box"}], "title": "5.4. \nFragmented Borders and Backgrounds: the box-decoration-break property"}], "external": true};
-window.dfnpanelData['0e5cedd7'] = {"dfnID": "0e5cedd7", "url": "https://drafts.csswg.org/css-sizing-3/#valdef-width-auto", "dfnText": "auto", "refSections": [{"refs": [{"id": "ref-for-valdef-width-auto"}], "title": "4.1. \nPossible Break Points"}], "external": true};
-window.dfnpanelData['68019d7a'] = {"dfnID": "68019d7a", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-height", "dfnText": "height", "refSections": [{"refs": [{"id": "ref-for-propdef-height"}], "title": "5.1. \nBreaking into Varying-size Fragmentainers"}], "external": true};
-window.dfnpanelData['26a40c98'] = {"dfnID": "26a40c98", "url": "https://drafts.csswg.org/css-sizing-3/#max-content", "dfnText": "max-content size", "refSections": [{"refs": [{"id": "ref-for-max-content"}], "title": "5.1. \nBreaking into Varying-size Fragmentainers"}], "external": true};
-window.dfnpanelData['3f0db204'] = {"dfnID": "3f0db204", "url": "https://drafts.csswg.org/css-sizing-3/#min-content", "dfnText": "min-content size", "refSections": [{"refs": [{"id": "ref-for-min-content"}], "title": "5.1. \nBreaking into Varying-size Fragmentainers"}], "external": true};
-window.dfnpanelData['3f92298d'] = {"dfnID": "3f92298d", "url": "https://drafts.csswg.org/css-sizing-3/#stretch-fit-size", "dfnText": "stretch-fit size", "refSections": [{"refs": [{"id": "ref-for-stretch-fit-size"}], "title": "5.1. \nBreaking into Varying-size Fragmentainers"}], "external": true};
-window.dfnpanelData['5a6dc1f0'] = {"dfnID": "5a6dc1f0", "url": "https://drafts.csswg.org/css-text-4/#line-break", "dfnText": "line break", "refSections": [{"refs": [{"id": "ref-for-line-break"}], "title": "4.2. \nTypes of Breaks"}], "external": true};
-window.dfnpanelData['70c9f859'] = {"dfnID": "70c9f859", "url": "https://drafts.csswg.org/css-values-4/#integer-value", "dfnText": "<integer>", "refSections": [{"refs": [{"id": "ref-for-integer-value"}], "title": "3.3. \nBreaks Between Lines: orphans, widows"}], "external": true};
-window.dfnpanelData['358fd6ff'] = {"dfnID": "358fd6ff", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "dfnText": "css-wide keywords", "refSections": [{"refs": [{"id": "ref-for-css-wide-keywords"}], "title": "1.2. \nValue Definitions"}], "external": true};
-window.dfnpanelData['6ec67710'] = {"dfnID": "6ec67710", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "dfnText": "|", "refSections": [{"refs": [{"id": "ref-for-comb-one"}, {"id": "ref-for-comb-one\u2460"}, {"id": "ref-for-comb-one\u2461"}, {"id": "ref-for-comb-one\u2462"}, {"id": "ref-for-comb-one\u2463"}, {"id": "ref-for-comb-one\u2464"}, {"id": "ref-for-comb-one\u2465"}, {"id": "ref-for-comb-one\u2466"}, {"id": "ref-for-comb-one\u2467"}, {"id": "ref-for-comb-one\u2468"}, {"id": "ref-for-comb-one\u2460\u24ea"}, {"id": "ref-for-comb-one\u2460\u2460"}, {"id": "ref-for-comb-one\u2460\u2461"}], "title": "3.1. \nBreaks Between Boxes: the break-before and break-after properties"}, {"refs": [{"id": "ref-for-comb-one\u2460\u2462"}, {"id": "ref-for-comb-one\u2460\u2463"}, {"id": "ref-for-comb-one\u2460\u2464"}, {"id": "ref-for-comb-one\u2460\u2465"}], "title": "3.2. \nBreaks Within Boxes: the break-inside property"}, {"refs": [{"id": "ref-for-comb-one\u2460\u2466"}, {"id": "ref-for-comb-one\u2460\u2467"}], "title": "5.2. \nAdjoining Margins at Breaks: the margin-break property"}, {"refs": [{"id": "ref-for-comb-one\u2460\u2468"}], "title": "5.4. \nFragmented Borders and Backgrounds: the box-decoration-break property"}], "external": true};
-window.dfnpanelData['5bc8bd12'] = {"dfnID": "5bc8bd12", "url": "https://drafts.csswg.org/css-writing-modes-3/#propdef-direction", "dfnText": "direction", "refSections": [{"refs": [{"id": "ref-for-propdef-direction"}, {"id": "ref-for-propdef-direction\u2460"}, {"id": "ref-for-propdef-direction\u2461"}], "title": "5.4. \nFragmented Borders and Backgrounds: the box-decoration-break property"}, {"refs": [{"id": "ref-for-propdef-direction\u2462"}], "title": "5.4.1. \nJoining Boxes for slice"}], "external": true};
-window.dfnpanelData['88dd7551'] = {"dfnID": "88dd7551", "url": "https://drafts.csswg.org/css-writing-modes-4/#block-flow-direction", "dfnText": "block flow direction", "refSections": [{"refs": [{"id": "ref-for-block-flow-direction"}, {"id": "ref-for-block-flow-direction\u2460"}, {"id": "ref-for-block-flow-direction\u2461"}], "title": "5.4.1. \nJoining Boxes for slice"}], "external": true};
-window.dfnpanelData['190183bb'] = {"dfnID": "190183bb", "url": "https://drafts.csswg.org/css-writing-modes-4/#block-size", "dfnText": "block size", "refSections": [{"refs": [{"id": "ref-for-block-size"}], "title": "4. \nRules for Breaking"}, {"refs": [{"id": "ref-for-block-size\u2460"}], "title": "5.1. \nBreaking into Varying-size Fragmentainers"}, {"refs": [{"id": "ref-for-block-size\u2461"}, {"id": "ref-for-block-size\u2462"}, {"id": "ref-for-block-size\u2463"}], "title": "5.3. \nSplitting Boxes"}], "external": true};
-window.dfnpanelData['32995ff0'] = {"dfnID": "32995ff0", "url": "https://drafts.csswg.org/css-writing-modes-4/#block-axis", "dfnText": "block-axis", "refSections": [{"refs": [{"id": "ref-for-block-axis"}], "title": "2. \nFragmentation Model and Terminology"}, {"refs": [{"id": "ref-for-block-axis\u2460"}], "title": "5.2. \nAdjoining Margins at Breaks: the margin-break property"}], "external": true};
-window.dfnpanelData['37c3d179'] = {"dfnID": "37c3d179", "url": "https://drafts.csswg.org/css-writing-modes-4/#block-end", "dfnText": "block-end", "refSections": [{"refs": [{"id": "ref-for-block-end"}], "title": "4.4. \nUnforced Breaks"}], "external": true};
-window.dfnpanelData['1370dad0'] = {"dfnID": "1370dad0", "url": "https://drafts.csswg.org/css-writing-modes-4/#block-start", "dfnText": "block-start", "refSections": [{"refs": [{"id": "ref-for-block-start"}], "title": "4.4. \nUnforced Breaks"}, {"refs": [{"id": "ref-for-block-start\u2460"}, {"id": "ref-for-block-start\u2461"}], "title": "5.1. \nBreaking into Varying-size Fragmentainers"}, {"refs": [{"id": "ref-for-block-start\u2462"}], "title": "5.5. \nTransforms, Positioning, and Pagination"}], "external": true};
-window.dfnpanelData['887c0c5c'] = {"dfnID": "887c0c5c", "url": "https://drafts.csswg.org/css-writing-modes-4/#inline-base-direction", "dfnText": "inline base direction", "refSections": [{"refs": [{"id": "ref-for-inline-base-direction"}], "title": "5.4.1. \nJoining Boxes for slice"}], "external": true};
-window.dfnpanelData['37f0daea'] = {"dfnID": "37f0daea", "url": "https://drafts.csswg.org/css-writing-modes-4/#inline-size", "dfnText": "inline size", "refSections": [{"refs": [{"id": "ref-for-inline-size"}, {"id": "ref-for-inline-size\u2460"}, {"id": "ref-for-inline-size\u2461"}], "title": "5.1. \nBreaking into Varying-size Fragmentainers"}], "external": true};
-window.dfnpanelData['3bcf9aaa'] = {"dfnID": "3bcf9aaa", "url": "https://drafts.csswg.org/css-writing-modes-4/#logical-height", "dfnText": "logical height", "refSections": [{"refs": [{"id": "ref-for-logical-height"}], "title": "4.1. \nPossible Break Points"}], "external": true};
-window.dfnpanelData['7f0d729a'] = {"dfnID": "7f0d729a", "url": "https://drafts.csswg.org/css-writing-modes-4/#valdef-direction-ltr", "dfnText": "ltr", "refSections": [{"refs": [{"id": "ref-for-valdef-direction-ltr"}], "title": "5.4.1. \nJoining Boxes for slice"}], "external": true};
-window.dfnpanelData['d97c40f4'] = {"dfnID": "d97c40f4", "url": "https://drafts.csswg.org/css-writing-modes-4/#principal-writing-mode", "dfnText": "principal writing mode", "refSections": [{"refs": [{"id": "ref-for-principal-writing-mode"}], "title": "5.4.1. \nJoining Boxes for slice"}], "external": true};
-window.dfnpanelData['5ddc23c6'] = {"dfnID": "5ddc23c6", "url": "https://drafts.csswg.org/css2/#propdef-page-break-after", "dfnText": "page-break-after", "refSections": [{"refs": [{"id": "ref-for-propdef-page-break-after"}, {"id": "ref-for-propdef-page-break-after\u2460"}], "title": "3.4. \nPage Break Aliases: the page-break-before, page-break-after, and page-break-inside properties"}], "external": true};
-window.dfnpanelData['8f568cb6'] = {"dfnID": "8f568cb6", "url": "https://drafts.csswg.org/css2/#propdef-page-break-before", "dfnText": "page-break-before", "refSections": [{"refs": [{"id": "ref-for-propdef-page-break-before"}, {"id": "ref-for-propdef-page-break-before\u2460"}], "title": "3.4. \nPage Break Aliases: the page-break-before, page-break-after, and page-break-inside properties"}], "external": true};
-window.dfnpanelData['f6cbcbce'] = {"dfnID": "f6cbcbce", "url": "https://drafts.csswg.org/css2/#propdef-page-break-inside", "dfnText": "page-break-inside", "refSections": [{"refs": [{"id": "ref-for-propdef-page-break-inside"}, {"id": "ref-for-propdef-page-break-inside\u2460"}], "title": "3.4. \nPage Break Aliases: the page-break-before, page-break-after, and page-break-inside properties"}], "external": true};
-window.dfnpanelData['ec0a7b21'] = {"dfnID": "ec0a7b21", "url": "https://drafts.csswg.org/css-regions-1/#region-chain", "dfnText": "region chain", "refSections": [{"refs": [{"id": "ref-for-region-chain"}], "title": "5.4.1. \nJoining Boxes for slice"}], "external": true};
-window.dfnpanelData['aba1ccaf'] = {"dfnID": "aba1ccaf", "url": "https://drafts.csswg.org/mediaqueries-5/#continuous-media", "dfnText": "continuous media", "refSections": [{"refs": [{"id": "ref-for-continuous-media"}], "title": "1. \nIntroduction"}], "external": true};
-window.dfnpanelData['758665a5'] = {"dfnID": "758665a5", "url": "https://drafts.csswg.org/mediaqueries-5/#paged-media", "dfnText": "paged media", "refSections": [{"refs": [{"id": "ref-for-paged-media"}, {"id": "ref-for-paged-media\u2460"}], "title": "1. \nIntroduction"}, {"refs": [{"id": "ref-for-paged-media\u2461"}], "title": "2. \nFragmentation Model and Terminology"}, {"refs": [{"id": "ref-for-paged-media\u2462"}, {"id": "ref-for-paged-media\u2463"}], "title": "\nGeneric Break Values"}], "external": true};
-window.dfnpanelData['fragmentation-container'] = {"dfnID": "fragmentation-container", "url": "#fragmentation-container", "dfnText": "fragmentation container", "refSections": [{"refs": [{"id": "ref-for-fragmentation-container"}], "title": "1. \nIntroduction"}, {"refs": [{"id": "ref-for-fragmentation-container\u2460"}], "title": "5.2. \nAdjoining Margins at Breaks: the margin-break property"}], "external": false};
-window.dfnpanelData['fragmentainer'] = {"dfnID": "fragmentainer", "url": "#fragmentainer", "dfnText": "fragmentainer", "refSections": [{"refs": [{"id": "ref-for-fragmentainer"}], "title": "1. \nIntroduction"}, {"refs": [{"id": "ref-for-fragmentainer\u2460"}, {"id": "ref-for-fragmentainer\u2461"}, {"id": "ref-for-fragmentainer\u2462"}, {"id": "ref-for-fragmentainer\u2463"}, {"id": "ref-for-fragmentainer\u2464"}, {"id": "ref-for-fragmentainer\u2465"}, {"id": "ref-for-fragmentainer\u2466"}, {"id": "ref-for-fragmentainer\u2467"}, {"id": "ref-for-fragmentainer\u2468"}, {"id": "ref-for-fragmentainer\u2460\u24ea"}], "title": "2. \nFragmentation Model and Terminology"}, {"refs": [{"id": "ref-for-fragmentainer\u2460\u2460"}], "title": "2.1. \nParallel Fragmentation Flows"}, {"refs": [{"id": "ref-for-fragmentainer\u2460\u2461"}, {"id": "ref-for-fragmentainer\u2460\u2462"}, {"id": "ref-for-fragmentainer\u2460\u2463"}, {"id": "ref-for-fragmentainer\u2460\u2464"}], "title": "2.2. \nNested Fragmentation Flows"}, {"refs": [{"id": "ref-for-fragmentainer\u2460\u2465"}], "title": "4. \nRules for Breaking"}, {"refs": [{"id": "ref-for-fragmentainer\u2460\u2466"}, {"id": "ref-for-fragmentainer\u2460\u2467"}], "title": "4.4. \nUnforced Breaks"}, {"refs": [{"id": "ref-for-fragmentainer\u2460\u2468"}, {"id": "ref-for-fragmentainer\u2461\u24ea"}, {"id": "ref-for-fragmentainer\u2461\u2460"}], "title": "4.5. \nOptimizing Unforced Breaks"}, {"refs": [{"id": "ref-for-fragmentainer\u2461\u2461"}, {"id": "ref-for-fragmentainer\u2461\u2462"}, {"id": "ref-for-fragmentainer\u2461\u2463"}], "title": "5.3. \nSplitting Boxes"}], "external": false};
-window.dfnpanelData['fragmentation-context'] = {"dfnID": "fragmentation-context", "url": "#fragmentation-context", "dfnText": "fragmentation context", "refSections": [{"refs": [{"id": "ref-for-fragmentation-context"}, {"id": "ref-for-fragmentation-context\u2460"}, {"id": "ref-for-fragmentation-context\u2461"}, {"id": "ref-for-fragmentation-context\u2462"}], "title": "2. \nFragmentation Model and Terminology"}, {"refs": [{"id": "ref-for-fragmentation-context\u2463"}, {"id": "ref-for-fragmentation-context\u2464"}], "title": "2.2. \nNested Fragmentation Flows"}, {"refs": [{"id": "ref-for-fragmentation-context\u2465"}, {"id": "ref-for-fragmentation-context\u2466"}], "title": "\nGeneric Break Values"}, {"refs": [{"id": "ref-for-fragmentation-context\u2467"}], "title": "5.2. \nAdjoining Margins at Breaks: the margin-break property"}], "external": false};
-window.dfnpanelData['fragmented-flow'] = {"dfnID": "fragmented-flow", "url": "#fragmented-flow", "dfnText": "fragmented flow", "refSections": [{"refs": [{"id": "ref-for-fragmented-flow"}, {"id": "ref-for-fragmented-flow\u2460"}], "title": "2. \nFragmentation Model and Terminology"}, {"refs": [{"id": "ref-for-fragmented-flow\u2461"}], "title": "2.1. \nParallel Fragmentation Flows"}, {"refs": [{"id": "ref-for-fragmented-flow\u2462"}], "title": "3. \nControlling Breaks"}, {"refs": [{"id": "ref-for-fragmented-flow\u2463"}], "title": "4. \nRules for Breaking"}, {"refs": [{"id": "ref-for-fragmented-flow\u2464"}], "title": "4.4. \nUnforced Breaks"}, {"refs": [{"id": "ref-for-fragmented-flow\u2465"}], "title": "4.5. \nOptimizing Unforced Breaks"}], "external": false};
-window.dfnpanelData['fragmentation-root'] = {"dfnID": "fragmentation-root", "url": "#fragmentation-root", "dfnText": "fragmentation root", "refSections": [{"refs": [{"id": "ref-for-fragmentation-root"}, {"id": "ref-for-fragmentation-root\u2460"}], "title": "2. \nFragmentation Model and Terminology"}, {"refs": [{"id": "ref-for-fragmentation-root\u2461"}], "title": "2.1. \nParallel Fragmentation Flows"}, {"refs": [{"id": "ref-for-fragmentation-root\u2462"}], "title": "3.1. \nBreaks Between Boxes: the break-before and break-after properties"}], "external": false};
-window.dfnpanelData['fragmentation'] = {"dfnID": "fragmentation", "url": "#fragmentation", "dfnText": "fragmentation", "refSections": [{"refs": [{"id": "ref-for-fragmentation"}], "title": "1. \nIntroduction"}], "external": false};
-window.dfnpanelData['box-fragment'] = {"dfnID": "box-fragment", "url": "#box-fragment", "dfnText": "box fragment", "refSections": [{"refs": [{"id": "ref-for-box-fragment"}], "title": "2. \nFragmentation Model and Terminology"}, {"refs": [{"id": "ref-for-box-fragment\u2460"}, {"id": "ref-for-box-fragment\u2461"}], "title": "4.5. \nOptimizing Unforced Breaks"}], "external": false};
-window.dfnpanelData['fragment'] = {"dfnID": "fragment", "url": "#fragment", "dfnText": "fragment", "refSections": [{"refs": [{"id": "ref-for-fragment"}], "title": "2. \nFragmentation Model and Terminology"}, {"refs": [{"id": "ref-for-fragment\u2460"}, {"id": "ref-for-fragment\u2461"}], "title": "3.3. \nBreaks Between Lines: orphans, widows"}], "external": false};
-window.dfnpanelData['remaining-fragmentainer-extent'] = {"dfnID": "remaining-fragmentainer-extent", "url": "#remaining-fragmentainer-extent", "dfnText": "remaining fragmentainer extent", "refSections": [{"refs": [{"id": "ref-for-remaining-fragmentainer-extent"}], "title": "5.2. \nAdjoining Margins at Breaks: the margin-break property"}, {"refs": [{"id": "ref-for-remaining-fragmentainer-extent\u2460"}, {"id": "ref-for-remaining-fragmentainer-extent\u2461"}], "title": "5.3. \nSplitting Boxes"}], "external": false};
-window.dfnpanelData['fragmentation-break'] = {"dfnID": "fragmentation-break", "url": "#fragmentation-break", "dfnText": "fragmentation break", "refSections": [{"refs": [{"id": "ref-for-fragmentation-break"}], "title": "4.5. \nOptimizing Unforced Breaks"}, {"refs": [{"id": "ref-for-fragmentation-break\u2460"}, {"id": "ref-for-fragmentation-break\u2461"}, {"id": "ref-for-fragmentation-break\u2462"}], "title": "5.2. \nAdjoining Margins at Breaks: the margin-break property"}, {"refs": [{"id": "ref-for-fragmentation-break\u2463"}], "title": "5.3. \nSplitting Boxes"}, {"refs": [{"id": "ref-for-fragmentation-break\u2464"}], "title": "5.5. \nTransforms, Positioning, and Pagination"}], "external": false};
-window.dfnpanelData['propdef-break-before'] = {"dfnID": "propdef-break-before", "url": "#propdef-break-before", "dfnText": "break-before", "refSections": [{"refs": [{"id": "ref-for-propdef-break-before\u2460"}], "title": "1. \nIntroduction"}, {"refs": [{"id": "ref-for-propdef-break-before\u2461"}], "title": "3. \nControlling Breaks"}, {"refs": [{"id": "ref-for-propdef-break-before\u2462"}, {"id": "ref-for-propdef-break-before\u2463"}], "title": "3.1. \nBreaks Between Boxes: the break-before and break-after properties"}, {"refs": [{"id": "ref-for-propdef-break-before\u2464"}], "title": "3.1.1. \nChild\u2192Parent Break Propagation"}, {"refs": [{"id": "ref-for-propdef-break-before\u2465"}], "title": "3.4. \nPage Break Aliases: the page-break-before, page-break-after, and page-break-inside properties"}, {"refs": [{"id": "ref-for-propdef-break-before\u2466"}], "title": "4.3. \nForced Breaks"}, {"refs": [{"id": "ref-for-propdef-break-before\u2467"}], "title": "4.4. \nUnforced Breaks"}, {"refs": [{"id": "ref-for-propdef-break-before\u2468"}], "title": "\nChanges Since Level 3"}], "external": false};
-window.dfnpanelData['propdef-break-after'] = {"dfnID": "propdef-break-after", "url": "#propdef-break-after", "dfnText": "break-after", "refSections": [{"refs": [{"id": "ref-for-propdef-break-after\u2460"}], "title": "1. \nIntroduction"}, {"refs": [{"id": "ref-for-propdef-break-after\u2461"}], "title": "3. \nControlling Breaks"}, {"refs": [{"id": "ref-for-propdef-break-after\u2462"}, {"id": "ref-for-propdef-break-after\u2463"}], "title": "3.1. \nBreaks Between Boxes: the break-before and break-after properties"}, {"refs": [{"id": "ref-for-propdef-break-after\u2464"}], "title": "3.1.1. \nChild\u2192Parent Break Propagation"}, {"refs": [{"id": "ref-for-propdef-break-after\u2465"}], "title": "3.4. \nPage Break Aliases: the page-break-before, page-break-after, and page-break-inside properties"}, {"refs": [{"id": "ref-for-propdef-break-after\u2466"}], "title": "4.3. \nForced Breaks"}, {"refs": [{"id": "ref-for-propdef-break-after\u2467"}], "title": "4.4. \nUnforced Breaks"}, {"refs": [{"id": "ref-for-propdef-break-after\u2468"}], "title": "\nChanges Since Level 3"}], "external": false};
-window.dfnpanelData['forced-break-values'] = {"dfnID": "forced-break-values", "url": "#forced-break-values", "dfnText": "forced break values", "refSections": [{"refs": [{"id": "ref-for-forced-break-values"}, {"id": "ref-for-forced-break-values\u2460"}, {"id": "ref-for-forced-break-values\u2461"}], "title": "4.3. \nForced Breaks"}], "external": false};
-window.dfnpanelData['avoid-break-values'] = {"dfnID": "avoid-break-values", "url": "#avoid-break-values", "dfnText": "avoid break values", "refSections": [{"refs": [{"id": "ref-for-avoid-break-values"}], "title": "4.3. \nForced Breaks"}], "external": false};
-window.dfnpanelData['valdef-break-before-auto'] = {"dfnID": "valdef-break-before-auto", "url": "#valdef-break-before-auto", "dfnText": "auto", "refSections": [{"refs": [{"id": "ref-for-valdef-break-before-auto"}], "title": "4.4. \nUnforced Breaks"}], "external": false};
-window.dfnpanelData['valdef-break-before-avoid'] = {"dfnID": "valdef-break-before-avoid", "url": "#valdef-break-before-avoid", "dfnText": "avoid", "refSections": [{"refs": [{"id": "ref-for-valdef-break-before-avoid"}], "title": "3.1. \nBreaks Between Boxes: the break-before and break-after properties"}, {"refs": [{"id": "ref-for-valdef-break-before-avoid\u2460"}], "title": "4.4. \nUnforced Breaks"}], "external": false};
-window.dfnpanelData['valdef-break-before-always'] = {"dfnID": "valdef-break-before-always", "url": "#valdef-break-before-always", "dfnText": "always", "refSections": [{"refs": [{"id": "ref-for-valdef-break-before-always"}], "title": "1. \nIntroduction"}, {"refs": [{"id": "ref-for-valdef-break-before-always\u2460"}], "title": "3.1. \nBreaks Between Boxes: the break-before and break-after properties"}, {"refs": [{"id": "ref-for-valdef-break-before-always\u2461"}], "title": "\nChanges Since Level 3"}], "external": false};
-window.dfnpanelData['valdef-break-before-all'] = {"dfnID": "valdef-break-before-all", "url": "#valdef-break-before-all", "dfnText": "all", "refSections": [{"refs": [{"id": "ref-for-valdef-break-before-all\u2460"}], "title": "1. \nIntroduction"}, {"refs": [{"id": "ref-for-valdef-break-before-all\u2461"}], "title": "3.1. \nBreaks Between Boxes: the break-before and break-after properties"}, {"refs": [{"id": "ref-for-valdef-break-before-all\u2462"}], "title": "\nChanges Since Level 3"}], "external": false};
-window.dfnpanelData['valdef-break-before-avoid-page'] = {"dfnID": "valdef-break-before-avoid-page", "url": "#valdef-break-before-avoid-page", "dfnText": "avoid-page", "refSections": [{"refs": [{"id": "ref-for-valdef-break-before-avoid-page"}], "title": "3.1. \nBreaks Between Boxes: the break-before and break-after properties"}, {"refs": [{"id": "ref-for-valdef-break-before-avoid-page\u2460"}], "title": "4.4. \nUnforced Breaks"}], "external": false};
-window.dfnpanelData['valdef-break-before-page'] = {"dfnID": "valdef-break-before-page", "url": "#valdef-break-before-page", "dfnText": "page", "refSections": [{"refs": [{"id": "ref-for-valdef-break-before-page"}], "title": "3.1. \nBreaks Between Boxes: the break-before and break-after properties"}], "external": false};
-window.dfnpanelData['valdef-break-before-left'] = {"dfnID": "valdef-break-before-left", "url": "#valdef-break-before-left", "dfnText": "left", "refSections": [{"refs": [{"id": "ref-for-valdef-break-before-left"}], "title": "3.1. \nBreaks Between Boxes: the break-before and break-after properties"}, {"refs": [{"id": "ref-for-valdef-break-before-left\u2460"}], "title": "4.3. \nForced Breaks"}], "external": false};
-window.dfnpanelData['valdef-break-before-right'] = {"dfnID": "valdef-break-before-right", "url": "#valdef-break-before-right", "dfnText": "right", "refSections": [{"refs": [{"id": "ref-for-valdef-break-before-right"}], "title": "3.1. \nBreaks Between Boxes: the break-before and break-after properties"}, {"refs": [{"id": "ref-for-valdef-break-before-right\u2460"}], "title": "4.3. \nForced Breaks"}], "external": false};
-window.dfnpanelData['valdef-break-before-recto'] = {"dfnID": "valdef-break-before-recto", "url": "#valdef-break-before-recto", "dfnText": "recto", "refSections": [{"refs": [{"id": "ref-for-valdef-break-before-recto"}], "title": "3.1. \nBreaks Between Boxes: the break-before and break-after properties"}, {"refs": [{"id": "ref-for-valdef-break-before-recto\u2460"}], "title": "4.3. \nForced Breaks"}], "external": false};
-window.dfnpanelData['valdef-break-before-verso'] = {"dfnID": "valdef-break-before-verso", "url": "#valdef-break-before-verso", "dfnText": "verso", "refSections": [{"refs": [{"id": "ref-for-valdef-break-before-verso"}], "title": "3.1. \nBreaks Between Boxes: the break-before and break-after properties"}, {"refs": [{"id": "ref-for-valdef-break-before-verso\u2460"}], "title": "4.3. \nForced Breaks"}], "external": false};
-window.dfnpanelData['valdef-break-before-avoid-column'] = {"dfnID": "valdef-break-before-avoid-column", "url": "#valdef-break-before-avoid-column", "dfnText": "avoid-column", "refSections": [{"refs": [{"id": "ref-for-valdef-break-before-avoid-column"}], "title": "3.1. \nBreaks Between Boxes: the break-before and break-after properties"}, {"refs": [{"id": "ref-for-valdef-break-before-avoid-column\u2460"}], "title": "4.4. \nUnforced Breaks"}], "external": false};
-window.dfnpanelData['valdef-break-before-column'] = {"dfnID": "valdef-break-before-column", "url": "#valdef-break-before-column", "dfnText": "column", "refSections": [{"refs": [{"id": "ref-for-valdef-break-before-column"}], "title": "3.1. \nBreaks Between Boxes: the break-before and break-after properties"}], "external": false};
-window.dfnpanelData['valdef-break-before-avoid-region'] = {"dfnID": "valdef-break-before-avoid-region", "url": "#valdef-break-before-avoid-region", "dfnText": "avoid-region", "refSections": [{"refs": [{"id": "ref-for-valdef-break-before-avoid-region"}], "title": "3.1. \nBreaks Between Boxes: the break-before and break-after properties"}, {"refs": [{"id": "ref-for-valdef-break-before-avoid-region\u2460"}], "title": "4.4. \nUnforced Breaks"}], "external": false};
-window.dfnpanelData['valdef-break-before-region'] = {"dfnID": "valdef-break-before-region", "url": "#valdef-break-before-region", "dfnText": "region", "refSections": [{"refs": [{"id": "ref-for-valdef-break-before-region"}], "title": "3.1. \nBreaks Between Boxes: the break-before and break-after properties"}], "external": false};
-window.dfnpanelData['propagate'] = {"dfnID": "propagate", "url": "#propagate", "dfnText": "propagated", "refSections": [{"refs": [{"id": "ref-for-propagate"}, {"id": "ref-for-propagate\u2460"}, {"id": "ref-for-propagate\u2461"}], "title": "3.1.1. \nChild\u2192Parent Break Propagation"}, {"refs": [{"id": "ref-for-propagate\u2462"}, {"id": "ref-for-propagate\u2463"}], "title": "4.3. \nForced Breaks"}], "external": false};
-window.dfnpanelData['propdef-break-inside'] = {"dfnID": "propdef-break-inside", "url": "#propdef-break-inside", "dfnText": "break-inside", "refSections": [{"refs": [{"id": "ref-for-propdef-break-inside"}, {"id": "ref-for-propdef-break-inside\u2460"}], "title": "3. \nControlling Breaks"}, {"refs": [{"id": "ref-for-propdef-break-inside\u2461"}], "title": "3.2. \nBreaks Within Boxes: the break-inside property"}, {"refs": [{"id": "ref-for-propdef-break-inside\u2462"}], "title": "3.4. \nPage Break Aliases: the page-break-before, page-break-after, and page-break-inside properties"}, {"refs": [{"id": "ref-for-propdef-break-inside\u2463"}, {"id": "ref-for-propdef-break-inside\u2464"}], "title": "4.4. \nUnforced Breaks"}], "external": false};
-window.dfnpanelData['valdef-break-inside-auto'] = {"dfnID": "valdef-break-inside-auto", "url": "#valdef-break-inside-auto", "dfnText": "auto", "refSections": [{"refs": [{"id": "ref-for-valdef-break-inside-auto"}], "title": "4.4. \nUnforced Breaks"}], "external": false};
-window.dfnpanelData['valdef-break-inside-avoid'] = {"dfnID": "valdef-break-inside-avoid", "url": "#valdef-break-inside-avoid", "dfnText": "avoid", "refSections": [{"refs": [{"id": "ref-for-valdef-break-inside-avoid"}], "title": "4.4. \nUnforced Breaks"}], "external": false};
-window.dfnpanelData['propdef-orphans'] = {"dfnID": "propdef-orphans", "url": "#propdef-orphans", "dfnText": "orphans", "refSections": [{"refs": [{"id": "ref-for-propdef-orphans"}], "title": "3. \nControlling Breaks"}, {"refs": [{"id": "ref-for-propdef-orphans\u2460"}, {"id": "ref-for-propdef-orphans\u2461"}, {"id": "ref-for-propdef-orphans\u2462"}, {"id": "ref-for-propdef-orphans\u2463"}], "title": "3.3. \nBreaks Between Lines: orphans, widows"}, {"refs": [{"id": "ref-for-propdef-orphans\u2464"}], "title": "4.4. \nUnforced Breaks"}, {"refs": [{"id": "ref-for-propdef-orphans\u2465"}, {"id": "ref-for-propdef-orphans\u2466"}], "title": "4.5. \nOptimizing Unforced Breaks"}], "external": false};
-window.dfnpanelData['propdef-widows'] = {"dfnID": "propdef-widows", "url": "#propdef-widows", "dfnText": "widows", "refSections": [{"refs": [{"id": "ref-for-propdef-widows"}], "title": "3. \nControlling Breaks"}, {"refs": [{"id": "ref-for-propdef-widows\u2460"}, {"id": "ref-for-propdef-widows\u2461"}, {"id": "ref-for-propdef-widows\u2462"}, {"id": "ref-for-propdef-widows\u2463"}], "title": "3.3. \nBreaks Between Lines: orphans, widows"}, {"refs": [{"id": "ref-for-propdef-widows\u2464"}], "title": "4.4. \nUnforced Breaks"}, {"refs": [{"id": "ref-for-propdef-widows\u2465"}, {"id": "ref-for-propdef-widows\u2466"}], "title": "4.5. \nOptimizing Unforced Breaks"}], "external": false};
-window.dfnpanelData['monolithic'] = {"dfnID": "monolithic", "url": "#monolithic", "dfnText": "monolithic", "refSections": [{"refs": [{"id": "ref-for-monolithic"}, {"id": "ref-for-monolithic\u2460"}], "title": "4.1. \nPossible Break Points"}, {"refs": [{"id": "ref-for-monolithic\u2461"}], "title": "4.4. \nUnforced Breaks"}, {"refs": [{"id": "ref-for-monolithic\u2462"}], "title": "5.1. \nBreaking into Varying-size Fragmentainers"}], "external": false};
-window.dfnpanelData['page-break'] = {"dfnID": "page-break", "url": "#page-break", "dfnText": "page break", "refSections": [{"refs": [{"id": "ref-for-page-break"}, {"id": "ref-for-page-break\u2460"}], "title": "\nGeneric Break Values"}, {"refs": [{"id": "ref-for-page-break\u2461"}, {"id": "ref-for-page-break\u2462"}], "title": "4.2. \nTypes of Breaks"}], "external": false};
-window.dfnpanelData['column-break'] = {"dfnID": "column-break", "url": "#column-break", "dfnText": "column break", "refSections": [{"refs": [{"id": "ref-for-column-break"}, {"id": "ref-for-column-break\u2460"}, {"id": "ref-for-column-break\u2461"}], "title": "\nGeneric Break Values"}], "external": false};
-window.dfnpanelData['region-break'] = {"dfnID": "region-break", "url": "#region-break", "dfnText": "region break", "refSections": [{"refs": [{"id": "ref-for-region-break"}], "title": "\nGeneric Break Values"}, {"refs": [{"id": "ref-for-region-break\u2460"}], "title": "4.2. \nTypes of Breaks"}], "external": false};
-window.dfnpanelData['forced-break'] = {"dfnID": "forced-break", "url": "#forced-break", "dfnText": "forced break", "refSections": [{"refs": [{"id": "ref-for-forced-break"}], "title": "2.1. \nParallel Fragmentation Flows"}, {"refs": [{"id": "ref-for-forced-break\u2460"}], "title": "4.3. \nForced Breaks"}], "external": false};
-window.dfnpanelData['unforced-break'] = {"dfnID": "unforced-break", "url": "#unforced-break", "dfnText": "unforced break", "refSections": [{"refs": [{"id": "ref-for-unforced-break"}], "title": "2.1. \nParallel Fragmentation Flows"}], "external": false};
-window.dfnpanelData['propdef-margin-break'] = {"dfnID": "propdef-margin-break", "url": "#propdef-margin-break", "dfnText": "margin-break", "refSections": [{"refs": [{"id": "ref-for-propdef-margin-break"}], "title": "1. \nIntroduction"}, {"refs": [{"id": "ref-for-propdef-margin-break\u2460"}, {"id": "ref-for-propdef-margin-break\u2461"}, {"id": "ref-for-propdef-margin-break\u2462"}, {"id": "ref-for-propdef-margin-break\u2463"}, {"id": "ref-for-propdef-margin-break\u2464"}, {"id": "ref-for-propdef-margin-break\u2465"}], "title": "5.2. \nAdjoining Margins at Breaks: the margin-break property"}, {"refs": [{"id": "ref-for-propdef-margin-break\u2466"}], "title": "\nChanges Since Level 3"}], "external": false};
-window.dfnpanelData['valdef-margin-break-keep'] = {"dfnID": "valdef-margin-break-keep", "url": "#valdef-margin-break-keep", "dfnText": "keep", "refSections": [{"refs": [{"id": "ref-for-valdef-margin-break-keep"}], "title": "5.2. \nAdjoining Margins at Breaks: the margin-break property"}], "external": false};
-window.dfnpanelData['propdef-box-decoration-break'] = {"dfnID": "propdef-box-decoration-break", "url": "#propdef-box-decoration-break", "dfnText": "box-decoration-break", "refSections": [{"refs": [{"id": "ref-for-propdef-box-decoration-break"}], "title": "2. \nFragmentation Model and Terminology"}, {"refs": [{"id": "ref-for-propdef-box-decoration-break\u2460"}], "title": "5.1. \nBreaking into Varying-size Fragmentainers"}, {"refs": [{"id": "ref-for-propdef-box-decoration-break\u2461"}], "title": "5.3. \nSplitting Boxes"}, {"refs": [{"id": "ref-for-propdef-box-decoration-break\u2462"}, {"id": "ref-for-propdef-box-decoration-break\u2463"}, {"id": "ref-for-propdef-box-decoration-break\u2464"}, {"id": "ref-for-propdef-box-decoration-break\u2465"}], "title": "5.4. \nFragmented Borders and Backgrounds: the box-decoration-break property"}, {"refs": [{"id": "ref-for-propdef-box-decoration-break\u2466"}], "title": "5.4.1. \nJoining Boxes for slice"}], "external": false};
-window.dfnpanelData['valdef-box-decoration-break-clone'] = {"dfnID": "valdef-box-decoration-break-clone", "url": "#valdef-box-decoration-break-clone", "dfnText": "clone", "refSections": [{"refs": [{"id": "ref-for-valdef-box-decoration-break-clone"}, {"id": "ref-for-valdef-box-decoration-break-clone"}], "title": "4.4. \nUnforced Breaks"}, {"refs": [{"id": "ref-for-valdef-box-decoration-break-clone"}], "title": "5.4. \nFragmented Borders and Backgrounds: the box-decoration-break property"}], "external": false};
-window.dfnpanelData['valdef-box-decoration-break-slice'] = {"dfnID": "valdef-box-decoration-break-slice", "url": "#valdef-box-decoration-break-slice", "dfnText": "slice", "refSections": [{"refs": [{"id": "ref-for-valdef-box-decoration-break-slice"}, {"id": "ref-for-valdef-box-decoration-break-slice\u2460"}], "title": "5.4. \nFragmented Borders and Backgrounds: the box-decoration-break property"}, {"refs": [{"id": "ref-for-valdef-box-decoration-break-slice\u2461"}], "title": "5.4.1. \nJoining Boxes for slice"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -3254,12 +2751,512 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"a4cd8a8d": {"dfnID":"a4cd8a8d","dfnText":"border-image","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-border-image"},{"id":"ref-for-propdef-border-image\u2460"}],"title":"5.4. \nFragmented Borders and Backgrounds: the box-decoration-break property"},{"refs":[{"id":"ref-for-propdef-border-image\u2461"}],"title":"5.4.1. \nJoining Boxes for slice"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-border-image"},
+"5f1a81e7": {"dfnID":"5f1a81e7","dfnText":"border-radius","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-border-radius"},{"id":"ref-for-propdef-border-radius\u2460"}],"title":"5.4. \nFragmented Borders and Backgrounds: the box-decoration-break property"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-border-radius"},
+"6916104d": {"dfnID":"6916104d","dfnText":"box-shadow","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-box-shadow"}],"title":"5.4. \nFragmented Borders and Backgrounds: the box-decoration-break property"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-box-shadow"},
+"4a57c942": {"dfnID":"4a57c942","dfnText":"border area","external":true,"refSections":[{"refs":[{"id":"ref-for-border-area"}],"title":"2. \nFragmentation Model and Terminology"}],"url":"https://drafts.csswg.org/css-box-4/#border-area"},
+"54aa64f0": {"dfnID":"54aa64f0","dfnText":"margin","external":true,"refSections":[{"refs":[{"id":"ref-for-margin"}],"title":"5.2. \nAdjoining Margins at Breaks: the margin-break property"}],"url":"https://drafts.csswg.org/css-box-4/#margin"},
+"62dcf741": {"dfnID":"62dcf741","dfnText":"margin area","external":true,"refSections":[{"refs":[{"id":"ref-for-margin-area"}],"title":"2. \nFragmentation Model and Terminology"}],"url":"https://drafts.csswg.org/css-box-4/#margin-area"},
+"d657c27f": {"dfnID":"d657c27f","dfnText":"margin-trim","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-margin-trim"}],"title":"5.2. \nAdjoining Margins at Breaks: the margin-break property"}],"url":"https://drafts.csswg.org/css-box-4/#propdef-margin-trim"},
+"e511deaa": {"dfnID":"e511deaa","dfnText":"padding area","external":true,"refSections":[{"refs":[{"id":"ref-for-padding-area"}],"title":"2. \nFragmentation Model and Terminology"}],"url":"https://drafts.csswg.org/css-box-4/#padding-area"},
+"9cd25054": {"dfnID":"9cd25054","dfnText":"computed value","external":true,"refSections":[{"refs":[{"id":"ref-for-computed-value"}],"title":"3.1.1. \nChild\u2192Parent Break Propagation"}],"url":"https://drafts.csswg.org/css-cascade-5/#computed-value"},
+"1364cc84": {"dfnID":"1364cc84","dfnText":"legacy shorthand","external":true,"refSections":[{"refs":[{"id":"ref-for-legacy-shorthand"}],"title":"3.4. \nPage Break Aliases: the page-break-before, page-break-after, and page-break-inside properties"}],"url":"https://drafts.csswg.org/css-cascade-5/#legacy-shorthand"},
+"9f3d4f17": {"dfnID":"9f3d4f17","dfnText":"block container","external":true,"refSections":[{"refs":[{"id":"ref-for-block-container"}],"title":"3.3. \nBreaks Between Lines: orphans, widows"},{"refs":[{"id":"ref-for-block-container\u2460"}],"title":"5.4. \nFragmented Borders and Backgrounds: the box-decoration-break property"}],"url":"https://drafts.csswg.org/css-display-4/#block-container"},
+"fd9aa8f7": {"dfnID":"fd9aa8f7","dfnText":"block-level box","external":true,"refSections":[{"refs":[{"id":"ref-for-block-level-box"}],"title":"5.4. \nFragmented Borders and Backgrounds: the box-decoration-break property"}],"url":"https://drafts.csswg.org/css-display-4/#block-level-box"},
+"09cd65e4": {"dfnID":"09cd65e4","dfnText":"display type","external":true,"refSections":[{"refs":[{"id":"ref-for-display-type"}],"title":"2. \nFragmentation Model and Terminology"},{"refs":[{"id":"ref-for-display-type\u2460"}],"title":"4.1. \nPossible Break Points"},{"refs":[{"id":"ref-for-display-type\u2461"}],"title":"5.4. \nFragmented Borders and Backgrounds: the box-decoration-break property"}],"url":"https://drafts.csswg.org/css-display-4/#display-type"},
+"0bc73d68": {"dfnID":"0bc73d68","dfnText":"formatting context","external":true,"refSections":[{"refs":[{"id":"ref-for-formatting-context"},{"id":"ref-for-formatting-context\u2460"},{"id":"ref-for-formatting-context\u2461"}],"title":"2.1. \nParallel Fragmentation Flows"}],"url":"https://drafts.csswg.org/css-display-4/#formatting-context"},
+"99cabd32": {"dfnID":"99cabd32","dfnText":"in-flow","external":true,"refSections":[{"refs":[{"id":"ref-for-in-flow"},{"id":"ref-for-in-flow\u2460"}],"title":"3.1.1. \nChild\u2192Parent Break Propagation"}],"url":"https://drafts.csswg.org/css-display-4/#in-flow"},
+"8141cabb": {"dfnID":"8141cabb","dfnText":"independent formatting context","external":true,"refSections":[{"refs":[{"id":"ref-for-independent-formatting-context"}],"title":"4.1. \nPossible Break Points"}],"url":"https://drafts.csswg.org/css-display-4/#independent-formatting-context"},
+"083ffe5f": {"dfnID":"083ffe5f","dfnText":"inline box","external":true,"refSections":[{"refs":[{"id":"ref-for-inline-box"}],"title":"5.4. \nFragmented Borders and Backgrounds: the box-decoration-break property"}],"url":"https://drafts.csswg.org/css-display-4/#inline-box"},
+"b8f126f1": {"dfnID":"b8f126f1","dfnText":"inline formatting context","external":true,"refSections":[{"refs":[{"id":"ref-for-inline-formatting-context"}],"title":"3.3. \nBreaks Between Lines: orphans, widows"}],"url":"https://drafts.csswg.org/css-display-4/#inline-formatting-context"},
+"e33664cd": {"dfnID":"e33664cd","dfnText":"inline-block","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-display-inline-block"}],"title":"4.1. \nPossible Break Points"}],"url":"https://drafts.csswg.org/css-display-4/#valdef-display-inline-block"},
+"4225558e": {"dfnID":"4225558e","dfnText":"inline-table","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-display-inline-table"}],"title":"4.1. \nPossible Break Points"}],"url":"https://drafts.csswg.org/css-display-4/#valdef-display-inline-table"},
+"80eb9508": {"dfnID":"80eb9508","dfnText":"principal box","external":true,"refSections":[{"refs":[{"id":"ref-for-principal-box"},{"id":"ref-for-principal-box\u2460"}],"title":"\nGeneric Break Values"}],"url":"https://drafts.csswg.org/css-display-4/#principal-box"},
+"65b081ea": {"dfnID":"65b081ea","dfnText":"mask positioning area","external":true,"refSections":[{"refs":[{"id":"ref-for-mask-positioning-area"}],"title":"5.4. \nFragmented Borders and Backgrounds: the box-decoration-break property"}],"url":"https://drafts.fxtf.org/css-masking-1/#mask-positioning-area"},
+"521eb6d4": {"dfnID":"521eb6d4","dfnText":"multi-column container","external":true,"refSections":[{"refs":[{"id":"ref-for-multi-column-container"},{"id":"ref-for-multi-column-container\u2460"},{"id":"ref-for-multi-column-container\u2461"},{"id":"ref-for-multi-column-container\u2462"},{"id":"ref-for-multi-column-container\u2463"},{"id":"ref-for-multi-column-container\u2464"}],"title":"\nGeneric Break Values"}],"url":"https://drafts.csswg.org/css-multicol-1/#multi-column-container"},
+"18499cc8": {"dfnID":"18499cc8","dfnText":"multi-column layout","external":true,"refSections":[{"refs":[{"id":"ref-for-multi-column-layout"}],"title":"5.2. \nAdjoining Margins at Breaks: the margin-break property"}],"url":"https://drafts.csswg.org/css-multicol-1/#multi-column-layout"},
+"8b3ca704": {"dfnID":"8b3ca704","dfnText":"auto","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-overflow-auto"}],"title":"4.1. \nPossible Break Points"}],"url":"https://drafts.csswg.org/css-overflow-3/#valdef-overflow-auto"},
+"86928bde": {"dfnID":"86928bde","dfnText":"overflow","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-overflow"},{"id":"ref-for-propdef-overflow\u2460"}],"title":"4.1. \nPossible Break Points"}],"url":"https://drafts.csswg.org/css-overflow-3/#propdef-overflow"},
+"e7ab0d6a": {"dfnID":"e7ab0d6a","dfnText":"scroll","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-overflow-scroll"}],"title":"4.1. \nPossible Break Points"}],"url":"https://drafts.csswg.org/css-overflow-3/#valdef-overflow-scroll"},
+"decf3b99": {"dfnID":"decf3b99","dfnText":"page","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-page"}],"title":"4.3. \nForced Breaks"}],"url":"https://drafts.csswg.org/css-page-3/#propdef-page"},
+"46080d3b": {"dfnID":"46080d3b","dfnText":"page progression","external":true,"refSections":[{"refs":[{"id":"ref-for-page-progression"},{"id":"ref-for-page-progression\u2460"}],"title":"\nPage Break Values"}],"url":"https://drafts.csswg.org/css-page-3/#page-progression"},
+"e1483d91": {"dfnID":"e1483d91","dfnText":"top","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-top"}],"title":"5.1. \nBreaking into Varying-size Fragmentainers"}],"url":"https://drafts.csswg.org/css-position-3/#propdef-top"},
+"175a39e9": {"dfnID":"175a39e9","dfnText":"reference box","external":true,"refSections":[{"refs":[{"id":"ref-for-basic-shape-reference-box"}],"title":"5.4. \nFragmented Borders and Backgrounds: the box-decoration-break property"}],"url":"https://drafts.csswg.org/css-shapes-1/#basic-shape-reference-box"},
+"0e5cedd7": {"dfnID":"0e5cedd7","dfnText":"auto","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-width-auto"}],"title":"4.1. \nPossible Break Points"}],"url":"https://drafts.csswg.org/css-sizing-3/#valdef-width-auto"},
+"68019d7a": {"dfnID":"68019d7a","dfnText":"height","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-height"}],"title":"5.1. \nBreaking into Varying-size Fragmentainers"}],"url":"https://drafts.csswg.org/css-sizing-3/#propdef-height"},
+"26a40c98": {"dfnID":"26a40c98","dfnText":"max-content size","external":true,"refSections":[{"refs":[{"id":"ref-for-max-content"}],"title":"5.1. \nBreaking into Varying-size Fragmentainers"}],"url":"https://drafts.csswg.org/css-sizing-3/#max-content"},
+"3f0db204": {"dfnID":"3f0db204","dfnText":"min-content size","external":true,"refSections":[{"refs":[{"id":"ref-for-min-content"}],"title":"5.1. \nBreaking into Varying-size Fragmentainers"}],"url":"https://drafts.csswg.org/css-sizing-3/#min-content"},
+"3f92298d": {"dfnID":"3f92298d","dfnText":"stretch-fit size","external":true,"refSections":[{"refs":[{"id":"ref-for-stretch-fit-size"}],"title":"5.1. \nBreaking into Varying-size Fragmentainers"}],"url":"https://drafts.csswg.org/css-sizing-3/#stretch-fit-size"},
+"5a6dc1f0": {"dfnID":"5a6dc1f0","dfnText":"line break","external":true,"refSections":[{"refs":[{"id":"ref-for-line-break"}],"title":"4.2. \nTypes of Breaks"}],"url":"https://drafts.csswg.org/css-text-4/#line-break"},
+"70c9f859": {"dfnID":"70c9f859","dfnText":"<integer>","external":true,"refSections":[{"refs":[{"id":"ref-for-integer-value"}],"title":"3.3. \nBreaks Between Lines: orphans, widows"}],"url":"https://drafts.csswg.org/css-values-4/#integer-value"},
+"358fd6ff": {"dfnID":"358fd6ff","dfnText":"css-wide keywords","external":true,"refSections":[{"refs":[{"id":"ref-for-css-wide-keywords"}],"title":"1.2. \nValue Definitions"}],"url":"https://drafts.csswg.org/css-values-4/#css-wide-keywords"},
+"6ec67710": {"dfnID":"6ec67710","dfnText":"|","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-one"},{"id":"ref-for-comb-one\u2460"},{"id":"ref-for-comb-one\u2461"},{"id":"ref-for-comb-one\u2462"},{"id":"ref-for-comb-one\u2463"},{"id":"ref-for-comb-one\u2464"},{"id":"ref-for-comb-one\u2465"},{"id":"ref-for-comb-one\u2466"},{"id":"ref-for-comb-one\u2467"},{"id":"ref-for-comb-one\u2468"},{"id":"ref-for-comb-one\u2460\u24ea"},{"id":"ref-for-comb-one\u2460\u2460"},{"id":"ref-for-comb-one\u2460\u2461"}],"title":"3.1. \nBreaks Between Boxes: the break-before and break-after properties"},{"refs":[{"id":"ref-for-comb-one\u2460\u2462"},{"id":"ref-for-comb-one\u2460\u2463"},{"id":"ref-for-comb-one\u2460\u2464"},{"id":"ref-for-comb-one\u2460\u2465"}],"title":"3.2. \nBreaks Within Boxes: the break-inside property"},{"refs":[{"id":"ref-for-comb-one\u2460\u2466"},{"id":"ref-for-comb-one\u2460\u2467"}],"title":"5.2. \nAdjoining Margins at Breaks: the margin-break property"},{"refs":[{"id":"ref-for-comb-one\u2460\u2468"}],"title":"5.4. \nFragmented Borders and Backgrounds: the box-decoration-break property"}],"url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"5bc8bd12": {"dfnID":"5bc8bd12","dfnText":"direction","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-direction"},{"id":"ref-for-propdef-direction\u2460"},{"id":"ref-for-propdef-direction\u2461"}],"title":"5.4. \nFragmented Borders and Backgrounds: the box-decoration-break property"},{"refs":[{"id":"ref-for-propdef-direction\u2462"}],"title":"5.4.1. \nJoining Boxes for slice"}],"url":"https://drafts.csswg.org/css-writing-modes-3/#propdef-direction"},
+"88dd7551": {"dfnID":"88dd7551","dfnText":"block flow direction","external":true,"refSections":[{"refs":[{"id":"ref-for-block-flow-direction"},{"id":"ref-for-block-flow-direction\u2460"},{"id":"ref-for-block-flow-direction\u2461"}],"title":"5.4.1. \nJoining Boxes for slice"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#block-flow-direction"},
+"190183bb": {"dfnID":"190183bb","dfnText":"block size","external":true,"refSections":[{"refs":[{"id":"ref-for-block-size"}],"title":"4. \nRules for Breaking"},{"refs":[{"id":"ref-for-block-size\u2460"}],"title":"5.1. \nBreaking into Varying-size Fragmentainers"},{"refs":[{"id":"ref-for-block-size\u2461"},{"id":"ref-for-block-size\u2462"},{"id":"ref-for-block-size\u2463"}],"title":"5.3. \nSplitting Boxes"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#block-size"},
+"32995ff0": {"dfnID":"32995ff0","dfnText":"block-axis","external":true,"refSections":[{"refs":[{"id":"ref-for-block-axis"}],"title":"2. \nFragmentation Model and Terminology"},{"refs":[{"id":"ref-for-block-axis\u2460"}],"title":"5.2. \nAdjoining Margins at Breaks: the margin-break property"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#block-axis"},
+"37c3d179": {"dfnID":"37c3d179","dfnText":"block-end","external":true,"refSections":[{"refs":[{"id":"ref-for-block-end"}],"title":"4.4. \nUnforced Breaks"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#block-end"},
+"1370dad0": {"dfnID":"1370dad0","dfnText":"block-start","external":true,"refSections":[{"refs":[{"id":"ref-for-block-start"}],"title":"4.4. \nUnforced Breaks"},{"refs":[{"id":"ref-for-block-start\u2460"},{"id":"ref-for-block-start\u2461"}],"title":"5.1. \nBreaking into Varying-size Fragmentainers"},{"refs":[{"id":"ref-for-block-start\u2462"}],"title":"5.5. \nTransforms, Positioning, and Pagination"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#block-start"},
+"887c0c5c": {"dfnID":"887c0c5c","dfnText":"inline base direction","external":true,"refSections":[{"refs":[{"id":"ref-for-inline-base-direction"}],"title":"5.4.1. \nJoining Boxes for slice"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#inline-base-direction"},
+"37f0daea": {"dfnID":"37f0daea","dfnText":"inline size","external":true,"refSections":[{"refs":[{"id":"ref-for-inline-size"},{"id":"ref-for-inline-size\u2460"},{"id":"ref-for-inline-size\u2461"}],"title":"5.1. \nBreaking into Varying-size Fragmentainers"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#inline-size"},
+"3bcf9aaa": {"dfnID":"3bcf9aaa","dfnText":"logical height","external":true,"refSections":[{"refs":[{"id":"ref-for-logical-height"}],"title":"4.1. \nPossible Break Points"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#logical-height"},
+"7f0d729a": {"dfnID":"7f0d729a","dfnText":"ltr","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-direction-ltr"}],"title":"5.4.1. \nJoining Boxes for slice"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#valdef-direction-ltr"},
+"d97c40f4": {"dfnID":"d97c40f4","dfnText":"principal writing mode","external":true,"refSections":[{"refs":[{"id":"ref-for-principal-writing-mode"}],"title":"5.4.1. \nJoining Boxes for slice"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#principal-writing-mode"},
+"5ddc23c6": {"dfnID":"5ddc23c6","dfnText":"page-break-after","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-page-break-after"},{"id":"ref-for-propdef-page-break-after\u2460"}],"title":"3.4. \nPage Break Aliases: the page-break-before, page-break-after, and page-break-inside properties"}],"url":"https://drafts.csswg.org/css2/#propdef-page-break-after"},
+"8f568cb6": {"dfnID":"8f568cb6","dfnText":"page-break-before","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-page-break-before"},{"id":"ref-for-propdef-page-break-before\u2460"}],"title":"3.4. \nPage Break Aliases: the page-break-before, page-break-after, and page-break-inside properties"}],"url":"https://drafts.csswg.org/css2/#propdef-page-break-before"},
+"f6cbcbce": {"dfnID":"f6cbcbce","dfnText":"page-break-inside","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-page-break-inside"},{"id":"ref-for-propdef-page-break-inside\u2460"}],"title":"3.4. \nPage Break Aliases: the page-break-before, page-break-after, and page-break-inside properties"}],"url":"https://drafts.csswg.org/css2/#propdef-page-break-inside"},
+"ec0a7b21": {"dfnID":"ec0a7b21","dfnText":"region chain","external":true,"refSections":[{"refs":[{"id":"ref-for-region-chain"}],"title":"5.4.1. \nJoining Boxes for slice"}],"url":"https://drafts.csswg.org/css-regions-1/#region-chain"},
+"aba1ccaf": {"dfnID":"aba1ccaf","dfnText":"continuous media","external":true,"refSections":[{"refs":[{"id":"ref-for-continuous-media"}],"title":"1. \nIntroduction"}],"url":"https://drafts.csswg.org/mediaqueries-5/#continuous-media"},
+"758665a5": {"dfnID":"758665a5","dfnText":"paged media","external":true,"refSections":[{"refs":[{"id":"ref-for-paged-media"},{"id":"ref-for-paged-media\u2460"}],"title":"1. \nIntroduction"},{"refs":[{"id":"ref-for-paged-media\u2461"}],"title":"2. \nFragmentation Model and Terminology"},{"refs":[{"id":"ref-for-paged-media\u2462"},{"id":"ref-for-paged-media\u2463"}],"title":"\nGeneric Break Values"}],"url":"https://drafts.csswg.org/mediaqueries-5/#paged-media"},
+"fragmentation-container": {"dfnID":"fragmentation-container","dfnText":"fragmentation container","external":false,"refSections":[{"refs":[{"id":"ref-for-fragmentation-container"}],"title":"1. \nIntroduction"},{"refs":[{"id":"ref-for-fragmentation-container\u2460"}],"title":"5.2. \nAdjoining Margins at Breaks: the margin-break property"}],"url":"#fragmentation-container"},
+"fragmentainer": {"dfnID":"fragmentainer","dfnText":"fragmentainer","external":false,"refSections":[{"refs":[{"id":"ref-for-fragmentainer"}],"title":"1. \nIntroduction"},{"refs":[{"id":"ref-for-fragmentainer\u2460"},{"id":"ref-for-fragmentainer\u2461"},{"id":"ref-for-fragmentainer\u2462"},{"id":"ref-for-fragmentainer\u2463"},{"id":"ref-for-fragmentainer\u2464"},{"id":"ref-for-fragmentainer\u2465"},{"id":"ref-for-fragmentainer\u2466"},{"id":"ref-for-fragmentainer\u2467"},{"id":"ref-for-fragmentainer\u2468"},{"id":"ref-for-fragmentainer\u2460\u24ea"}],"title":"2. \nFragmentation Model and Terminology"},{"refs":[{"id":"ref-for-fragmentainer\u2460\u2460"}],"title":"2.1. \nParallel Fragmentation Flows"},{"refs":[{"id":"ref-for-fragmentainer\u2460\u2461"},{"id":"ref-for-fragmentainer\u2460\u2462"},{"id":"ref-for-fragmentainer\u2460\u2463"},{"id":"ref-for-fragmentainer\u2460\u2464"}],"title":"2.2. \nNested Fragmentation Flows"},{"refs":[{"id":"ref-for-fragmentainer\u2460\u2465"}],"title":"4. \nRules for Breaking"},{"refs":[{"id":"ref-for-fragmentainer\u2460\u2466"},{"id":"ref-for-fragmentainer\u2460\u2467"}],"title":"4.4. \nUnforced Breaks"},{"refs":[{"id":"ref-for-fragmentainer\u2460\u2468"},{"id":"ref-for-fragmentainer\u2461\u24ea"},{"id":"ref-for-fragmentainer\u2461\u2460"}],"title":"4.5. \nOptimizing Unforced Breaks"},{"refs":[{"id":"ref-for-fragmentainer\u2461\u2461"},{"id":"ref-for-fragmentainer\u2461\u2462"},{"id":"ref-for-fragmentainer\u2461\u2463"}],"title":"5.3. \nSplitting Boxes"}],"url":"#fragmentainer"},
+"fragmentation-context": {"dfnID":"fragmentation-context","dfnText":"fragmentation context","external":false,"refSections":[{"refs":[{"id":"ref-for-fragmentation-context"},{"id":"ref-for-fragmentation-context\u2460"},{"id":"ref-for-fragmentation-context\u2461"},{"id":"ref-for-fragmentation-context\u2462"}],"title":"2. \nFragmentation Model and Terminology"},{"refs":[{"id":"ref-for-fragmentation-context\u2463"},{"id":"ref-for-fragmentation-context\u2464"}],"title":"2.2. \nNested Fragmentation Flows"},{"refs":[{"id":"ref-for-fragmentation-context\u2465"},{"id":"ref-for-fragmentation-context\u2466"}],"title":"\nGeneric Break Values"},{"refs":[{"id":"ref-for-fragmentation-context\u2467"}],"title":"5.2. \nAdjoining Margins at Breaks: the margin-break property"}],"url":"#fragmentation-context"},
+"fragmented-flow": {"dfnID":"fragmented-flow","dfnText":"fragmented flow","external":false,"refSections":[{"refs":[{"id":"ref-for-fragmented-flow"},{"id":"ref-for-fragmented-flow\u2460"}],"title":"2. \nFragmentation Model and Terminology"},{"refs":[{"id":"ref-for-fragmented-flow\u2461"}],"title":"2.1. \nParallel Fragmentation Flows"},{"refs":[{"id":"ref-for-fragmented-flow\u2462"}],"title":"3. \nControlling Breaks"},{"refs":[{"id":"ref-for-fragmented-flow\u2463"}],"title":"4. \nRules for Breaking"},{"refs":[{"id":"ref-for-fragmented-flow\u2464"}],"title":"4.4. \nUnforced Breaks"},{"refs":[{"id":"ref-for-fragmented-flow\u2465"}],"title":"4.5. \nOptimizing Unforced Breaks"}],"url":"#fragmented-flow"},
+"fragmentation-root": {"dfnID":"fragmentation-root","dfnText":"fragmentation root","external":false,"refSections":[{"refs":[{"id":"ref-for-fragmentation-root"},{"id":"ref-for-fragmentation-root\u2460"}],"title":"2. \nFragmentation Model and Terminology"},{"refs":[{"id":"ref-for-fragmentation-root\u2461"}],"title":"2.1. \nParallel Fragmentation Flows"},{"refs":[{"id":"ref-for-fragmentation-root\u2462"}],"title":"3.1. \nBreaks Between Boxes: the break-before and break-after properties"}],"url":"#fragmentation-root"},
+"fragmentation": {"dfnID":"fragmentation","dfnText":"fragmentation","external":false,"refSections":[{"refs":[{"id":"ref-for-fragmentation"}],"title":"1. \nIntroduction"}],"url":"#fragmentation"},
+"box-fragment": {"dfnID":"box-fragment","dfnText":"box fragment","external":false,"refSections":[{"refs":[{"id":"ref-for-box-fragment"}],"title":"2. \nFragmentation Model and Terminology"},{"refs":[{"id":"ref-for-box-fragment\u2460"},{"id":"ref-for-box-fragment\u2461"}],"title":"4.5. \nOptimizing Unforced Breaks"}],"url":"#box-fragment"},
+"fragment": {"dfnID":"fragment","dfnText":"fragment","external":false,"refSections":[{"refs":[{"id":"ref-for-fragment"}],"title":"2. \nFragmentation Model and Terminology"},{"refs":[{"id":"ref-for-fragment\u2460"},{"id":"ref-for-fragment\u2461"}],"title":"3.3. \nBreaks Between Lines: orphans, widows"}],"url":"#fragment"},
+"remaining-fragmentainer-extent": {"dfnID":"remaining-fragmentainer-extent","dfnText":"remaining fragmentainer extent","external":false,"refSections":[{"refs":[{"id":"ref-for-remaining-fragmentainer-extent"}],"title":"5.2. \nAdjoining Margins at Breaks: the margin-break property"},{"refs":[{"id":"ref-for-remaining-fragmentainer-extent\u2460"},{"id":"ref-for-remaining-fragmentainer-extent\u2461"}],"title":"5.3. \nSplitting Boxes"}],"url":"#remaining-fragmentainer-extent"},
+"fragmentation-break": {"dfnID":"fragmentation-break","dfnText":"fragmentation break","external":false,"refSections":[{"refs":[{"id":"ref-for-fragmentation-break"}],"title":"4.5. \nOptimizing Unforced Breaks"},{"refs":[{"id":"ref-for-fragmentation-break\u2460"},{"id":"ref-for-fragmentation-break\u2461"},{"id":"ref-for-fragmentation-break\u2462"}],"title":"5.2. \nAdjoining Margins at Breaks: the margin-break property"},{"refs":[{"id":"ref-for-fragmentation-break\u2463"}],"title":"5.3. \nSplitting Boxes"},{"refs":[{"id":"ref-for-fragmentation-break\u2464"}],"title":"5.5. \nTransforms, Positioning, and Pagination"}],"url":"#fragmentation-break"},
+"propdef-break-before": {"dfnID":"propdef-break-before","dfnText":"break-before","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-break-before\u2460"}],"title":"1. \nIntroduction"},{"refs":[{"id":"ref-for-propdef-break-before\u2461"}],"title":"3. \nControlling Breaks"},{"refs":[{"id":"ref-for-propdef-break-before\u2462"},{"id":"ref-for-propdef-break-before\u2463"}],"title":"3.1. \nBreaks Between Boxes: the break-before and break-after properties"},{"refs":[{"id":"ref-for-propdef-break-before\u2464"}],"title":"3.1.1. \nChild\u2192Parent Break Propagation"},{"refs":[{"id":"ref-for-propdef-break-before\u2465"}],"title":"3.4. \nPage Break Aliases: the page-break-before, page-break-after, and page-break-inside properties"},{"refs":[{"id":"ref-for-propdef-break-before\u2466"}],"title":"4.3. \nForced Breaks"},{"refs":[{"id":"ref-for-propdef-break-before\u2467"}],"title":"4.4. \nUnforced Breaks"},{"refs":[{"id":"ref-for-propdef-break-before\u2468"}],"title":"\nChanges Since Level 3"}],"url":"#propdef-break-before"},
+"propdef-break-after": {"dfnID":"propdef-break-after","dfnText":"break-after","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-break-after\u2460"}],"title":"1. \nIntroduction"},{"refs":[{"id":"ref-for-propdef-break-after\u2461"}],"title":"3. \nControlling Breaks"},{"refs":[{"id":"ref-for-propdef-break-after\u2462"},{"id":"ref-for-propdef-break-after\u2463"}],"title":"3.1. \nBreaks Between Boxes: the break-before and break-after properties"},{"refs":[{"id":"ref-for-propdef-break-after\u2464"}],"title":"3.1.1. \nChild\u2192Parent Break Propagation"},{"refs":[{"id":"ref-for-propdef-break-after\u2465"}],"title":"3.4. \nPage Break Aliases: the page-break-before, page-break-after, and page-break-inside properties"},{"refs":[{"id":"ref-for-propdef-break-after\u2466"}],"title":"4.3. \nForced Breaks"},{"refs":[{"id":"ref-for-propdef-break-after\u2467"}],"title":"4.4. \nUnforced Breaks"},{"refs":[{"id":"ref-for-propdef-break-after\u2468"}],"title":"\nChanges Since Level 3"}],"url":"#propdef-break-after"},
+"forced-break-values": {"dfnID":"forced-break-values","dfnText":"forced break values","external":false,"refSections":[{"refs":[{"id":"ref-for-forced-break-values"},{"id":"ref-for-forced-break-values\u2460"},{"id":"ref-for-forced-break-values\u2461"}],"title":"4.3. \nForced Breaks"}],"url":"#forced-break-values"},
+"avoid-break-values": {"dfnID":"avoid-break-values","dfnText":"avoid break values","external":false,"refSections":[{"refs":[{"id":"ref-for-avoid-break-values"}],"title":"4.3. \nForced Breaks"}],"url":"#avoid-break-values"},
+"valdef-break-before-auto": {"dfnID":"valdef-break-before-auto","dfnText":"auto","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-break-before-auto"}],"title":"4.4. \nUnforced Breaks"}],"url":"#valdef-break-before-auto"},
+"valdef-break-before-avoid": {"dfnID":"valdef-break-before-avoid","dfnText":"avoid","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-break-before-avoid"}],"title":"3.1. \nBreaks Between Boxes: the break-before and break-after properties"},{"refs":[{"id":"ref-for-valdef-break-before-avoid\u2460"}],"title":"4.4. \nUnforced Breaks"}],"url":"#valdef-break-before-avoid"},
+"valdef-break-before-always": {"dfnID":"valdef-break-before-always","dfnText":"always","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-break-before-always"}],"title":"1. \nIntroduction"},{"refs":[{"id":"ref-for-valdef-break-before-always\u2460"}],"title":"3.1. \nBreaks Between Boxes: the break-before and break-after properties"},{"refs":[{"id":"ref-for-valdef-break-before-always\u2461"}],"title":"\nChanges Since Level 3"}],"url":"#valdef-break-before-always"},
+"valdef-break-before-all": {"dfnID":"valdef-break-before-all","dfnText":"all","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-break-before-all\u2460"}],"title":"1. \nIntroduction"},{"refs":[{"id":"ref-for-valdef-break-before-all\u2461"}],"title":"3.1. \nBreaks Between Boxes: the break-before and break-after properties"},{"refs":[{"id":"ref-for-valdef-break-before-all\u2462"}],"title":"\nChanges Since Level 3"}],"url":"#valdef-break-before-all"},
+"valdef-break-before-avoid-page": {"dfnID":"valdef-break-before-avoid-page","dfnText":"avoid-page","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-break-before-avoid-page"}],"title":"3.1. \nBreaks Between Boxes: the break-before and break-after properties"},{"refs":[{"id":"ref-for-valdef-break-before-avoid-page\u2460"}],"title":"4.4. \nUnforced Breaks"}],"url":"#valdef-break-before-avoid-page"},
+"valdef-break-before-page": {"dfnID":"valdef-break-before-page","dfnText":"page","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-break-before-page"}],"title":"3.1. \nBreaks Between Boxes: the break-before and break-after properties"}],"url":"#valdef-break-before-page"},
+"valdef-break-before-left": {"dfnID":"valdef-break-before-left","dfnText":"left","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-break-before-left"}],"title":"3.1. \nBreaks Between Boxes: the break-before and break-after properties"},{"refs":[{"id":"ref-for-valdef-break-before-left\u2460"}],"title":"4.3. \nForced Breaks"}],"url":"#valdef-break-before-left"},
+"valdef-break-before-right": {"dfnID":"valdef-break-before-right","dfnText":"right","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-break-before-right"}],"title":"3.1. \nBreaks Between Boxes: the break-before and break-after properties"},{"refs":[{"id":"ref-for-valdef-break-before-right\u2460"}],"title":"4.3. \nForced Breaks"}],"url":"#valdef-break-before-right"},
+"valdef-break-before-recto": {"dfnID":"valdef-break-before-recto","dfnText":"recto","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-break-before-recto"}],"title":"3.1. \nBreaks Between Boxes: the break-before and break-after properties"},{"refs":[{"id":"ref-for-valdef-break-before-recto\u2460"}],"title":"4.3. \nForced Breaks"}],"url":"#valdef-break-before-recto"},
+"valdef-break-before-verso": {"dfnID":"valdef-break-before-verso","dfnText":"verso","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-break-before-verso"}],"title":"3.1. \nBreaks Between Boxes: the break-before and break-after properties"},{"refs":[{"id":"ref-for-valdef-break-before-verso\u2460"}],"title":"4.3. \nForced Breaks"}],"url":"#valdef-break-before-verso"},
+"valdef-break-before-avoid-column": {"dfnID":"valdef-break-before-avoid-column","dfnText":"avoid-column","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-break-before-avoid-column"}],"title":"3.1. \nBreaks Between Boxes: the break-before and break-after properties"},{"refs":[{"id":"ref-for-valdef-break-before-avoid-column\u2460"}],"title":"4.4. \nUnforced Breaks"}],"url":"#valdef-break-before-avoid-column"},
+"valdef-break-before-column": {"dfnID":"valdef-break-before-column","dfnText":"column","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-break-before-column"}],"title":"3.1. \nBreaks Between Boxes: the break-before and break-after properties"}],"url":"#valdef-break-before-column"},
+"valdef-break-before-avoid-region": {"dfnID":"valdef-break-before-avoid-region","dfnText":"avoid-region","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-break-before-avoid-region"}],"title":"3.1. \nBreaks Between Boxes: the break-before and break-after properties"},{"refs":[{"id":"ref-for-valdef-break-before-avoid-region\u2460"}],"title":"4.4. \nUnforced Breaks"}],"url":"#valdef-break-before-avoid-region"},
+"valdef-break-before-region": {"dfnID":"valdef-break-before-region","dfnText":"region","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-break-before-region"}],"title":"3.1. \nBreaks Between Boxes: the break-before and break-after properties"}],"url":"#valdef-break-before-region"},
+"propagate": {"dfnID":"propagate","dfnText":"propagated","external":false,"refSections":[{"refs":[{"id":"ref-for-propagate"},{"id":"ref-for-propagate\u2460"},{"id":"ref-for-propagate\u2461"}],"title":"3.1.1. \nChild\u2192Parent Break Propagation"},{"refs":[{"id":"ref-for-propagate\u2462"},{"id":"ref-for-propagate\u2463"}],"title":"4.3. \nForced Breaks"}],"url":"#propagate"},
+"propdef-break-inside": {"dfnID":"propdef-break-inside","dfnText":"break-inside","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-break-inside"},{"id":"ref-for-propdef-break-inside\u2460"}],"title":"3. \nControlling Breaks"},{"refs":[{"id":"ref-for-propdef-break-inside\u2461"}],"title":"3.2. \nBreaks Within Boxes: the break-inside property"},{"refs":[{"id":"ref-for-propdef-break-inside\u2462"}],"title":"3.4. \nPage Break Aliases: the page-break-before, page-break-after, and page-break-inside properties"},{"refs":[{"id":"ref-for-propdef-break-inside\u2463"},{"id":"ref-for-propdef-break-inside\u2464"}],"title":"4.4. \nUnforced Breaks"}],"url":"#propdef-break-inside"},
+"valdef-break-inside-auto": {"dfnID":"valdef-break-inside-auto","dfnText":"auto","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-break-inside-auto"}],"title":"4.4. \nUnforced Breaks"}],"url":"#valdef-break-inside-auto"},
+"valdef-break-inside-avoid": {"dfnID":"valdef-break-inside-avoid","dfnText":"avoid","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-break-inside-avoid"}],"title":"4.4. \nUnforced Breaks"}],"url":"#valdef-break-inside-avoid"},
+"propdef-orphans": {"dfnID":"propdef-orphans","dfnText":"orphans","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-orphans"}],"title":"3. \nControlling Breaks"},{"refs":[{"id":"ref-for-propdef-orphans\u2460"},{"id":"ref-for-propdef-orphans\u2461"},{"id":"ref-for-propdef-orphans\u2462"},{"id":"ref-for-propdef-orphans\u2463"}],"title":"3.3. \nBreaks Between Lines: orphans, widows"},{"refs":[{"id":"ref-for-propdef-orphans\u2464"}],"title":"4.4. \nUnforced Breaks"},{"refs":[{"id":"ref-for-propdef-orphans\u2465"},{"id":"ref-for-propdef-orphans\u2466"}],"title":"4.5. \nOptimizing Unforced Breaks"}],"url":"#propdef-orphans"},
+"propdef-widows": {"dfnID":"propdef-widows","dfnText":"widows","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-widows"}],"title":"3. \nControlling Breaks"},{"refs":[{"id":"ref-for-propdef-widows\u2460"},{"id":"ref-for-propdef-widows\u2461"},{"id":"ref-for-propdef-widows\u2462"},{"id":"ref-for-propdef-widows\u2463"}],"title":"3.3. \nBreaks Between Lines: orphans, widows"},{"refs":[{"id":"ref-for-propdef-widows\u2464"}],"title":"4.4. \nUnforced Breaks"},{"refs":[{"id":"ref-for-propdef-widows\u2465"},{"id":"ref-for-propdef-widows\u2466"}],"title":"4.5. \nOptimizing Unforced Breaks"}],"url":"#propdef-widows"},
+"monolithic": {"dfnID":"monolithic","dfnText":"monolithic","external":false,"refSections":[{"refs":[{"id":"ref-for-monolithic"},{"id":"ref-for-monolithic\u2460"}],"title":"4.1. \nPossible Break Points"},{"refs":[{"id":"ref-for-monolithic\u2461"}],"title":"4.4. \nUnforced Breaks"},{"refs":[{"id":"ref-for-monolithic\u2462"}],"title":"5.1. \nBreaking into Varying-size Fragmentainers"}],"url":"#monolithic"},
+"page-break": {"dfnID":"page-break","dfnText":"page break","external":false,"refSections":[{"refs":[{"id":"ref-for-page-break"},{"id":"ref-for-page-break\u2460"}],"title":"\nGeneric Break Values"},{"refs":[{"id":"ref-for-page-break\u2461"},{"id":"ref-for-page-break\u2462"}],"title":"4.2. \nTypes of Breaks"}],"url":"#page-break"},
+"column-break": {"dfnID":"column-break","dfnText":"column break","external":false,"refSections":[{"refs":[{"id":"ref-for-column-break"},{"id":"ref-for-column-break\u2460"},{"id":"ref-for-column-break\u2461"}],"title":"\nGeneric Break Values"}],"url":"#column-break"},
+"region-break": {"dfnID":"region-break","dfnText":"region break","external":false,"refSections":[{"refs":[{"id":"ref-for-region-break"}],"title":"\nGeneric Break Values"},{"refs":[{"id":"ref-for-region-break\u2460"}],"title":"4.2. \nTypes of Breaks"}],"url":"#region-break"},
+"forced-break": {"dfnID":"forced-break","dfnText":"forced break","external":false,"refSections":[{"refs":[{"id":"ref-for-forced-break"}],"title":"2.1. \nParallel Fragmentation Flows"},{"refs":[{"id":"ref-for-forced-break\u2460"}],"title":"4.3. \nForced Breaks"}],"url":"#forced-break"},
+"unforced-break": {"dfnID":"unforced-break","dfnText":"unforced break","external":false,"refSections":[{"refs":[{"id":"ref-for-unforced-break"}],"title":"2.1. \nParallel Fragmentation Flows"}],"url":"#unforced-break"},
+"propdef-margin-break": {"dfnID":"propdef-margin-break","dfnText":"margin-break","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-margin-break"}],"title":"1. \nIntroduction"},{"refs":[{"id":"ref-for-propdef-margin-break\u2460"},{"id":"ref-for-propdef-margin-break\u2461"},{"id":"ref-for-propdef-margin-break\u2462"},{"id":"ref-for-propdef-margin-break\u2463"},{"id":"ref-for-propdef-margin-break\u2464"},{"id":"ref-for-propdef-margin-break\u2465"}],"title":"5.2. \nAdjoining Margins at Breaks: the margin-break property"},{"refs":[{"id":"ref-for-propdef-margin-break\u2466"}],"title":"\nChanges Since Level 3"}],"url":"#propdef-margin-break"},
+"valdef-margin-break-keep": {"dfnID":"valdef-margin-break-keep","dfnText":"keep","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-margin-break-keep"}],"title":"5.2. \nAdjoining Margins at Breaks: the margin-break property"}],"url":"#valdef-margin-break-keep"},
+"propdef-box-decoration-break": {"dfnID":"propdef-box-decoration-break","dfnText":"box-decoration-break","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-box-decoration-break"}],"title":"2. \nFragmentation Model and Terminology"},{"refs":[{"id":"ref-for-propdef-box-decoration-break\u2460"}],"title":"5.1. \nBreaking into Varying-size Fragmentainers"},{"refs":[{"id":"ref-for-propdef-box-decoration-break\u2461"}],"title":"5.3. \nSplitting Boxes"},{"refs":[{"id":"ref-for-propdef-box-decoration-break\u2462"},{"id":"ref-for-propdef-box-decoration-break\u2463"},{"id":"ref-for-propdef-box-decoration-break\u2464"},{"id":"ref-for-propdef-box-decoration-break\u2465"}],"title":"5.4. \nFragmented Borders and Backgrounds: the box-decoration-break property"},{"refs":[{"id":"ref-for-propdef-box-decoration-break\u2466"}],"title":"5.4.1. \nJoining Boxes for slice"}],"url":"#propdef-box-decoration-break"},
+"valdef-box-decoration-break-clone": {"dfnID":"valdef-box-decoration-break-clone","dfnText":"clone","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-box-decoration-break-clone"},{"id":"ref-for-valdef-box-decoration-break-clone"}],"title":"4.4. \nUnforced Breaks"},{"refs":[{"id":"ref-for-valdef-box-decoration-break-clone"}],"title":"5.4. \nFragmented Borders and Backgrounds: the box-decoration-break property"}],"url":"#valdef-box-decoration-break-clone"},
+"valdef-box-decoration-break-slice": {"dfnID":"valdef-box-decoration-break-slice","dfnText":"slice","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-box-decoration-break-slice"},{"id":"ref-for-valdef-box-decoration-break-slice\u2460"}],"title":"5.4. \nFragmented Borders and Backgrounds: the box-decoration-break property"},{"refs":[{"id":"ref-for-valdef-box-decoration-break-slice\u2461"}],"title":"5.4.1. \nJoining Boxes for slice"}],"url":"#valdef-box-decoration-break-slice"},
+};
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+const typeFormatters = {
+    'dfn': (text) => `[=${text}=]`,
+    'abstract-op': (text) => `[\$${text}\$]`,
+    'value': (text) => `''${text}''`,
+    'http-header': (text) => `[:${text}:]`,
+    'idl': (text) => `{{${text}}}`,
+    'interface': 'idl',
+    'constructor': 'idl',
+    'method': 'idl',
+    'argument': 'idl',
+    'attribute': 'idl',
+    'callback': 'idl',
+    'dictionary': 'idl',
+    'dict-member': 'idl',
+    'enum': 'idl',
+    'enum-value': 'idl',
+    'exception': 'idl',
+    'const': 'idl',
+    'typedef': 'idl',
+    'stringifier': 'idl',
+    'serializer': 'idl',
+    'iterator': 'idl',
+    'maplike': 'idl',
+    'setlike': 'idl',
+    'extended-attribute': 'idl',
+    'event': 'idl',
+    'element': (element) => `<{${element}}>`,
+    'element-state': 'element',
+    'element-attr': 'element',
+    'attr-value': 'element',
+    'scheme': 'dfn',
+    'permission': 'dfn',
+    'grammar': (text) => `${text} (within a <pre class=prod>)`,
+    'type': (text)=> `<<${text}>>`,
+    'property': (text) => `'${text}'`,
+    'descriptor': 'property',
+    'function': 'value',
+    'at-rule': 'value',
+    'selector': 'value',
+};
+const typesUsingFor = new Set(
+    [
+        "descriptor",
+        "value",
+        "element-attr",
+        "attr-value",
+        "element-state",
+        "method",
+        "constructor",
+        "argument",
+        "attribute",
+        "const",
+        "dict-member",
+        "event",
+        "enum-value",
+        "stringifier",
+        "serializer",
+        "iterator",
+        "maplike",
+        "setlike",
+        "state",
+        "mode",
+        "context",
+        "facet",
+    ],
+)
+const typesNotUsingFor = new Set(
+    [
+        "property",
+        "element",
+        "interface",
+        "namespace",
+        "callback",
+        "dictionary",
+        "enum",
+        "exception",
+        "typedef",
+        "http-header",
+        "permission",
+    ],
+)
+function linkFormatterFromType(type) {
+    const fnOrType = typeFormatters[type];
+    if(typeof fnOrType === 'string') {
+        // follow the alias
+        return linkFormatterFromType(fnOrType);
+    }
+    return fnOrType;
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!typesUsingFor.has(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!typesNotUsingFor.has(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
+
+function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+    dfnPanel.forDfn = dfn;
+    if(!dfn) { console.log(dfnPanel); }
+    return dfnPanel;
+}
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        const panel = genDfnPanel({ ...panelData, dfn });
+        append(document.body, panel);
+        insertDfnPopupAction(panel)
+    }
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+})
+
+function hideAllDfnPanels() {
+    // Turn off any currently "on" or "activated" panels.
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
+}
+
+function showDfnPanel(dfnPanel) {
+    hideAllDfnPanels(); // Only display one at this time.
+
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "true");
+
+    dfnPanel.classList.add("on");
+    positionDfnPanel(dfnPanel);
+
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    // Increment tabindex for each anchor and button tags in panel
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.style.position = "absolute"; // unfix it
+    dfnPanel.classList.remove("on");
+    dfnPanel.classList.remove("activated");
+}
+
+function toggleDfnPanel(dfnPanel) {
+    if(dfnPanel.classList.contains("on")) {
+        hideDfnPanel(dfnPanel);
+    } else {
+        showDfnPanel(dfnPanel);
+    }
+}
+
+function insertDfnPopupAction(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        showDfnPanel(dfnPanel);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfnPanel);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel(dfnPanel, dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    })
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
 }
 </script>
 <script>/* Boilerplate: script-position-annos */
 "use strict";
 {
-
 function repositionAnnoPanels(){
     const panels = [...document.querySelectorAll("[data-anno-for]")];
     const main = document.querySelector("main");
@@ -3303,320 +3300,314 @@ window.addEventListener("resize", repositionAnnoPanels);
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
+let refsData = {
+"#valdef-break-before-all": {"export":true,"for_":["break-after","break-before"],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"all","type":"value","url":"#valdef-break-before-all"},
+"#propdef-break-before": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"break-before","type":"property","url":"#propdef-break-before"},
+"#propdef-break-after": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"break-after","type":"property","url":"#propdef-break-after"},
+"https://drafts.csswg.org/mediaqueries-5/#paged-media": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"mediaqueries","spec":"mediaqueries-5","status":"current","text":"paged media","type":"dfn","url":"https://drafts.csswg.org/mediaqueries-5/#paged-media"},
+"https://drafts.csswg.org/mediaqueries-5/#continuous-media": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"mediaqueries","spec":"mediaqueries-5","status":"current","text":"continuous media","type":"dfn","url":"https://drafts.csswg.org/mediaqueries-5/#continuous-media"},
+"#fragmentation": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"fragmentation","type":"dfn","url":"#fragmentation"},
+"#fragmentation-container": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"fragmentation container","type":"dfn","url":"#fragmentation-container"},
+"#fragmentainer": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"fragmentainer","type":"dfn","url":"#fragmentainer"},
+"#propdef-margin-break": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"margin-break","type":"property","url":"#propdef-margin-break"},
+"#valdef-break-before-always": {"export":true,"for_":["break-after","break-before"],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"always","type":"value","url":"#valdef-break-before-always"},
+"https://drafts.csswg.org/css-values-4/#css-wide-keywords": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"css-wide keywords","type":"dfn","url":"https://drafts.csswg.org/css-values-4/#css-wide-keywords"},
+"#fragmented-flow": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"fragmented flow","type":"dfn","url":"#fragmented-flow"},
+"#fragmentation-context": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"fragmentation context","type":"dfn","url":"#fragmentation-context"},
+"#fragmentation-root": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"fragmentation root","type":"dfn","url":"#fragmentation-root"},
+"https://drafts.csswg.org/css-box-4/#padding-area": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"current","text":"padding area","type":"dfn","url":"https://drafts.csswg.org/css-box-4/#padding-area"},
+"https://drafts.csswg.org/css-box-4/#border-area": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"current","text":"border area","type":"dfn","url":"https://drafts.csswg.org/css-box-4/#border-area"},
+"https://drafts.csswg.org/css-box-4/#margin-area": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"current","text":"margin area","type":"dfn","url":"https://drafts.csswg.org/css-box-4/#margin-area"},
+"#propdef-box-decoration-break": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"box-decoration-break","type":"property","url":"#propdef-box-decoration-break"},
+"https://drafts.csswg.org/css-writing-modes-4/#block-axis": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"block-axis","type":"dfn","url":"https://drafts.csswg.org/css-writing-modes-4/#block-axis"},
+"#fragment": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"fragment","type":"dfn","url":"#fragment"},
+"https://drafts.csswg.org/css-display-4/#display-type": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"display type","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#display-type"},
+"#box-fragment": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"box fragment","type":"dfn","url":"#box-fragment"},
+"https://drafts.csswg.org/css-display-4/#formatting-context": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"formatting context","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#formatting-context"},
+"#unforced-break": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"unforced break","type":"dfn","url":"#unforced-break"},
+"#forced-break": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"forced break","type":"dfn","url":"#forced-break"},
+"#propdef-break-inside": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"break-inside","type":"property","url":"#propdef-break-inside"},
+"#propdef-widows": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"widows","type":"property","url":"#propdef-widows"},
+"#propdef-orphans": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"orphans","type":"property","url":"#propdef-orphans"},
+"https://drafts.csswg.org/css-values-4/#comb-one": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"|","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"#valdef-break-before-left": {"export":true,"for_":["break-after","break-before"],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"left","type":"value","url":"#valdef-break-before-left"},
+"#valdef-break-before-right": {"export":true,"for_":["break-after","break-before"],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"right","type":"value","url":"#valdef-break-before-right"},
+"#valdef-break-before-recto": {"export":true,"for_":["break-after","break-before"],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"recto","type":"value","url":"#valdef-break-before-recto"},
+"#valdef-break-before-verso": {"export":true,"for_":["break-after","break-before"],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"verso","type":"value","url":"#valdef-break-before-verso"},
+"#valdef-break-before-page": {"export":true,"for_":["break-after","break-before"],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"page","type":"value","url":"#valdef-break-before-page"},
+"#valdef-break-before-column": {"export":true,"for_":["break-after","break-before"],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"column","type":"value","url":"#valdef-break-before-column"},
+"#valdef-break-before-region": {"export":true,"for_":["break-after","break-before"],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"region","type":"value","url":"#valdef-break-before-region"},
+"#valdef-break-before-avoid": {"export":true,"for_":["break-after","break-before"],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"avoid","type":"value","url":"#valdef-break-before-avoid"},
+"#valdef-break-before-avoid-page": {"export":true,"for_":["break-after","break-before"],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"avoid-page","type":"value","url":"#valdef-break-before-avoid-page"},
+"#valdef-break-before-avoid-column": {"export":true,"for_":["break-after","break-before"],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"avoid-column","type":"value","url":"#valdef-break-before-avoid-column"},
+"#valdef-break-before-avoid-region": {"export":true,"for_":["break-after","break-before"],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"avoid-region","type":"value","url":"#valdef-break-before-avoid-region"},
+"https://drafts.csswg.org/css-display-4/#principal-box": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"principal box","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#principal-box"},
+"https://drafts.csswg.org/css-multicol-1/#multi-column-container": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-multicol","spec":"css-multicol-1","status":"current","text":"multi-column container","type":"dfn","url":"https://drafts.csswg.org/css-multicol-1/#multi-column-container"},
+"#column-break": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"column break","type":"dfn","url":"#column-break"},
+"#page-break": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"page break","type":"dfn","url":"#page-break"},
+"#region-break": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"region break","type":"dfn","url":"#region-break"},
+"https://drafts.csswg.org/css-page-3/#page-progression": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-page","spec":"css-page-3","status":"current","text":"page progression","type":"dfn","url":"https://drafts.csswg.org/css-page-3/#page-progression"},
+"https://drafts.csswg.org/css-display-4/#in-flow": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"in-flow","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#in-flow"},
+"#propagate": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"propagate","type":"dfn","url":"#propagate"},
+"https://drafts.csswg.org/css-cascade-5/#computed-value": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-cascade","spec":"css-cascade-5","status":"current","text":"computed value","type":"dfn","url":"https://drafts.csswg.org/css-cascade-5/#computed-value"},
+"https://drafts.csswg.org/css-values-4/#integer-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<integer>","type":"type","url":"https://drafts.csswg.org/css-values-4/#integer-value"},
+"https://drafts.csswg.org/css-display-4/#block-container": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"block container","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#block-container"},
+"https://drafts.csswg.org/css-display-4/#inline-formatting-context": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"inline formatting context","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#inline-formatting-context"},
+"https://drafts.csswg.org/css2/#propdef-page-break-before": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css","spec":"css22","status":"current","text":"page-break-before","type":"property","url":"https://drafts.csswg.org/css2/#propdef-page-break-before"},
+"https://drafts.csswg.org/css2/#propdef-page-break-after": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css","spec":"css22","status":"current","text":"page-break-after","type":"property","url":"https://drafts.csswg.org/css2/#propdef-page-break-after"},
+"https://drafts.csswg.org/css2/#propdef-page-break-inside": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css","spec":"css22","status":"current","text":"page-break-inside","type":"property","url":"https://drafts.csswg.org/css2/#propdef-page-break-inside"},
+"https://drafts.csswg.org/css-cascade-5/#legacy-shorthand": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-cascade","spec":"css-cascade-5","status":"current","text":"legacy shorthand","type":"dfn","url":"https://drafts.csswg.org/css-cascade-5/#legacy-shorthand"},
+"https://drafts.csswg.org/css-writing-modes-4/#block-size": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"block size","type":"dfn","url":"https://drafts.csswg.org/css-writing-modes-4/#block-size"},
+"#monolithic": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"monolithic","type":"dfn","url":"#monolithic"},
+"https://drafts.csswg.org/css-overflow-3/#propdef-overflow": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-overflow","spec":"css-overflow-3","status":"current","text":"overflow","type":"property","url":"https://drafts.csswg.org/css-overflow-3/#propdef-overflow"},
+"https://drafts.csswg.org/css-overflow-3/#valdef-overflow-auto": {"export":true,"for_":["overflow","overflow-x","overflow-y"],"level":"3","normative":true,"shortname":"css-overflow","spec":"css-overflow-3","status":"current","text":"auto","type":"value","url":"https://drafts.csswg.org/css-overflow-3/#valdef-overflow-auto"},
+"https://drafts.csswg.org/css-overflow-3/#valdef-overflow-scroll": {"export":true,"for_":["overflow","overflow-x","overflow-y"],"level":"3","normative":true,"shortname":"css-overflow","spec":"css-overflow-3","status":"current","text":"scroll","type":"value","url":"https://drafts.csswg.org/css-overflow-3/#valdef-overflow-scroll"},
+"https://drafts.csswg.org/css-sizing-3/#valdef-width-auto": {"export":true,"for_":["width","height","min-width","min-height"],"level":"3","normative":true,"shortname":"css-sizing","spec":"css-sizing-3","status":"current","text":"auto","type":"value","url":"https://drafts.csswg.org/css-sizing-3/#valdef-width-auto"},
+"https://drafts.csswg.org/css-writing-modes-4/#logical-height": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"logical height","type":"dfn","url":"https://drafts.csswg.org/css-writing-modes-4/#logical-height"},
+"https://drafts.csswg.org/css-display-4/#valdef-display-inline-block": {"export":true,"for_":["display","<display-legacy>"],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"inline-block","type":"value","url":"https://drafts.csswg.org/css-display-4/#valdef-display-inline-block"},
+"https://drafts.csswg.org/css-display-4/#valdef-display-inline-table": {"export":true,"for_":["display","<display-legacy>"],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"inline-table","type":"value","url":"https://drafts.csswg.org/css-display-4/#valdef-display-inline-table"},
+"https://drafts.csswg.org/css-display-4/#independent-formatting-context": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"independent formatting context","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#independent-formatting-context"},
+"https://drafts.csswg.org/css-text-4/#line-break": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-text","spec":"css-text-4","status":"current","text":"line break","type":"dfn","url":"https://drafts.csswg.org/css-text-4/#line-break"},
+"#forced-break-values": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"forced break values","type":"dfn","url":"#forced-break-values"},
+"#avoid-break-values": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"avoid break values","type":"dfn","url":"#avoid-break-values"},
+"https://drafts.csswg.org/css-page-3/#propdef-page": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-page","spec":"css-page-3","status":"current","text":"page","type":"property","url":"https://drafts.csswg.org/css-page-3/#propdef-page"},
+"#valdef-break-before-auto": {"export":true,"for_":["break-after","break-before"],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"auto","type":"value","url":"#valdef-break-before-auto"},
+"#valdef-break-inside-avoid": {"export":true,"for_":["break-inside","page-break-inside"],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"avoid","type":"value","url":"#valdef-break-inside-avoid"},
+"#valdef-break-inside-auto": {"export":true,"for_":["break-inside","page-break-inside"],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"auto","type":"value","url":"#valdef-break-inside-auto"},
+"https://drafts.csswg.org/css-writing-modes-4/#block-end": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"block-end","type":"dfn","url":"https://drafts.csswg.org/css-writing-modes-4/#block-end"},
+"https://drafts.csswg.org/css-writing-modes-4/#block-start": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"block-start","type":"dfn","url":"https://drafts.csswg.org/css-writing-modes-4/#block-start"},
+"#fragmentation-break": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"fragmentation break","type":"dfn","url":"#fragmentation-break"},
+"https://drafts.csswg.org/css-writing-modes-4/#inline-size": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"inline size","type":"dfn","url":"https://drafts.csswg.org/css-writing-modes-4/#inline-size"},
+"https://drafts.csswg.org/css-sizing-3/#stretch-fit-size": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-sizing","spec":"css-sizing-3","status":"current","text":"stretch-fit size","type":"dfn","url":"https://drafts.csswg.org/css-sizing-3/#stretch-fit-size"},
+"https://drafts.csswg.org/css-sizing-3/#min-content": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-sizing","spec":"css-sizing-3","status":"current","text":"min-content size","type":"dfn","url":"https://drafts.csswg.org/css-sizing-3/#min-content"},
+"https://drafts.csswg.org/css-sizing-3/#max-content": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-sizing","spec":"css-sizing-3","status":"current","text":"max-content size","type":"dfn","url":"https://drafts.csswg.org/css-sizing-3/#max-content"},
+"https://drafts.csswg.org/css-position-3/#propdef-top": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-position","spec":"css-position-3","status":"current","text":"top","type":"property","url":"https://drafts.csswg.org/css-position-3/#propdef-top"},
+"https://drafts.csswg.org/css-sizing-3/#propdef-height": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-sizing","spec":"css-sizing-3","status":"current","text":"height","type":"property","url":"https://drafts.csswg.org/css-sizing-3/#propdef-height"},
+"https://drafts.csswg.org/css-box-4/#margin": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"current","text":"margin","type":"dfn","url":"https://drafts.csswg.org/css-box-4/#margin"},
+"#remaining-fragmentainer-extent": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"remaining fragmentainer extent","type":"dfn","url":"#remaining-fragmentainer-extent"},
+"https://drafts.csswg.org/css-box-4/#propdef-margin-trim": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"current","text":"margin-trim","type":"property","url":"https://drafts.csswg.org/css-box-4/#propdef-margin-trim"},
+"#valdef-margin-break-keep": {"export":true,"for_":["margin-break"],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"keep","type":"value","url":"#valdef-margin-break-keep"},
+"https://drafts.csswg.org/css-multicol-1/#multi-column-layout": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-multicol","spec":"css-multicol-1","status":"current","text":"multi-column layout","type":"dfn","url":"https://drafts.csswg.org/css-multicol-1/#multi-column-layout"},
+"https://drafts.fxtf.org/css-masking-1/#mask-positioning-area": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-masking","spec":"css-masking-1","status":"current","text":"mask positioning area","type":"dfn","url":"https://drafts.fxtf.org/css-masking-1/#mask-positioning-area"},
+"https://drafts.csswg.org/css-shapes-1/#basic-shape-reference-box": {"export":true,"for_":["<basic-shape>"],"level":"1","normative":true,"shortname":"css-shapes","spec":"css-shapes-1","status":"current","text":"reference box","type":"dfn","url":"https://drafts.csswg.org/css-shapes-1/#basic-shape-reference-box"},
+"https://drafts.csswg.org/css-backgrounds-3/#propdef-border-radius": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"current","text":"border-radius","type":"property","url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-border-radius"},
+"https://drafts.csswg.org/css-backgrounds-3/#propdef-border-image": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"current","text":"border-image","type":"property","url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-border-image"},
+"https://drafts.csswg.org/css-backgrounds-3/#propdef-box-shadow": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"current","text":"box-shadow","type":"property","url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-box-shadow"},
+"#valdef-box-decoration-break-slice": {"export":true,"for_":["box-decoration-break"],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"slice","type":"value","url":"#valdef-box-decoration-break-slice"},
+"#valdef-box-decoration-break-clone": {"export":true,"for_":["box-decoration-break"],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"local","text":"clone","type":"value","url":"#valdef-box-decoration-break-clone"},
+"https://drafts.csswg.org/css-display-4/#block-level-box": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"block-level box","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#block-level-box"},
+"https://drafts.csswg.org/css-display-4/#inline-box": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"inline box","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#inline-box"},
+"https://drafts.csswg.org/css-writing-modes-3/#propdef-direction": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-3","status":"current","text":"direction","type":"property","url":"https://drafts.csswg.org/css-writing-modes-3/#propdef-direction"},
+"https://drafts.csswg.org/css-writing-modes-4/#inline-base-direction": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"inline base direction","type":"dfn","url":"https://drafts.csswg.org/css-writing-modes-4/#inline-base-direction"},
+"https://drafts.csswg.org/css-writing-modes-4/#valdef-direction-ltr": {"export":true,"for_":["direction"],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"ltr","type":"value","url":"https://drafts.csswg.org/css-writing-modes-4/#valdef-direction-ltr"},
+"https://drafts.csswg.org/css-writing-modes-4/#block-flow-direction": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"block flow direction","type":"dfn","url":"https://drafts.csswg.org/css-writing-modes-4/#block-flow-direction"},
+"https://drafts.csswg.org/css-writing-modes-4/#principal-writing-mode": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"principal writing mode","type":"dfn","url":"https://drafts.csswg.org/css-writing-modes-4/#principal-writing-mode"},
+"https://drafts.csswg.org/css-regions-1/#region-chain": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-regions","spec":"css-regions-1","status":"current","text":"region chain","type":"dfn","url":"https://drafts.csswg.org/css-regions-1/#region-chain"},
+};
+
+function genRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "DFN: "),
+                mk.code({ class: "dfn-text" }, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    const forListElements = forList.length === 0 ? '' : mk.li({},
+        mk.b({}, "For: "),
+        mk.ul({},
+            ...forList.map(forItem =>
                 mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
-            mk.b({}, "For: "),
-            mk.ul({},
-                ...forList.map(forItem =>
-                    mk.li({},
-                        mk.span({}, `${forItem}`)
-                    ),
+                    mk.span({}, `${forItem}`)
                 ),
             ),
-        );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+        ),
+    );
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
-    }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    return hintPanel;
+}
+function genAllRefHints() {
+    for(const refData of Object.values(refsData)) {
+        const refUrl = refData.url;
+        const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+        if (links.length == 0) {
+            console.log(`Can't find link href="${refUrl}".`, refData);
+            continue;
+        }
+        for(const link of links) {
+            if(link.classList.contains("dfn-link")) continue;
+            const hint = genRefHint(link, refData);
+            append(document.body, hint);
+            insertLinkPopupAction(hint)
         }
     }
+}
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+function hideAllRefHints() {
+    queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    refHint.style.position = "absolute"; // unfix it
+    refHint.classList.remove("on");
+    const teardown = refHint.teardownEventListeners;
+    if (teardown) {
+        refHint.teardownEventListeners = undefined;
+        teardown();
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+function showRefHint(refHint) {
+    hideAllRefHints(); // Only display one at this time.
+
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "true");
+    refHint.classList.add("on");
+    positionRefHint(refHint);
+    setupRefHintEventListeners(refHint);
+}
+
+function setupRefHintEventListeners(refHint) {
+    if (refHint.teardownEventListeners) return;
+    const link = refHint.forLink;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
 
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
 
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+function insertLinkPopupAction(refHint) {
+    const link = refHint.forLink;
+    // link.setAttribute('role', 'button');
+    link.setAttribute('aria-expanded', 'false')
+    link.classList.add('has-ref-hint');
+    link.addEventListener('mouseover', (event) => {
+        showRefHint(refHint);
     });
+    link.addEventListener('focus', (event) => {
+        showRefHint(refHint);
+    })
+}
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+document.addEventListener("DOMContentLoaded", () => {
+    genAllRefHints();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['#valdef-break-before-all'] = {"text": "all", "type": "value", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#valdef-break-before-all", "export": true, "normative": true, "for_": ["break-after", "break-before"]};
-window.refsData['#propdef-break-before'] = {"text": "break-before", "type": "property", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#propdef-break-before", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-break-after'] = {"text": "break-after", "type": "property", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#propdef-break-after", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/mediaqueries-5/#paged-media'] = {"text": "paged media", "type": "dfn", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-5/#paged-media", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/mediaqueries-5/#continuous-media'] = {"text": "continuous media", "type": "dfn", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-5/#continuous-media", "export": true, "normative": true, "for_": []};
-window.refsData['#fragmentation'] = {"text": "fragmentation", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#fragmentation", "export": true, "normative": true, "for_": []};
-window.refsData['#fragmentation-container'] = {"text": "fragmentation container", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#fragmentation-container", "export": true, "normative": true, "for_": []};
-window.refsData['#fragmentainer'] = {"text": "fragmentainer", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#fragmentainer", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-margin-break'] = {"text": "margin-break", "type": "property", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#propdef-margin-break", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-break-before-always'] = {"text": "always", "type": "value", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#valdef-break-before-always", "export": true, "normative": true, "for_": ["break-after", "break-before"]};
-window.refsData['https://drafts.csswg.org/css-values-4/#css-wide-keywords'] = {"text": "css-wide keywords", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "export": true, "normative": true, "for_": []};
-window.refsData['#fragmented-flow'] = {"text": "fragmented flow", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#fragmented-flow", "export": true, "normative": true, "for_": []};
-window.refsData['#fragmentation-context'] = {"text": "fragmentation context", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#fragmentation-context", "export": true, "normative": true, "for_": []};
-window.refsData['#fragmentation-root'] = {"text": "fragmentation root", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#fragmentation-root", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-box-4/#padding-area'] = {"text": "padding area", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#padding-area", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-box-4/#border-area'] = {"text": "border area", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#border-area", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-box-4/#margin-area'] = {"text": "margin area", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#margin-area", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-box-decoration-break'] = {"text": "box-decoration-break", "type": "property", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#propdef-box-decoration-break", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#block-axis'] = {"text": "block-axis", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#block-axis", "export": true, "normative": true, "for_": []};
-window.refsData['#fragment'] = {"text": "fragment", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#fragment", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#display-type'] = {"text": "display type", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#display-type", "export": true, "normative": true, "for_": []};
-window.refsData['#box-fragment'] = {"text": "box fragment", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#box-fragment", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#formatting-context'] = {"text": "formatting context", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#formatting-context", "export": true, "normative": true, "for_": []};
-window.refsData['#unforced-break'] = {"text": "unforced break", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#unforced-break", "export": true, "normative": true, "for_": []};
-window.refsData['#forced-break'] = {"text": "forced break", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#forced-break", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-break-inside'] = {"text": "break-inside", "type": "property", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#propdef-break-inside", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-widows'] = {"text": "widows", "type": "property", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#propdef-widows", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-orphans'] = {"text": "orphans", "type": "property", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#propdef-orphans", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-break-before-left'] = {"text": "left", "type": "value", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#valdef-break-before-left", "export": true, "normative": true, "for_": ["break-after", "break-before"]};
-window.refsData['#valdef-break-before-right'] = {"text": "right", "type": "value", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#valdef-break-before-right", "export": true, "normative": true, "for_": ["break-after", "break-before"]};
-window.refsData['#valdef-break-before-recto'] = {"text": "recto", "type": "value", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#valdef-break-before-recto", "export": true, "normative": true, "for_": ["break-after", "break-before"]};
-window.refsData['#valdef-break-before-verso'] = {"text": "verso", "type": "value", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#valdef-break-before-verso", "export": true, "normative": true, "for_": ["break-after", "break-before"]};
-window.refsData['#valdef-break-before-page'] = {"text": "page", "type": "value", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#valdef-break-before-page", "export": true, "normative": true, "for_": ["break-after", "break-before"]};
-window.refsData['#valdef-break-before-column'] = {"text": "column", "type": "value", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#valdef-break-before-column", "export": true, "normative": true, "for_": ["break-after", "break-before"]};
-window.refsData['#valdef-break-before-region'] = {"text": "region", "type": "value", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#valdef-break-before-region", "export": true, "normative": true, "for_": ["break-after", "break-before"]};
-window.refsData['#valdef-break-before-avoid'] = {"text": "avoid", "type": "value", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#valdef-break-before-avoid", "export": true, "normative": true, "for_": ["break-after", "break-before"]};
-window.refsData['#valdef-break-before-avoid-page'] = {"text": "avoid-page", "type": "value", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#valdef-break-before-avoid-page", "export": true, "normative": true, "for_": ["break-after", "break-before"]};
-window.refsData['#valdef-break-before-avoid-column'] = {"text": "avoid-column", "type": "value", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#valdef-break-before-avoid-column", "export": true, "normative": true, "for_": ["break-after", "break-before"]};
-window.refsData['#valdef-break-before-avoid-region'] = {"text": "avoid-region", "type": "value", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#valdef-break-before-avoid-region", "export": true, "normative": true, "for_": ["break-after", "break-before"]};
-window.refsData['https://drafts.csswg.org/css-display-4/#principal-box'] = {"text": "principal box", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#principal-box", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-multicol-1/#multi-column-container'] = {"text": "multi-column container", "type": "dfn", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-multicol-1/#multi-column-container", "export": true, "normative": true, "for_": []};
-window.refsData['#column-break'] = {"text": "column break", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#column-break", "export": true, "normative": true, "for_": []};
-window.refsData['#page-break'] = {"text": "page break", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#page-break", "export": true, "normative": true, "for_": []};
-window.refsData['#region-break'] = {"text": "region break", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#region-break", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-page-3/#page-progression'] = {"text": "page progression", "type": "dfn", "spec": "css-page-3", "shortname": "css-page", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-page-3/#page-progression", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#in-flow'] = {"text": "in-flow", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#in-flow", "export": true, "normative": true, "for_": []};
-window.refsData['#propagate'] = {"text": "propagate", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#propagate", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-cascade-5/#computed-value'] = {"text": "computed value", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#computed-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#integer-value'] = {"text": "<integer>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#integer-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#block-container'] = {"text": "block container", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#block-container", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#inline-formatting-context'] = {"text": "inline formatting context", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#inline-formatting-context", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css2/#propdef-page-break-before'] = {"text": "page-break-before", "type": "property", "spec": "css22", "shortname": "css", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css2/#propdef-page-break-before", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css2/#propdef-page-break-after'] = {"text": "page-break-after", "type": "property", "spec": "css22", "shortname": "css", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css2/#propdef-page-break-after", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css2/#propdef-page-break-inside'] = {"text": "page-break-inside", "type": "property", "spec": "css22", "shortname": "css", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css2/#propdef-page-break-inside", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-cascade-5/#legacy-shorthand'] = {"text": "legacy shorthand", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#legacy-shorthand", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#block-size'] = {"text": "block size", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#block-size", "export": true, "normative": true, "for_": []};
-window.refsData['#monolithic'] = {"text": "monolithic", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#monolithic", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-overflow-3/#propdef-overflow'] = {"text": "overflow", "type": "property", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#propdef-overflow", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-overflow-3/#valdef-overflow-auto'] = {"text": "auto", "type": "value", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#valdef-overflow-auto", "export": true, "normative": true, "for_": ["overflow", "overflow-x", "overflow-y"]};
-window.refsData['https://drafts.csswg.org/css-overflow-3/#valdef-overflow-scroll'] = {"text": "scroll", "type": "value", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#valdef-overflow-scroll", "export": true, "normative": true, "for_": ["overflow", "overflow-x", "overflow-y"]};
-window.refsData['https://drafts.csswg.org/css-sizing-3/#valdef-width-auto'] = {"text": "auto", "type": "value", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#valdef-width-auto", "export": true, "normative": true, "for_": ["width", "height", "min-width", "min-height"]};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#logical-height'] = {"text": "logical height", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#logical-height", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#valdef-display-inline-block'] = {"text": "inline-block", "type": "value", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#valdef-display-inline-block", "export": true, "normative": true, "for_": ["display", "<display-legacy>"]};
-window.refsData['https://drafts.csswg.org/css-display-4/#valdef-display-inline-table'] = {"text": "inline-table", "type": "value", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#valdef-display-inline-table", "export": true, "normative": true, "for_": ["display", "<display-legacy>"]};
-window.refsData['https://drafts.csswg.org/css-display-4/#independent-formatting-context'] = {"text": "independent formatting context", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#independent-formatting-context", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-text-4/#line-break'] = {"text": "line break", "type": "dfn", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#line-break", "export": true, "normative": true, "for_": []};
-window.refsData['#forced-break-values'] = {"text": "forced break values", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#forced-break-values", "export": true, "normative": true, "for_": []};
-window.refsData['#avoid-break-values'] = {"text": "avoid break values", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#avoid-break-values", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-page-3/#propdef-page'] = {"text": "page", "type": "property", "spec": "css-page-3", "shortname": "css-page", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-page-3/#propdef-page", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-break-before-auto'] = {"text": "auto", "type": "value", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#valdef-break-before-auto", "export": true, "normative": true, "for_": ["break-after", "break-before"]};
-window.refsData['#valdef-break-inside-avoid'] = {"text": "avoid", "type": "value", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#valdef-break-inside-avoid", "export": true, "normative": true, "for_": ["break-inside", "page-break-inside"]};
-window.refsData['#valdef-break-inside-auto'] = {"text": "auto", "type": "value", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#valdef-break-inside-auto", "export": true, "normative": true, "for_": ["break-inside", "page-break-inside"]};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#block-end'] = {"text": "block-end", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#block-end", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#block-start'] = {"text": "block-start", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#block-start", "export": true, "normative": true, "for_": []};
-window.refsData['#fragmentation-break'] = {"text": "fragmentation break", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#fragmentation-break", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#inline-size'] = {"text": "inline size", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#inline-size", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-sizing-3/#stretch-fit-size'] = {"text": "stretch-fit size", "type": "dfn", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#stretch-fit-size", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-sizing-3/#min-content'] = {"text": "min-content size", "type": "dfn", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#min-content", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-sizing-3/#max-content'] = {"text": "max-content size", "type": "dfn", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#max-content", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-position-3/#propdef-top'] = {"text": "top", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-top", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-sizing-3/#propdef-height'] = {"text": "height", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-height", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-box-4/#margin'] = {"text": "margin", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#margin", "export": true, "normative": true, "for_": []};
-window.refsData['#remaining-fragmentainer-extent'] = {"text": "remaining fragmentainer extent", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#remaining-fragmentainer-extent", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-box-4/#propdef-margin-trim'] = {"text": "margin-trim", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#propdef-margin-trim", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-margin-break-keep'] = {"text": "keep", "type": "value", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#valdef-margin-break-keep", "export": true, "normative": true, "for_": ["margin-break"]};
-window.refsData['https://drafts.csswg.org/css-multicol-1/#multi-column-layout'] = {"text": "multi-column layout", "type": "dfn", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-multicol-1/#multi-column-layout", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.fxtf.org/css-masking-1/#mask-positioning-area'] = {"text": "mask positioning area", "type": "dfn", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/css-masking-1/#mask-positioning-area", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-shapes-1/#basic-shape-reference-box'] = {"text": "reference box", "type": "dfn", "spec": "css-shapes-1", "shortname": "css-shapes", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-shapes-1/#basic-shape-reference-box", "export": true, "normative": true, "for_": ["<basic-shape>"]};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border-radius'] = {"text": "border-radius", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-radius", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border-image'] = {"text": "border-image", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-image", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-box-shadow'] = {"text": "box-shadow", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-box-shadow", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-box-decoration-break-slice'] = {"text": "slice", "type": "value", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#valdef-box-decoration-break-slice", "export": true, "normative": true, "for_": ["box-decoration-break"]};
-window.refsData['#valdef-box-decoration-break-clone'] = {"text": "clone", "type": "value", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#valdef-box-decoration-break-clone", "export": true, "normative": true, "for_": ["box-decoration-break"]};
-window.refsData['https://drafts.csswg.org/css-display-4/#block-level-box'] = {"text": "block-level box", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#block-level-box", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#inline-box'] = {"text": "inline box", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#inline-box", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-3/#propdef-direction'] = {"text": "direction", "type": "property", "spec": "css-writing-modes-3", "shortname": "css-writing-modes", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-3/#propdef-direction", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#inline-base-direction'] = {"text": "inline base direction", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#inline-base-direction", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#valdef-direction-ltr'] = {"text": "ltr", "type": "value", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#valdef-direction-ltr", "export": true, "normative": true, "for_": ["direction"]};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#block-flow-direction'] = {"text": "block flow direction", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#block-flow-direction", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#principal-writing-mode'] = {"text": "principal writing mode", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#principal-writing-mode", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-regions-1/#region-chain'] = {"text": "region chain", "type": "dfn", "spec": "css-regions-1", "shortname": "css-regions", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-regions-1/#region-chain", "export": true, "normative": true, "for_": []};window.refsData['#propdef-box-decoration-break'] = {"text": "box-decoration-break", "type": "property", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#propdef-box-decoration-break", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-break-after'] = {"text": "break-after", "type": "property", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#propdef-break-after", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-break-before'] = {"text": "break-before", "type": "property", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#propdef-break-before", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-break-inside'] = {"text": "break-inside", "type": "property", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#propdef-break-inside", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-margin-break'] = {"text": "margin-break", "type": "property", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#propdef-margin-break", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-orphans'] = {"text": "orphans", "type": "property", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#propdef-orphans", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-widows'] = {"text": "widows", "type": "property", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "local", "url": "#propdef-widows", "export": true, "normative": true, "for_": []};
 </script>

@@ -117,7 +117,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -768,7 +767,6 @@ a[href].issue-return {
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -828,7 +826,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -885,7 +882,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -2686,474 +2682,8 @@ for their reviews, comments, and corrections.</p>
     </div>
    </div>
   </details>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['d27a809f'] = {"dfnID": "d27a809f", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background-position", "dfnText": "background-position", "refSections": [{"refs": [{"id": "ref-for-propdef-background-position"}], "title": "4.4. Define an anchor point: The offset-anchor property"}], "external": true};
-window.dfnpanelData['5f1a81e7'] = {"dfnID": "5f1a81e7", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-radius", "dfnText": "border-radius", "refSections": [{"refs": [{"id": "ref-for-propdef-border-radius"}, {"id": "ref-for-propdef-border-radius\u2460"}], "title": "4.1. Define a path: The offset-path property"}, {"refs": [{"id": "ref-for-propdef-border-radius\u2461"}], "title": "4.1.3. Examples of <coord-box> Positioning"}], "external": true};
-window.dfnpanelData['784ef06e'] = {"dfnID": "784ef06e", "url": "https://drafts.csswg.org/css-box-4/#typedef-coord-box", "dfnText": "<coord-box>", "refSections": [{"refs": [{"id": "ref-for-typedef-coord-box"}, {"id": "ref-for-typedef-coord-box\u2460"}, {"id": "ref-for-typedef-coord-box\u2461"}, {"id": "ref-for-typedef-coord-box\u2462"}, {"id": "ref-for-typedef-coord-box\u2463"}], "title": "4.1. Define a path: The offset-path property"}, {"refs": [{"id": "ref-for-typedef-coord-box\u2464"}, {"id": "ref-for-typedef-coord-box\u2465"}], "title": "4.1.3. Examples of <coord-box> Positioning"}], "external": true};
-window.dfnpanelData['a4eb3c57'] = {"dfnID": "a4eb3c57", "url": "https://drafts.csswg.org/css-cascade-5/#used-value", "dfnText": "used value", "refSections": [{"refs": [{"id": "ref-for-used-value"}, {"id": "ref-for-used-value\u2460"}], "title": "4.1. Define a path: The offset-path property"}], "external": true};
-window.dfnpanelData['754e7a89'] = {"dfnID": "754e7a89", "url": "https://drafts.csswg.org/css-contain-2/#propdef-contain", "dfnText": "contain", "refSections": [{"refs": [{"id": "ref-for-propdef-contain"}, {"id": "ref-for-propdef-contain\u2460"}, {"id": "ref-for-propdef-contain\u2461"}], "title": "4.1.1. Examples Of ray() Positioning"}, {"refs": [{"id": "ref-for-propdef-contain\u2462"}], "title": "Changes"}], "external": true};
-window.dfnpanelData['bd95103a'] = {"dfnID": "bd95103a", "url": "https://www.w3.org/TR/css-images-3/#typedef-size", "dfnText": "<size>", "refSections": [{"refs": [{"id": "ref-for-typedef-size"}, {"id": "ref-for-typedef-size\u2460"}], "title": "4.1. Define a path: The offset-path property"}, {"refs": [{"id": "ref-for-typedef-size\u2461"}], "title": "Changes"}], "external": true};
-window.dfnpanelData['101119a4'] = {"dfnID": "101119a4", "url": "https://drafts.fxtf.org/css-masking-1/#typedef-geometry-box", "dfnText": "<geometry-box>", "refSections": [{"refs": [{"id": "ref-for-typedef-geometry-box"}], "title": "4.3. Define the starting point of the path: The offset-position property"}], "external": true};
-window.dfnpanelData['4bdbccda'] = {"dfnID": "4bdbccda", "url": "https://drafts.fxtf.org/css-masking-1/#valdef-mask-clip-border-box", "dfnText": "border-box", "refSections": [{"refs": [{"id": "ref-for-valdef-mask-clip-border-box"}, {"id": "ref-for-valdef-mask-clip-border-box\u2460"}], "title": "4.1. Define a path: The offset-path property"}], "external": true};
-window.dfnpanelData['581e67aa'] = {"dfnID": "581e67aa", "url": "https://drafts.fxtf.org/css-masking-1/#valdef-mask-clip-content-box", "dfnText": "content-box", "refSections": [{"refs": [{"id": "ref-for-valdef-mask-clip-content-box"}], "title": "4.1. Define a path: The offset-path property"}], "external": true};
-window.dfnpanelData['f0d904ae'] = {"dfnID": "f0d904ae", "url": "https://drafts.fxtf.org/css-masking-1/#valdef-clip-path-fill-box", "dfnText": "fill-box", "refSections": [{"refs": [{"id": "ref-for-valdef-clip-path-fill-box"}, {"id": "ref-for-valdef-clip-path-fill-box\u2460"}], "title": "4.1. Define a path: The offset-path property"}], "external": true};
-window.dfnpanelData['ae53b4d9'] = {"dfnID": "ae53b4d9", "url": "https://drafts.fxtf.org/css-masking-1/#valdef-mask-clip-padding-box", "dfnText": "padding-box", "refSections": [{"refs": [{"id": "ref-for-valdef-mask-clip-padding-box"}], "title": "4.1. Define a path: The offset-path property"}], "external": true};
-window.dfnpanelData['e76c09ea'] = {"dfnID": "e76c09ea", "url": "https://drafts.fxtf.org/css-masking-1/#valdef-clip-path-stroke-box", "dfnText": "stroke-box", "refSections": [{"refs": [{"id": "ref-for-valdef-clip-path-stroke-box"}], "title": "4.1. Define a path: The offset-path property"}], "external": true};
-window.dfnpanelData['7e059d0c'] = {"dfnID": "7e059d0c", "url": "https://drafts.fxtf.org/css-masking-1/#valdef-clip-path-view-box", "dfnText": "view-box", "refSections": [{"refs": [{"id": "ref-for-valdef-clip-path-view-box"}], "title": "4.1. Define a path: The offset-path property"}], "external": true};
-window.dfnpanelData['dde41168'] = {"dfnID": "dde41168", "url": "https://drafts.csswg.org/css-position-3/#propdef-left", "dfnText": "left", "refSections": [{"refs": [{"id": "ref-for-propdef-left"}], "title": "4.3. Define the starting point of the path: The offset-position property"}], "external": true};
-window.dfnpanelData['b8a0ba74'] = {"dfnID": "b8a0ba74", "url": "https://drafts.csswg.org/css-position-3/#propdef-position", "dfnText": "position", "refSections": [{"refs": [{"id": "ref-for-propdef-position"}, {"id": "ref-for-propdef-position\u2460"}, {"id": "ref-for-propdef-position\u2461"}, {"id": "ref-for-propdef-position\u2462"}], "title": "4.3. Define the starting point of the path: The offset-position property"}], "external": true};
-window.dfnpanelData['288dfcac'] = {"dfnID": "288dfcac", "url": "https://drafts.csswg.org/css-position-3/#valdef-position-static", "dfnText": "static", "refSections": [{"refs": [{"id": "ref-for-valdef-position-static"}, {"id": "ref-for-valdef-position-static\u2460"}, {"id": "ref-for-valdef-position-static\u2461"}], "title": "4.3. Define the starting point of the path: The offset-position property"}], "external": true};
-window.dfnpanelData['e1483d91'] = {"dfnID": "e1483d91", "url": "https://drafts.csswg.org/css-position-3/#propdef-top", "dfnText": "top", "refSections": [{"refs": [{"id": "ref-for-propdef-top"}], "title": "4.3. Define the starting point of the path: The offset-position property"}], "external": true};
-window.dfnpanelData['bce13de7'] = {"dfnID": "bce13de7", "url": "https://drafts.csswg.org/css-shapes-1/#typedef-basic-shape", "dfnText": "<basic-shape>", "refSections": [{"refs": [{"id": "ref-for-typedef-basic-shape"}, {"id": "ref-for-typedef-basic-shape\u2460"}, {"id": "ref-for-typedef-basic-shape\u2461"}, {"id": "ref-for-typedef-basic-shape\u2462"}], "title": "4.1. Define a path: The offset-path property"}, {"refs": [{"id": "ref-for-typedef-basic-shape\u2463"}], "title": "4.1.2. Examples Of <basic-shape> Positioning"}], "external": true};
-window.dfnpanelData['37df27a7'] = {"dfnID": "37df27a7", "url": "https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-circle", "dfnText": "circle()", "refSections": [{"refs": [{"id": "ref-for-funcdef-basic-shape-circle"}], "title": "4.1. Define a path: The offset-path property"}], "external": true};
-window.dfnpanelData['c1b815c4'] = {"dfnID": "c1b815c4", "url": "https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-ellipse", "dfnText": "ellipse()", "refSections": [{"refs": [{"id": "ref-for-funcdef-basic-shape-ellipse"}], "title": "4.1. Define a path: The offset-path property"}], "external": true};
-window.dfnpanelData['020bceec'] = {"dfnID": "020bceec", "url": "https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-inset", "dfnText": "inset()", "refSections": [{"refs": [{"id": "ref-for-funcdef-basic-shape-inset"}], "title": "4.1. Define a path: The offset-path property"}], "external": true};
-window.dfnpanelData['9bae10e5'] = {"dfnID": "9bae10e5", "url": "https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-polygon", "dfnText": "polygon()", "refSections": [{"refs": [{"id": "ref-for-funcdef-basic-shape-polygon"}], "title": "4.1. Define a path: The offset-path property"}], "external": true};
-window.dfnpanelData['c62d98eb'] = {"dfnID": "c62d98eb", "url": "https://drafts.csswg.org/css-transforms-1/#local-coordinate-system", "dfnText": "local coordinate system", "refSections": [{"refs": [{"id": "ref-for-local-coordinate-system"}], "title": "1. Introduction"}], "external": true};
-window.dfnpanelData['d8eb5956'] = {"dfnID": "d8eb5956", "url": "https://drafts.csswg.org/css-transforms-1/#funcdef-transform-rotate", "dfnText": "rotate()", "refSections": [{"refs": [{"id": "ref-for-funcdef-transform-rotate"}], "title": "4.5.1. Calculating the path transform"}], "external": true};
-window.dfnpanelData['e2e08d07'] = {"dfnID": "e2e08d07", "url": "https://drafts.csswg.org/css-transforms-1/#propdef-transform", "dfnText": "transform", "refSections": [{"refs": [{"id": "ref-for-propdef-transform"}], "title": "2. Module interactions"}, {"refs": [{"id": "67291a070"}], "title": "4.1. Define a path: The offset-path property"}, {"refs": [{"id": "67291a071"}, {"id": "ref-for-propdef-transform\u2460"}], "title": "4.3. Define the starting point of the path: The offset-position property"}, {"refs": [{"id": "ref-for-propdef-transform\u2461"}], "title": "4.5. Rotation at point: The offset-rotate property"}], "external": true};
-window.dfnpanelData['09f2cf3e'] = {"dfnID": "09f2cf3e", "url": "https://drafts.csswg.org/css-transforms-1/#propdef-transform-origin", "dfnText": "transform-origin", "refSections": [{"refs": [{"id": "ref-for-propdef-transform-origin"}], "title": "4.4. Define an anchor point: The offset-anchor property"}], "external": true};
-window.dfnpanelData['6ae98fc9'] = {"dfnID": "6ae98fc9", "url": "https://drafts.csswg.org/css-transforms-2/#propdef-rotate", "dfnText": "rotate", "refSections": [{"refs": [{"id": "ref-for-propdef-rotate"}], "title": "2. Module interactions"}, {"refs": [{"id": "ref-for-propdef-rotate\u2460"}], "title": "4.3. Define the starting point of the path: The offset-position property"}], "external": true};
-window.dfnpanelData['223bd4c4'] = {"dfnID": "223bd4c4", "url": "https://drafts.csswg.org/css-transforms-2/#propdef-scale", "dfnText": "scale", "refSections": [{"refs": [{"id": "ref-for-propdef-scale"}], "title": "2. Module interactions"}, {"refs": [{"id": "ref-for-propdef-scale\u2460"}], "title": "4.3. Define the starting point of the path: The offset-position property"}], "external": true};
-window.dfnpanelData['a48ce1c0'] = {"dfnID": "a48ce1c0", "url": "https://drafts.csswg.org/css-transforms-2/#propdef-translate", "dfnText": "translate", "refSections": [{"refs": [{"id": "ref-for-propdef-translate"}], "title": "2. Module interactions"}], "external": true};
-window.dfnpanelData['08eba280'] = {"dfnID": "08eba280", "url": "https://drafts.csswg.org/css-values-4/#mult-req", "dfnText": "!", "refSections": [{"refs": [{"id": "ref-for-mult-req"}], "title": "4.6. Offset shorthand: The offset property"}], "external": true};
-window.dfnpanelData['f0809abc'] = {"dfnID": "f0809abc", "url": "https://drafts.csswg.org/css-values-4/#comb-all", "dfnText": "&&", "refSections": [{"refs": [{"id": "ref-for-comb-all"}], "title": "4.1. Define a path: The offset-path property"}], "external": true};
-window.dfnpanelData['3559c926'] = {"dfnID": "3559c926", "url": "https://drafts.csswg.org/css-values-4/#angle-value", "dfnText": "<angle>", "refSections": [{"refs": [{"id": "ref-for-angle-value"}, {"id": "ref-for-angle-value\u2460"}, {"id": "ref-for-angle-value\u2461"}, {"id": "ref-for-angle-value\u2462"}, {"id": "ref-for-angle-value\u2463"}], "title": "4.1. Define a path: The offset-path property"}, {"refs": [{"id": "ref-for-angle-value\u2464"}, {"id": "ref-for-angle-value\u2465"}, {"id": "ref-for-angle-value\u2466"}], "title": "4.2.1. Calculating the computed distance along a path"}, {"refs": [{"id": "ref-for-angle-value\u2467"}, {"id": "ref-for-angle-value\u2468"}, {"id": "ref-for-angle-value\u2460\u24ea"}, {"id": "ref-for-angle-value\u2460\u2460"}, {"id": "ref-for-angle-value\u2460\u2461"}, {"id": "ref-for-angle-value\u2460\u2462"}, {"id": "ref-for-angle-value\u2460\u2463"}, {"id": "ref-for-angle-value\u2460\u2464"}, {"id": "ref-for-angle-value\u2460\u2465"}, {"id": "ref-for-angle-value\u2460\u2466"}], "title": "4.5. Rotation at point: The offset-rotate property"}, {"refs": [{"id": "ref-for-angle-value\u2460\u2467"}, {"id": "ref-for-angle-value\u2460\u2468"}], "title": "Changes"}], "external": true};
-window.dfnpanelData['18222566'] = {"dfnID": "18222566", "url": "https://drafts.csswg.org/css-values-4/#typedef-length-percentage", "dfnText": "<length-percentage>", "refSections": [{"refs": [{"id": "ref-for-typedef-length-percentage"}, {"id": "ref-for-typedef-length-percentage\u2460"}, {"id": "ref-for-typedef-length-percentage\u2461"}], "title": "4.2. Position on the path: The offset-distance property"}], "external": true};
-window.dfnpanelData['fb030e6c'] = {"dfnID": "fb030e6c", "url": "https://drafts.csswg.org/css-values-4/#length-value", "dfnText": "<length>", "refSections": [{"refs": [{"id": "ref-for-length-value"}], "title": "4.3. Define the starting point of the path: The offset-position property"}, {"refs": [{"id": "ref-for-length-value\u2460"}, {"id": "ref-for-length-value\u2461"}], "title": "4.4. Define an anchor point: The offset-anchor property"}], "external": true};
-window.dfnpanelData['15f5b381'] = {"dfnID": "15f5b381", "url": "https://drafts.csswg.org/css-values-4/#percentage-value", "dfnText": "<percentage>", "refSections": [{"refs": [{"id": "ref-for-percentage-value"}], "title": "4.4. Define an anchor point: The offset-anchor property"}], "external": true};
-window.dfnpanelData['2cd27cd8'] = {"dfnID": "2cd27cd8", "url": "https://drafts.csswg.org/css-values-4/#typedef-position", "dfnText": "<position>", "refSections": [{"refs": [{"id": "ref-for-typedef-position"}, {"id": "ref-for-typedef-position\u2460"}], "title": "4.3. Define the starting point of the path: The offset-position property"}, {"refs": [{"id": "ref-for-typedef-position\u2461"}, {"id": "ref-for-typedef-position\u2462"}], "title": "4.4. Define an anchor point: The offset-anchor property"}], "external": true};
-window.dfnpanelData['977d3003'] = {"dfnID": "977d3003", "url": "https://drafts.csswg.org/css-values-4/#string-value", "dfnText": "<string>", "refSections": [{"refs": [{"id": "ref-for-string-value"}, {"id": "ref-for-string-value\u2460"}], "title": "4.1. Define a path: The offset-path property"}], "external": true};
-window.dfnpanelData['fa293cdd'] = {"dfnID": "fa293cdd", "url": "https://drafts.csswg.org/css-values-4/#url-value", "dfnText": "<url>", "refSections": [{"refs": [{"id": "ref-for-url-value"}, {"id": "ref-for-url-value\u2460"}], "title": "4.1. Define a path: The offset-path property"}], "external": true};
-window.dfnpanelData['537cf076'] = {"dfnID": "537cf076", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "dfnText": "?", "refSections": [{"refs": [{"id": "ref-for-mult-opt"}], "title": "4.1. Define a path: The offset-path property"}, {"refs": [{"id": "ref-for-mult-opt\u2460"}, {"id": "ref-for-mult-opt\u2461"}, {"id": "ref-for-mult-opt\u2462"}, {"id": "ref-for-mult-opt\u2463"}], "title": "4.6. Offset shorthand: The offset property"}], "external": true};
-window.dfnpanelData['6ec67710'] = {"dfnID": "6ec67710", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "dfnText": "|", "refSections": [{"refs": [{"id": "ref-for-comb-one"}, {"id": "ref-for-comb-one\u2460"}, {"id": "ref-for-comb-one\u2461"}, {"id": "ref-for-comb-one\u2462"}, {"id": "ref-for-comb-one\u2463"}], "title": "4.1. Define a path: The offset-path property"}, {"refs": [{"id": "ref-for-comb-one\u2464"}], "title": "4.3. Define the starting point of the path: The offset-position property"}, {"refs": [{"id": "ref-for-comb-one\u2465"}], "title": "4.4. Define an anchor point: The offset-anchor property"}, {"refs": [{"id": "ref-for-comb-one\u2466"}], "title": "4.5. Rotation at point: The offset-rotate property"}], "external": true};
-window.dfnpanelData['8a82fda1'] = {"dfnID": "8a82fda1", "url": "https://drafts.csswg.org/css-values-4/#comb-any", "dfnText": "||", "refSections": [{"refs": [{"id": "ref-for-comb-any"}], "title": "4.5. Rotation at point: The offset-rotate property"}, {"refs": [{"id": "ref-for-comb-any\u2460"}], "title": "4.6. Offset shorthand: The offset property"}], "external": true};
-window.dfnpanelData['d8bec048'] = {"dfnID": "d8bec048", "url": "https://svgwg.org/svg2-draft/paths.html#TermPathDirection", "dfnText": "direction of a path", "refSections": [{"refs": [{"id": "ref-for-TermPathDirection"}], "title": "4.5. Rotation at point: The offset-rotate property"}], "external": true};
-window.dfnpanelData['3a660536'] = {"dfnID": "3a660536", "url": "https://svgwg.org/svg2-draft/shapes.html#TermShapeElement", "dfnText": "shape elements", "refSections": [{"refs": [{"id": "ref-for-TermShapeElement"}, {"id": "ref-for-TermShapeElement\u2460"}, {"id": "ref-for-TermShapeElement\u2461"}, {"id": "ref-for-TermShapeElement\u2462"}], "title": "4.1. Define a path: The offset-path property"}], "external": true};
-window.dfnpanelData['3c067729'] = {"dfnID": "3c067729", "url": "https://svgwg.org/svg2-draft/render.html#TermStackingContext", "dfnText": "stacking contexts", "refSections": [{"refs": [{"id": "ref-for-TermStackingContext"}], "title": "2. Module interactions"}, {"refs": [{"id": "ref-for-TermStackingContext\u2460"}], "title": "4.1. Define a path: The offset-path property"}, {"refs": [{"id": "ref-for-TermStackingContext\u2461"}], "title": "4.3. Define the starting point of the path: The offset-position property"}], "external": true};
-window.dfnpanelData['propdef-offset-path'] = {"dfnID": "propdef-offset-path", "url": "#propdef-offset-path", "dfnText": "offset-path", "refSections": [{"refs": [{"id": "ref-for-propdef-offset-path"}], "title": "2. Module interactions"}, {"refs": [{"id": "ref-for-propdef-offset-path\u2460"}], "title": "4. Motion Paths"}, {"refs": [{"id": "ref-for-propdef-offset-path\u2461"}, {"id": "ref-for-propdef-offset-path\u2462"}], "title": "4.1. Define a path: The offset-path property"}, {"refs": [{"id": "ref-for-propdef-offset-path\u2463"}, {"id": "ref-for-propdef-offset-path\u2464"}, {"id": "ref-for-propdef-offset-path\u2465"}, {"id": "ref-for-propdef-offset-path\u2466"}], "title": "4.1.1. Examples Of ray() Positioning"}, {"refs": [{"id": "ref-for-propdef-offset-path\u2467"}], "title": "4.2.1. Calculating the computed distance along a path"}, {"refs": [{"id": "ref-for-propdef-offset-path\u2468"}, {"id": "ref-for-propdef-offset-path\u2460\u24ea"}, {"id": "ref-for-propdef-offset-path\u2460\u2460"}], "title": "4.3. Define the starting point of the path: The offset-position property"}, {"refs": [{"id": "ref-for-propdef-offset-path\u2460\u2461"}, {"id": "ref-for-propdef-offset-path\u2460\u2462"}], "title": "4.4. Define an anchor point: The offset-anchor property"}, {"refs": [{"id": "ref-for-propdef-offset-path\u2460\u2463"}, {"id": "ref-for-propdef-offset-path\u2460\u2464"}], "title": "4.6. Offset shorthand: The offset property"}, {"refs": [{"id": "ref-for-propdef-offset-path\u2460\u2465"}], "title": "Changes"}], "external": false};
-window.dfnpanelData['offset-path'] = {"dfnID": "offset-path", "url": "#offset-path", "dfnText": "offset path", "refSections": [{"refs": [{"id": "ref-for-offset-path"}, {"id": "ref-for-offset-path\u2460"}, {"id": "ref-for-offset-path\u2461"}, {"id": "ref-for-offset-path\u2462"}, {"id": "ref-for-offset-path\u2463"}, {"id": "ref-for-offset-path\u2464"}], "title": "4.1. Define a path: The offset-path property"}, {"refs": [{"id": "ref-for-offset-path\u2465"}], "title": "4.1.1. Examples Of ray() Positioning"}, {"refs": [{"id": "ref-for-offset-path\u2466"}], "title": "4.1.3. Examples of <coord-box> Positioning"}, {"refs": [{"id": "ref-for-offset-path\u2467"}, {"id": "ref-for-offset-path\u2468"}, {"id": "ref-for-offset-path\u2460\u24ea"}, {"id": "ref-for-offset-path\u2460\u2460"}], "title": "4.2. Position on the path: The offset-distance property"}, {"refs": [{"id": "ref-for-offset-path\u2460\u2461"}, {"id": "ref-for-offset-path\u2460\u2462"}, {"id": "ref-for-offset-path\u2460\u2463"}, {"id": "ref-for-offset-path\u2460\u2464"}, {"id": "ref-for-offset-path\u2460\u2465"}, {"id": "ref-for-offset-path\u2460\u2466"}, {"id": "ref-for-offset-path\u2460\u2467"}, {"id": "ref-for-offset-path\u2460\u2468"}, {"id": "ref-for-offset-path\u2461\u24ea"}, {"id": "ref-for-offset-path\u2461\u2460"}, {"id": "ref-for-offset-path\u2461\u2461"}], "title": "4.2.1. Calculating the computed distance along a path"}, {"refs": [{"id": "ref-for-offset-path\u2461\u2462"}], "title": "4.3. Define the starting point of the path: The offset-position property"}, {"refs": [{"id": "ref-for-offset-path\u2461\u2463"}, {"id": "ref-for-offset-path\u2461\u2464"}], "title": "4.4. Define an anchor point: The offset-anchor property"}, {"refs": [{"id": "ref-for-offset-path\u2461\u2465"}, {"id": "ref-for-offset-path\u2461\u2466"}, {"id": "ref-for-offset-path\u2461\u2467"}, {"id": "ref-for-offset-path\u2461\u2468"}, {"id": "ref-for-offset-path\u2462\u24ea"}], "title": "4.5. Rotation at point: The offset-rotate property"}, {"refs": [{"id": "ref-for-offset-path\u2462\u2460"}, {"id": "ref-for-offset-path\u2462\u2461"}], "title": "4.5.1. Calculating the path transform"}, {"refs": [{"id": "ref-for-offset-path\u2462\u2462"}], "title": "Changes"}], "external": false};
-window.dfnpanelData['offset-path-initial-position'] = {"dfnID": "offset-path-initial-position", "url": "#offset-path-initial-position", "dfnText": "initial position", "refSections": [{"refs": [{"id": "ref-for-offset-path-initial-position"}], "title": "4.1. Define a path: The offset-path property"}, {"refs": [{"id": "ref-for-offset-path-initial-position\u2460"}], "title": "4.1.3. Examples of <coord-box> Positioning"}], "external": false};
-window.dfnpanelData['funcdef-offset-path-ray'] = {"dfnID": "funcdef-offset-path-ray", "url": "#funcdef-offset-path-ray", "dfnText": "ray()", "refSections": [{"refs": [{"id": "ref-for-funcdef-offset-path-ray"}], "title": "4.1. Define a path: The offset-path property"}, {"refs": [{"id": "ref-for-funcdef-offset-path-ray\u2460"}], "title": "4.1.1. Examples Of ray() Positioning"}, {"refs": [{"id": "ref-for-funcdef-offset-path-ray\u2461"}, {"id": "ref-for-funcdef-offset-path-ray\u2462"}], "title": "Changes"}], "external": false};
-window.dfnpanelData['size-closest-side'] = {"dfnID": "size-closest-side", "url": "#size-closest-side", "dfnText": "closest-side", "refSections": [{"refs": [{"id": "ref-for-size-closest-side"}], "title": "4.1. Define a path: The offset-path property"}], "external": false};
-window.dfnpanelData['size-farthest-side'] = {"dfnID": "size-farthest-side", "url": "#size-farthest-side", "dfnText": "farthest-side", "refSections": [{"refs": [{"id": "ref-for-size-farthest-side"}], "title": "4.1. Define a path: The offset-path property"}], "external": false};
-window.dfnpanelData['size-sides'] = {"dfnID": "size-sides", "url": "#size-sides", "dfnText": "sides", "refSections": [{"refs": [{"id": "ref-for-size-sides"}], "title": "4.1. Define a path: The offset-path property"}], "external": false};
-window.dfnpanelData['funcdef-offsetpath-pathfunc-path'] = {"dfnID": "funcdef-offsetpath-pathfunc-path", "url": "#funcdef-offsetpath-pathfunc-path", "dfnText": "path()", "refSections": [{"refs": [{"id": "ref-for-funcdef-offsetpath-pathfunc-path"}], "title": "4.1. Define a path: The offset-path property"}], "external": false};
-window.dfnpanelData['offsetpath-none'] = {"dfnID": "offsetpath-none", "url": "#offsetpath-none", "dfnText": "none", "refSections": [{"refs": [{"id": "ref-for-offsetpath-none"}, {"id": "ref-for-offsetpath-none"}], "title": "4.1. Define a path: The offset-path property"}, {"refs": [{"id": "ref-for-offsetpath-none"}, {"id": "ref-for-offsetpath-none"}], "title": "4.4. Define an anchor point: The offset-anchor property"}], "external": false};
-window.dfnpanelData['propdef-offset-distance'] = {"dfnID": "propdef-offset-distance", "url": "#propdef-offset-distance", "dfnText": "offset-distance", "refSections": [{"refs": [{"id": "ref-for-propdef-offset-distance"}], "title": "4. Motion Paths"}, {"refs": [{"id": "ref-for-propdef-offset-distance\u2460"}, {"id": "ref-for-propdef-offset-distance\u2461"}, {"id": "ref-for-propdef-offset-distance\u2462"}, {"id": "ref-for-propdef-offset-distance\u2463"}, {"id": "ref-for-propdef-offset-distance\u2464"}, {"id": "ref-for-propdef-offset-distance\u2465"}, {"id": "ref-for-propdef-offset-distance\u2466"}], "title": "4.1. Define a path: The offset-path property"}, {"refs": [{"id": "ref-for-propdef-offset-distance\u2467"}], "title": "4.2. Position on the path: The offset-distance property"}, {"refs": [{"id": "ref-for-propdef-offset-distance\u2468"}], "title": "4.2.1. Calculating the computed distance along a path"}, {"refs": [{"id": "ref-for-propdef-offset-distance\u2460\u24ea"}, {"id": "ref-for-propdef-offset-distance\u2460\u2460"}], "title": "4.5. Rotation at point: The offset-rotate property"}, {"refs": [{"id": "ref-for-propdef-offset-distance\u2460\u2461"}, {"id": "ref-for-propdef-offset-distance\u2460\u2462"}], "title": "4.6. Offset shorthand: The offset property"}, {"refs": [{"id": "ref-for-propdef-offset-distance\u2460\u2463"}], "title": "Changes"}], "external": false};
-window.dfnpanelData['used-offset-distance'] = {"dfnID": "used-offset-distance", "url": "#used-offset-distance", "dfnText": "used offset distance", "refSections": [{"refs": [{"id": "ref-for-used-offset-distance"}], "title": "4.1.1. Examples Of ray() Positioning"}, {"refs": [{"id": "ref-for-used-offset-distance\u2460"}, {"id": "ref-for-used-offset-distance\u2461"}, {"id": "ref-for-used-offset-distance\u2462"}, {"id": "ref-for-used-offset-distance\u2463"}, {"id": "ref-for-used-offset-distance\u2464"}], "title": "4.2.1. Calculating the computed distance along a path"}, {"refs": [{"id": "ref-for-used-offset-distance\u2465"}], "title": "4.5.1. Calculating the path transform"}], "external": false};
-window.dfnpanelData['offset-distance'] = {"dfnID": "offset-distance", "url": "#offset-distance", "dfnText": "offset distance", "refSections": [{"refs": [{"id": "ref-for-offset-distance"}, {"id": "ref-for-offset-distance\u2460"}, {"id": "ref-for-offset-distance\u2461"}, {"id": "ref-for-offset-distance\u2462"}, {"id": "ref-for-offset-distance\u2463"}], "title": "4.2.1. Calculating the computed distance along a path"}], "external": false};
-window.dfnpanelData['total-length'] = {"dfnID": "total-length", "url": "#total-length", "dfnText": "total length", "refSections": [{"refs": [{"id": "ref-for-total-length"}], "title": "4.2.1. Calculating the computed distance along a path"}], "external": false};
-window.dfnpanelData['propdef-offset-position'] = {"dfnID": "propdef-offset-position", "url": "#propdef-offset-position", "dfnText": "offset-position", "refSections": [{"refs": [{"id": "ref-for-propdef-offset-position"}], "title": "2. Module interactions"}, {"refs": [{"id": "ref-for-propdef-offset-position\u2460"}], "title": "4. Motion Paths"}, {"refs": [{"id": "ref-for-propdef-offset-position\u2461"}, {"id": "ref-for-propdef-offset-position\u2462"}], "title": "4.1. Define a path: The offset-path property"}, {"refs": [{"id": "ref-for-propdef-offset-position\u2463"}, {"id": "ref-for-propdef-offset-position\u2464"}, {"id": "ref-for-propdef-offset-position\u2465"}, {"id": "ref-for-propdef-offset-position\u2466"}, {"id": "ref-for-propdef-offset-position\u2467"}, {"id": "ref-for-propdef-offset-position\u2468"}, {"id": "ref-for-propdef-offset-position\u2460\u24ea"}, {"id": "ref-for-propdef-offset-position\u2460\u2460"}, {"id": "ref-for-propdef-offset-position\u2460\u2461"}, {"id": "ref-for-propdef-offset-position\u2460\u2462"}, {"id": "ref-for-propdef-offset-position\u2460\u2463"}, {"id": "ref-for-propdef-offset-position\u2460\u2464"}], "title": "4.3. Define the starting point of the path: The offset-position property"}, {"refs": [{"id": "ref-for-propdef-offset-position\u2460\u2465"}, {"id": "ref-for-propdef-offset-position\u2460\u2466"}, {"id": "ref-for-propdef-offset-position\u2460\u2467"}], "title": "4.4. Define an anchor point: The offset-anchor property"}, {"refs": [{"id": "ref-for-propdef-offset-position\u2460\u2468"}], "title": "4.5.1. Calculating the path transform"}, {"refs": [{"id": "ref-for-propdef-offset-position\u2461\u24ea"}, {"id": "ref-for-propdef-offset-position\u2461\u2460"}], "title": "4.6. Offset shorthand: The offset property"}, {"refs": [{"id": "ref-for-propdef-offset-position\u2461\u2461"}], "title": "Changes"}], "external": false};
-window.dfnpanelData['propdef-offset-anchor'] = {"dfnID": "propdef-offset-anchor", "url": "#propdef-offset-anchor", "dfnText": "offset-anchor", "refSections": [{"refs": [{"id": "ref-for-propdef-offset-anchor"}], "title": "4. Motion Paths"}, {"refs": [{"id": "ref-for-propdef-offset-anchor\u2460"}, {"id": "ref-for-propdef-offset-anchor\u2461"}, {"id": "ref-for-propdef-offset-anchor\u2462"}], "title": "4.4. Define an anchor point: The offset-anchor property"}, {"refs": [{"id": "ref-for-propdef-offset-anchor\u2463"}, {"id": "ref-for-propdef-offset-anchor\u2464"}], "title": "4.6. Offset shorthand: The offset property"}, {"refs": [{"id": "ref-for-propdef-offset-anchor\u2465"}], "title": "Changes"}], "external": false};
-window.dfnpanelData['anchor-point'] = {"dfnID": "anchor-point", "url": "#anchor-point", "dfnText": "anchor point", "refSections": [{"refs": [{"id": "ref-for-anchor-point"}], "title": "4. Motion Paths"}, {"refs": [{"id": "ref-for-anchor-point\u2460"}], "title": "4.2. Position on the path: The offset-distance property"}, {"refs": [{"id": "ref-for-anchor-point\u2461"}, {"id": "ref-for-anchor-point\u2462"}, {"id": "ref-for-anchor-point\u2463"}, {"id": "ref-for-anchor-point\u2464"}, {"id": "ref-for-anchor-point\u2465"}, {"id": "ref-for-anchor-point\u2466"}], "title": "4.4. Define an anchor point: The offset-anchor property"}, {"refs": [{"id": "ref-for-anchor-point\u2467"}, {"id": "ref-for-anchor-point\u2468"}, {"id": "ref-for-anchor-point\u2460\u24ea"}], "title": "4.5. Rotation at point: The offset-rotate property"}, {"refs": [{"id": "ref-for-anchor-point\u2460\u2460"}], "title": "4.5.1. Calculating the path transform"}], "external": false};
-window.dfnpanelData['propdef-offset-rotate'] = {"dfnID": "propdef-offset-rotate", "url": "#propdef-offset-rotate", "dfnText": "offset-rotate", "refSections": [{"refs": [{"id": "ref-for-propdef-offset-rotate"}], "title": "4. Motion Paths"}, {"refs": [{"id": "ref-for-propdef-offset-rotate\u2460"}, {"id": "ref-for-propdef-offset-rotate\u2461"}, {"id": "ref-for-propdef-offset-rotate\u2462"}], "title": "4.1. Define a path: The offset-path property"}, {"refs": [{"id": "ref-for-propdef-offset-rotate\u2463"}, {"id": "ref-for-propdef-offset-rotate\u2464"}, {"id": "ref-for-propdef-offset-rotate\u2465"}, {"id": "ref-for-propdef-offset-rotate\u2466"}, {"id": "ref-for-propdef-offset-rotate\u2467"}, {"id": "ref-for-propdef-offset-rotate\u2468"}], "title": "4.5. Rotation at point: The offset-rotate property"}, {"refs": [{"id": "ref-for-propdef-offset-rotate\u2460\u24ea"}], "title": "4.5.1. Calculating the path transform"}, {"refs": [{"id": "ref-for-propdef-offset-rotate\u2460\u2460"}, {"id": "ref-for-propdef-offset-rotate\u2460\u2461"}], "title": "4.6. Offset shorthand: The offset property"}, {"refs": [{"id": "ref-for-propdef-offset-rotate\u2460\u2462"}, {"id": "ref-for-propdef-offset-rotate\u2460\u2463"}], "title": "Changes"}], "external": false};
-window.dfnpanelData['valdef-offset-rotate-auto'] = {"dfnID": "valdef-offset-rotate-auto", "url": "#valdef-offset-rotate-auto", "dfnText": "auto", "refSections": [{"refs": [{"id": "ref-for-valdef-offset-rotate-auto"}], "title": "4.1. Define a path: The offset-path property"}, {"refs": [{"id": "ref-for-valdef-offset-rotate-auto\u2460"}, {"id": "ref-for-valdef-offset-rotate-auto\u2461"}, {"id": "ref-for-valdef-offset-rotate-auto\u2462"}], "title": "4.3. Define the starting point of the path: The offset-position property"}, {"refs": [{"id": "ref-for-valdef-offset-rotate-auto\u2463"}, {"id": "ref-for-valdef-offset-rotate-auto\u2464"}], "title": "4.4. Define an anchor point: The offset-anchor property"}, {"refs": [{"id": "ref-for-valdef-offset-rotate-auto\u2465"}, {"id": "ref-for-valdef-offset-rotate-auto\u2466"}, {"id": "ref-for-valdef-offset-rotate-auto\u2467"}, {"id": "ref-for-valdef-offset-rotate-auto\u2468"}, {"id": "ref-for-valdef-offset-rotate-auto\u2460\u24ea"}, {"id": "ref-for-valdef-offset-rotate-auto\u2460\u2460"}, {"id": "ref-for-valdef-offset-rotate-auto\u2460\u2461"}], "title": "4.5. Rotation at point: The offset-rotate property"}, {"refs": [{"id": "ref-for-valdef-offset-rotate-auto\u2460\u2462"}], "title": "Changes"}], "external": false};
-window.dfnpanelData['valdef-offset-rotate-reverse'] = {"dfnID": "valdef-offset-rotate-reverse", "url": "#valdef-offset-rotate-reverse", "dfnText": "reverse", "refSections": [{"refs": [{"id": "ref-for-valdef-offset-rotate-reverse"}, {"id": "ref-for-valdef-offset-rotate-reverse\u2460"}, {"id": "ref-for-valdef-offset-rotate-reverse\u2461"}, {"id": "ref-for-valdef-offset-rotate-reverse\u2462"}, {"id": "ref-for-valdef-offset-rotate-reverse\u2463"}], "title": "4.5. Rotation at point: The offset-rotate property"}, {"refs": [{"id": "ref-for-valdef-offset-rotate-reverse\u2464"}], "title": "Changes"}], "external": false};
-window.dfnpanelData['t1'] = {"dfnID": "t1", "url": "#t1", "dfnText": "T1", "refSections": [{"refs": [{"id": "ref-for-t1"}, {"id": "ref-for-t1\u2460"}], "title": "4.5.1. Calculating the path transform"}], "external": false};
-window.dfnpanelData['t2'] = {"dfnID": "t2", "url": "#t2", "dfnText": "T2", "refSections": [{"refs": [{"id": "ref-for-t2"}, {"id": "ref-for-t2\u2460"}, {"id": "ref-for-t2\u2461"}], "title": "4.5.1. Calculating the path transform"}], "external": false};
-window.dfnpanelData['p'] = {"dfnID": "p", "url": "#p", "dfnText": "P", "refSections": [{"refs": [{"id": "ref-for-p"}], "title": "4.5.1. Calculating the path transform"}], "external": false};
-window.dfnpanelData['propdef-offset'] = {"dfnID": "propdef-offset", "url": "#propdef-offset", "dfnText": "offset", "refSections": [{"refs": [{"id": "ref-for-propdef-offset"}], "title": "4.6. Offset shorthand: The offset property"}, {"refs": [{"id": "ref-for-propdef-offset\u2460"}], "title": "Changes"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -3347,16 +2877,484 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"d27a809f": {"dfnID":"d27a809f","dfnText":"background-position","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-background-position"}],"title":"4.4. Define an anchor point: The offset-anchor property"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-background-position"},
+"5f1a81e7": {"dfnID":"5f1a81e7","dfnText":"border-radius","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-border-radius"},{"id":"ref-for-propdef-border-radius\u2460"}],"title":"4.1. Define a path: The offset-path property"},{"refs":[{"id":"ref-for-propdef-border-radius\u2461"}],"title":"4.1.3. Examples of <coord-box> Positioning"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-border-radius"},
+"784ef06e": {"dfnID":"784ef06e","dfnText":"<coord-box>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-coord-box"},{"id":"ref-for-typedef-coord-box\u2460"},{"id":"ref-for-typedef-coord-box\u2461"},{"id":"ref-for-typedef-coord-box\u2462"},{"id":"ref-for-typedef-coord-box\u2463"}],"title":"4.1. Define a path: The offset-path property"},{"refs":[{"id":"ref-for-typedef-coord-box\u2464"},{"id":"ref-for-typedef-coord-box\u2465"}],"title":"4.1.3. Examples of <coord-box> Positioning"}],"url":"https://drafts.csswg.org/css-box-4/#typedef-coord-box"},
+"a4eb3c57": {"dfnID":"a4eb3c57","dfnText":"used value","external":true,"refSections":[{"refs":[{"id":"ref-for-used-value"},{"id":"ref-for-used-value\u2460"}],"title":"4.1. Define a path: The offset-path property"}],"url":"https://drafts.csswg.org/css-cascade-5/#used-value"},
+"754e7a89": {"dfnID":"754e7a89","dfnText":"contain","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-contain"},{"id":"ref-for-propdef-contain\u2460"},{"id":"ref-for-propdef-contain\u2461"}],"title":"4.1.1. Examples Of ray() Positioning"},{"refs":[{"id":"ref-for-propdef-contain\u2462"}],"title":"Changes"}],"url":"https://drafts.csswg.org/css-contain-2/#propdef-contain"},
+"bd95103a": {"dfnID":"bd95103a","dfnText":"<size>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-size"},{"id":"ref-for-typedef-size\u2460"}],"title":"4.1. Define a path: The offset-path property"},{"refs":[{"id":"ref-for-typedef-size\u2461"}],"title":"Changes"}],"url":"https://www.w3.org/TR/css-images-3/#typedef-size"},
+"101119a4": {"dfnID":"101119a4","dfnText":"<geometry-box>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-geometry-box"}],"title":"4.3. Define the starting point of the path: The offset-position property"}],"url":"https://drafts.fxtf.org/css-masking-1/#typedef-geometry-box"},
+"4bdbccda": {"dfnID":"4bdbccda","dfnText":"border-box","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-mask-clip-border-box"},{"id":"ref-for-valdef-mask-clip-border-box\u2460"}],"title":"4.1. Define a path: The offset-path property"}],"url":"https://drafts.fxtf.org/css-masking-1/#valdef-mask-clip-border-box"},
+"581e67aa": {"dfnID":"581e67aa","dfnText":"content-box","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-mask-clip-content-box"}],"title":"4.1. Define a path: The offset-path property"}],"url":"https://drafts.fxtf.org/css-masking-1/#valdef-mask-clip-content-box"},
+"f0d904ae": {"dfnID":"f0d904ae","dfnText":"fill-box","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-clip-path-fill-box"},{"id":"ref-for-valdef-clip-path-fill-box\u2460"}],"title":"4.1. Define a path: The offset-path property"}],"url":"https://drafts.fxtf.org/css-masking-1/#valdef-clip-path-fill-box"},
+"ae53b4d9": {"dfnID":"ae53b4d9","dfnText":"padding-box","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-mask-clip-padding-box"}],"title":"4.1. Define a path: The offset-path property"}],"url":"https://drafts.fxtf.org/css-masking-1/#valdef-mask-clip-padding-box"},
+"e76c09ea": {"dfnID":"e76c09ea","dfnText":"stroke-box","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-clip-path-stroke-box"}],"title":"4.1. Define a path: The offset-path property"}],"url":"https://drafts.fxtf.org/css-masking-1/#valdef-clip-path-stroke-box"},
+"7e059d0c": {"dfnID":"7e059d0c","dfnText":"view-box","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-clip-path-view-box"}],"title":"4.1. Define a path: The offset-path property"}],"url":"https://drafts.fxtf.org/css-masking-1/#valdef-clip-path-view-box"},
+"dde41168": {"dfnID":"dde41168","dfnText":"left","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-left"}],"title":"4.3. Define the starting point of the path: The offset-position property"}],"url":"https://drafts.csswg.org/css-position-3/#propdef-left"},
+"b8a0ba74": {"dfnID":"b8a0ba74","dfnText":"position","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-position"},{"id":"ref-for-propdef-position\u2460"},{"id":"ref-for-propdef-position\u2461"},{"id":"ref-for-propdef-position\u2462"}],"title":"4.3. Define the starting point of the path: The offset-position property"}],"url":"https://drafts.csswg.org/css-position-3/#propdef-position"},
+"288dfcac": {"dfnID":"288dfcac","dfnText":"static","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-position-static"},{"id":"ref-for-valdef-position-static\u2460"},{"id":"ref-for-valdef-position-static\u2461"}],"title":"4.3. Define the starting point of the path: The offset-position property"}],"url":"https://drafts.csswg.org/css-position-3/#valdef-position-static"},
+"e1483d91": {"dfnID":"e1483d91","dfnText":"top","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-top"}],"title":"4.3. Define the starting point of the path: The offset-position property"}],"url":"https://drafts.csswg.org/css-position-3/#propdef-top"},
+"bce13de7": {"dfnID":"bce13de7","dfnText":"<basic-shape>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-basic-shape"},{"id":"ref-for-typedef-basic-shape\u2460"},{"id":"ref-for-typedef-basic-shape\u2461"},{"id":"ref-for-typedef-basic-shape\u2462"}],"title":"4.1. Define a path: The offset-path property"},{"refs":[{"id":"ref-for-typedef-basic-shape\u2463"}],"title":"4.1.2. Examples Of <basic-shape> Positioning"}],"url":"https://drafts.csswg.org/css-shapes-1/#typedef-basic-shape"},
+"37df27a7": {"dfnID":"37df27a7","dfnText":"circle()","external":true,"refSections":[{"refs":[{"id":"ref-for-funcdef-basic-shape-circle"}],"title":"4.1. Define a path: The offset-path property"}],"url":"https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-circle"},
+"c1b815c4": {"dfnID":"c1b815c4","dfnText":"ellipse()","external":true,"refSections":[{"refs":[{"id":"ref-for-funcdef-basic-shape-ellipse"}],"title":"4.1. Define a path: The offset-path property"}],"url":"https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-ellipse"},
+"020bceec": {"dfnID":"020bceec","dfnText":"inset()","external":true,"refSections":[{"refs":[{"id":"ref-for-funcdef-basic-shape-inset"}],"title":"4.1. Define a path: The offset-path property"}],"url":"https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-inset"},
+"9bae10e5": {"dfnID":"9bae10e5","dfnText":"polygon()","external":true,"refSections":[{"refs":[{"id":"ref-for-funcdef-basic-shape-polygon"}],"title":"4.1. Define a path: The offset-path property"}],"url":"https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-polygon"},
+"c62d98eb": {"dfnID":"c62d98eb","dfnText":"local coordinate system","external":true,"refSections":[{"refs":[{"id":"ref-for-local-coordinate-system"}],"title":"1. Introduction"}],"url":"https://drafts.csswg.org/css-transforms-1/#local-coordinate-system"},
+"d8eb5956": {"dfnID":"d8eb5956","dfnText":"rotate()","external":true,"refSections":[{"refs":[{"id":"ref-for-funcdef-transform-rotate"}],"title":"4.5.1. Calculating the path transform"}],"url":"https://drafts.csswg.org/css-transforms-1/#funcdef-transform-rotate"},
+"e2e08d07": {"dfnID":"e2e08d07","dfnText":"transform","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-transform"}],"title":"2. Module interactions"},{"refs":[{"id":"67291a070"}],"title":"4.1. Define a path: The offset-path property"},{"refs":[{"id":"67291a071"},{"id":"ref-for-propdef-transform\u2460"}],"title":"4.3. Define the starting point of the path: The offset-position property"},{"refs":[{"id":"ref-for-propdef-transform\u2461"}],"title":"4.5. Rotation at point: The offset-rotate property"}],"url":"https://drafts.csswg.org/css-transforms-1/#propdef-transform"},
+"09f2cf3e": {"dfnID":"09f2cf3e","dfnText":"transform-origin","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-transform-origin"}],"title":"4.4. Define an anchor point: The offset-anchor property"}],"url":"https://drafts.csswg.org/css-transforms-1/#propdef-transform-origin"},
+"6ae98fc9": {"dfnID":"6ae98fc9","dfnText":"rotate","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-rotate"}],"title":"2. Module interactions"},{"refs":[{"id":"ref-for-propdef-rotate\u2460"}],"title":"4.3. Define the starting point of the path: The offset-position property"}],"url":"https://drafts.csswg.org/css-transforms-2/#propdef-rotate"},
+"223bd4c4": {"dfnID":"223bd4c4","dfnText":"scale","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-scale"}],"title":"2. Module interactions"},{"refs":[{"id":"ref-for-propdef-scale\u2460"}],"title":"4.3. Define the starting point of the path: The offset-position property"}],"url":"https://drafts.csswg.org/css-transforms-2/#propdef-scale"},
+"a48ce1c0": {"dfnID":"a48ce1c0","dfnText":"translate","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-translate"}],"title":"2. Module interactions"}],"url":"https://drafts.csswg.org/css-transforms-2/#propdef-translate"},
+"08eba280": {"dfnID":"08eba280","dfnText":"!","external":true,"refSections":[{"refs":[{"id":"ref-for-mult-req"}],"title":"4.6. Offset shorthand: The offset property"}],"url":"https://drafts.csswg.org/css-values-4/#mult-req"},
+"f0809abc": {"dfnID":"f0809abc","dfnText":"&&","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-all"}],"title":"4.1. Define a path: The offset-path property"}],"url":"https://drafts.csswg.org/css-values-4/#comb-all"},
+"3559c926": {"dfnID":"3559c926","dfnText":"<angle>","external":true,"refSections":[{"refs":[{"id":"ref-for-angle-value"},{"id":"ref-for-angle-value\u2460"},{"id":"ref-for-angle-value\u2461"},{"id":"ref-for-angle-value\u2462"},{"id":"ref-for-angle-value\u2463"}],"title":"4.1. Define a path: The offset-path property"},{"refs":[{"id":"ref-for-angle-value\u2464"},{"id":"ref-for-angle-value\u2465"},{"id":"ref-for-angle-value\u2466"}],"title":"4.2.1. Calculating the computed distance along a path"},{"refs":[{"id":"ref-for-angle-value\u2467"},{"id":"ref-for-angle-value\u2468"},{"id":"ref-for-angle-value\u2460\u24ea"},{"id":"ref-for-angle-value\u2460\u2460"},{"id":"ref-for-angle-value\u2460\u2461"},{"id":"ref-for-angle-value\u2460\u2462"},{"id":"ref-for-angle-value\u2460\u2463"},{"id":"ref-for-angle-value\u2460\u2464"},{"id":"ref-for-angle-value\u2460\u2465"},{"id":"ref-for-angle-value\u2460\u2466"}],"title":"4.5. Rotation at point: The offset-rotate property"},{"refs":[{"id":"ref-for-angle-value\u2460\u2467"},{"id":"ref-for-angle-value\u2460\u2468"}],"title":"Changes"}],"url":"https://drafts.csswg.org/css-values-4/#angle-value"},
+"18222566": {"dfnID":"18222566","dfnText":"<length-percentage>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-length-percentage"},{"id":"ref-for-typedef-length-percentage\u2460"},{"id":"ref-for-typedef-length-percentage\u2461"}],"title":"4.2. Position on the path: The offset-distance property"}],"url":"https://drafts.csswg.org/css-values-4/#typedef-length-percentage"},
+"fb030e6c": {"dfnID":"fb030e6c","dfnText":"<length>","external":true,"refSections":[{"refs":[{"id":"ref-for-length-value"}],"title":"4.3. Define the starting point of the path: The offset-position property"},{"refs":[{"id":"ref-for-length-value\u2460"},{"id":"ref-for-length-value\u2461"}],"title":"4.4. Define an anchor point: The offset-anchor property"}],"url":"https://drafts.csswg.org/css-values-4/#length-value"},
+"15f5b381": {"dfnID":"15f5b381","dfnText":"<percentage>","external":true,"refSections":[{"refs":[{"id":"ref-for-percentage-value"}],"title":"4.4. Define an anchor point: The offset-anchor property"}],"url":"https://drafts.csswg.org/css-values-4/#percentage-value"},
+"2cd27cd8": {"dfnID":"2cd27cd8","dfnText":"<position>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-position"},{"id":"ref-for-typedef-position\u2460"}],"title":"4.3. Define the starting point of the path: The offset-position property"},{"refs":[{"id":"ref-for-typedef-position\u2461"},{"id":"ref-for-typedef-position\u2462"}],"title":"4.4. Define an anchor point: The offset-anchor property"}],"url":"https://drafts.csswg.org/css-values-4/#typedef-position"},
+"977d3003": {"dfnID":"977d3003","dfnText":"<string>","external":true,"refSections":[{"refs":[{"id":"ref-for-string-value"},{"id":"ref-for-string-value\u2460"}],"title":"4.1. Define a path: The offset-path property"}],"url":"https://drafts.csswg.org/css-values-4/#string-value"},
+"fa293cdd": {"dfnID":"fa293cdd","dfnText":"<url>","external":true,"refSections":[{"refs":[{"id":"ref-for-url-value"},{"id":"ref-for-url-value\u2460"}],"title":"4.1. Define a path: The offset-path property"}],"url":"https://drafts.csswg.org/css-values-4/#url-value"},
+"537cf076": {"dfnID":"537cf076","dfnText":"?","external":true,"refSections":[{"refs":[{"id":"ref-for-mult-opt"}],"title":"4.1. Define a path: The offset-path property"},{"refs":[{"id":"ref-for-mult-opt\u2460"},{"id":"ref-for-mult-opt\u2461"},{"id":"ref-for-mult-opt\u2462"},{"id":"ref-for-mult-opt\u2463"}],"title":"4.6. Offset shorthand: The offset property"}],"url":"https://drafts.csswg.org/css-values-4/#mult-opt"},
+"6ec67710": {"dfnID":"6ec67710","dfnText":"|","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-one"},{"id":"ref-for-comb-one\u2460"},{"id":"ref-for-comb-one\u2461"},{"id":"ref-for-comb-one\u2462"},{"id":"ref-for-comb-one\u2463"}],"title":"4.1. Define a path: The offset-path property"},{"refs":[{"id":"ref-for-comb-one\u2464"}],"title":"4.3. Define the starting point of the path: The offset-position property"},{"refs":[{"id":"ref-for-comb-one\u2465"}],"title":"4.4. Define an anchor point: The offset-anchor property"},{"refs":[{"id":"ref-for-comb-one\u2466"}],"title":"4.5. Rotation at point: The offset-rotate property"}],"url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"8a82fda1": {"dfnID":"8a82fda1","dfnText":"||","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-any"}],"title":"4.5. Rotation at point: The offset-rotate property"},{"refs":[{"id":"ref-for-comb-any\u2460"}],"title":"4.6. Offset shorthand: The offset property"}],"url":"https://drafts.csswg.org/css-values-4/#comb-any"},
+"d8bec048": {"dfnID":"d8bec048","dfnText":"direction of a path","external":true,"refSections":[{"refs":[{"id":"ref-for-TermPathDirection"}],"title":"4.5. Rotation at point: The offset-rotate property"}],"url":"https://svgwg.org/svg2-draft/paths.html#TermPathDirection"},
+"3a660536": {"dfnID":"3a660536","dfnText":"shape elements","external":true,"refSections":[{"refs":[{"id":"ref-for-TermShapeElement"},{"id":"ref-for-TermShapeElement\u2460"},{"id":"ref-for-TermShapeElement\u2461"},{"id":"ref-for-TermShapeElement\u2462"}],"title":"4.1. Define a path: The offset-path property"}],"url":"https://svgwg.org/svg2-draft/shapes.html#TermShapeElement"},
+"3c067729": {"dfnID":"3c067729","dfnText":"stacking contexts","external":true,"refSections":[{"refs":[{"id":"ref-for-TermStackingContext"}],"title":"2. Module interactions"},{"refs":[{"id":"ref-for-TermStackingContext\u2460"}],"title":"4.1. Define a path: The offset-path property"},{"refs":[{"id":"ref-for-TermStackingContext\u2461"}],"title":"4.3. Define the starting point of the path: The offset-position property"}],"url":"https://svgwg.org/svg2-draft/render.html#TermStackingContext"},
+"propdef-offset-path": {"dfnID":"propdef-offset-path","dfnText":"offset-path","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-offset-path"}],"title":"2. Module interactions"},{"refs":[{"id":"ref-for-propdef-offset-path\u2460"}],"title":"4. Motion Paths"},{"refs":[{"id":"ref-for-propdef-offset-path\u2461"},{"id":"ref-for-propdef-offset-path\u2462"}],"title":"4.1. Define a path: The offset-path property"},{"refs":[{"id":"ref-for-propdef-offset-path\u2463"},{"id":"ref-for-propdef-offset-path\u2464"},{"id":"ref-for-propdef-offset-path\u2465"},{"id":"ref-for-propdef-offset-path\u2466"}],"title":"4.1.1. Examples Of ray() Positioning"},{"refs":[{"id":"ref-for-propdef-offset-path\u2467"}],"title":"4.2.1. Calculating the computed distance along a path"},{"refs":[{"id":"ref-for-propdef-offset-path\u2468"},{"id":"ref-for-propdef-offset-path\u2460\u24ea"},{"id":"ref-for-propdef-offset-path\u2460\u2460"}],"title":"4.3. Define the starting point of the path: The offset-position property"},{"refs":[{"id":"ref-for-propdef-offset-path\u2460\u2461"},{"id":"ref-for-propdef-offset-path\u2460\u2462"}],"title":"4.4. Define an anchor point: The offset-anchor property"},{"refs":[{"id":"ref-for-propdef-offset-path\u2460\u2463"},{"id":"ref-for-propdef-offset-path\u2460\u2464"}],"title":"4.6. Offset shorthand: The offset property"},{"refs":[{"id":"ref-for-propdef-offset-path\u2460\u2465"}],"title":"Changes"}],"url":"#propdef-offset-path"},
+"offset-path": {"dfnID":"offset-path","dfnText":"offset path","external":false,"refSections":[{"refs":[{"id":"ref-for-offset-path"},{"id":"ref-for-offset-path\u2460"},{"id":"ref-for-offset-path\u2461"},{"id":"ref-for-offset-path\u2462"},{"id":"ref-for-offset-path\u2463"},{"id":"ref-for-offset-path\u2464"}],"title":"4.1. Define a path: The offset-path property"},{"refs":[{"id":"ref-for-offset-path\u2465"}],"title":"4.1.1. Examples Of ray() Positioning"},{"refs":[{"id":"ref-for-offset-path\u2466"}],"title":"4.1.3. Examples of <coord-box> Positioning"},{"refs":[{"id":"ref-for-offset-path\u2467"},{"id":"ref-for-offset-path\u2468"},{"id":"ref-for-offset-path\u2460\u24ea"},{"id":"ref-for-offset-path\u2460\u2460"}],"title":"4.2. Position on the path: The offset-distance property"},{"refs":[{"id":"ref-for-offset-path\u2460\u2461"},{"id":"ref-for-offset-path\u2460\u2462"},{"id":"ref-for-offset-path\u2460\u2463"},{"id":"ref-for-offset-path\u2460\u2464"},{"id":"ref-for-offset-path\u2460\u2465"},{"id":"ref-for-offset-path\u2460\u2466"},{"id":"ref-for-offset-path\u2460\u2467"},{"id":"ref-for-offset-path\u2460\u2468"},{"id":"ref-for-offset-path\u2461\u24ea"},{"id":"ref-for-offset-path\u2461\u2460"},{"id":"ref-for-offset-path\u2461\u2461"}],"title":"4.2.1. Calculating the computed distance along a path"},{"refs":[{"id":"ref-for-offset-path\u2461\u2462"}],"title":"4.3. Define the starting point of the path: The offset-position property"},{"refs":[{"id":"ref-for-offset-path\u2461\u2463"},{"id":"ref-for-offset-path\u2461\u2464"}],"title":"4.4. Define an anchor point: The offset-anchor property"},{"refs":[{"id":"ref-for-offset-path\u2461\u2465"},{"id":"ref-for-offset-path\u2461\u2466"},{"id":"ref-for-offset-path\u2461\u2467"},{"id":"ref-for-offset-path\u2461\u2468"},{"id":"ref-for-offset-path\u2462\u24ea"}],"title":"4.5. Rotation at point: The offset-rotate property"},{"refs":[{"id":"ref-for-offset-path\u2462\u2460"},{"id":"ref-for-offset-path\u2462\u2461"}],"title":"4.5.1. Calculating the path transform"},{"refs":[{"id":"ref-for-offset-path\u2462\u2462"}],"title":"Changes"}],"url":"#offset-path"},
+"offset-path-initial-position": {"dfnID":"offset-path-initial-position","dfnText":"initial position","external":false,"refSections":[{"refs":[{"id":"ref-for-offset-path-initial-position"}],"title":"4.1. Define a path: The offset-path property"},{"refs":[{"id":"ref-for-offset-path-initial-position\u2460"}],"title":"4.1.3. Examples of <coord-box> Positioning"}],"url":"#offset-path-initial-position"},
+"funcdef-offset-path-ray": {"dfnID":"funcdef-offset-path-ray","dfnText":"ray()","external":false,"refSections":[{"refs":[{"id":"ref-for-funcdef-offset-path-ray"}],"title":"4.1. Define a path: The offset-path property"},{"refs":[{"id":"ref-for-funcdef-offset-path-ray\u2460"}],"title":"4.1.1. Examples Of ray() Positioning"},{"refs":[{"id":"ref-for-funcdef-offset-path-ray\u2461"},{"id":"ref-for-funcdef-offset-path-ray\u2462"}],"title":"Changes"}],"url":"#funcdef-offset-path-ray"},
+"size-closest-side": {"dfnID":"size-closest-side","dfnText":"closest-side","external":false,"refSections":[{"refs":[{"id":"ref-for-size-closest-side"}],"title":"4.1. Define a path: The offset-path property"}],"url":"#size-closest-side"},
+"size-farthest-side": {"dfnID":"size-farthest-side","dfnText":"farthest-side","external":false,"refSections":[{"refs":[{"id":"ref-for-size-farthest-side"}],"title":"4.1. Define a path: The offset-path property"}],"url":"#size-farthest-side"},
+"size-sides": {"dfnID":"size-sides","dfnText":"sides","external":false,"refSections":[{"refs":[{"id":"ref-for-size-sides"}],"title":"4.1. Define a path: The offset-path property"}],"url":"#size-sides"},
+"funcdef-offsetpath-pathfunc-path": {"dfnID":"funcdef-offsetpath-pathfunc-path","dfnText":"path()","external":false,"refSections":[{"refs":[{"id":"ref-for-funcdef-offsetpath-pathfunc-path"}],"title":"4.1. Define a path: The offset-path property"}],"url":"#funcdef-offsetpath-pathfunc-path"},
+"offsetpath-none": {"dfnID":"offsetpath-none","dfnText":"none","external":false,"refSections":[{"refs":[{"id":"ref-for-offsetpath-none"},{"id":"ref-for-offsetpath-none"}],"title":"4.1. Define a path: The offset-path property"},{"refs":[{"id":"ref-for-offsetpath-none"},{"id":"ref-for-offsetpath-none"}],"title":"4.4. Define an anchor point: The offset-anchor property"}],"url":"#offsetpath-none"},
+"propdef-offset-distance": {"dfnID":"propdef-offset-distance","dfnText":"offset-distance","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-offset-distance"}],"title":"4. Motion Paths"},{"refs":[{"id":"ref-for-propdef-offset-distance\u2460"},{"id":"ref-for-propdef-offset-distance\u2461"},{"id":"ref-for-propdef-offset-distance\u2462"},{"id":"ref-for-propdef-offset-distance\u2463"},{"id":"ref-for-propdef-offset-distance\u2464"},{"id":"ref-for-propdef-offset-distance\u2465"},{"id":"ref-for-propdef-offset-distance\u2466"}],"title":"4.1. Define a path: The offset-path property"},{"refs":[{"id":"ref-for-propdef-offset-distance\u2467"}],"title":"4.2. Position on the path: The offset-distance property"},{"refs":[{"id":"ref-for-propdef-offset-distance\u2468"}],"title":"4.2.1. Calculating the computed distance along a path"},{"refs":[{"id":"ref-for-propdef-offset-distance\u2460\u24ea"},{"id":"ref-for-propdef-offset-distance\u2460\u2460"}],"title":"4.5. Rotation at point: The offset-rotate property"},{"refs":[{"id":"ref-for-propdef-offset-distance\u2460\u2461"},{"id":"ref-for-propdef-offset-distance\u2460\u2462"}],"title":"4.6. Offset shorthand: The offset property"},{"refs":[{"id":"ref-for-propdef-offset-distance\u2460\u2463"}],"title":"Changes"}],"url":"#propdef-offset-distance"},
+"used-offset-distance": {"dfnID":"used-offset-distance","dfnText":"used offset distance","external":false,"refSections":[{"refs":[{"id":"ref-for-used-offset-distance"}],"title":"4.1.1. Examples Of ray() Positioning"},{"refs":[{"id":"ref-for-used-offset-distance\u2460"},{"id":"ref-for-used-offset-distance\u2461"},{"id":"ref-for-used-offset-distance\u2462"},{"id":"ref-for-used-offset-distance\u2463"},{"id":"ref-for-used-offset-distance\u2464"}],"title":"4.2.1. Calculating the computed distance along a path"},{"refs":[{"id":"ref-for-used-offset-distance\u2465"}],"title":"4.5.1. Calculating the path transform"}],"url":"#used-offset-distance"},
+"offset-distance": {"dfnID":"offset-distance","dfnText":"offset distance","external":false,"refSections":[{"refs":[{"id":"ref-for-offset-distance"},{"id":"ref-for-offset-distance\u2460"},{"id":"ref-for-offset-distance\u2461"},{"id":"ref-for-offset-distance\u2462"},{"id":"ref-for-offset-distance\u2463"}],"title":"4.2.1. Calculating the computed distance along a path"}],"url":"#offset-distance"},
+"total-length": {"dfnID":"total-length","dfnText":"total length","external":false,"refSections":[{"refs":[{"id":"ref-for-total-length"}],"title":"4.2.1. Calculating the computed distance along a path"}],"url":"#total-length"},
+"propdef-offset-position": {"dfnID":"propdef-offset-position","dfnText":"offset-position","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-offset-position"}],"title":"2. Module interactions"},{"refs":[{"id":"ref-for-propdef-offset-position\u2460"}],"title":"4. Motion Paths"},{"refs":[{"id":"ref-for-propdef-offset-position\u2461"},{"id":"ref-for-propdef-offset-position\u2462"}],"title":"4.1. Define a path: The offset-path property"},{"refs":[{"id":"ref-for-propdef-offset-position\u2463"},{"id":"ref-for-propdef-offset-position\u2464"},{"id":"ref-for-propdef-offset-position\u2465"},{"id":"ref-for-propdef-offset-position\u2466"},{"id":"ref-for-propdef-offset-position\u2467"},{"id":"ref-for-propdef-offset-position\u2468"},{"id":"ref-for-propdef-offset-position\u2460\u24ea"},{"id":"ref-for-propdef-offset-position\u2460\u2460"},{"id":"ref-for-propdef-offset-position\u2460\u2461"},{"id":"ref-for-propdef-offset-position\u2460\u2462"},{"id":"ref-for-propdef-offset-position\u2460\u2463"},{"id":"ref-for-propdef-offset-position\u2460\u2464"}],"title":"4.3. Define the starting point of the path: The offset-position property"},{"refs":[{"id":"ref-for-propdef-offset-position\u2460\u2465"},{"id":"ref-for-propdef-offset-position\u2460\u2466"},{"id":"ref-for-propdef-offset-position\u2460\u2467"}],"title":"4.4. Define an anchor point: The offset-anchor property"},{"refs":[{"id":"ref-for-propdef-offset-position\u2460\u2468"}],"title":"4.5.1. Calculating the path transform"},{"refs":[{"id":"ref-for-propdef-offset-position\u2461\u24ea"},{"id":"ref-for-propdef-offset-position\u2461\u2460"}],"title":"4.6. Offset shorthand: The offset property"},{"refs":[{"id":"ref-for-propdef-offset-position\u2461\u2461"}],"title":"Changes"}],"url":"#propdef-offset-position"},
+"propdef-offset-anchor": {"dfnID":"propdef-offset-anchor","dfnText":"offset-anchor","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-offset-anchor"}],"title":"4. Motion Paths"},{"refs":[{"id":"ref-for-propdef-offset-anchor\u2460"},{"id":"ref-for-propdef-offset-anchor\u2461"},{"id":"ref-for-propdef-offset-anchor\u2462"}],"title":"4.4. Define an anchor point: The offset-anchor property"},{"refs":[{"id":"ref-for-propdef-offset-anchor\u2463"},{"id":"ref-for-propdef-offset-anchor\u2464"}],"title":"4.6. Offset shorthand: The offset property"},{"refs":[{"id":"ref-for-propdef-offset-anchor\u2465"}],"title":"Changes"}],"url":"#propdef-offset-anchor"},
+"anchor-point": {"dfnID":"anchor-point","dfnText":"anchor point","external":false,"refSections":[{"refs":[{"id":"ref-for-anchor-point"}],"title":"4. Motion Paths"},{"refs":[{"id":"ref-for-anchor-point\u2460"}],"title":"4.2. Position on the path: The offset-distance property"},{"refs":[{"id":"ref-for-anchor-point\u2461"},{"id":"ref-for-anchor-point\u2462"},{"id":"ref-for-anchor-point\u2463"},{"id":"ref-for-anchor-point\u2464"},{"id":"ref-for-anchor-point\u2465"},{"id":"ref-for-anchor-point\u2466"}],"title":"4.4. Define an anchor point: The offset-anchor property"},{"refs":[{"id":"ref-for-anchor-point\u2467"},{"id":"ref-for-anchor-point\u2468"},{"id":"ref-for-anchor-point\u2460\u24ea"}],"title":"4.5. Rotation at point: The offset-rotate property"},{"refs":[{"id":"ref-for-anchor-point\u2460\u2460"}],"title":"4.5.1. Calculating the path transform"}],"url":"#anchor-point"},
+"propdef-offset-rotate": {"dfnID":"propdef-offset-rotate","dfnText":"offset-rotate","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-offset-rotate"}],"title":"4. Motion Paths"},{"refs":[{"id":"ref-for-propdef-offset-rotate\u2460"},{"id":"ref-for-propdef-offset-rotate\u2461"},{"id":"ref-for-propdef-offset-rotate\u2462"}],"title":"4.1. Define a path: The offset-path property"},{"refs":[{"id":"ref-for-propdef-offset-rotate\u2463"},{"id":"ref-for-propdef-offset-rotate\u2464"},{"id":"ref-for-propdef-offset-rotate\u2465"},{"id":"ref-for-propdef-offset-rotate\u2466"},{"id":"ref-for-propdef-offset-rotate\u2467"},{"id":"ref-for-propdef-offset-rotate\u2468"}],"title":"4.5. Rotation at point: The offset-rotate property"},{"refs":[{"id":"ref-for-propdef-offset-rotate\u2460\u24ea"}],"title":"4.5.1. Calculating the path transform"},{"refs":[{"id":"ref-for-propdef-offset-rotate\u2460\u2460"},{"id":"ref-for-propdef-offset-rotate\u2460\u2461"}],"title":"4.6. Offset shorthand: The offset property"},{"refs":[{"id":"ref-for-propdef-offset-rotate\u2460\u2462"},{"id":"ref-for-propdef-offset-rotate\u2460\u2463"}],"title":"Changes"}],"url":"#propdef-offset-rotate"},
+"valdef-offset-rotate-auto": {"dfnID":"valdef-offset-rotate-auto","dfnText":"auto","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-offset-rotate-auto"}],"title":"4.1. Define a path: The offset-path property"},{"refs":[{"id":"ref-for-valdef-offset-rotate-auto\u2460"},{"id":"ref-for-valdef-offset-rotate-auto\u2461"},{"id":"ref-for-valdef-offset-rotate-auto\u2462"}],"title":"4.3. Define the starting point of the path: The offset-position property"},{"refs":[{"id":"ref-for-valdef-offset-rotate-auto\u2463"},{"id":"ref-for-valdef-offset-rotate-auto\u2464"}],"title":"4.4. Define an anchor point: The offset-anchor property"},{"refs":[{"id":"ref-for-valdef-offset-rotate-auto\u2465"},{"id":"ref-for-valdef-offset-rotate-auto\u2466"},{"id":"ref-for-valdef-offset-rotate-auto\u2467"},{"id":"ref-for-valdef-offset-rotate-auto\u2468"},{"id":"ref-for-valdef-offset-rotate-auto\u2460\u24ea"},{"id":"ref-for-valdef-offset-rotate-auto\u2460\u2460"},{"id":"ref-for-valdef-offset-rotate-auto\u2460\u2461"}],"title":"4.5. Rotation at point: The offset-rotate property"},{"refs":[{"id":"ref-for-valdef-offset-rotate-auto\u2460\u2462"}],"title":"Changes"}],"url":"#valdef-offset-rotate-auto"},
+"valdef-offset-rotate-reverse": {"dfnID":"valdef-offset-rotate-reverse","dfnText":"reverse","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-offset-rotate-reverse"},{"id":"ref-for-valdef-offset-rotate-reverse\u2460"},{"id":"ref-for-valdef-offset-rotate-reverse\u2461"},{"id":"ref-for-valdef-offset-rotate-reverse\u2462"},{"id":"ref-for-valdef-offset-rotate-reverse\u2463"}],"title":"4.5. Rotation at point: The offset-rotate property"},{"refs":[{"id":"ref-for-valdef-offset-rotate-reverse\u2464"}],"title":"Changes"}],"url":"#valdef-offset-rotate-reverse"},
+"t1": {"dfnID":"t1","dfnText":"T1","external":false,"refSections":[{"refs":[{"id":"ref-for-t1"},{"id":"ref-for-t1\u2460"}],"title":"4.5.1. Calculating the path transform"}],"url":"#t1"},
+"t2": {"dfnID":"t2","dfnText":"T2","external":false,"refSections":[{"refs":[{"id":"ref-for-t2"},{"id":"ref-for-t2\u2460"},{"id":"ref-for-t2\u2461"}],"title":"4.5.1. Calculating the path transform"}],"url":"#t2"},
+"p": {"dfnID":"p","dfnText":"P","external":false,"refSections":[{"refs":[{"id":"ref-for-p"}],"title":"4.5.1. Calculating the path transform"}],"url":"#p"},
+"propdef-offset": {"dfnID":"propdef-offset","dfnText":"offset","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-offset"}],"title":"4.6. Offset shorthand: The offset property"},{"refs":[{"id":"ref-for-propdef-offset\u2460"}],"title":"Changes"}],"url":"#propdef-offset"},
+};
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+const typeFormatters = {
+    'dfn': (text) => `[=${text}=]`,
+    'abstract-op': (text) => `[\$${text}\$]`,
+    'value': (text) => `''${text}''`,
+    'http-header': (text) => `[:${text}:]`,
+    'idl': (text) => `{{${text}}}`,
+    'interface': 'idl',
+    'constructor': 'idl',
+    'method': 'idl',
+    'argument': 'idl',
+    'attribute': 'idl',
+    'callback': 'idl',
+    'dictionary': 'idl',
+    'dict-member': 'idl',
+    'enum': 'idl',
+    'enum-value': 'idl',
+    'exception': 'idl',
+    'const': 'idl',
+    'typedef': 'idl',
+    'stringifier': 'idl',
+    'serializer': 'idl',
+    'iterator': 'idl',
+    'maplike': 'idl',
+    'setlike': 'idl',
+    'extended-attribute': 'idl',
+    'event': 'idl',
+    'element': (element) => `<{${element}}>`,
+    'element-state': 'element',
+    'element-attr': 'element',
+    'attr-value': 'element',
+    'scheme': 'dfn',
+    'permission': 'dfn',
+    'grammar': (text) => `${text} (within a <pre class=prod>)`,
+    'type': (text)=> `<<${text}>>`,
+    'property': (text) => `'${text}'`,
+    'descriptor': 'property',
+    'function': 'value',
+    'at-rule': 'value',
+    'selector': 'value',
+};
+const typesUsingFor = new Set(
+    [
+        "descriptor",
+        "value",
+        "element-attr",
+        "attr-value",
+        "element-state",
+        "method",
+        "constructor",
+        "argument",
+        "attribute",
+        "const",
+        "dict-member",
+        "event",
+        "enum-value",
+        "stringifier",
+        "serializer",
+        "iterator",
+        "maplike",
+        "setlike",
+        "state",
+        "mode",
+        "context",
+        "facet",
+    ],
+)
+const typesNotUsingFor = new Set(
+    [
+        "property",
+        "element",
+        "interface",
+        "namespace",
+        "callback",
+        "dictionary",
+        "enum",
+        "exception",
+        "typedef",
+        "http-header",
+        "permission",
+    ],
+)
+function linkFormatterFromType(type) {
+    const fnOrType = typeFormatters[type];
+    if(typeof fnOrType === 'string') {
+        // follow the alias
+        return linkFormatterFromType(fnOrType);
+    }
+    return fnOrType;
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!typesUsingFor.has(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!typesNotUsingFor.has(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
+
+function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+    dfnPanel.forDfn = dfn;
+    if(!dfn) { console.log(dfnPanel); }
+    return dfnPanel;
+}
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        const panel = genDfnPanel({ ...panelData, dfn });
+        append(document.body, panel);
+        insertDfnPopupAction(panel)
+    }
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+})
+
+function hideAllDfnPanels() {
+    // Turn off any currently "on" or "activated" panels.
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
+}
+
+function showDfnPanel(dfnPanel) {
+    hideAllDfnPanels(); // Only display one at this time.
+
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "true");
+
+    dfnPanel.classList.add("on");
+    positionDfnPanel(dfnPanel);
+
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    // Increment tabindex for each anchor and button tags in panel
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.style.position = "absolute"; // unfix it
+    dfnPanel.classList.remove("on");
+    dfnPanel.classList.remove("activated");
+}
+
+function toggleDfnPanel(dfnPanel) {
+    if(dfnPanel.classList.contains("on")) {
+        hideDfnPanel(dfnPanel);
+    } else {
+        showDfnPanel(dfnPanel);
+    }
+}
+
+function insertDfnPopupAction(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        showDfnPanel(dfnPanel);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfnPanel);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel(dfnPanel, dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    })
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
 }
 </script>
 <script>/* Boilerplate: script-link-titles */
+"use strict";
+{
 let linkTitleData = {
- "https://drafts.csswg.org/css-shapes-1/#typedef-basic-shape": "Expands to: circle() | ellipse() | inset() | path() | polygon() | rect() | reference box | xywh()",
- "https://drafts.csswg.org/css-values-4/#angle-value": "Expands to: deg | grad | rad | turn",
- "https://drafts.csswg.org/css-values-4/#length-value": "Expands to: advance measure | cap | ch | cm | dvb | dvh | dvi | dvmax | dvmin | dvw | em | ex | ic | in | lh | lvb | lvh | lvi | lvmax | lvmin | lvw | mm | pc | pt | px | q | rcap | rch | rem | rex | ric | rlh | svb | svh | svi | svmax | svmin | svw | vb | vh | vi | vmax | vmin | vw",
- "https://drafts.csswg.org/css-values-4/#url-value": "Expands to: local url flag",
- "https://drafts.fxtf.org/css-masking-1/#typedef-geometry-box": "Expands to: border-box | content-box | fill-box | margin-box | padding-box | stroke-box | svg viewport origin box | view-box",
- "https://www.w3.org/TR/css-images-3/#typedef-size": "Expands to: <length-percentage>{2} | <length> | closest-corner | closest-side | farthest-corner | farthest-side | sides"
+"https://drafts.csswg.org/css-values-4/#url-value": "Expands to: local url flag",
+"https://drafts.csswg.org/css-shapes-1/#typedef-basic-shape": "Expands to: circle() | ellipse() | inset() | path() | polygon() | rect() | reference box | xywh()",
+"https://drafts.csswg.org/css-values-4/#angle-value": "Expands to: deg | grad | rad | turn",
+"https://www.w3.org/TR/css-images-3/#typedef-size": "Expands to: <length-percentage>{2} | <length> | closest-corner | closest-side | farthest-corner | farthest-side | sides",
+"https://drafts.csswg.org/css-values-4/#length-value": "Expands to: advance measure | cap | ch | cm | dvb | dvh | dvi | dvmax | dvmin | dvw | em | ex | ic | in | lh | lvb | lvh | lvi | lvmax | lvmin | lvw | mm | pc | pt | px | q | rcap | rch | rem | rex | ric | rlh | svb | svh | svi | svmax | svmin | svw | vb | vh | vi | vmax | vmin | vw",
+"https://drafts.fxtf.org/css-masking-1/#typedef-geometry-box": "Expands to: border-box | content-box | fill-box | margin-box | padding-box | stroke-box | svg viewport origin box | view-box",
 };
 
 function setTypeTitles() {
@@ -3368,11 +3366,11 @@ function setTypeTitles() {
 }
 
 document.addEventListener("DOMContentLoaded", setTypeTitles);
+}
 </script>
 <script>/* Boilerplate: script-position-annos */
 "use strict";
 {
-
 function repositionAnnoPanels(){
     const panels = [...document.querySelectorAll("[data-anno-for]")];
     const main = document.querySelector("main");
@@ -3416,280 +3414,275 @@ window.addEventListener("resize", repositionAnnoPanels);
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
+let refsData = {
+"https://drafts.csswg.org/css-transforms-1/#local-coordinate-system": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-transforms","spec":"css-transforms-1","status":"current","text":"local coordinate system","type":"dfn","url":"https://drafts.csswg.org/css-transforms-1/#local-coordinate-system"},
+"#propdef-offset-path": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"motion","spec":"motion-1","status":"local","text":"offset-path","type":"property","url":"#propdef-offset-path"},
+"#propdef-offset-position": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"motion","spec":"motion-1","status":"local","text":"offset-position","type":"property","url":"#propdef-offset-position"},
+"https://svgwg.org/svg2-draft/render.html#TermStackingContext": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"stacking contexts","type":"dfn","url":"https://svgwg.org/svg2-draft/render.html#TermStackingContext"},
+"https://drafts.csswg.org/css-transforms-1/#propdef-transform": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-transforms","spec":"css-transforms-1","status":"current","text":"transform","type":"property","url":"https://drafts.csswg.org/css-transforms-1/#propdef-transform"},
+"https://drafts.csswg.org/css-transforms-2/#propdef-translate": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-transforms","spec":"css-transforms-2","status":"current","text":"translate","type":"property","url":"https://drafts.csswg.org/css-transforms-2/#propdef-translate"},
+"https://drafts.csswg.org/css-transforms-2/#propdef-scale": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-transforms","spec":"css-transforms-2","status":"current","text":"scale","type":"property","url":"https://drafts.csswg.org/css-transforms-2/#propdef-scale"},
+"https://drafts.csswg.org/css-transforms-2/#propdef-rotate": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-transforms","spec":"css-transforms-2","status":"current","text":"rotate","type":"property","url":"https://drafts.csswg.org/css-transforms-2/#propdef-rotate"},
+"#propdef-offset-distance": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"motion","spec":"motion-1","status":"local","text":"offset-distance","type":"property","url":"#propdef-offset-distance"},
+"#anchor-point": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"motion","spec":"motion-1","status":"local","text":"anchor point","type":"dfn","url":"#anchor-point"},
+"#propdef-offset-anchor": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"motion","spec":"motion-1","status":"local","text":"offset-anchor","type":"property","url":"#propdef-offset-anchor"},
+"#propdef-offset-rotate": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"motion","spec":"motion-1","status":"local","text":"offset-rotate","type":"property","url":"#propdef-offset-rotate"},
+"https://drafts.csswg.org/css-values-4/#comb-one": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"|","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"#funcdef-offset-path-ray": {"export":true,"for_":["offset-path"],"level":"1","normative":true,"shortname":"motion","spec":"motion-1","status":"local","text":"ray()","type":"function","url":"#funcdef-offset-path-ray"},
+"#funcdef-offsetpath-pathfunc-path": {"export":true,"for_":["offsetpath-pathfunc"],"level":"1","normative":true,"shortname":"motion","spec":"motion-1","status":"local","text":"path()","type":"function","url":"#funcdef-offsetpath-pathfunc-path"},
+"https://drafts.csswg.org/css-values-4/#url-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<url>","type":"type","url":"https://drafts.csswg.org/css-values-4/#url-value"},
+"https://drafts.csswg.org/css-shapes-1/#typedef-basic-shape": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-shapes","spec":"css-shapes-1","status":"current","text":"<basic-shape>","type":"type","url":"https://drafts.csswg.org/css-shapes-1/#typedef-basic-shape"},
+"https://drafts.csswg.org/css-values-4/#comb-all": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"&&","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-all"},
+"https://drafts.csswg.org/css-box-4/#typedef-coord-box": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"current","text":"<coord-box>","type":"type","url":"https://drafts.csswg.org/css-box-4/#typedef-coord-box"},
+"https://drafts.csswg.org/css-values-4/#mult-opt": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"?","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#mult-opt"},
+"#offset-path": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"motion","spec":"motion-1","status":"local","text":"offset path","type":"dfn","url":"#offset-path"},
+"#offset-path-initial-position": {"export":true,"for_":["offset path"],"level":"1","normative":true,"shortname":"motion","spec":"motion-1","status":"local","text":"initial position","type":"dfn","url":"#offset-path-initial-position"},
+"https://drafts.csswg.org/css-values-4/#angle-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<angle>","type":"type","url":"https://drafts.csswg.org/css-values-4/#angle-value"},
+"https://www.w3.org/TR/css-images-3/#typedef-size": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-images","spec":"css-images-3","status":"snapshot","text":"<size>","type":"type","url":"https://www.w3.org/TR/css-images-3/#typedef-size"},
+"https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-circle": {"export":true,"for_":["<basic-shape>"],"level":"1","normative":true,"shortname":"css-shapes","spec":"css-shapes-1","status":"current","text":"circle()","type":"function","url":"https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-circle"},
+"https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-ellipse": {"export":true,"for_":["<basic-shape>"],"level":"1","normative":true,"shortname":"css-shapes","spec":"css-shapes-1","status":"current","text":"ellipse()","type":"function","url":"https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-ellipse"},
+"https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-inset": {"export":true,"for_":["<basic-shape>"],"level":"1","normative":true,"shortname":"css-shapes","spec":"css-shapes-1","status":"current","text":"inset()","type":"function","url":"https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-inset"},
+"https://drafts.csswg.org/css-backgrounds-3/#propdef-border-radius": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"current","text":"border-radius","type":"property","url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-border-radius"},
+"https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-polygon": {"export":true,"for_":["<basic-shape>"],"level":"1","normative":true,"shortname":"css-shapes","spec":"css-shapes-1","status":"current","text":"polygon()","type":"function","url":"https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-polygon"},
+"#valdef-offset-rotate-auto": {"export":true,"for_":["offset-rotate"],"level":"1","normative":true,"shortname":"motion","spec":"motion-1","status":"local","text":"auto","type":"value","url":"#valdef-offset-rotate-auto"},
+"https://drafts.csswg.org/css-values-4/#string-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<string>","type":"type","url":"https://drafts.csswg.org/css-values-4/#string-value"},
+"https://svgwg.org/svg2-draft/shapes.html#TermShapeElement": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"shape elements","type":"dfn","url":"https://svgwg.org/svg2-draft/shapes.html#TermShapeElement"},
+"https://drafts.csswg.org/css-cascade-5/#used-value": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-cascade","spec":"css-cascade-5","status":"current","text":"used value","type":"dfn","url":"https://drafts.csswg.org/css-cascade-5/#used-value"},
+"https://drafts.fxtf.org/css-masking-1/#valdef-mask-clip-content-box": {"export":true,"for_":["mask-clip"],"level":"1","normative":true,"shortname":"css-masking","spec":"css-masking-1","status":"current","text":"content-box","type":"value","url":"https://drafts.fxtf.org/css-masking-1/#valdef-mask-clip-content-box"},
+"https://drafts.fxtf.org/css-masking-1/#valdef-mask-clip-padding-box": {"export":true,"for_":["mask-clip"],"level":"1","normative":true,"shortname":"css-masking","spec":"css-masking-1","status":"current","text":"padding-box","type":"value","url":"https://drafts.fxtf.org/css-masking-1/#valdef-mask-clip-padding-box"},
+"https://drafts.fxtf.org/css-masking-1/#valdef-mask-clip-border-box": {"export":true,"for_":["mask-clip"],"level":"1","normative":true,"shortname":"css-masking","spec":"css-masking-1","status":"current","text":"border-box","type":"value","url":"https://drafts.fxtf.org/css-masking-1/#valdef-mask-clip-border-box"},
+"https://drafts.fxtf.org/css-masking-1/#valdef-clip-path-fill-box": {"export":true,"for_":["clip-path"],"level":"1","normative":true,"shortname":"css-masking","spec":"css-masking-1","status":"current","text":"fill-box","type":"value","url":"https://drafts.fxtf.org/css-masking-1/#valdef-clip-path-fill-box"},
+"https://drafts.fxtf.org/css-masking-1/#valdef-clip-path-stroke-box": {"export":true,"for_":["clip-path"],"level":"1","normative":true,"shortname":"css-masking","spec":"css-masking-1","status":"current","text":"stroke-box","type":"value","url":"https://drafts.fxtf.org/css-masking-1/#valdef-clip-path-stroke-box"},
+"https://drafts.fxtf.org/css-masking-1/#valdef-clip-path-view-box": {"export":true,"for_":["clip-path"],"level":"1","normative":true,"shortname":"css-masking","spec":"css-masking-1","status":"current","text":"view-box","type":"value","url":"https://drafts.fxtf.org/css-masking-1/#valdef-clip-path-view-box"},
+"https://drafts.csswg.org/css-contain-2/#propdef-contain": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-contain","spec":"css-contain-2","status":"current","text":"contain","type":"property","url":"https://drafts.csswg.org/css-contain-2/#propdef-contain"},
+"#used-offset-distance": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"motion","spec":"motion-1","status":"local","text":"used offset distance","type":"dfn","url":"#used-offset-distance"},
+"https://drafts.csswg.org/css-values-4/#typedef-length-percentage": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<length-percentage>","type":"type","url":"https://drafts.csswg.org/css-values-4/#typedef-length-percentage"},
+"#offset-distance": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"motion","spec":"motion-1","status":"local","text":"offset distance","type":"dfn","url":"#offset-distance"},
+"#total-length": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"motion","spec":"motion-1","status":"local","text":"total length","type":"dfn","url":"#total-length"},
+"https://drafts.csswg.org/css-values-4/#typedef-position": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<position>","type":"type","url":"https://drafts.csswg.org/css-values-4/#typedef-position"},
+"https://drafts.csswg.org/css-values-4/#length-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<length>","type":"type","url":"https://drafts.csswg.org/css-values-4/#length-value"},
+"https://drafts.csswg.org/css-position-3/#propdef-position": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-position","spec":"css-position-3","status":"current","text":"position","type":"property","url":"https://drafts.csswg.org/css-position-3/#propdef-position"},
+"https://drafts.csswg.org/css-position-3/#valdef-position-static": {"export":true,"for_":["position"],"level":"3","normative":true,"shortname":"css-position","spec":"css-position-3","status":"current","text":"static","type":"value","url":"https://drafts.csswg.org/css-position-3/#valdef-position-static"},
+"https://drafts.csswg.org/css-position-3/#propdef-left": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-position","spec":"css-position-3","status":"current","text":"left","type":"property","url":"https://drafts.csswg.org/css-position-3/#propdef-left"},
+"https://drafts.csswg.org/css-position-3/#propdef-top": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-position","spec":"css-position-3","status":"current","text":"top","type":"property","url":"https://drafts.csswg.org/css-position-3/#propdef-top"},
+"https://drafts.fxtf.org/css-masking-1/#typedef-geometry-box": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-masking","spec":"css-masking-1","status":"current","text":"<geometry-box>","type":"type","url":"https://drafts.fxtf.org/css-masking-1/#typedef-geometry-box"},
+"https://drafts.csswg.org/css-transforms-1/#propdef-transform-origin": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-transforms","spec":"css-transforms-1","status":"current","text":"transform-origin","type":"property","url":"https://drafts.csswg.org/css-transforms-1/#propdef-transform-origin"},
+"https://drafts.csswg.org/css-backgrounds-3/#propdef-background-position": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"current","text":"background-position","type":"property","url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-background-position"},
+"https://drafts.csswg.org/css-values-4/#percentage-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<percentage>","type":"type","url":"https://drafts.csswg.org/css-values-4/#percentage-value"},
+"https://drafts.csswg.org/css-values-4/#comb-any": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"||","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-any"},
+"#valdef-offset-rotate-reverse": {"export":true,"for_":["offset-rotate"],"level":"1","normative":true,"shortname":"motion","spec":"motion-1","status":"local","text":"reverse","type":"value","url":"#valdef-offset-rotate-reverse"},
+"https://svgwg.org/svg2-draft/paths.html#TermPathDirection": {"export":false,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"direction of a path","type":"dfn","url":"https://svgwg.org/svg2-draft/paths.html#TermPathDirection"},
+"#p": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"motion","spec":"motion-1","status":"local","text":"p","type":"dfn","url":"#p"},
+"#t2": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"motion","spec":"motion-1","status":"local","text":"t2","type":"dfn","url":"#t2"},
+"#t1": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"motion","spec":"motion-1","status":"local","text":"t1","type":"dfn","url":"#t1"},
+"https://drafts.csswg.org/css-transforms-1/#funcdef-transform-rotate": {"export":true,"for_":["transform"],"level":"1","normative":true,"shortname":"css-transforms","spec":"css-transforms-1","status":"current","text":"rotate()","type":"function","url":"https://drafts.csswg.org/css-transforms-1/#funcdef-transform-rotate"},
+"#propdef-offset": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"motion","spec":"motion-1","status":"local","text":"offset","type":"property","url":"#propdef-offset"},
+"https://drafts.csswg.org/css-values-4/#mult-req": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"!","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#mult-req"},
+};
+
+function genRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "DFN: "),
+                mk.code({ class: "dfn-text" }, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    const forListElements = forList.length === 0 ? '' : mk.li({},
+        mk.b({}, "For: "),
+        mk.ul({},
+            ...forList.map(forItem =>
                 mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
-            mk.b({}, "For: "),
-            mk.ul({},
-                ...forList.map(forItem =>
-                    mk.li({},
-                        mk.span({}, `${forItem}`)
-                    ),
+                    mk.span({}, `${forItem}`)
                 ),
             ),
-        );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+        ),
+    );
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
-    }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    return hintPanel;
+}
+function genAllRefHints() {
+    for(const refData of Object.values(refsData)) {
+        const refUrl = refData.url;
+        const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+        if (links.length == 0) {
+            console.log(`Can't find link href="${refUrl}".`, refData);
+            continue;
+        }
+        for(const link of links) {
+            if(link.classList.contains("dfn-link")) continue;
+            const hint = genRefHint(link, refData);
+            append(document.body, hint);
+            insertLinkPopupAction(hint)
         }
     }
+}
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+function hideAllRefHints() {
+    queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    refHint.style.position = "absolute"; // unfix it
+    refHint.classList.remove("on");
+    const teardown = refHint.teardownEventListeners;
+    if (teardown) {
+        refHint.teardownEventListeners = undefined;
+        teardown();
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+function showRefHint(refHint) {
+    hideAllRefHints(); // Only display one at this time.
+
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "true");
+    refHint.classList.add("on");
+    positionRefHint(refHint);
+    setupRefHintEventListeners(refHint);
+}
+
+function setupRefHintEventListeners(refHint) {
+    if (refHint.teardownEventListeners) return;
+    const link = refHint.forLink;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
 
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
 
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+function insertLinkPopupAction(refHint) {
+    const link = refHint.forLink;
+    // link.setAttribute('role', 'button');
+    link.setAttribute('aria-expanded', 'false')
+    link.classList.add('has-ref-hint');
+    link.addEventListener('mouseover', (event) => {
+        showRefHint(refHint);
     });
+    link.addEventListener('focus', (event) => {
+        showRefHint(refHint);
+    })
+}
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+document.addEventListener("DOMContentLoaded", () => {
+    genAllRefHints();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['https://drafts.csswg.org/css-transforms-1/#local-coordinate-system'] = {"text": "local coordinate system", "type": "dfn", "spec": "css-transforms-1", "shortname": "css-transforms", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transforms-1/#local-coordinate-system", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-offset-path'] = {"text": "offset-path", "type": "property", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#propdef-offset-path", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-offset-position'] = {"text": "offset-position", "type": "property", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#propdef-offset-position", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/render.html#TermStackingContext'] = {"text": "stacking contexts", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/render.html#TermStackingContext", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-transforms-1/#propdef-transform'] = {"text": "transform", "type": "property", "spec": "css-transforms-1", "shortname": "css-transforms", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transforms-1/#propdef-transform", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-transforms-2/#propdef-translate'] = {"text": "translate", "type": "property", "spec": "css-transforms-2", "shortname": "css-transforms", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-transforms-2/#propdef-translate", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-transforms-2/#propdef-scale'] = {"text": "scale", "type": "property", "spec": "css-transforms-2", "shortname": "css-transforms", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-transforms-2/#propdef-scale", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-transforms-2/#propdef-rotate'] = {"text": "rotate", "type": "property", "spec": "css-transforms-2", "shortname": "css-transforms", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-transforms-2/#propdef-rotate", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-offset-distance'] = {"text": "offset-distance", "type": "property", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#propdef-offset-distance", "export": true, "normative": true, "for_": []};
-window.refsData['#anchor-point'] = {"text": "anchor point", "type": "dfn", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#anchor-point", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-offset-anchor'] = {"text": "offset-anchor", "type": "property", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#propdef-offset-anchor", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-offset-rotate'] = {"text": "offset-rotate", "type": "property", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#propdef-offset-rotate", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
-window.refsData['#funcdef-offset-path-ray'] = {"text": "ray()", "type": "function", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#funcdef-offset-path-ray", "export": true, "normative": true, "for_": ["offset-path"]};
-window.refsData['#funcdef-offsetpath-pathfunc-path'] = {"text": "path()", "type": "function", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#funcdef-offsetpath-pathfunc-path", "export": true, "normative": true, "for_": ["offsetpath-pathfunc"]};
-window.refsData['https://drafts.csswg.org/css-values-4/#url-value'] = {"text": "<url>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#url-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-shapes-1/#typedef-basic-shape'] = {"text": "<basic-shape>", "type": "type", "spec": "css-shapes-1", "shortname": "css-shapes", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-shapes-1/#typedef-basic-shape", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-all'] = {"text": "&&", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-all", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-box-4/#typedef-coord-box'] = {"text": "<coord-box>", "type": "type", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#typedef-coord-box", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#mult-opt'] = {"text": "?", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "export": true, "normative": true, "for_": []};
-window.refsData['#offset-path'] = {"text": "offset path", "type": "dfn", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#offset-path", "export": true, "normative": true, "for_": []};
-window.refsData['#offset-path-initial-position'] = {"text": "initial position", "type": "dfn", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#offset-path-initial-position", "export": true, "normative": true, "for_": ["offset path"]};
-window.refsData['https://drafts.csswg.org/css-values-4/#angle-value'] = {"text": "<angle>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#angle-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-images-3/#typedef-size'] = {"text": "<size>", "type": "type", "spec": "css-images-3", "shortname": "css-images", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-images-3/#typedef-size", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-circle'] = {"text": "circle()", "type": "function", "spec": "css-shapes-1", "shortname": "css-shapes", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-circle", "export": true, "normative": true, "for_": ["<basic-shape>"]};
-window.refsData['https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-ellipse'] = {"text": "ellipse()", "type": "function", "spec": "css-shapes-1", "shortname": "css-shapes", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-ellipse", "export": true, "normative": true, "for_": ["<basic-shape>"]};
-window.refsData['https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-inset'] = {"text": "inset()", "type": "function", "spec": "css-shapes-1", "shortname": "css-shapes", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-inset", "export": true, "normative": true, "for_": ["<basic-shape>"]};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border-radius'] = {"text": "border-radius", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-radius", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-polygon'] = {"text": "polygon()", "type": "function", "spec": "css-shapes-1", "shortname": "css-shapes", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-polygon", "export": true, "normative": true, "for_": ["<basic-shape>"]};
-window.refsData['#valdef-offset-rotate-auto'] = {"text": "auto", "type": "value", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#valdef-offset-rotate-auto", "export": true, "normative": true, "for_": ["offset-rotate"]};
-window.refsData['https://drafts.csswg.org/css-values-4/#string-value'] = {"text": "<string>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#string-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/shapes.html#TermShapeElement'] = {"text": "shape elements", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/shapes.html#TermShapeElement", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-cascade-5/#used-value'] = {"text": "used value", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#used-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.fxtf.org/css-masking-1/#valdef-mask-clip-content-box'] = {"text": "content-box", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/css-masking-1/#valdef-mask-clip-content-box", "export": true, "normative": true, "for_": ["mask-clip"]};
-window.refsData['https://drafts.fxtf.org/css-masking-1/#valdef-mask-clip-padding-box'] = {"text": "padding-box", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/css-masking-1/#valdef-mask-clip-padding-box", "export": true, "normative": true, "for_": ["mask-clip"]};
-window.refsData['https://drafts.fxtf.org/css-masking-1/#valdef-mask-clip-border-box'] = {"text": "border-box", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/css-masking-1/#valdef-mask-clip-border-box", "export": true, "normative": true, "for_": ["mask-clip"]};
-window.refsData['https://drafts.fxtf.org/css-masking-1/#valdef-clip-path-fill-box'] = {"text": "fill-box", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/css-masking-1/#valdef-clip-path-fill-box", "export": true, "normative": true, "for_": ["clip-path"]};
-window.refsData['https://drafts.fxtf.org/css-masking-1/#valdef-clip-path-stroke-box'] = {"text": "stroke-box", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/css-masking-1/#valdef-clip-path-stroke-box", "export": true, "normative": true, "for_": ["clip-path"]};
-window.refsData['https://drafts.fxtf.org/css-masking-1/#valdef-clip-path-view-box'] = {"text": "view-box", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/css-masking-1/#valdef-clip-path-view-box", "export": true, "normative": true, "for_": ["clip-path"]};
-window.refsData['https://drafts.csswg.org/css-contain-2/#propdef-contain'] = {"text": "contain", "type": "property", "spec": "css-contain-2", "shortname": "css-contain", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-contain-2/#propdef-contain", "export": true, "normative": true, "for_": []};
-window.refsData['#used-offset-distance'] = {"text": "used offset distance", "type": "dfn", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#used-offset-distance", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#typedef-length-percentage'] = {"text": "<length-percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#typedef-length-percentage", "export": true, "normative": true, "for_": []};
-window.refsData['#offset-distance'] = {"text": "offset distance", "type": "dfn", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#offset-distance", "export": true, "normative": true, "for_": []};
-window.refsData['#total-length'] = {"text": "total length", "type": "dfn", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#total-length", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#typedef-position'] = {"text": "<position>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#typedef-position", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#length-value'] = {"text": "<length>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#length-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-position-3/#propdef-position'] = {"text": "position", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-position", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-position-3/#valdef-position-static'] = {"text": "static", "type": "value", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#valdef-position-static", "export": true, "normative": true, "for_": ["position"]};
-window.refsData['https://drafts.csswg.org/css-position-3/#propdef-left'] = {"text": "left", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-left", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-position-3/#propdef-top'] = {"text": "top", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-top", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.fxtf.org/css-masking-1/#typedef-geometry-box'] = {"text": "<geometry-box>", "type": "type", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/css-masking-1/#typedef-geometry-box", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-transforms-1/#propdef-transform-origin'] = {"text": "transform-origin", "type": "property", "spec": "css-transforms-1", "shortname": "css-transforms", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transforms-1/#propdef-transform-origin", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-background-position'] = {"text": "background-position", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background-position", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#percentage-value'] = {"text": "<percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#percentage-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-any'] = {"text": "||", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-any", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-offset-rotate-reverse'] = {"text": "reverse", "type": "value", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#valdef-offset-rotate-reverse", "export": true, "normative": true, "for_": ["offset-rotate"]};
-window.refsData['https://svgwg.org/svg2-draft/paths.html#TermPathDirection'] = {"text": "direction of a path", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/paths.html#TermPathDirection", "export": false, "normative": true, "for_": []};
-window.refsData['#p'] = {"text": "p", "type": "dfn", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#p", "export": true, "normative": true, "for_": []};
-window.refsData['#t2'] = {"text": "t2", "type": "dfn", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#t2", "export": true, "normative": true, "for_": []};
-window.refsData['#t1'] = {"text": "t1", "type": "dfn", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#t1", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-transforms-1/#funcdef-transform-rotate'] = {"text": "rotate()", "type": "function", "spec": "css-transforms-1", "shortname": "css-transforms", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transforms-1/#funcdef-transform-rotate", "export": true, "normative": true, "for_": ["transform"]};
-window.refsData['#propdef-offset'] = {"text": "offset", "type": "property", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#propdef-offset", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#mult-req'] = {"text": "!", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-req", "export": true, "normative": true, "for_": []};window.refsData['#propdef-offset'] = {"text": "offset", "type": "property", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#propdef-offset", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-offset-anchor'] = {"text": "offset-anchor", "type": "property", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#propdef-offset-anchor", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-offset-distance'] = {"text": "offset-distance", "type": "property", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#propdef-offset-distance", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-offset-path'] = {"text": "offset-path", "type": "property", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#propdef-offset-path", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-offset-position'] = {"text": "offset-position", "type": "property", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#propdef-offset-position", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-offset-rotate'] = {"text": "offset-rotate", "type": "property", "spec": "motion-1", "shortname": "motion", "level": "1", "status": "local", "url": "#propdef-offset-rotate", "export": true, "normative": true, "for_": []};
 </script>

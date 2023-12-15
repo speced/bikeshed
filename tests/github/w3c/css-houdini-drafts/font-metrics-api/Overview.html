@@ -1559,7 +1559,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -1933,6 +1932,11 @@ figcaption:not(.no-marker)::before {
     }
 }
 </style>
+<style>/* Boilerplate: style-idl-highlighting */
+pre.idl.highlight {
+    background: var(--borderedblock-bg, var(--def-bg));
+}
+</style>
 <style>/* Boilerplate: style-issues */
 a[href].issue-return {
     float: right;
@@ -1990,7 +1994,6 @@ a[href].issue-return {
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -2050,7 +2053,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -2107,7 +2109,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -2549,437 +2550,8 @@ codepoints.</p>
 };
 
 </pre>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['32c697dc'] = {"dfnID": "32c697dc", "url": "https://drafts.css-houdini.org/css-typed-om-1/#stylepropertymapreadonly", "dfnText": "StylePropertyMapReadOnly", "refSections": [{"refs": [{"id": "ref-for-stylepropertymapreadonly"}, {"id": "ref-for-stylepropertymapreadonly\u2460"}], "title": "2. Measure API"}], "external": true};
-window.dfnpanelData['85394472'] = {"dfnID": "85394472", "url": "https://dom.spec.whatwg.org/#document", "dfnText": "Document", "refSections": [{"refs": [{"id": "ref-for-document"}], "title": "2. Measure API"}], "external": true};
-window.dfnpanelData['296f3551'] = {"dfnID": "296f3551", "url": "https://dom.spec.whatwg.org/#element", "dfnText": "Element", "refSections": [{"refs": [{"id": "ref-for-element"}, {"id": "ref-for-element\u2460"}, {"id": "ref-for-element\u2461"}], "title": "2. Measure API"}], "external": true};
-window.dfnpanelData['8855a9aa'] = {"dfnID": "8855a9aa", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "dfnText": "DOMString", "refSections": [{"refs": [{"id": "ref-for-idl-DOMString"}, {"id": "ref-for-idl-DOMString\u2460"}], "title": "2. Measure API"}, {"refs": [{"id": "ref-for-idl-DOMString\u2461"}], "title": "2.2. Baseline object"}, {"refs": [{"id": "ref-for-idl-DOMString\u2462"}], "title": "2.3. Font object"}], "external": true};
-window.dfnpanelData['889e932f'] = {"dfnID": "889e932f", "url": "https://webidl.spec.whatwg.org/#Exposed", "dfnText": "Exposed", "refSections": [{"refs": [{"id": "ref-for-Exposed"}], "title": "2.1. FontMetrics object"}, {"refs": [{"id": "ref-for-Exposed\u2460"}], "title": "2.2. Baseline object"}, {"refs": [{"id": "ref-for-Exposed\u2461"}], "title": "2.3. Font object"}], "external": true};
-window.dfnpanelData['dcf5fafa'] = {"dfnID": "dcf5fafa", "url": "https://webidl.spec.whatwg.org/#idl-frozen-array", "dfnText": "FrozenArray", "refSections": [{"refs": [{"id": "ref-for-idl-frozen-array"}, {"id": "ref-for-idl-frozen-array\u2460"}, {"id": "ref-for-idl-frozen-array\u2461"}], "title": "2.1. FontMetrics object"}], "external": true};
-window.dfnpanelData['8c800cdf'] = {"dfnID": "8c800cdf", "url": "https://webidl.spec.whatwg.org/#idl-double", "dfnText": "double", "refSections": [{"refs": [{"id": "ref-for-idl-double"}, {"id": "ref-for-idl-double\u2460"}, {"id": "ref-for-idl-double\u2461"}, {"id": "ref-for-idl-double\u2462"}, {"id": "ref-for-idl-double\u2463"}, {"id": "ref-for-idl-double\u2464"}, {"id": "ref-for-idl-double\u2465"}, {"id": "ref-for-idl-double\u2466"}, {"id": "ref-for-idl-double\u2467"}, {"id": "ref-for-idl-double\u2468"}, {"id": "ref-for-idl-double\u2460\u24ea"}], "title": "2.1. FontMetrics object"}, {"refs": [{"id": "ref-for-idl-double\u2460\u2460"}], "title": "2.2. Baseline object"}], "external": true};
-window.dfnpanelData['e97a9688'] = {"dfnID": "e97a9688", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-long", "dfnText": "unsigned long", "refSections": [{"refs": [{"id": "ref-for-idl-unsigned-long"}], "title": "2.3. Font object"}], "external": true};
-window.dfnpanelData['dom-document-measureelement'] = {"dfnID": "dom-document-measureelement", "url": "#dom-document-measureelement", "dfnText": "measureElement", "refSections": [{"refs": [{"id": "ref-for-dom-document-measureelement"}], "title": "2. Measure API"}], "external": false};
-window.dfnpanelData['dom-document-measuretext'] = {"dfnID": "dom-document-measuretext", "url": "#dom-document-measuretext", "dfnText": "measureText", "refSections": [{"refs": [{"id": "ref-for-dom-document-measuretext"}, {"id": "ref-for-dom-document-measuretext\u2460"}], "title": "2. Measure API"}], "external": false};
-window.dfnpanelData['fontmetrics'] = {"dfnID": "fontmetrics", "url": "#fontmetrics", "dfnText": "FontMetrics", "refSections": [{"refs": [{"id": "ref-for-fontmetrics"}, {"id": "ref-for-fontmetrics\u2460"}, {"id": "ref-for-fontmetrics\u2461"}, {"id": "ref-for-fontmetrics\u2462"}, {"id": "ref-for-fontmetrics\u2463"}, {"id": "ref-for-fontmetrics\u2464"}], "title": "2. Measure API"}, {"refs": [{"id": "ref-for-fontmetrics\u2465"}, {"id": "ref-for-fontmetrics\u2466"}], "title": "2.1. FontMetrics object"}], "external": false};
-window.dfnpanelData['dom-fontmetrics-width'] = {"dfnID": "dom-fontmetrics-width", "url": "#dom-fontmetrics-width", "dfnText": "width", "refSections": [{"refs": [{"id": "ref-for-dom-fontmetrics-width"}, {"id": "ref-for-dom-fontmetrics-width\u2460"}], "title": "2.1. FontMetrics object"}], "external": false};
-window.dfnpanelData['dom-fontmetrics-advances'] = {"dfnID": "dom-fontmetrics-advances", "url": "#dom-fontmetrics-advances", "dfnText": "advances", "refSections": [{"refs": [{"id": "ref-for-dom-fontmetrics-advances"}], "title": "2.1. FontMetrics object"}], "external": false};
-window.dfnpanelData['dom-fontmetrics-boundingboxleft'] = {"dfnID": "dom-fontmetrics-boundingboxleft", "url": "#dom-fontmetrics-boundingboxleft", "dfnText": "boundingBoxLeft", "refSections": [{"refs": [{"id": "ref-for-dom-fontmetrics-boundingboxleft"}], "title": "2.1. FontMetrics object"}], "external": false};
-window.dfnpanelData['dom-fontmetrics-boundingboxright'] = {"dfnID": "dom-fontmetrics-boundingboxright", "url": "#dom-fontmetrics-boundingboxright", "dfnText": "boundingBoxRight", "refSections": [{"refs": [{"id": "ref-for-dom-fontmetrics-boundingboxright"}, {"id": "ref-for-dom-fontmetrics-boundingboxright\u2460"}], "title": "2.1. FontMetrics object"}], "external": false};
-window.dfnpanelData['dom-fontmetrics-height'] = {"dfnID": "dom-fontmetrics-height", "url": "#dom-fontmetrics-height", "dfnText": "height", "refSections": [{"refs": [{"id": "ref-for-dom-fontmetrics-height"}], "title": "2.1. FontMetrics object"}], "external": false};
-window.dfnpanelData['dom-fontmetrics-emheightascent'] = {"dfnID": "dom-fontmetrics-emheightascent", "url": "#dom-fontmetrics-emheightascent", "dfnText": "emHeightAscent", "refSections": [{"refs": [{"id": "ref-for-dom-fontmetrics-emheightascent"}], "title": "2.1. FontMetrics object"}], "external": false};
-window.dfnpanelData['dom-fontmetrics-emheightdescent'] = {"dfnID": "dom-fontmetrics-emheightdescent", "url": "#dom-fontmetrics-emheightdescent", "dfnText": "emHeightDescent", "refSections": [{"refs": [{"id": "ref-for-dom-fontmetrics-emheightdescent"}], "title": "2.1. FontMetrics object"}], "external": false};
-window.dfnpanelData['dom-fontmetrics-boundingboxascent'] = {"dfnID": "dom-fontmetrics-boundingboxascent", "url": "#dom-fontmetrics-boundingboxascent", "dfnText": "boundingBoxAscent", "refSections": [{"refs": [{"id": "ref-for-dom-fontmetrics-boundingboxascent"}, {"id": "ref-for-dom-fontmetrics-boundingboxascent\u2460"}], "title": "2.1. FontMetrics object"}], "external": false};
-window.dfnpanelData['dom-fontmetrics-boundingboxdescent'] = {"dfnID": "dom-fontmetrics-boundingboxdescent", "url": "#dom-fontmetrics-boundingboxdescent", "dfnText": "boundingBoxDescent", "refSections": [{"refs": [{"id": "ref-for-dom-fontmetrics-boundingboxdescent"}], "title": "2.1. FontMetrics object"}], "external": false};
-window.dfnpanelData['dom-fontmetrics-fontboundingboxascent'] = {"dfnID": "dom-fontmetrics-fontboundingboxascent", "url": "#dom-fontmetrics-fontboundingboxascent", "dfnText": "fontBoundingBoxAscent", "refSections": [{"refs": [{"id": "ref-for-dom-fontmetrics-fontboundingboxascent"}], "title": "2.1. FontMetrics object"}], "external": false};
-window.dfnpanelData['dom-fontmetrics-fontboundingboxdescent'] = {"dfnID": "dom-fontmetrics-fontboundingboxdescent", "url": "#dom-fontmetrics-fontboundingboxdescent", "dfnText": "fontBoundingBoxDescent", "refSections": [{"refs": [{"id": "ref-for-dom-fontmetrics-fontboundingboxdescent"}, {"id": "ref-for-dom-fontmetrics-fontboundingboxdescent\u2460"}], "title": "2.1. FontMetrics object"}], "external": false};
-window.dfnpanelData['dom-fontmetrics-dominantbaseline'] = {"dfnID": "dom-fontmetrics-dominantbaseline", "url": "#dom-fontmetrics-dominantbaseline", "dfnText": "dominantBaseline", "refSections": [{"refs": [{"id": "ref-for-dom-fontmetrics-dominantbaseline"}, {"id": "ref-for-dom-fontmetrics-dominantbaseline\u2460"}, {"id": "ref-for-dom-fontmetrics-dominantbaseline\u2461"}, {"id": "ref-for-dom-fontmetrics-dominantbaseline\u2462"}, {"id": "ref-for-dom-fontmetrics-dominantbaseline\u2463"}, {"id": "ref-for-dom-fontmetrics-dominantbaseline\u2464"}, {"id": "ref-for-dom-fontmetrics-dominantbaseline\u2465"}, {"id": "ref-for-dom-fontmetrics-dominantbaseline\u2466"}, {"id": "ref-for-dom-fontmetrics-dominantbaseline\u2467"}, {"id": "ref-for-dom-fontmetrics-dominantbaseline\u2468"}, {"id": "ref-for-dom-fontmetrics-dominantbaseline\u2460\u24ea"}, {"id": "ref-for-dom-fontmetrics-dominantbaseline\u2460\u2460"}, {"id": "ref-for-dom-fontmetrics-dominantbaseline\u2460\u2461"}, {"id": "ref-for-dom-fontmetrics-dominantbaseline\u2460\u2462"}, {"id": "ref-for-dom-fontmetrics-dominantbaseline\u2460\u2463"}, {"id": "ref-for-dom-fontmetrics-dominantbaseline\u2460\u2464"}, {"id": "ref-for-dom-fontmetrics-dominantbaseline\u2460\u2465"}, {"id": "ref-for-dom-fontmetrics-dominantbaseline\u2460\u2466"}], "title": "2.1. FontMetrics object"}, {"refs": [{"id": "ref-for-dom-fontmetrics-dominantbaseline\u2460\u2467"}, {"id": "ref-for-dom-fontmetrics-dominantbaseline\u2460\u2468"}], "title": "2.2. Baseline object"}], "external": false};
-window.dfnpanelData['dom-fontmetrics-baselines'] = {"dfnID": "dom-fontmetrics-baselines", "url": "#dom-fontmetrics-baselines", "dfnText": "baselines", "refSections": [{"refs": [{"id": "ref-for-dom-fontmetrics-baselines"}, {"id": "ref-for-dom-fontmetrics-baselines\u2460"}], "title": "2.1. FontMetrics object"}], "external": false};
-window.dfnpanelData['baseline'] = {"dfnID": "baseline", "url": "#baseline", "dfnText": "Baseline", "refSections": [{"refs": [{"id": "ref-for-baseline"}, {"id": "ref-for-baseline\u2460"}, {"id": "ref-for-baseline\u2461"}, {"id": "ref-for-baseline\u2462"}], "title": "2.1. FontMetrics object"}, {"refs": [{"id": "ref-for-baseline\u2463"}, {"id": "ref-for-baseline\u2464"}], "title": "2.2. Baseline object"}], "external": false};
-window.dfnpanelData['dom-baseline-name'] = {"dfnID": "dom-baseline-name", "url": "#dom-baseline-name", "dfnText": "name", "refSections": [{"refs": [{"id": "ref-for-dom-baseline-name"}], "title": "2.2. Baseline object"}], "external": false};
-window.dfnpanelData['dom-baseline-value'] = {"dfnID": "dom-baseline-value", "url": "#dom-baseline-value", "dfnText": "value", "refSections": [{"refs": [{"id": "ref-for-dom-baseline-value"}], "title": "2.2. Baseline object"}], "external": false};
-window.dfnpanelData['font'] = {"dfnID": "font", "url": "#font", "dfnText": "Font", "refSections": [{"refs": [{"id": "ref-for-font"}], "title": "2.1. FontMetrics object"}, {"refs": [{"id": "ref-for-font\u2460"}, {"id": "ref-for-font\u2461"}], "title": "2.3. Font object"}], "external": false};
-window.dfnpanelData['dom-font-name'] = {"dfnID": "dom-font-name", "url": "#dom-font-name", "dfnText": "name", "refSections": [{"refs": [{"id": "ref-for-dom-font-name"}], "title": "2.3. Font object"}], "external": false};
-window.dfnpanelData['dom-font-glyphsrendered'] = {"dfnID": "dom-font-glyphsrendered", "url": "#dom-font-glyphsrendered", "dfnText": "glyphsRendered", "refSections": [{"refs": [{"id": "ref-for-dom-font-glyphsrendered"}], "title": "2.3. Font object"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -3173,247 +2745,676 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"32c697dc": {"dfnID":"32c697dc","dfnText":"StylePropertyMapReadOnly","external":true,"refSections":[{"refs":[{"id":"ref-for-stylepropertymapreadonly"},{"id":"ref-for-stylepropertymapreadonly\u2460"}],"title":"2. Measure API"}],"url":"https://drafts.css-houdini.org/css-typed-om-1/#stylepropertymapreadonly"},
+"85394472": {"dfnID":"85394472","dfnText":"Document","external":true,"refSections":[{"refs":[{"id":"ref-for-document"}],"title":"2. Measure API"}],"url":"https://dom.spec.whatwg.org/#document"},
+"296f3551": {"dfnID":"296f3551","dfnText":"Element","external":true,"refSections":[{"refs":[{"id":"ref-for-element"},{"id":"ref-for-element\u2460"},{"id":"ref-for-element\u2461"}],"title":"2. Measure API"}],"url":"https://dom.spec.whatwg.org/#element"},
+"8855a9aa": {"dfnID":"8855a9aa","dfnText":"DOMString","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-DOMString"},{"id":"ref-for-idl-DOMString\u2460"}],"title":"2. Measure API"},{"refs":[{"id":"ref-for-idl-DOMString\u2461"}],"title":"2.2. Baseline object"},{"refs":[{"id":"ref-for-idl-DOMString\u2462"}],"title":"2.3. Font object"}],"url":"https://webidl.spec.whatwg.org/#idl-DOMString"},
+"889e932f": {"dfnID":"889e932f","dfnText":"Exposed","external":true,"refSections":[{"refs":[{"id":"ref-for-Exposed"}],"title":"2.1. FontMetrics object"},{"refs":[{"id":"ref-for-Exposed\u2460"}],"title":"2.2. Baseline object"},{"refs":[{"id":"ref-for-Exposed\u2461"}],"title":"2.3. Font object"}],"url":"https://webidl.spec.whatwg.org/#Exposed"},
+"dcf5fafa": {"dfnID":"dcf5fafa","dfnText":"FrozenArray","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-frozen-array"},{"id":"ref-for-idl-frozen-array\u2460"},{"id":"ref-for-idl-frozen-array\u2461"}],"title":"2.1. FontMetrics object"}],"url":"https://webidl.spec.whatwg.org/#idl-frozen-array"},
+"8c800cdf": {"dfnID":"8c800cdf","dfnText":"double","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-double"},{"id":"ref-for-idl-double\u2460"},{"id":"ref-for-idl-double\u2461"},{"id":"ref-for-idl-double\u2462"},{"id":"ref-for-idl-double\u2463"},{"id":"ref-for-idl-double\u2464"},{"id":"ref-for-idl-double\u2465"},{"id":"ref-for-idl-double\u2466"},{"id":"ref-for-idl-double\u2467"},{"id":"ref-for-idl-double\u2468"},{"id":"ref-for-idl-double\u2460\u24ea"}],"title":"2.1. FontMetrics object"},{"refs":[{"id":"ref-for-idl-double\u2460\u2460"}],"title":"2.2. Baseline object"}],"url":"https://webidl.spec.whatwg.org/#idl-double"},
+"e97a9688": {"dfnID":"e97a9688","dfnText":"unsigned long","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-unsigned-long"}],"title":"2.3. Font object"}],"url":"https://webidl.spec.whatwg.org/#idl-unsigned-long"},
+"dom-document-measureelement": {"dfnID":"dom-document-measureelement","dfnText":"measureElement","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-document-measureelement"}],"title":"2. Measure API"}],"url":"#dom-document-measureelement"},
+"dom-document-measuretext": {"dfnID":"dom-document-measuretext","dfnText":"measureText","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-document-measuretext"},{"id":"ref-for-dom-document-measuretext\u2460"}],"title":"2. Measure API"}],"url":"#dom-document-measuretext"},
+"fontmetrics": {"dfnID":"fontmetrics","dfnText":"FontMetrics","external":false,"refSections":[{"refs":[{"id":"ref-for-fontmetrics"},{"id":"ref-for-fontmetrics\u2460"},{"id":"ref-for-fontmetrics\u2461"},{"id":"ref-for-fontmetrics\u2462"},{"id":"ref-for-fontmetrics\u2463"},{"id":"ref-for-fontmetrics\u2464"}],"title":"2. Measure API"},{"refs":[{"id":"ref-for-fontmetrics\u2465"},{"id":"ref-for-fontmetrics\u2466"}],"title":"2.1. FontMetrics object"}],"url":"#fontmetrics"},
+"dom-fontmetrics-width": {"dfnID":"dom-fontmetrics-width","dfnText":"width","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontmetrics-width"},{"id":"ref-for-dom-fontmetrics-width\u2460"}],"title":"2.1. FontMetrics object"}],"url":"#dom-fontmetrics-width"},
+"dom-fontmetrics-advances": {"dfnID":"dom-fontmetrics-advances","dfnText":"advances","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontmetrics-advances"}],"title":"2.1. FontMetrics object"}],"url":"#dom-fontmetrics-advances"},
+"dom-fontmetrics-boundingboxleft": {"dfnID":"dom-fontmetrics-boundingboxleft","dfnText":"boundingBoxLeft","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontmetrics-boundingboxleft"}],"title":"2.1. FontMetrics object"}],"url":"#dom-fontmetrics-boundingboxleft"},
+"dom-fontmetrics-boundingboxright": {"dfnID":"dom-fontmetrics-boundingboxright","dfnText":"boundingBoxRight","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontmetrics-boundingboxright"},{"id":"ref-for-dom-fontmetrics-boundingboxright\u2460"}],"title":"2.1. FontMetrics object"}],"url":"#dom-fontmetrics-boundingboxright"},
+"dom-fontmetrics-height": {"dfnID":"dom-fontmetrics-height","dfnText":"height","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontmetrics-height"}],"title":"2.1. FontMetrics object"}],"url":"#dom-fontmetrics-height"},
+"dom-fontmetrics-emheightascent": {"dfnID":"dom-fontmetrics-emheightascent","dfnText":"emHeightAscent","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontmetrics-emheightascent"}],"title":"2.1. FontMetrics object"}],"url":"#dom-fontmetrics-emheightascent"},
+"dom-fontmetrics-emheightdescent": {"dfnID":"dom-fontmetrics-emheightdescent","dfnText":"emHeightDescent","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontmetrics-emheightdescent"}],"title":"2.1. FontMetrics object"}],"url":"#dom-fontmetrics-emheightdescent"},
+"dom-fontmetrics-boundingboxascent": {"dfnID":"dom-fontmetrics-boundingboxascent","dfnText":"boundingBoxAscent","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontmetrics-boundingboxascent"},{"id":"ref-for-dom-fontmetrics-boundingboxascent\u2460"}],"title":"2.1. FontMetrics object"}],"url":"#dom-fontmetrics-boundingboxascent"},
+"dom-fontmetrics-boundingboxdescent": {"dfnID":"dom-fontmetrics-boundingboxdescent","dfnText":"boundingBoxDescent","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontmetrics-boundingboxdescent"}],"title":"2.1. FontMetrics object"}],"url":"#dom-fontmetrics-boundingboxdescent"},
+"dom-fontmetrics-fontboundingboxascent": {"dfnID":"dom-fontmetrics-fontboundingboxascent","dfnText":"fontBoundingBoxAscent","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontmetrics-fontboundingboxascent"}],"title":"2.1. FontMetrics object"}],"url":"#dom-fontmetrics-fontboundingboxascent"},
+"dom-fontmetrics-fontboundingboxdescent": {"dfnID":"dom-fontmetrics-fontboundingboxdescent","dfnText":"fontBoundingBoxDescent","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontmetrics-fontboundingboxdescent"},{"id":"ref-for-dom-fontmetrics-fontboundingboxdescent\u2460"}],"title":"2.1. FontMetrics object"}],"url":"#dom-fontmetrics-fontboundingboxdescent"},
+"dom-fontmetrics-dominantbaseline": {"dfnID":"dom-fontmetrics-dominantbaseline","dfnText":"dominantBaseline","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontmetrics-dominantbaseline"},{"id":"ref-for-dom-fontmetrics-dominantbaseline\u2460"},{"id":"ref-for-dom-fontmetrics-dominantbaseline\u2461"},{"id":"ref-for-dom-fontmetrics-dominantbaseline\u2462"},{"id":"ref-for-dom-fontmetrics-dominantbaseline\u2463"},{"id":"ref-for-dom-fontmetrics-dominantbaseline\u2464"},{"id":"ref-for-dom-fontmetrics-dominantbaseline\u2465"},{"id":"ref-for-dom-fontmetrics-dominantbaseline\u2466"},{"id":"ref-for-dom-fontmetrics-dominantbaseline\u2467"},{"id":"ref-for-dom-fontmetrics-dominantbaseline\u2468"},{"id":"ref-for-dom-fontmetrics-dominantbaseline\u2460\u24ea"},{"id":"ref-for-dom-fontmetrics-dominantbaseline\u2460\u2460"},{"id":"ref-for-dom-fontmetrics-dominantbaseline\u2460\u2461"},{"id":"ref-for-dom-fontmetrics-dominantbaseline\u2460\u2462"},{"id":"ref-for-dom-fontmetrics-dominantbaseline\u2460\u2463"},{"id":"ref-for-dom-fontmetrics-dominantbaseline\u2460\u2464"},{"id":"ref-for-dom-fontmetrics-dominantbaseline\u2460\u2465"},{"id":"ref-for-dom-fontmetrics-dominantbaseline\u2460\u2466"}],"title":"2.1. FontMetrics object"},{"refs":[{"id":"ref-for-dom-fontmetrics-dominantbaseline\u2460\u2467"},{"id":"ref-for-dom-fontmetrics-dominantbaseline\u2460\u2468"}],"title":"2.2. Baseline object"}],"url":"#dom-fontmetrics-dominantbaseline"},
+"dom-fontmetrics-baselines": {"dfnID":"dom-fontmetrics-baselines","dfnText":"baselines","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontmetrics-baselines"},{"id":"ref-for-dom-fontmetrics-baselines\u2460"}],"title":"2.1. FontMetrics object"}],"url":"#dom-fontmetrics-baselines"},
+"baseline": {"dfnID":"baseline","dfnText":"Baseline","external":false,"refSections":[{"refs":[{"id":"ref-for-baseline"},{"id":"ref-for-baseline\u2460"},{"id":"ref-for-baseline\u2461"},{"id":"ref-for-baseline\u2462"}],"title":"2.1. FontMetrics object"},{"refs":[{"id":"ref-for-baseline\u2463"},{"id":"ref-for-baseline\u2464"}],"title":"2.2. Baseline object"}],"url":"#baseline"},
+"dom-baseline-name": {"dfnID":"dom-baseline-name","dfnText":"name","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-baseline-name"}],"title":"2.2. Baseline object"}],"url":"#dom-baseline-name"},
+"dom-baseline-value": {"dfnID":"dom-baseline-value","dfnText":"value","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-baseline-value"}],"title":"2.2. Baseline object"}],"url":"#dom-baseline-value"},
+"font": {"dfnID":"font","dfnText":"Font","external":false,"refSections":[{"refs":[{"id":"ref-for-font"}],"title":"2.1. FontMetrics object"},{"refs":[{"id":"ref-for-font\u2460"},{"id":"ref-for-font\u2461"}],"title":"2.3. Font object"}],"url":"#font"},
+"dom-font-name": {"dfnID":"dom-font-name","dfnText":"name","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-font-name"}],"title":"2.3. Font object"}],"url":"#dom-font-name"},
+"dom-font-glyphsrendered": {"dfnID":"dom-font-glyphsrendered","dfnText":"glyphsRendered","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-font-glyphsrendered"}],"title":"2.3. Font object"}],"url":"#dom-font-glyphsrendered"},
+};
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+const typeFormatters = {
+    'dfn': (text) => `[=${text}=]`,
+    'abstract-op': (text) => `[\$${text}\$]`,
+    'value': (text) => `''${text}''`,
+    'http-header': (text) => `[:${text}:]`,
+    'idl': (text) => `{{${text}}}`,
+    'interface': 'idl',
+    'constructor': 'idl',
+    'method': 'idl',
+    'argument': 'idl',
+    'attribute': 'idl',
+    'callback': 'idl',
+    'dictionary': 'idl',
+    'dict-member': 'idl',
+    'enum': 'idl',
+    'enum-value': 'idl',
+    'exception': 'idl',
+    'const': 'idl',
+    'typedef': 'idl',
+    'stringifier': 'idl',
+    'serializer': 'idl',
+    'iterator': 'idl',
+    'maplike': 'idl',
+    'setlike': 'idl',
+    'extended-attribute': 'idl',
+    'event': 'idl',
+    'element': (element) => `<{${element}}>`,
+    'element-state': 'element',
+    'element-attr': 'element',
+    'attr-value': 'element',
+    'scheme': 'dfn',
+    'permission': 'dfn',
+    'grammar': (text) => `${text} (within a <pre class=prod>)`,
+    'type': (text)=> `<<${text}>>`,
+    'property': (text) => `'${text}'`,
+    'descriptor': 'property',
+    'function': 'value',
+    'at-rule': 'value',
+    'selector': 'value',
+};
+const typesUsingFor = new Set(
+    [
+        "descriptor",
+        "value",
+        "element-attr",
+        "attr-value",
+        "element-state",
+        "method",
+        "constructor",
+        "argument",
+        "attribute",
+        "const",
+        "dict-member",
+        "event",
+        "enum-value",
+        "stringifier",
+        "serializer",
+        "iterator",
+        "maplike",
+        "setlike",
+        "state",
+        "mode",
+        "context",
+        "facet",
+    ],
+)
+const typesNotUsingFor = new Set(
+    [
+        "property",
+        "element",
+        "interface",
+        "namespace",
+        "callback",
+        "dictionary",
+        "enum",
+        "exception",
+        "typedef",
+        "http-header",
+        "permission",
+    ],
+)
+function linkFormatterFromType(type) {
+    const fnOrType = typeFormatters[type];
+    if(typeof fnOrType === 'string') {
+        // follow the alias
+        return linkFormatterFromType(fnOrType);
+    }
+    return fnOrType;
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!typesUsingFor.has(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!typesNotUsingFor.has(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
+
+function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+    dfnPanel.forDfn = dfn;
+    if(!dfn) { console.log(dfnPanel); }
+    return dfnPanel;
+}
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        const panel = genDfnPanel({ ...panelData, dfn });
+        append(document.body, panel);
+        insertDfnPopupAction(panel)
+    }
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+})
+
+function hideAllDfnPanels() {
+    // Turn off any currently "on" or "activated" panels.
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
+}
+
+function showDfnPanel(dfnPanel) {
+    hideAllDfnPanels(); // Only display one at this time.
+
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "true");
+
+    dfnPanel.classList.add("on");
+    positionDfnPanel(dfnPanel);
+
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    // Increment tabindex for each anchor and button tags in panel
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.style.position = "absolute"; // unfix it
+    dfnPanel.classList.remove("on");
+    dfnPanel.classList.remove("activated");
+}
+
+function toggleDfnPanel(dfnPanel) {
+    if(dfnPanel.classList.contains("on")) {
+        hideDfnPanel(dfnPanel);
+    } else {
+        showDfnPanel(dfnPanel);
+    }
+}
+
+function insertDfnPopupAction(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        showDfnPanel(dfnPanel);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfnPanel);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel(dfnPanel, dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    })
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
 }
 </script>
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
+let refsData = {
+"https://dom.spec.whatwg.org/#document": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"Document","type":"interface","url":"https://dom.spec.whatwg.org/#document"},
+"#fontmetrics": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"font-metrics-api","spec":"font-metrics-api-1","status":"local","text":"FontMetrics","type":"interface","url":"#fontmetrics"},
+"https://dom.spec.whatwg.org/#element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"Element","type":"interface","url":"https://dom.spec.whatwg.org/#element"},
+"https://webidl.spec.whatwg.org/#idl-DOMString": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"DOMString","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-DOMString"},
+"https://drafts.css-houdini.org/css-typed-om-1/#stylepropertymapreadonly": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-typed-om","spec":"css-typed-om-1","status":"current","text":"StylePropertyMapReadOnly","type":"interface","url":"https://drafts.css-houdini.org/css-typed-om-1/#stylepropertymapreadonly"},
+"#dom-document-measureelement": {"export":true,"for_":["Document"],"level":"1","normative":true,"shortname":"font-metrics-api","spec":"font-metrics-api-1","status":"local","text":"measureElement(element)","type":"method","url":"#dom-document-measureelement"},
+"#dom-document-measuretext": {"export":true,"for_":["Document"],"level":"1","normative":true,"shortname":"font-metrics-api","spec":"font-metrics-api-1","status":"local","text":"measureText(text, styleMap)","type":"method","url":"#dom-document-measuretext"},
+"https://webidl.spec.whatwg.org/#Exposed": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"Exposed","type":"extended-attribute","url":"https://webidl.spec.whatwg.org/#Exposed"},
+"https://webidl.spec.whatwg.org/#idl-double": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"double","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-double"},
+"https://webidl.spec.whatwg.org/#idl-frozen-array": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"FrozenArray","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-frozen-array"},
+"#baseline": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"font-metrics-api","spec":"font-metrics-api-1","status":"local","text":"Baseline","type":"interface","url":"#baseline"},
+"#font": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"font-metrics-api","spec":"font-metrics-api-1","status":"local","text":"Font","type":"interface","url":"#font"},
+"#dom-fontmetrics-width": {"export":true,"for_":["FontMetrics"],"level":"1","normative":true,"shortname":"font-metrics-api","spec":"font-metrics-api-1","status":"local","text":"width","type":"attribute","url":"#dom-fontmetrics-width"},
+"#dom-fontmetrics-advances": {"export":true,"for_":["FontMetrics"],"level":"1","normative":true,"shortname":"font-metrics-api","spec":"font-metrics-api-1","status":"local","text":"advances","type":"attribute","url":"#dom-fontmetrics-advances"},
+"#dom-fontmetrics-boundingboxleft": {"export":true,"for_":["FontMetrics"],"level":"1","normative":true,"shortname":"font-metrics-api","spec":"font-metrics-api-1","status":"local","text":"boundingBoxLeft","type":"attribute","url":"#dom-fontmetrics-boundingboxleft"},
+"#dom-fontmetrics-dominantbaseline": {"export":true,"for_":["FontMetrics"],"level":"1","normative":true,"shortname":"font-metrics-api","spec":"font-metrics-api-1","status":"local","text":"dominantBaseline","type":"attribute","url":"#dom-fontmetrics-dominantbaseline"},
+"#dom-fontmetrics-boundingboxright": {"export":true,"for_":["FontMetrics"],"level":"1","normative":true,"shortname":"font-metrics-api","spec":"font-metrics-api-1","status":"local","text":"boundingBoxRight","type":"attribute","url":"#dom-fontmetrics-boundingboxright"},
+"#dom-fontmetrics-height": {"export":true,"for_":["FontMetrics"],"level":"1","normative":true,"shortname":"font-metrics-api","spec":"font-metrics-api-1","status":"local","text":"height","type":"attribute","url":"#dom-fontmetrics-height"},
+"#dom-fontmetrics-emheightascent": {"export":true,"for_":["FontMetrics"],"level":"1","normative":true,"shortname":"font-metrics-api","spec":"font-metrics-api-1","status":"local","text":"emHeightAscent","type":"attribute","url":"#dom-fontmetrics-emheightascent"},
+"#dom-fontmetrics-emheightdescent": {"export":true,"for_":["FontMetrics"],"level":"1","normative":true,"shortname":"font-metrics-api","spec":"font-metrics-api-1","status":"local","text":"emHeightDescent","type":"attribute","url":"#dom-fontmetrics-emheightdescent"},
+"#dom-fontmetrics-boundingboxascent": {"export":true,"for_":["FontMetrics"],"level":"1","normative":true,"shortname":"font-metrics-api","spec":"font-metrics-api-1","status":"local","text":"boundingBoxAscent","type":"attribute","url":"#dom-fontmetrics-boundingboxascent"},
+"#dom-fontmetrics-boundingboxdescent": {"export":true,"for_":["FontMetrics"],"level":"1","normative":true,"shortname":"font-metrics-api","spec":"font-metrics-api-1","status":"local","text":"boundingBoxDescent","type":"attribute","url":"#dom-fontmetrics-boundingboxdescent"},
+"#dom-fontmetrics-fontboundingboxascent": {"export":true,"for_":["FontMetrics"],"level":"1","normative":true,"shortname":"font-metrics-api","spec":"font-metrics-api-1","status":"local","text":"fontBoundingBoxAscent","type":"attribute","url":"#dom-fontmetrics-fontboundingboxascent"},
+"#dom-fontmetrics-fontboundingboxdescent": {"export":true,"for_":["FontMetrics"],"level":"1","normative":true,"shortname":"font-metrics-api","spec":"font-metrics-api-1","status":"local","text":"fontBoundingBoxDescent","type":"attribute","url":"#dom-fontmetrics-fontboundingboxdescent"},
+"#dom-fontmetrics-baselines": {"export":true,"for_":["FontMetrics"],"level":"1","normative":true,"shortname":"font-metrics-api","spec":"font-metrics-api-1","status":"local","text":"baselines","type":"attribute","url":"#dom-fontmetrics-baselines"},
+"#dom-baseline-name": {"export":true,"for_":["Baseline"],"level":"1","normative":true,"shortname":"font-metrics-api","spec":"font-metrics-api-1","status":"local","text":"name","type":"attribute","url":"#dom-baseline-name"},
+"#dom-baseline-value": {"export":true,"for_":["Baseline"],"level":"1","normative":true,"shortname":"font-metrics-api","spec":"font-metrics-api-1","status":"local","text":"value","type":"attribute","url":"#dom-baseline-value"},
+"https://webidl.spec.whatwg.org/#idl-unsigned-long": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"unsigned long","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-unsigned-long"},
+"#dom-font-name": {"export":true,"for_":["Font"],"level":"1","normative":true,"shortname":"font-metrics-api","spec":"font-metrics-api-1","status":"local","text":"name","type":"attribute","url":"#dom-font-name"},
+"#dom-font-glyphsrendered": {"export":true,"for_":["Font"],"level":"1","normative":true,"shortname":"font-metrics-api","spec":"font-metrics-api-1","status":"local","text":"glyphsRendered","type":"attribute","url":"#dom-font-glyphsrendered"},
+};
+
+function genRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "DFN: "),
+                mk.code({ class: "dfn-text" }, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    const forListElements = forList.length === 0 ? '' : mk.li({},
+        mk.b({}, "For: "),
+        mk.ul({},
+            ...forList.map(forItem =>
                 mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
-            mk.b({}, "For: "),
-            mk.ul({},
-                ...forList.map(forItem =>
-                    mk.li({},
-                        mk.span({}, `${forItem}`)
-                    ),
+                    mk.span({}, `${forItem}`)
                 ),
             ),
-        );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+        ),
+    );
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
-    }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    return hintPanel;
+}
+function genAllRefHints() {
+    for(const refData of Object.values(refsData)) {
+        const refUrl = refData.url;
+        const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+        if (links.length == 0) {
+            console.log(`Can't find link href="${refUrl}".`, refData);
+            continue;
+        }
+        for(const link of links) {
+            if(link.classList.contains("dfn-link")) continue;
+            const hint = genRefHint(link, refData);
+            append(document.body, hint);
+            insertLinkPopupAction(hint)
         }
     }
+}
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+function hideAllRefHints() {
+    queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    refHint.style.position = "absolute"; // unfix it
+    refHint.classList.remove("on");
+    const teardown = refHint.teardownEventListeners;
+    if (teardown) {
+        refHint.teardownEventListeners = undefined;
+        teardown();
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+function showRefHint(refHint) {
+    hideAllRefHints(); // Only display one at this time.
+
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "true");
+    refHint.classList.add("on");
+    positionRefHint(refHint);
+    setupRefHintEventListeners(refHint);
+}
+
+function setupRefHintEventListeners(refHint) {
+    if (refHint.teardownEventListeners) return;
+    const link = refHint.forLink;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
 
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
 
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+function insertLinkPopupAction(refHint) {
+    const link = refHint.forLink;
+    // link.setAttribute('role', 'button');
+    link.setAttribute('aria-expanded', 'false')
+    link.classList.add('has-ref-hint');
+    link.addEventListener('mouseover', (event) => {
+        showRefHint(refHint);
     });
+    link.addEventListener('focus', (event) => {
+        showRefHint(refHint);
+    })
+}
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+document.addEventListener("DOMContentLoaded", () => {
+    genAllRefHints();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
-window.refsData['#fontmetrics'] = {"text": "FontMetrics", "type": "interface", "spec": "font-metrics-api-1", "shortname": "font-metrics-api", "level": "1", "status": "local", "url": "#fontmetrics", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#element'] = {"text": "Element", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#element", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.css-houdini.org/css-typed-om-1/#stylepropertymapreadonly'] = {"text": "StylePropertyMapReadOnly", "type": "interface", "spec": "css-typed-om-1", "shortname": "css-typed-om", "level": "1", "status": "current", "url": "https://drafts.css-houdini.org/css-typed-om-1/#stylepropertymapreadonly", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-document-measureelement'] = {"text": "measureElement(element)", "type": "method", "spec": "font-metrics-api-1", "shortname": "font-metrics-api", "level": "1", "status": "local", "url": "#dom-document-measureelement", "export": true, "normative": true, "for_": ["Document"]};
-window.refsData['#dom-document-measuretext'] = {"text": "measureText(text, styleMap)", "type": "method", "spec": "font-metrics-api-1", "shortname": "font-metrics-api", "level": "1", "status": "local", "url": "#dom-document-measuretext", "export": true, "normative": true, "for_": ["Document"]};
-window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-double'] = {"text": "double", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-double", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-frozen-array'] = {"text": "FrozenArray", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-frozen-array", "export": true, "normative": true, "for_": []};
-window.refsData['#baseline'] = {"text": "Baseline", "type": "interface", "spec": "font-metrics-api-1", "shortname": "font-metrics-api", "level": "1", "status": "local", "url": "#baseline", "export": true, "normative": true, "for_": []};
-window.refsData['#font'] = {"text": "Font", "type": "interface", "spec": "font-metrics-api-1", "shortname": "font-metrics-api", "level": "1", "status": "local", "url": "#font", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-fontmetrics-width'] = {"text": "width", "type": "attribute", "spec": "font-metrics-api-1", "shortname": "font-metrics-api", "level": "1", "status": "local", "url": "#dom-fontmetrics-width", "export": true, "normative": true, "for_": ["FontMetrics"]};
-window.refsData['#dom-fontmetrics-advances'] = {"text": "advances", "type": "attribute", "spec": "font-metrics-api-1", "shortname": "font-metrics-api", "level": "1", "status": "local", "url": "#dom-fontmetrics-advances", "export": true, "normative": true, "for_": ["FontMetrics"]};
-window.refsData['#dom-fontmetrics-boundingboxleft'] = {"text": "boundingBoxLeft", "type": "attribute", "spec": "font-metrics-api-1", "shortname": "font-metrics-api", "level": "1", "status": "local", "url": "#dom-fontmetrics-boundingboxleft", "export": true, "normative": true, "for_": ["FontMetrics"]};
-window.refsData['#dom-fontmetrics-dominantbaseline'] = {"text": "dominantBaseline", "type": "attribute", "spec": "font-metrics-api-1", "shortname": "font-metrics-api", "level": "1", "status": "local", "url": "#dom-fontmetrics-dominantbaseline", "export": true, "normative": true, "for_": ["FontMetrics"]};
-window.refsData['#dom-fontmetrics-boundingboxright'] = {"text": "boundingBoxRight", "type": "attribute", "spec": "font-metrics-api-1", "shortname": "font-metrics-api", "level": "1", "status": "local", "url": "#dom-fontmetrics-boundingboxright", "export": true, "normative": true, "for_": ["FontMetrics"]};
-window.refsData['#dom-fontmetrics-height'] = {"text": "height", "type": "attribute", "spec": "font-metrics-api-1", "shortname": "font-metrics-api", "level": "1", "status": "local", "url": "#dom-fontmetrics-height", "export": true, "normative": true, "for_": ["FontMetrics"]};
-window.refsData['#dom-fontmetrics-emheightascent'] = {"text": "emHeightAscent", "type": "attribute", "spec": "font-metrics-api-1", "shortname": "font-metrics-api", "level": "1", "status": "local", "url": "#dom-fontmetrics-emheightascent", "export": true, "normative": true, "for_": ["FontMetrics"]};
-window.refsData['#dom-fontmetrics-emheightdescent'] = {"text": "emHeightDescent", "type": "attribute", "spec": "font-metrics-api-1", "shortname": "font-metrics-api", "level": "1", "status": "local", "url": "#dom-fontmetrics-emheightdescent", "export": true, "normative": true, "for_": ["FontMetrics"]};
-window.refsData['#dom-fontmetrics-boundingboxascent'] = {"text": "boundingBoxAscent", "type": "attribute", "spec": "font-metrics-api-1", "shortname": "font-metrics-api", "level": "1", "status": "local", "url": "#dom-fontmetrics-boundingboxascent", "export": true, "normative": true, "for_": ["FontMetrics"]};
-window.refsData['#dom-fontmetrics-boundingboxdescent'] = {"text": "boundingBoxDescent", "type": "attribute", "spec": "font-metrics-api-1", "shortname": "font-metrics-api", "level": "1", "status": "local", "url": "#dom-fontmetrics-boundingboxdescent", "export": true, "normative": true, "for_": ["FontMetrics"]};
-window.refsData['#dom-fontmetrics-fontboundingboxascent'] = {"text": "fontBoundingBoxAscent", "type": "attribute", "spec": "font-metrics-api-1", "shortname": "font-metrics-api", "level": "1", "status": "local", "url": "#dom-fontmetrics-fontboundingboxascent", "export": true, "normative": true, "for_": ["FontMetrics"]};
-window.refsData['#dom-fontmetrics-fontboundingboxdescent'] = {"text": "fontBoundingBoxDescent", "type": "attribute", "spec": "font-metrics-api-1", "shortname": "font-metrics-api", "level": "1", "status": "local", "url": "#dom-fontmetrics-fontboundingboxdescent", "export": true, "normative": true, "for_": ["FontMetrics"]};
-window.refsData['#dom-fontmetrics-baselines'] = {"text": "baselines", "type": "attribute", "spec": "font-metrics-api-1", "shortname": "font-metrics-api", "level": "1", "status": "local", "url": "#dom-fontmetrics-baselines", "export": true, "normative": true, "for_": ["FontMetrics"]};
-window.refsData['#dom-baseline-name'] = {"text": "name", "type": "attribute", "spec": "font-metrics-api-1", "shortname": "font-metrics-api", "level": "1", "status": "local", "url": "#dom-baseline-name", "export": true, "normative": true, "for_": ["Baseline"]};
-window.refsData['#dom-baseline-value'] = {"text": "value", "type": "attribute", "spec": "font-metrics-api-1", "shortname": "font-metrics-api", "level": "1", "status": "local", "url": "#dom-baseline-value", "export": true, "normative": true, "for_": ["Baseline"]};
-window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-long'] = {"text": "unsigned long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-long", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-font-name'] = {"text": "name", "type": "attribute", "spec": "font-metrics-api-1", "shortname": "font-metrics-api", "level": "1", "status": "local", "url": "#dom-font-name", "export": true, "normative": true, "for_": ["Font"]};
-window.refsData['#dom-font-glyphsrendered'] = {"text": "glyphsRendered", "type": "attribute", "spec": "font-metrics-api-1", "shortname": "font-metrics-api", "level": "1", "status": "local", "url": "#dom-font-glyphsrendered", "export": true, "normative": true, "for_": ["Font"]};
 </script>

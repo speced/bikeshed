@@ -78,7 +78,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -509,7 +508,6 @@ a[href].issue-return {
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -2227,476 +2225,8 @@ plus a computed color
    <div class="issue"> If you find any issues, recommendations to add, or corrections,
 		please send the information to <a href="mailto:www-style@w3.org">www-style@w3.org</a> with <kbd>[css-text-decor]</kbd> in the subject line. <a class="issue-return" href="#issue-4a420eee" title="Jump to section">↵</a></div>
   </div>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['c48eaa20'] = {"dfnID": "c48eaa20", "url": "https://www.w3.org/TR/css-backgrounds-3/#propdef-box-shadow", "dfnText": "box-shadow", "refSections": [{"refs": [{"id": "ref-for-propdef-box-shadow"}, {"id": "ref-for-propdef-box-shadow\u2460"}, {"id": "ref-for-propdef-box-shadow\u2461"}], "title": "4. \nText Shadows: the text-shadow property"}], "external": true};
-window.dfnpanelData['dd273458'] = {"dfnID": "dd273458", "url": "https://www.w3.org/TR/css-backgrounds-3/#shadow-inset", "dfnText": "inset", "refSections": [{"refs": [{"id": "ref-for-shadow-inset"}], "title": "4. \nText Shadows: the text-shadow property"}], "external": true};
-window.dfnpanelData['429d8615'] = {"dfnID": "429d8615", "url": "https://www.w3.org/TR/css-backgrounds-3/#box-shadow-none", "dfnText": "none", "refSections": [{"refs": [{"id": "ref-for-box-shadow-none"}, {"id": "ref-for-box-shadow-none\u2460"}], "title": "4. \nText Shadows: the text-shadow property"}], "external": true};
-window.dfnpanelData['62c772f5'] = {"dfnID": "62c772f5", "url": "https://www.w3.org/TR/css-break-3/#fragment", "dfnText": "fragment", "refSections": [{"refs": [{"id": "ref-for-fragment"}], "title": "2. \nLine Decoration: Underline, Overline, and Strike-Through"}], "external": true};
-window.dfnpanelData['329ecc08'] = {"dfnID": "329ecc08", "url": "https://www.w3.org/TR/css-color-4/#typedef-color", "dfnText": "<color>", "refSections": [{"refs": [{"id": "ref-for-typedef-color"}], "title": "2.3. \nText Decoration Color: the text-decoration-color property"}, {"refs": [{"id": "ref-for-typedef-color\u2460"}], "title": "3.2. \nEmphasis Mark Color: the text-emphasis-color property"}, {"refs": [{"id": "ref-for-typedef-color\u2461"}], "title": "4. \nText Shadows: the text-shadow property"}], "external": true};
-window.dfnpanelData['a42c65ac'] = {"dfnID": "a42c65ac", "url": "https://www.w3.org/TR/css-color-4/#valdef-color-currentcolor", "dfnText": "currentcolor", "refSections": [{"refs": [{"id": "ref-for-valdef-color-currentcolor"}], "title": "3.2. \nEmphasis Mark Color: the text-emphasis-color property"}, {"refs": [{"id": "ref-for-valdef-color-currentcolor\u2460"}], "title": "4. \nText Shadows: the text-shadow property"}], "external": true};
-window.dfnpanelData['56a84c2f'] = {"dfnID": "56a84c2f", "url": "https://www.w3.org/TR/css-display-3/#anonymous", "dfnText": "anonymous", "refSections": [{"refs": [{"id": "ref-for-anonymous"}], "title": "2. \nLine Decoration: Underline, Overline, and Strike-Through"}], "external": true};
-window.dfnpanelData['f2938b9c'] = {"dfnID": "f2938b9c", "url": "https://www.w3.org/TR/css-display-3/#atomic-inline", "dfnText": "atomic inline", "refSections": [{"refs": [{"id": "ref-for-atomic-inline"}], "title": "2. \nLine Decoration: Underline, Overline, and Strike-Through"}], "external": true};
-window.dfnpanelData['05c40e8e'] = {"dfnID": "05c40e8e", "url": "https://www.w3.org/TR/css-display-3/#block-container", "dfnText": "block container", "refSections": [{"refs": [{"id": "ref-for-block-container"}, {"id": "ref-for-block-container\u2460"}], "title": "2. \nLine Decoration: Underline, Overline, and Strike-Through"}], "external": true};
-window.dfnpanelData['ecb27d09'] = {"dfnID": "ecb27d09", "url": "https://www.w3.org/TR/css-display-3/#block-level", "dfnText": "block-level", "refSections": [{"refs": [{"id": "ref-for-block-level"}], "title": "2. \nLine Decoration: Underline, Overline, and Strike-Through"}], "external": true};
-window.dfnpanelData['5c159f8f'] = {"dfnID": "5c159f8f", "url": "https://www.w3.org/TR/css-display-3/#box", "dfnText": "box", "refSections": [{"refs": [{"id": "ref-for-box"}], "title": "2. \nLine Decoration: Underline, Overline, and Strike-Through"}, {"refs": [{"id": "ref-for-box\u2460"}], "title": "5.2. \nOverflow of Text Decorations"}], "external": true};
-window.dfnpanelData['2ccfe434'] = {"dfnID": "2ccfe434", "url": "https://www.w3.org/TR/css-display-3/#propdef-display", "dfnText": "display", "refSections": [{"refs": [{"id": "ref-for-propdef-display"}], "title": "2. \nLine Decoration: Underline, Overline, and Strike-Through"}], "external": true};
-window.dfnpanelData['e8976716'] = {"dfnID": "e8976716", "url": "https://www.w3.org/TR/css-display-3/#in-flow", "dfnText": "in-flow", "refSections": [{"refs": [{"id": "ref-for-in-flow"}, {"id": "ref-for-in-flow\u2460"}], "title": "2. \nLine Decoration: Underline, Overline, and Strike-Through"}], "external": true};
-window.dfnpanelData['d41bfa8c'] = {"dfnID": "d41bfa8c", "url": "https://www.w3.org/TR/css-display-3/#inline-box", "dfnText": "inline box", "refSections": [{"refs": [{"id": "ref-for-inline-box"}, {"id": "ref-for-inline-box\u2460"}, {"id": "ref-for-inline-box\u2461"}], "title": "2. \nLine Decoration: Underline, Overline, and Strike-Through"}], "external": true};
-window.dfnpanelData['c7eac2b9'] = {"dfnID": "c7eac2b9", "url": "https://www.w3.org/TR/css-display-3/#inline-formatting-context", "dfnText": "inline formatting context", "refSections": [{"refs": [{"id": "ref-for-inline-formatting-context"}], "title": "2. \nLine Decoration: Underline, Overline, and Strike-Through"}], "external": true};
-window.dfnpanelData['4f918eb5'] = {"dfnID": "4f918eb5", "url": "https://www.w3.org/TR/css-display-3/#inline-level", "dfnText": "inline-level", "refSections": [{"refs": [{"id": "ref-for-inline-level"}], "title": "2. \nLine Decoration: Underline, Overline, and Strike-Through"}], "external": true};
-window.dfnpanelData['5c0c2c32'] = {"dfnID": "5c0c2c32", "url": "https://www.w3.org/TR/css-display-3/#non-replaced", "dfnText": "non-replaced", "refSections": [{"refs": [{"id": "ref-for-non-replaced"}], "title": "2. \nLine Decoration: Underline, Overline, and Strike-Through"}], "external": true};
-window.dfnpanelData['d3ff9a69'] = {"dfnID": "d3ff9a69", "url": "https://www.w3.org/TR/css-display-3/#propdef-visibility", "dfnText": "visibility", "refSections": [{"refs": [{"id": "ref-for-propdef-visibility"}], "title": "2. \nLine Decoration: Underline, Overline, and Strike-Through"}], "external": true};
-window.dfnpanelData['354876d6'] = {"dfnID": "354876d6", "url": "https://www.w3.org/TR/css-fonts-4/#propdef-font-variant-position", "dfnText": "font-variant-position", "refSections": [{"refs": [{"id": "ref-for-propdef-font-variant-position"}], "title": "2.5. \nText Underline Position: the text-underline-position property"}], "external": true};
-window.dfnpanelData['07be701f'] = {"dfnID": "07be701f", "url": "https://www.w3.org/TR/css-fonts-4/#valdef-font-variant-east-asian-ruby", "dfnText": "ruby", "refSections": [{"refs": [{"id": "ref-for-valdef-font-variant-east-asian-ruby"}], "title": "3.1. \nEmphasis Mark Style: the text-emphasis-style property"}, {"refs": [{"id": "ref-for-valdef-font-variant-east-asian-ruby\u2460"}], "title": "\nChanges since the August 2013 Candidate Recommendation"}], "external": true};
-window.dfnpanelData['ea4fcd78'] = {"dfnID": "ea4fcd78", "url": "https://www.w3.org/TR/css-inline-3/#valdef-alignment-baseline-baseline", "dfnText": "baseline", "refSections": [{"refs": [{"id": "ref-for-valdef-alignment-baseline-baseline"}], "title": "2.5. \nText Underline Position: the text-underline-position property"}], "external": true};
-window.dfnpanelData['2d8be2d9'] = {"dfnID": "2d8be2d9", "url": "https://www.w3.org/TR/css-inline-3/#propdef-vertical-align", "dfnText": "vertical-align", "refSections": [{"refs": [{"id": "ref-for-propdef-vertical-align"}], "title": "2.5. \nText Underline Position: the text-underline-position property"}], "external": true};
-window.dfnpanelData['00d2e365'] = {"dfnID": "00d2e365", "url": "https://www.w3.org/TR/css-overflow-3/#ink-overflow", "dfnText": "ink overflow", "refSections": [{"refs": [{"id": "ref-for-ink-overflow"}], "title": "5.2. \nOverflow of Text Decorations"}, {"refs": [{"id": "ref-for-ink-overflow\u2460"}], "title": "\nChanges since the July 2018 Candidate Recommendation"}], "external": true};
-window.dfnpanelData['3ed7991e'] = {"dfnID": "3ed7991e", "url": "https://www.w3.org/TR/css-overflow-3/#scrollable-overflow-region", "dfnText": "scrollable overflow area", "refSections": [{"refs": [{"id": "ref-for-scrollable-overflow-region"}], "title": "4. \nText Shadows: the text-shadow property"}, {"refs": [{"id": "ref-for-scrollable-overflow-region\u2460"}], "title": "5.2. \nOverflow of Text Decorations"}], "external": true};
-window.dfnpanelData['42a3c4cb'] = {"dfnID": "42a3c4cb", "url": "https://www.w3.org/TR/css-ruby-1/#ruby-annotation-box", "dfnText": "ruby annotation", "refSections": [{"refs": [{"id": "ref-for-ruby-annotation-box"}], "title": "3.4. \nEmphasis Mark Position: the text-emphasis-position property"}, {"refs": [{"id": "ref-for-ruby-annotation-box\u2460"}], "title": "\nChanges since the August 2013 Candidate Recommendation"}], "external": true};
-window.dfnpanelData['7f0f7927'] = {"dfnID": "7f0f7927", "url": "https://www.w3.org/TR/css-ruby-1/#ruby-base-box", "dfnText": "ruby base", "refSections": [{"refs": [{"id": "ref-for-ruby-base-box"}], "title": "2. \nLine Decoration: Underline, Overline, and Strike-Through"}], "external": true};
-window.dfnpanelData['be5da72e'] = {"dfnID": "be5da72e", "url": "https://www.w3.org/TR/css-ruby-1/#ruby-container", "dfnText": "ruby container", "refSections": [{"refs": [{"id": "ref-for-ruby-container"}], "title": "2. \nLine Decoration: Underline, Overline, and Strike-Through"}], "external": true};
-window.dfnpanelData['24e3d3d6'] = {"dfnID": "24e3d3d6", "url": "https://www.w3.org/TR/css-text-4/#typographic-character-unit", "dfnText": "typographic character unit", "refSections": [{"refs": [{"id": "ref-for-typographic-character-unit"}], "title": "3.1. \nEmphasis Mark Style: the text-emphasis-style property"}], "external": true};
-window.dfnpanelData['2c391340'] = {"dfnID": "2c391340", "url": "https://www.w3.org/TR/css-text-decor-4/#valdef-text-decoration-style-wavy", "dfnText": "wavy", "refSections": [{"refs": [{"id": "ref-for-valdef-text-decoration-style-wavy"}], "title": "2.2. \nText Decoration Style: the text-decoration-style property"}], "external": true};
-window.dfnpanelData['c297b070'] = {"dfnID": "c297b070", "url": "https://www.w3.org/TR/css-values-4/#mult-comma", "dfnText": "#", "refSections": [{"refs": [{"id": "ref-for-mult-comma"}], "title": "4. \nText Shadows: the text-shadow property"}], "external": true};
-window.dfnpanelData['bdb4e757'] = {"dfnID": "bdb4e757", "url": "https://www.w3.org/TR/css-values-4/#comb-all", "dfnText": "&&", "refSections": [{"refs": [{"id": "ref-for-comb-all"}], "title": "3.4. \nEmphasis Mark Position: the text-emphasis-position property"}, {"refs": [{"id": "ref-for-comb-all\u2460"}], "title": "4. \nText Shadows: the text-shadow property"}], "external": true};
-window.dfnpanelData['98ddb9b0'] = {"dfnID": "98ddb9b0", "url": "https://www.w3.org/TR/css-values-4/#length-value", "dfnText": "<length>", "refSections": [{"refs": [{"id": "ref-for-length-value"}], "title": "4. \nText Shadows: the text-shadow property"}], "external": true};
-window.dfnpanelData['1d798932'] = {"dfnID": "1d798932", "url": "https://www.w3.org/TR/css-values-4/#string-value", "dfnText": "<string>", "refSections": [{"refs": [{"id": "ref-for-string-value"}, {"id": "ref-for-string-value\u2460"}], "title": "3.1. \nEmphasis Mark Style: the text-emphasis-style property"}], "external": true};
-window.dfnpanelData['d4441b24'] = {"dfnID": "d4441b24", "url": "https://www.w3.org/TR/css-values-4/#mult-opt", "dfnText": "?", "refSections": [{"refs": [{"id": "ref-for-mult-opt"}], "title": "3.4. \nEmphasis Mark Position: the text-emphasis-position property"}, {"refs": [{"id": "ref-for-mult-opt\u2460"}], "title": "4. \nText Shadows: the text-shadow property"}], "external": true};
-window.dfnpanelData['8a110a7b'] = {"dfnID": "8a110a7b", "url": "https://www.w3.org/TR/css-values-4/#css-wide-keywords", "dfnText": "css-wide keywords", "refSections": [{"refs": [{"id": "ref-for-css-wide-keywords"}], "title": "1.2. \nValue Definitions"}], "external": true};
-window.dfnpanelData['3bafef5e'] = {"dfnID": "3bafef5e", "url": "https://www.w3.org/TR/css-values-4/#mult-num-range", "dfnText": "{a,b}", "refSections": [{"refs": [{"id": "ref-for-mult-num-range"}], "title": "4. \nText Shadows: the text-shadow property"}], "external": true};
-window.dfnpanelData['4eb9d37e'] = {"dfnID": "4eb9d37e", "url": "https://www.w3.org/TR/css-values-4/#comb-one", "dfnText": "|", "refSections": [{"refs": [{"id": "ref-for-comb-one"}], "title": "2.1. \nText Decoration Lines: the text-decoration-line property"}, {"refs": [{"id": "ref-for-comb-one\u2460"}, {"id": "ref-for-comb-one\u2461"}, {"id": "ref-for-comb-one\u2462"}, {"id": "ref-for-comb-one\u2463"}], "title": "2.2. \nText Decoration Style: the text-decoration-style property"}, {"refs": [{"id": "ref-for-comb-one\u2464"}, {"id": "ref-for-comb-one\u2465"}], "title": "2.5. \nText Underline Position: the text-underline-position property"}, {"refs": [{"id": "ref-for-comb-one\u2466"}, {"id": "ref-for-comb-one\u2467"}, {"id": "ref-for-comb-one\u2468"}, {"id": "ref-for-comb-one\u2460\u24ea"}, {"id": "ref-for-comb-one\u2460\u2460"}, {"id": "ref-for-comb-one\u2460\u2461"}, {"id": "ref-for-comb-one\u2460\u2462"}], "title": "3.1. \nEmphasis Mark Style: the text-emphasis-style property"}, {"refs": [{"id": "ref-for-comb-one\u2460\u2463"}, {"id": "ref-for-comb-one\u2460\u2464"}], "title": "3.4. \nEmphasis Mark Position: the text-emphasis-position property"}, {"refs": [{"id": "ref-for-comb-one\u2460\u2465"}], "title": "4. \nText Shadows: the text-shadow property"}], "external": true};
-window.dfnpanelData['a0336d84'] = {"dfnID": "a0336d84", "url": "https://www.w3.org/TR/css-values-4/#comb-any", "dfnText": "||", "refSections": [{"refs": [{"id": "ref-for-comb-any"}, {"id": "ref-for-comb-any\u2460"}, {"id": "ref-for-comb-any\u2461"}], "title": "2.1. \nText Decoration Lines: the text-decoration-line property"}, {"refs": [{"id": "ref-for-comb-any\u2462"}, {"id": "ref-for-comb-any\u2463"}], "title": "2.4. \nText Decoration Shorthand: the text-decoration property"}, {"refs": [{"id": "ref-for-comb-any\u2464"}], "title": "2.5. \nText Underline Position: the text-underline-position property"}, {"refs": [{"id": "ref-for-comb-any\u2465"}], "title": "3.1. \nEmphasis Mark Style: the text-emphasis-style property"}, {"refs": [{"id": "ref-for-comb-any\u2466"}], "title": "3.3. \nEmphasis Mark Shorthand: the text-emphasis property"}], "external": true};
-window.dfnpanelData['466114e3'] = {"dfnID": "466114e3", "url": "https://www.w3.org/TR/css-writing-modes-4/#valdef-writing-mode-sideways-lr", "dfnText": "sideways-lr", "refSections": [{"refs": [{"id": "ref-for-valdef-writing-mode-sideways-lr"}, {"id": "ref-for-valdef-writing-mode-sideways-lr\u2460"}], "title": "\nChanges since the August 2013 Candidate Recommendation"}], "external": true};
-window.dfnpanelData['fcaf9b9c'] = {"dfnID": "fcaf9b9c", "url": "https://www.w3.org/TR/css-writing-modes-4/#valdef-writing-mode-sideways-rl", "dfnText": "sideways-rl", "refSections": [{"refs": [{"id": "ref-for-valdef-writing-mode-sideways-rl"}, {"id": "ref-for-valdef-writing-mode-sideways-rl\u2460"}], "title": "\nChanges since the August 2013 Candidate Recommendation"}], "external": true};
-window.dfnpanelData['ef383707'] = {"dfnID": "ef383707", "url": "https://www.w3.org/TR/css-writing-modes-4/#typographic-mode", "dfnText": "typographic mode", "refSections": [{"refs": [{"id": "ref-for-typographic-mode"}, {"id": "ref-for-typographic-mode\u2460"}, {"id": "ref-for-typographic-mode\u2461"}, {"id": "ref-for-typographic-mode\u2462"}, {"id": "ref-for-typographic-mode\u2463"}], "title": "2.5. \nText Underline Position: the text-underline-position property"}, {"refs": [{"id": "ref-for-typographic-mode\u2464"}, {"id": "ref-for-typographic-mode\u2465"}, {"id": "ref-for-typographic-mode\u2466"}, {"id": "ref-for-typographic-mode\u2467"}], "title": "3.1. \nEmphasis Mark Style: the text-emphasis-style property"}, {"refs": [{"id": "ref-for-typographic-mode\u2468"}, {"id": "ref-for-typographic-mode\u2460\u24ea"}, {"id": "ref-for-typographic-mode\u2460\u2460"}, {"id": "ref-for-typographic-mode\u2460\u2461"}], "title": "3.4. \nEmphasis Mark Position: the text-emphasis-position property"}, {"refs": [{"id": "ref-for-typographic-mode\u2460\u2462"}], "title": "\nChanges since the August 2013 Candidate Recommendation"}], "external": true};
-window.dfnpanelData['99d814d1'] = {"dfnID": "99d814d1", "url": "https://www.w3.org/TR/css-writing-modes-4/#under", "dfnText": "under", "refSections": [{"refs": [{"id": "ref-for-under"}], "title": "2.5. \nText Underline Position: the text-underline-position property"}], "external": true};
-window.dfnpanelData['e51c8aeb'] = {"dfnID": "e51c8aeb", "url": "https://www.w3.org/TR/css-writing-modes-4/#vertical-writing-mode", "dfnText": "vertical writing mode", "refSections": [{"refs": [{"id": "ref-for-vertical-writing-mode"}], "title": "2.1. \nText Decoration Lines: the text-decoration-line property"}], "external": true};
-window.dfnpanelData['eb6008ce'] = {"dfnID": "eb6008ce", "url": "https://www.w3.org/TR/css-writing-modes-4/#writing-mode", "dfnText": "writing mode", "refSections": [{"refs": [{"id": "ref-for-writing-mode"}], "title": "3.1. \nEmphasis Mark Style: the text-emphasis-style property"}], "external": true};
-window.dfnpanelData['37bb38a0'] = {"dfnID": "37bb38a0", "url": "https://www.w3.org/TR/css-writing-modes-4/#propdef-writing-mode", "dfnText": "writing-mode", "refSections": [{"refs": [{"id": "ref-for-propdef-writing-mode"}], "title": "\nChanges since the August 2013 Candidate Recommendation"}], "external": true};
-window.dfnpanelData['b8cd3abf'] = {"dfnID": "b8cd3abf", "url": "https://html.spec.whatwg.org/multipage/edits.html#the-del-element", "dfnText": "del", "refSections": [{"refs": [{"id": "ref-for-the-del-element"}], "title": "2. \nLine Decoration: Underline, Overline, and Strike-Through"}], "external": true};
-window.dfnpanelData['2b83edc9'] = {"dfnID": "2b83edc9", "url": "https://html.spec.whatwg.org/multipage/edits.html#the-ins-element", "dfnText": "ins", "refSections": [{"refs": [{"id": "ref-for-the-ins-element"}], "title": "2. \nLine Decoration: Underline, Overline, and Strike-Through"}], "external": true};
-window.dfnpanelData['character'] = {"dfnID": "character", "url": "#character", "dfnText": "character", "refSections": [{"refs": [{"id": "ref-for-character"}, {"id": "ref-for-character\u2460"}, {"id": "ref-for-character\u2461"}], "title": "3.1. \nEmphasis Mark Style: the text-emphasis-style property"}], "external": false};
-window.dfnpanelData['decorating-box'] = {"dfnID": "decorating-box", "url": "#decorating-box", "dfnText": "decorating box", "refSections": [{"refs": [{"id": "ref-for-decorating-box"}, {"id": "ref-for-decorating-box\u2460"}, {"id": "ref-for-decorating-box\u2461"}], "title": "2. \nLine Decoration: Underline, Overline, and Strike-Through"}, {"refs": [{"id": "ref-for-decorating-box\u2462"}, {"id": "ref-for-decorating-box\u2463"}, {"id": "ref-for-decorating-box\u2464"}, {"id": "ref-for-decorating-box\u2465"}], "title": "2.5. \nText Underline Position: the text-underline-position property"}], "external": false};
-window.dfnpanelData['propdef-text-decoration-line'] = {"dfnID": "propdef-text-decoration-line", "url": "#propdef-text-decoration-line", "dfnText": "text-decoration-line", "refSections": [{"refs": [{"id": "ref-for-propdef-text-decoration-line"}], "title": "2.1. \nText Decoration Lines: the text-decoration-line property"}, {"refs": [{"id": "ref-for-propdef-text-decoration-line\u2460"}], "title": "2.3. \nText Decoration Color: the text-decoration-color property"}, {"refs": [{"id": "ref-for-propdef-text-decoration-line\u2461"}, {"id": "ref-for-propdef-text-decoration-line\u2462"}], "title": "2.4. \nText Decoration Shorthand: the text-decoration property"}, {"refs": [{"id": "ref-for-propdef-text-decoration-line\u2463"}], "title": "\nAppendix B: Default UA Stylesheet"}], "external": false};
-window.dfnpanelData['propdef-text-decoration-style'] = {"dfnID": "propdef-text-decoration-style", "url": "#propdef-text-decoration-style", "dfnText": "text-decoration-style", "refSections": [{"refs": [{"id": "ref-for-propdef-text-decoration-style"}], "title": "2.2. \nText Decoration Style: the text-decoration-style property"}, {"refs": [{"id": "ref-for-propdef-text-decoration-style\u2460"}, {"id": "ref-for-propdef-text-decoration-style\u2461"}, {"id": "ref-for-propdef-text-decoration-style\u2462"}], "title": "2.4. \nText Decoration Shorthand: the text-decoration property"}], "external": false};
-window.dfnpanelData['propdef-text-decoration-color'] = {"dfnID": "propdef-text-decoration-color", "url": "#propdef-text-decoration-color", "dfnText": "text-decoration-color", "refSections": [{"refs": [{"id": "ref-for-propdef-text-decoration-color"}], "title": "2.3. \nText Decoration Color: the text-decoration-color property"}, {"refs": [{"id": "ref-for-propdef-text-decoration-color\u2460"}, {"id": "ref-for-propdef-text-decoration-color\u2461"}, {"id": "ref-for-propdef-text-decoration-color\u2462"}], "title": "2.4. \nText Decoration Shorthand: the text-decoration property"}], "external": false};
-window.dfnpanelData['propdef-text-decoration'] = {"dfnID": "propdef-text-decoration", "url": "#propdef-text-decoration", "dfnText": "text-decoration", "refSections": [{"refs": [{"id": "ref-for-propdef-text-decoration"}, {"id": "ref-for-propdef-text-decoration\u2460"}, {"id": "ref-for-propdef-text-decoration\u2461"}], "title": "2.4. \nText Decoration Shorthand: the text-decoration property"}, {"refs": [{"id": "ref-for-propdef-text-decoration\u2462"}], "title": "2.5. \nText Underline Position: the text-underline-position property"}, {"refs": [{"id": "ref-for-propdef-text-decoration\u2463"}, {"id": "ref-for-propdef-text-decoration\u2464"}, {"id": "ref-for-propdef-text-decoration\u2465"}], "title": "5.1. \nPainting Order of Text Decorations"}], "external": false};
-window.dfnpanelData['propdef-text-underline-position'] = {"dfnID": "propdef-text-underline-position", "url": "#propdef-text-underline-position", "dfnText": "text-underline-position", "refSections": [{"refs": [{"id": "ref-for-propdef-text-underline-position"}], "title": "2.1. \nText Decoration Lines: the text-decoration-line property"}, {"refs": [{"id": "ref-for-propdef-text-underline-position\u2460"}], "title": "2.4. \nText Decoration Shorthand: the text-decoration property"}, {"refs": [{"id": "ref-for-propdef-text-underline-position\u2461"}, {"id": "ref-for-propdef-text-underline-position\u2462"}, {"id": "ref-for-propdef-text-underline-position\u2463"}, {"id": "ref-for-propdef-text-underline-position\u2464"}], "title": "2.5. \nText Underline Position: the text-underline-position property"}, {"refs": [{"id": "ref-for-propdef-text-underline-position\u2465"}], "title": "\nChanges since the July 2018 Candidate Recommendation"}, {"refs": [{"id": "ref-for-propdef-text-underline-position\u2466"}, {"id": "ref-for-propdef-text-underline-position\u2467"}], "title": "\nChanges since the August 2013 Candidate Recommendation"}], "external": false};
-window.dfnpanelData['underline-auto'] = {"dfnID": "underline-auto", "url": "#underline-auto", "dfnText": "auto", "refSections": [{"refs": [{"id": "ref-for-underline-auto"}, {"id": "ref-for-underline-auto\u2460"}], "title": "2.5. \nText Underline Position: the text-underline-position property"}, {"refs": [{"id": "ref-for-underline-auto\u2461"}], "title": "\nChanges since the August 2013 Candidate Recommendation"}], "external": false};
-window.dfnpanelData['underline-under'] = {"dfnID": "underline-under", "url": "#underline-under", "dfnText": "under", "refSections": [{"refs": [{"id": "ref-for-underline-under"}, {"id": "ref-for-underline-under\u2460"}, {"id": "ref-for-underline-under\u2461"}, {"id": "ref-for-underline-under\u2462"}], "title": "2.5. \nText Underline Position: the text-underline-position property"}, {"refs": [{"id": "ref-for-underline-under\u2463"}], "title": "\nChanges since the August 2013 Candidate Recommendation"}], "external": false};
-window.dfnpanelData['underline-left'] = {"dfnID": "underline-left", "url": "#underline-left", "dfnText": "left", "refSections": [{"refs": [{"id": "ref-for-underline-left"}, {"id": "ref-for-underline-left\u2460"}, {"id": "ref-for-underline-left\u2461"}, {"id": "ref-for-underline-left\u2462"}], "title": "2.5. \nText Underline Position: the text-underline-position property"}, {"refs": [{"id": "ref-for-underline-left\u2463"}], "title": "\nChanges since the August 2013 Candidate Recommendation"}], "external": false};
-window.dfnpanelData['underline-right'] = {"dfnID": "underline-right", "url": "#underline-right", "dfnText": "right", "refSections": [{"refs": [{"id": "ref-for-underline-right"}, {"id": "ref-for-underline-right\u2460"}, {"id": "ref-for-underline-right\u2461"}, {"id": "ref-for-underline-right\u2462"}], "title": "2.5. \nText Underline Position: the text-underline-position property"}, {"refs": [{"id": "ref-for-underline-right\u2463"}], "title": "\nChanges since the August 2013 Candidate Recommendation"}], "external": false};
-window.dfnpanelData['propdef-text-emphasis-style'] = {"dfnID": "propdef-text-emphasis-style", "url": "#propdef-text-emphasis-style", "dfnText": "text-emphasis-style", "refSections": [{"refs": [{"id": "ref-for-propdef-text-emphasis-style"}], "title": "3. \nEmphasis Marks"}, {"refs": [{"id": "ref-for-propdef-text-emphasis-style\u2460"}], "title": "3.1. \nEmphasis Mark Style: the text-emphasis-style property"}, {"refs": [{"id": "ref-for-propdef-text-emphasis-style\u2461"}, {"id": "ref-for-propdef-text-emphasis-style\u2462"}], "title": "3.3. \nEmphasis Mark Shorthand: the text-emphasis property"}], "external": false};
-window.dfnpanelData['valdef-text-emphasis-style-none'] = {"dfnID": "valdef-text-emphasis-style-none", "url": "#valdef-text-emphasis-style-none", "dfnText": "none", "refSections": [{"refs": [{"id": "ref-for-valdef-text-emphasis-style-none"}], "title": "3.1. \nEmphasis Mark Style: the text-emphasis-style property"}], "external": false};
-window.dfnpanelData['valdef-text-emphasis-style-filled'] = {"dfnID": "valdef-text-emphasis-style-filled", "url": "#valdef-text-emphasis-style-filled", "dfnText": "filled", "refSections": [{"refs": [{"id": "ref-for-valdef-text-emphasis-style-filled"}, {"id": "ref-for-valdef-text-emphasis-style-filled\u2460"}, {"id": "ref-for-valdef-text-emphasis-style-filled\u2461"}], "title": "3.1. \nEmphasis Mark Style: the text-emphasis-style property"}], "external": false};
-window.dfnpanelData['valdef-text-text-emphasis-open'] = {"dfnID": "valdef-text-text-emphasis-open", "url": "#valdef-text-text-emphasis-open", "dfnText": "open", "refSections": [{"refs": [{"id": "ref-for-valdef-text-text-emphasis-open"}, {"id": "ref-for-valdef-text-text-emphasis-open\u2460"}], "title": "3.1. \nEmphasis Mark Style: the text-emphasis-style property"}], "external": false};
-window.dfnpanelData['valdef-text-emphasis-style-circle'] = {"dfnID": "valdef-text-emphasis-style-circle", "url": "#valdef-text-emphasis-style-circle", "dfnText": "circle", "refSections": [{"refs": [{"id": "ref-for-valdef-text-emphasis-style-circle"}], "title": "3.1. \nEmphasis Mark Style: the text-emphasis-style property"}], "external": false};
-window.dfnpanelData['valdef-text-emphasis-style-sesame'] = {"dfnID": "valdef-text-emphasis-style-sesame", "url": "#valdef-text-emphasis-style-sesame", "dfnText": "sesame", "refSections": [{"refs": [{"id": "ref-for-valdef-text-emphasis-style-sesame"}], "title": "3.1. \nEmphasis Mark Style: the text-emphasis-style property"}], "external": false};
-window.dfnpanelData['propdef-text-emphasis-color'] = {"dfnID": "propdef-text-emphasis-color", "url": "#propdef-text-emphasis-color", "dfnText": "text-emphasis-color", "refSections": [{"refs": [{"id": "ref-for-propdef-text-emphasis-color"}], "title": "3. \nEmphasis Marks"}, {"refs": [{"id": "ref-for-propdef-text-emphasis-color\u2460"}, {"id": "ref-for-propdef-text-emphasis-color\u2461"}], "title": "3.2. \nEmphasis Mark Color: the text-emphasis-color property"}, {"refs": [{"id": "ref-for-propdef-text-emphasis-color\u2462"}, {"id": "ref-for-propdef-text-emphasis-color\u2463"}], "title": "3.3. \nEmphasis Mark Shorthand: the text-emphasis property"}], "external": false};
-window.dfnpanelData['propdef-text-emphasis'] = {"dfnID": "propdef-text-emphasis", "url": "#propdef-text-emphasis", "dfnText": "text-emphasis", "refSections": [{"refs": [{"id": "ref-for-propdef-text-emphasis"}], "title": "3. \nEmphasis Marks"}, {"refs": [{"id": "ref-for-propdef-text-emphasis\u2460"}], "title": "3.3. \nEmphasis Mark Shorthand: the text-emphasis property"}, {"refs": [{"id": "ref-for-propdef-text-emphasis\u2461"}], "title": "5.1. \nPainting Order of Text Decorations"}, {"refs": [{"id": "ref-for-propdef-text-emphasis\u2462"}], "title": "\nChanges since the August 2013 Candidate Recommendation"}], "external": false};
-window.dfnpanelData['propdef-text-emphasis-position'] = {"dfnID": "propdef-text-emphasis-position", "url": "#propdef-text-emphasis-position", "dfnText": "text-emphasis-position", "refSections": [{"refs": [{"id": "ref-for-propdef-text-emphasis-position"}], "title": "3. \nEmphasis Marks"}, {"refs": [{"id": "ref-for-propdef-text-emphasis-position\u2460"}], "title": "3.3. \nEmphasis Mark Shorthand: the text-emphasis property"}, {"refs": [{"id": "ref-for-propdef-text-emphasis-position\u2461"}, {"id": "ref-for-propdef-text-emphasis-position\u2462"}], "title": "3.4. \nEmphasis Mark Position: the text-emphasis-position property"}, {"refs": [{"id": "ref-for-propdef-text-emphasis-position\u2463"}, {"id": "ref-for-propdef-text-emphasis-position\u2464"}], "title": "\nChanges since the August 2013 Candidate Recommendation"}], "external": false};
-window.dfnpanelData['valdef-text-emphasis-position-right'] = {"dfnID": "valdef-text-emphasis-position-right", "url": "#valdef-text-emphasis-position-right", "dfnText": "right", "refSections": [{"refs": [{"id": "ref-for-valdef-text-emphasis-position-right"}], "title": "3.4. \nEmphasis Mark Position: the text-emphasis-position property"}, {"refs": [{"id": "ref-for-valdef-text-emphasis-position-right\u2460"}], "title": "\nChanges since the August 2013 Candidate Recommendation"}], "external": false};
-window.dfnpanelData['propdef-text-shadow'] = {"dfnID": "propdef-text-shadow", "url": "#propdef-text-shadow", "dfnText": "text-shadow", "refSections": [{"refs": [{"id": "ref-for-propdef-text-shadow"}], "title": "2. \nLine Decoration: Underline, Overline, and Strike-Through"}, {"refs": [{"id": "ref-for-propdef-text-shadow\u2460"}], "title": "4. \nText Shadows: the text-shadow property"}, {"refs": [{"id": "ref-for-propdef-text-shadow\u2461"}], "title": "5.1. \nPainting Order of Text Decorations"}, {"refs": [{"id": "ref-for-propdef-text-shadow\u2462"}, {"id": "ref-for-propdef-text-shadow\u2463"}, {"id": "ref-for-propdef-text-shadow\u2464"}], "title": "\nChanges since the August 2013 Candidate Recommendation"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -2890,12 +2420,482 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"c48eaa20": {"dfnID":"c48eaa20","dfnText":"box-shadow","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-box-shadow"},{"id":"ref-for-propdef-box-shadow\u2460"},{"id":"ref-for-propdef-box-shadow\u2461"}],"title":"4. \nText Shadows: the text-shadow property"}],"url":"https://www.w3.org/TR/css-backgrounds-3/#propdef-box-shadow"},
+"dd273458": {"dfnID":"dd273458","dfnText":"inset","external":true,"refSections":[{"refs":[{"id":"ref-for-shadow-inset"}],"title":"4. \nText Shadows: the text-shadow property"}],"url":"https://www.w3.org/TR/css-backgrounds-3/#shadow-inset"},
+"429d8615": {"dfnID":"429d8615","dfnText":"none","external":true,"refSections":[{"refs":[{"id":"ref-for-box-shadow-none"},{"id":"ref-for-box-shadow-none\u2460"}],"title":"4. \nText Shadows: the text-shadow property"}],"url":"https://www.w3.org/TR/css-backgrounds-3/#box-shadow-none"},
+"62c772f5": {"dfnID":"62c772f5","dfnText":"fragment","external":true,"refSections":[{"refs":[{"id":"ref-for-fragment"}],"title":"2. \nLine Decoration: Underline, Overline, and Strike-Through"}],"url":"https://www.w3.org/TR/css-break-3/#fragment"},
+"329ecc08": {"dfnID":"329ecc08","dfnText":"<color>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-color"}],"title":"2.3. \nText Decoration Color: the text-decoration-color property"},{"refs":[{"id":"ref-for-typedef-color\u2460"}],"title":"3.2. \nEmphasis Mark Color: the text-emphasis-color property"},{"refs":[{"id":"ref-for-typedef-color\u2461"}],"title":"4. \nText Shadows: the text-shadow property"}],"url":"https://www.w3.org/TR/css-color-4/#typedef-color"},
+"a42c65ac": {"dfnID":"a42c65ac","dfnText":"currentcolor","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-color-currentcolor"}],"title":"3.2. \nEmphasis Mark Color: the text-emphasis-color property"},{"refs":[{"id":"ref-for-valdef-color-currentcolor\u2460"}],"title":"4. \nText Shadows: the text-shadow property"}],"url":"https://www.w3.org/TR/css-color-4/#valdef-color-currentcolor"},
+"56a84c2f": {"dfnID":"56a84c2f","dfnText":"anonymous","external":true,"refSections":[{"refs":[{"id":"ref-for-anonymous"}],"title":"2. \nLine Decoration: Underline, Overline, and Strike-Through"}],"url":"https://www.w3.org/TR/css-display-3/#anonymous"},
+"f2938b9c": {"dfnID":"f2938b9c","dfnText":"atomic inline","external":true,"refSections":[{"refs":[{"id":"ref-for-atomic-inline"}],"title":"2. \nLine Decoration: Underline, Overline, and Strike-Through"}],"url":"https://www.w3.org/TR/css-display-3/#atomic-inline"},
+"05c40e8e": {"dfnID":"05c40e8e","dfnText":"block container","external":true,"refSections":[{"refs":[{"id":"ref-for-block-container"},{"id":"ref-for-block-container\u2460"}],"title":"2. \nLine Decoration: Underline, Overline, and Strike-Through"}],"url":"https://www.w3.org/TR/css-display-3/#block-container"},
+"ecb27d09": {"dfnID":"ecb27d09","dfnText":"block-level","external":true,"refSections":[{"refs":[{"id":"ref-for-block-level"}],"title":"2. \nLine Decoration: Underline, Overline, and Strike-Through"}],"url":"https://www.w3.org/TR/css-display-3/#block-level"},
+"5c159f8f": {"dfnID":"5c159f8f","dfnText":"box","external":true,"refSections":[{"refs":[{"id":"ref-for-box"}],"title":"2. \nLine Decoration: Underline, Overline, and Strike-Through"},{"refs":[{"id":"ref-for-box\u2460"}],"title":"5.2. \nOverflow of Text Decorations"}],"url":"https://www.w3.org/TR/css-display-3/#box"},
+"2ccfe434": {"dfnID":"2ccfe434","dfnText":"display","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-display"}],"title":"2. \nLine Decoration: Underline, Overline, and Strike-Through"}],"url":"https://www.w3.org/TR/css-display-3/#propdef-display"},
+"e8976716": {"dfnID":"e8976716","dfnText":"in-flow","external":true,"refSections":[{"refs":[{"id":"ref-for-in-flow"},{"id":"ref-for-in-flow\u2460"}],"title":"2. \nLine Decoration: Underline, Overline, and Strike-Through"}],"url":"https://www.w3.org/TR/css-display-3/#in-flow"},
+"d41bfa8c": {"dfnID":"d41bfa8c","dfnText":"inline box","external":true,"refSections":[{"refs":[{"id":"ref-for-inline-box"},{"id":"ref-for-inline-box\u2460"},{"id":"ref-for-inline-box\u2461"}],"title":"2. \nLine Decoration: Underline, Overline, and Strike-Through"}],"url":"https://www.w3.org/TR/css-display-3/#inline-box"},
+"c7eac2b9": {"dfnID":"c7eac2b9","dfnText":"inline formatting context","external":true,"refSections":[{"refs":[{"id":"ref-for-inline-formatting-context"}],"title":"2. \nLine Decoration: Underline, Overline, and Strike-Through"}],"url":"https://www.w3.org/TR/css-display-3/#inline-formatting-context"},
+"4f918eb5": {"dfnID":"4f918eb5","dfnText":"inline-level","external":true,"refSections":[{"refs":[{"id":"ref-for-inline-level"}],"title":"2. \nLine Decoration: Underline, Overline, and Strike-Through"}],"url":"https://www.w3.org/TR/css-display-3/#inline-level"},
+"5c0c2c32": {"dfnID":"5c0c2c32","dfnText":"non-replaced","external":true,"refSections":[{"refs":[{"id":"ref-for-non-replaced"}],"title":"2. \nLine Decoration: Underline, Overline, and Strike-Through"}],"url":"https://www.w3.org/TR/css-display-3/#non-replaced"},
+"d3ff9a69": {"dfnID":"d3ff9a69","dfnText":"visibility","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-visibility"}],"title":"2. \nLine Decoration: Underline, Overline, and Strike-Through"}],"url":"https://www.w3.org/TR/css-display-3/#propdef-visibility"},
+"354876d6": {"dfnID":"354876d6","dfnText":"font-variant-position","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-font-variant-position"}],"title":"2.5. \nText Underline Position: the text-underline-position property"}],"url":"https://www.w3.org/TR/css-fonts-4/#propdef-font-variant-position"},
+"07be701f": {"dfnID":"07be701f","dfnText":"ruby","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-font-variant-east-asian-ruby"}],"title":"3.1. \nEmphasis Mark Style: the text-emphasis-style property"},{"refs":[{"id":"ref-for-valdef-font-variant-east-asian-ruby\u2460"}],"title":"\nChanges since the August 2013 Candidate Recommendation"}],"url":"https://www.w3.org/TR/css-fonts-4/#valdef-font-variant-east-asian-ruby"},
+"ea4fcd78": {"dfnID":"ea4fcd78","dfnText":"baseline","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-alignment-baseline-baseline"}],"title":"2.5. \nText Underline Position: the text-underline-position property"}],"url":"https://www.w3.org/TR/css-inline-3/#valdef-alignment-baseline-baseline"},
+"2d8be2d9": {"dfnID":"2d8be2d9","dfnText":"vertical-align","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-vertical-align"}],"title":"2.5. \nText Underline Position: the text-underline-position property"}],"url":"https://www.w3.org/TR/css-inline-3/#propdef-vertical-align"},
+"00d2e365": {"dfnID":"00d2e365","dfnText":"ink overflow","external":true,"refSections":[{"refs":[{"id":"ref-for-ink-overflow"}],"title":"5.2. \nOverflow of Text Decorations"},{"refs":[{"id":"ref-for-ink-overflow\u2460"}],"title":"\nChanges since the July 2018 Candidate Recommendation"}],"url":"https://www.w3.org/TR/css-overflow-3/#ink-overflow"},
+"3ed7991e": {"dfnID":"3ed7991e","dfnText":"scrollable overflow area","external":true,"refSections":[{"refs":[{"id":"ref-for-scrollable-overflow-region"}],"title":"4. \nText Shadows: the text-shadow property"},{"refs":[{"id":"ref-for-scrollable-overflow-region\u2460"}],"title":"5.2. \nOverflow of Text Decorations"}],"url":"https://www.w3.org/TR/css-overflow-3/#scrollable-overflow-region"},
+"42a3c4cb": {"dfnID":"42a3c4cb","dfnText":"ruby annotation","external":true,"refSections":[{"refs":[{"id":"ref-for-ruby-annotation-box"}],"title":"3.4. \nEmphasis Mark Position: the text-emphasis-position property"},{"refs":[{"id":"ref-for-ruby-annotation-box\u2460"}],"title":"\nChanges since the August 2013 Candidate Recommendation"}],"url":"https://www.w3.org/TR/css-ruby-1/#ruby-annotation-box"},
+"7f0f7927": {"dfnID":"7f0f7927","dfnText":"ruby base","external":true,"refSections":[{"refs":[{"id":"ref-for-ruby-base-box"}],"title":"2. \nLine Decoration: Underline, Overline, and Strike-Through"}],"url":"https://www.w3.org/TR/css-ruby-1/#ruby-base-box"},
+"be5da72e": {"dfnID":"be5da72e","dfnText":"ruby container","external":true,"refSections":[{"refs":[{"id":"ref-for-ruby-container"}],"title":"2. \nLine Decoration: Underline, Overline, and Strike-Through"}],"url":"https://www.w3.org/TR/css-ruby-1/#ruby-container"},
+"24e3d3d6": {"dfnID":"24e3d3d6","dfnText":"typographic character unit","external":true,"refSections":[{"refs":[{"id":"ref-for-typographic-character-unit"}],"title":"3.1. \nEmphasis Mark Style: the text-emphasis-style property"}],"url":"https://www.w3.org/TR/css-text-4/#typographic-character-unit"},
+"2c391340": {"dfnID":"2c391340","dfnText":"wavy","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-text-decoration-style-wavy"}],"title":"2.2. \nText Decoration Style: the text-decoration-style property"}],"url":"https://www.w3.org/TR/css-text-decor-4/#valdef-text-decoration-style-wavy"},
+"c297b070": {"dfnID":"c297b070","dfnText":"#","external":true,"refSections":[{"refs":[{"id":"ref-for-mult-comma"}],"title":"4. \nText Shadows: the text-shadow property"}],"url":"https://www.w3.org/TR/css-values-4/#mult-comma"},
+"bdb4e757": {"dfnID":"bdb4e757","dfnText":"&&","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-all"}],"title":"3.4. \nEmphasis Mark Position: the text-emphasis-position property"},{"refs":[{"id":"ref-for-comb-all\u2460"}],"title":"4. \nText Shadows: the text-shadow property"}],"url":"https://www.w3.org/TR/css-values-4/#comb-all"},
+"98ddb9b0": {"dfnID":"98ddb9b0","dfnText":"<length>","external":true,"refSections":[{"refs":[{"id":"ref-for-length-value"}],"title":"4. \nText Shadows: the text-shadow property"}],"url":"https://www.w3.org/TR/css-values-4/#length-value"},
+"1d798932": {"dfnID":"1d798932","dfnText":"<string>","external":true,"refSections":[{"refs":[{"id":"ref-for-string-value"},{"id":"ref-for-string-value\u2460"}],"title":"3.1. \nEmphasis Mark Style: the text-emphasis-style property"}],"url":"https://www.w3.org/TR/css-values-4/#string-value"},
+"d4441b24": {"dfnID":"d4441b24","dfnText":"?","external":true,"refSections":[{"refs":[{"id":"ref-for-mult-opt"}],"title":"3.4. \nEmphasis Mark Position: the text-emphasis-position property"},{"refs":[{"id":"ref-for-mult-opt\u2460"}],"title":"4. \nText Shadows: the text-shadow property"}],"url":"https://www.w3.org/TR/css-values-4/#mult-opt"},
+"8a110a7b": {"dfnID":"8a110a7b","dfnText":"css-wide keywords","external":true,"refSections":[{"refs":[{"id":"ref-for-css-wide-keywords"}],"title":"1.2. \nValue Definitions"}],"url":"https://www.w3.org/TR/css-values-4/#css-wide-keywords"},
+"3bafef5e": {"dfnID":"3bafef5e","dfnText":"{a,b}","external":true,"refSections":[{"refs":[{"id":"ref-for-mult-num-range"}],"title":"4. \nText Shadows: the text-shadow property"}],"url":"https://www.w3.org/TR/css-values-4/#mult-num-range"},
+"4eb9d37e": {"dfnID":"4eb9d37e","dfnText":"|","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-one"}],"title":"2.1. \nText Decoration Lines: the text-decoration-line property"},{"refs":[{"id":"ref-for-comb-one\u2460"},{"id":"ref-for-comb-one\u2461"},{"id":"ref-for-comb-one\u2462"},{"id":"ref-for-comb-one\u2463"}],"title":"2.2. \nText Decoration Style: the text-decoration-style property"},{"refs":[{"id":"ref-for-comb-one\u2464"},{"id":"ref-for-comb-one\u2465"}],"title":"2.5. \nText Underline Position: the text-underline-position property"},{"refs":[{"id":"ref-for-comb-one\u2466"},{"id":"ref-for-comb-one\u2467"},{"id":"ref-for-comb-one\u2468"},{"id":"ref-for-comb-one\u2460\u24ea"},{"id":"ref-for-comb-one\u2460\u2460"},{"id":"ref-for-comb-one\u2460\u2461"},{"id":"ref-for-comb-one\u2460\u2462"}],"title":"3.1. \nEmphasis Mark Style: the text-emphasis-style property"},{"refs":[{"id":"ref-for-comb-one\u2460\u2463"},{"id":"ref-for-comb-one\u2460\u2464"}],"title":"3.4. \nEmphasis Mark Position: the text-emphasis-position property"},{"refs":[{"id":"ref-for-comb-one\u2460\u2465"}],"title":"4. \nText Shadows: the text-shadow property"}],"url":"https://www.w3.org/TR/css-values-4/#comb-one"},
+"a0336d84": {"dfnID":"a0336d84","dfnText":"||","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-any"},{"id":"ref-for-comb-any\u2460"},{"id":"ref-for-comb-any\u2461"}],"title":"2.1. \nText Decoration Lines: the text-decoration-line property"},{"refs":[{"id":"ref-for-comb-any\u2462"},{"id":"ref-for-comb-any\u2463"}],"title":"2.4. \nText Decoration Shorthand: the text-decoration property"},{"refs":[{"id":"ref-for-comb-any\u2464"}],"title":"2.5. \nText Underline Position: the text-underline-position property"},{"refs":[{"id":"ref-for-comb-any\u2465"}],"title":"3.1. \nEmphasis Mark Style: the text-emphasis-style property"},{"refs":[{"id":"ref-for-comb-any\u2466"}],"title":"3.3. \nEmphasis Mark Shorthand: the text-emphasis property"}],"url":"https://www.w3.org/TR/css-values-4/#comb-any"},
+"466114e3": {"dfnID":"466114e3","dfnText":"sideways-lr","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-writing-mode-sideways-lr"},{"id":"ref-for-valdef-writing-mode-sideways-lr\u2460"}],"title":"\nChanges since the August 2013 Candidate Recommendation"}],"url":"https://www.w3.org/TR/css-writing-modes-4/#valdef-writing-mode-sideways-lr"},
+"fcaf9b9c": {"dfnID":"fcaf9b9c","dfnText":"sideways-rl","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-writing-mode-sideways-rl"},{"id":"ref-for-valdef-writing-mode-sideways-rl\u2460"}],"title":"\nChanges since the August 2013 Candidate Recommendation"}],"url":"https://www.w3.org/TR/css-writing-modes-4/#valdef-writing-mode-sideways-rl"},
+"ef383707": {"dfnID":"ef383707","dfnText":"typographic mode","external":true,"refSections":[{"refs":[{"id":"ref-for-typographic-mode"},{"id":"ref-for-typographic-mode\u2460"},{"id":"ref-for-typographic-mode\u2461"},{"id":"ref-for-typographic-mode\u2462"},{"id":"ref-for-typographic-mode\u2463"}],"title":"2.5. \nText Underline Position: the text-underline-position property"},{"refs":[{"id":"ref-for-typographic-mode\u2464"},{"id":"ref-for-typographic-mode\u2465"},{"id":"ref-for-typographic-mode\u2466"},{"id":"ref-for-typographic-mode\u2467"}],"title":"3.1. \nEmphasis Mark Style: the text-emphasis-style property"},{"refs":[{"id":"ref-for-typographic-mode\u2468"},{"id":"ref-for-typographic-mode\u2460\u24ea"},{"id":"ref-for-typographic-mode\u2460\u2460"},{"id":"ref-for-typographic-mode\u2460\u2461"}],"title":"3.4. \nEmphasis Mark Position: the text-emphasis-position property"},{"refs":[{"id":"ref-for-typographic-mode\u2460\u2462"}],"title":"\nChanges since the August 2013 Candidate Recommendation"}],"url":"https://www.w3.org/TR/css-writing-modes-4/#typographic-mode"},
+"99d814d1": {"dfnID":"99d814d1","dfnText":"under","external":true,"refSections":[{"refs":[{"id":"ref-for-under"}],"title":"2.5. \nText Underline Position: the text-underline-position property"}],"url":"https://www.w3.org/TR/css-writing-modes-4/#under"},
+"e51c8aeb": {"dfnID":"e51c8aeb","dfnText":"vertical writing mode","external":true,"refSections":[{"refs":[{"id":"ref-for-vertical-writing-mode"}],"title":"2.1. \nText Decoration Lines: the text-decoration-line property"}],"url":"https://www.w3.org/TR/css-writing-modes-4/#vertical-writing-mode"},
+"eb6008ce": {"dfnID":"eb6008ce","dfnText":"writing mode","external":true,"refSections":[{"refs":[{"id":"ref-for-writing-mode"}],"title":"3.1. \nEmphasis Mark Style: the text-emphasis-style property"}],"url":"https://www.w3.org/TR/css-writing-modes-4/#writing-mode"},
+"37bb38a0": {"dfnID":"37bb38a0","dfnText":"writing-mode","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-writing-mode"}],"title":"\nChanges since the August 2013 Candidate Recommendation"}],"url":"https://www.w3.org/TR/css-writing-modes-4/#propdef-writing-mode"},
+"b8cd3abf": {"dfnID":"b8cd3abf","dfnText":"del","external":true,"refSections":[{"refs":[{"id":"ref-for-the-del-element"}],"title":"2. \nLine Decoration: Underline, Overline, and Strike-Through"}],"url":"https://html.spec.whatwg.org/multipage/edits.html#the-del-element"},
+"2b83edc9": {"dfnID":"2b83edc9","dfnText":"ins","external":true,"refSections":[{"refs":[{"id":"ref-for-the-ins-element"}],"title":"2. \nLine Decoration: Underline, Overline, and Strike-Through"}],"url":"https://html.spec.whatwg.org/multipage/edits.html#the-ins-element"},
+"character": {"dfnID":"character","dfnText":"character","external":false,"refSections":[{"refs":[{"id":"ref-for-character"},{"id":"ref-for-character\u2460"},{"id":"ref-for-character\u2461"}],"title":"3.1. \nEmphasis Mark Style: the text-emphasis-style property"}],"url":"#character"},
+"decorating-box": {"dfnID":"decorating-box","dfnText":"decorating box","external":false,"refSections":[{"refs":[{"id":"ref-for-decorating-box"},{"id":"ref-for-decorating-box\u2460"},{"id":"ref-for-decorating-box\u2461"}],"title":"2. \nLine Decoration: Underline, Overline, and Strike-Through"},{"refs":[{"id":"ref-for-decorating-box\u2462"},{"id":"ref-for-decorating-box\u2463"},{"id":"ref-for-decorating-box\u2464"},{"id":"ref-for-decorating-box\u2465"}],"title":"2.5. \nText Underline Position: the text-underline-position property"}],"url":"#decorating-box"},
+"propdef-text-decoration-line": {"dfnID":"propdef-text-decoration-line","dfnText":"text-decoration-line","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-text-decoration-line"}],"title":"2.1. \nText Decoration Lines: the text-decoration-line property"},{"refs":[{"id":"ref-for-propdef-text-decoration-line\u2460"}],"title":"2.3. \nText Decoration Color: the text-decoration-color property"},{"refs":[{"id":"ref-for-propdef-text-decoration-line\u2461"},{"id":"ref-for-propdef-text-decoration-line\u2462"}],"title":"2.4. \nText Decoration Shorthand: the text-decoration property"},{"refs":[{"id":"ref-for-propdef-text-decoration-line\u2463"}],"title":"\nAppendix B: Default UA Stylesheet"}],"url":"#propdef-text-decoration-line"},
+"propdef-text-decoration-style": {"dfnID":"propdef-text-decoration-style","dfnText":"text-decoration-style","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-text-decoration-style"}],"title":"2.2. \nText Decoration Style: the text-decoration-style property"},{"refs":[{"id":"ref-for-propdef-text-decoration-style\u2460"},{"id":"ref-for-propdef-text-decoration-style\u2461"},{"id":"ref-for-propdef-text-decoration-style\u2462"}],"title":"2.4. \nText Decoration Shorthand: the text-decoration property"}],"url":"#propdef-text-decoration-style"},
+"propdef-text-decoration-color": {"dfnID":"propdef-text-decoration-color","dfnText":"text-decoration-color","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-text-decoration-color"}],"title":"2.3. \nText Decoration Color: the text-decoration-color property"},{"refs":[{"id":"ref-for-propdef-text-decoration-color\u2460"},{"id":"ref-for-propdef-text-decoration-color\u2461"},{"id":"ref-for-propdef-text-decoration-color\u2462"}],"title":"2.4. \nText Decoration Shorthand: the text-decoration property"}],"url":"#propdef-text-decoration-color"},
+"propdef-text-decoration": {"dfnID":"propdef-text-decoration","dfnText":"text-decoration","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-text-decoration"},{"id":"ref-for-propdef-text-decoration\u2460"},{"id":"ref-for-propdef-text-decoration\u2461"}],"title":"2.4. \nText Decoration Shorthand: the text-decoration property"},{"refs":[{"id":"ref-for-propdef-text-decoration\u2462"}],"title":"2.5. \nText Underline Position: the text-underline-position property"},{"refs":[{"id":"ref-for-propdef-text-decoration\u2463"},{"id":"ref-for-propdef-text-decoration\u2464"},{"id":"ref-for-propdef-text-decoration\u2465"}],"title":"5.1. \nPainting Order of Text Decorations"}],"url":"#propdef-text-decoration"},
+"propdef-text-underline-position": {"dfnID":"propdef-text-underline-position","dfnText":"text-underline-position","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-text-underline-position"}],"title":"2.1. \nText Decoration Lines: the text-decoration-line property"},{"refs":[{"id":"ref-for-propdef-text-underline-position\u2460"}],"title":"2.4. \nText Decoration Shorthand: the text-decoration property"},{"refs":[{"id":"ref-for-propdef-text-underline-position\u2461"},{"id":"ref-for-propdef-text-underline-position\u2462"},{"id":"ref-for-propdef-text-underline-position\u2463"},{"id":"ref-for-propdef-text-underline-position\u2464"}],"title":"2.5. \nText Underline Position: the text-underline-position property"},{"refs":[{"id":"ref-for-propdef-text-underline-position\u2465"}],"title":"\nChanges since the July 2018 Candidate Recommendation"},{"refs":[{"id":"ref-for-propdef-text-underline-position\u2466"},{"id":"ref-for-propdef-text-underline-position\u2467"}],"title":"\nChanges since the August 2013 Candidate Recommendation"}],"url":"#propdef-text-underline-position"},
+"underline-auto": {"dfnID":"underline-auto","dfnText":"auto","external":false,"refSections":[{"refs":[{"id":"ref-for-underline-auto"},{"id":"ref-for-underline-auto\u2460"}],"title":"2.5. \nText Underline Position: the text-underline-position property"},{"refs":[{"id":"ref-for-underline-auto\u2461"}],"title":"\nChanges since the August 2013 Candidate Recommendation"}],"url":"#underline-auto"},
+"underline-under": {"dfnID":"underline-under","dfnText":"under","external":false,"refSections":[{"refs":[{"id":"ref-for-underline-under"},{"id":"ref-for-underline-under\u2460"},{"id":"ref-for-underline-under\u2461"},{"id":"ref-for-underline-under\u2462"}],"title":"2.5. \nText Underline Position: the text-underline-position property"},{"refs":[{"id":"ref-for-underline-under\u2463"}],"title":"\nChanges since the August 2013 Candidate Recommendation"}],"url":"#underline-under"},
+"underline-left": {"dfnID":"underline-left","dfnText":"left","external":false,"refSections":[{"refs":[{"id":"ref-for-underline-left"},{"id":"ref-for-underline-left\u2460"},{"id":"ref-for-underline-left\u2461"},{"id":"ref-for-underline-left\u2462"}],"title":"2.5. \nText Underline Position: the text-underline-position property"},{"refs":[{"id":"ref-for-underline-left\u2463"}],"title":"\nChanges since the August 2013 Candidate Recommendation"}],"url":"#underline-left"},
+"underline-right": {"dfnID":"underline-right","dfnText":"right","external":false,"refSections":[{"refs":[{"id":"ref-for-underline-right"},{"id":"ref-for-underline-right\u2460"},{"id":"ref-for-underline-right\u2461"},{"id":"ref-for-underline-right\u2462"}],"title":"2.5. \nText Underline Position: the text-underline-position property"},{"refs":[{"id":"ref-for-underline-right\u2463"}],"title":"\nChanges since the August 2013 Candidate Recommendation"}],"url":"#underline-right"},
+"propdef-text-emphasis-style": {"dfnID":"propdef-text-emphasis-style","dfnText":"text-emphasis-style","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-text-emphasis-style"}],"title":"3. \nEmphasis Marks"},{"refs":[{"id":"ref-for-propdef-text-emphasis-style\u2460"}],"title":"3.1. \nEmphasis Mark Style: the text-emphasis-style property"},{"refs":[{"id":"ref-for-propdef-text-emphasis-style\u2461"},{"id":"ref-for-propdef-text-emphasis-style\u2462"}],"title":"3.3. \nEmphasis Mark Shorthand: the text-emphasis property"}],"url":"#propdef-text-emphasis-style"},
+"valdef-text-emphasis-style-none": {"dfnID":"valdef-text-emphasis-style-none","dfnText":"none","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-text-emphasis-style-none"}],"title":"3.1. \nEmphasis Mark Style: the text-emphasis-style property"}],"url":"#valdef-text-emphasis-style-none"},
+"valdef-text-emphasis-style-filled": {"dfnID":"valdef-text-emphasis-style-filled","dfnText":"filled","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-text-emphasis-style-filled"},{"id":"ref-for-valdef-text-emphasis-style-filled\u2460"},{"id":"ref-for-valdef-text-emphasis-style-filled\u2461"}],"title":"3.1. \nEmphasis Mark Style: the text-emphasis-style property"}],"url":"#valdef-text-emphasis-style-filled"},
+"valdef-text-text-emphasis-open": {"dfnID":"valdef-text-text-emphasis-open","dfnText":"open","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-text-text-emphasis-open"},{"id":"ref-for-valdef-text-text-emphasis-open\u2460"}],"title":"3.1. \nEmphasis Mark Style: the text-emphasis-style property"}],"url":"#valdef-text-text-emphasis-open"},
+"valdef-text-emphasis-style-circle": {"dfnID":"valdef-text-emphasis-style-circle","dfnText":"circle","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-text-emphasis-style-circle"}],"title":"3.1. \nEmphasis Mark Style: the text-emphasis-style property"}],"url":"#valdef-text-emphasis-style-circle"},
+"valdef-text-emphasis-style-sesame": {"dfnID":"valdef-text-emphasis-style-sesame","dfnText":"sesame","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-text-emphasis-style-sesame"}],"title":"3.1. \nEmphasis Mark Style: the text-emphasis-style property"}],"url":"#valdef-text-emphasis-style-sesame"},
+"propdef-text-emphasis-color": {"dfnID":"propdef-text-emphasis-color","dfnText":"text-emphasis-color","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-text-emphasis-color"}],"title":"3. \nEmphasis Marks"},{"refs":[{"id":"ref-for-propdef-text-emphasis-color\u2460"},{"id":"ref-for-propdef-text-emphasis-color\u2461"}],"title":"3.2. \nEmphasis Mark Color: the text-emphasis-color property"},{"refs":[{"id":"ref-for-propdef-text-emphasis-color\u2462"},{"id":"ref-for-propdef-text-emphasis-color\u2463"}],"title":"3.3. \nEmphasis Mark Shorthand: the text-emphasis property"}],"url":"#propdef-text-emphasis-color"},
+"propdef-text-emphasis": {"dfnID":"propdef-text-emphasis","dfnText":"text-emphasis","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-text-emphasis"}],"title":"3. \nEmphasis Marks"},{"refs":[{"id":"ref-for-propdef-text-emphasis\u2460"}],"title":"3.3. \nEmphasis Mark Shorthand: the text-emphasis property"},{"refs":[{"id":"ref-for-propdef-text-emphasis\u2461"}],"title":"5.1. \nPainting Order of Text Decorations"},{"refs":[{"id":"ref-for-propdef-text-emphasis\u2462"}],"title":"\nChanges since the August 2013 Candidate Recommendation"}],"url":"#propdef-text-emphasis"},
+"propdef-text-emphasis-position": {"dfnID":"propdef-text-emphasis-position","dfnText":"text-emphasis-position","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-text-emphasis-position"}],"title":"3. \nEmphasis Marks"},{"refs":[{"id":"ref-for-propdef-text-emphasis-position\u2460"}],"title":"3.3. \nEmphasis Mark Shorthand: the text-emphasis property"},{"refs":[{"id":"ref-for-propdef-text-emphasis-position\u2461"},{"id":"ref-for-propdef-text-emphasis-position\u2462"}],"title":"3.4. \nEmphasis Mark Position: the text-emphasis-position property"},{"refs":[{"id":"ref-for-propdef-text-emphasis-position\u2463"},{"id":"ref-for-propdef-text-emphasis-position\u2464"}],"title":"\nChanges since the August 2013 Candidate Recommendation"}],"url":"#propdef-text-emphasis-position"},
+"valdef-text-emphasis-position-right": {"dfnID":"valdef-text-emphasis-position-right","dfnText":"right","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-text-emphasis-position-right"}],"title":"3.4. \nEmphasis Mark Position: the text-emphasis-position property"},{"refs":[{"id":"ref-for-valdef-text-emphasis-position-right\u2460"}],"title":"\nChanges since the August 2013 Candidate Recommendation"}],"url":"#valdef-text-emphasis-position-right"},
+"propdef-text-shadow": {"dfnID":"propdef-text-shadow","dfnText":"text-shadow","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-text-shadow"}],"title":"2. \nLine Decoration: Underline, Overline, and Strike-Through"},{"refs":[{"id":"ref-for-propdef-text-shadow\u2460"}],"title":"4. \nText Shadows: the text-shadow property"},{"refs":[{"id":"ref-for-propdef-text-shadow\u2461"}],"title":"5.1. \nPainting Order of Text Decorations"},{"refs":[{"id":"ref-for-propdef-text-shadow\u2462"},{"id":"ref-for-propdef-text-shadow\u2463"},{"id":"ref-for-propdef-text-shadow\u2464"}],"title":"\nChanges since the August 2013 Candidate Recommendation"}],"url":"#propdef-text-shadow"},
+};
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+const typeFormatters = {
+    'dfn': (text) => `[=${text}=]`,
+    'abstract-op': (text) => `[\$${text}\$]`,
+    'value': (text) => `''${text}''`,
+    'http-header': (text) => `[:${text}:]`,
+    'idl': (text) => `{{${text}}}`,
+    'interface': 'idl',
+    'constructor': 'idl',
+    'method': 'idl',
+    'argument': 'idl',
+    'attribute': 'idl',
+    'callback': 'idl',
+    'dictionary': 'idl',
+    'dict-member': 'idl',
+    'enum': 'idl',
+    'enum-value': 'idl',
+    'exception': 'idl',
+    'const': 'idl',
+    'typedef': 'idl',
+    'stringifier': 'idl',
+    'serializer': 'idl',
+    'iterator': 'idl',
+    'maplike': 'idl',
+    'setlike': 'idl',
+    'extended-attribute': 'idl',
+    'event': 'idl',
+    'element': (element) => `<{${element}}>`,
+    'element-state': 'element',
+    'element-attr': 'element',
+    'attr-value': 'element',
+    'scheme': 'dfn',
+    'permission': 'dfn',
+    'grammar': (text) => `${text} (within a <pre class=prod>)`,
+    'type': (text)=> `<<${text}>>`,
+    'property': (text) => `'${text}'`,
+    'descriptor': 'property',
+    'function': 'value',
+    'at-rule': 'value',
+    'selector': 'value',
+};
+const typesUsingFor = new Set(
+    [
+        "descriptor",
+        "value",
+        "element-attr",
+        "attr-value",
+        "element-state",
+        "method",
+        "constructor",
+        "argument",
+        "attribute",
+        "const",
+        "dict-member",
+        "event",
+        "enum-value",
+        "stringifier",
+        "serializer",
+        "iterator",
+        "maplike",
+        "setlike",
+        "state",
+        "mode",
+        "context",
+        "facet",
+    ],
+)
+const typesNotUsingFor = new Set(
+    [
+        "property",
+        "element",
+        "interface",
+        "namespace",
+        "callback",
+        "dictionary",
+        "enum",
+        "exception",
+        "typedef",
+        "http-header",
+        "permission",
+    ],
+)
+function linkFormatterFromType(type) {
+    const fnOrType = typeFormatters[type];
+    if(typeof fnOrType === 'string') {
+        // follow the alias
+        return linkFormatterFromType(fnOrType);
+    }
+    return fnOrType;
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!typesUsingFor.has(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!typesNotUsingFor.has(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
+
+function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+    dfnPanel.forDfn = dfn;
+    if(!dfn) { console.log(dfnPanel); }
+    return dfnPanel;
+}
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        const panel = genDfnPanel({ ...panelData, dfn });
+        append(document.body, panel);
+        insertDfnPopupAction(panel)
+    }
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+})
+
+function hideAllDfnPanels() {
+    // Turn off any currently "on" or "activated" panels.
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
+}
+
+function showDfnPanel(dfnPanel) {
+    hideAllDfnPanels(); // Only display one at this time.
+
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "true");
+
+    dfnPanel.classList.add("on");
+    positionDfnPanel(dfnPanel);
+
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    // Increment tabindex for each anchor and button tags in panel
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.style.position = "absolute"; // unfix it
+    dfnPanel.classList.remove("on");
+    dfnPanel.classList.remove("activated");
+}
+
+function toggleDfnPanel(dfnPanel) {
+    if(dfnPanel.classList.contains("on")) {
+        hideDfnPanel(dfnPanel);
+    } else {
+        showDfnPanel(dfnPanel);
+    }
+}
+
+function insertDfnPopupAction(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        showDfnPanel(dfnPanel);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfnPanel);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel(dfnPanel, dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    })
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
 }
 </script>
 <script>/* Boilerplate: script-link-titles */
+"use strict";
+{
 let linkTitleData = {
- "https://www.w3.org/TR/css-color-4/#typedef-color": "Expands to: aliceblue | antiquewhite | aqua | aquamarine | azure | beige | bisque | black | blanchedalmond | blue | blueviolet | brown | burlywood | cadetblue | chartreuse | chocolate | coral | cornflowerblue | cornsilk | crimson | currentcolor | cyan | darkblue | darkcyan | darkgoldenrod | darkgray | darkgreen | darkgrey | darkkhaki | darkmagenta | darkolivegreen | darkorange | darkorchid | darkred | darksalmon | darkseagreen | darkslateblue | darkslategray | darkslategrey | darkturquoise | darkviolet | deeppink | deepskyblue | dimgray | dimgrey | dodgerblue | firebrick | floralwhite | forestgreen | fuchsia | gainsboro | ghostwhite | gold | goldenrod | gray | green | greenyellow | grey | honeydew | hotpink | indianred | indigo | ivory | khaki | lavender | lavenderblush | lawngreen | lemonchiffon | lightblue | lightcoral | lightcyan | lightgoldenrodyellow | lightgray | lightgreen | lightgrey | lightpink | lightsalmon | lightseagreen | lightskyblue | lightslategray | lightslategrey | lightsteelblue | lightyellow | lime | limegreen | linen | magenta | maroon | mediumaquamarine | mediumblue | mediumorchid | mediumpurple | mediumseagreen | mediumslateblue | mediumspringgreen | mediumturquoise | mediumvioletred | midnightblue | mintcream | mistyrose | moccasin | navajowhite | navy | none | oldlace | olive | olivedrab | orange | orangered | orchid | palegoldenrod | palegreen | paleturquoise | palevioletred | papayawhip | peachpuff | peru | pink | plum | powderblue | purple | rebeccapurple | red | rosybrown | royalblue | saddlebrown | salmon | sandybrown | seagreen | seashell | sienna | silver | skyblue | slateblue | slategray | slategrey | snow | springgreen | steelblue | tan | teal | thistle | tomato | transparent | turquoise | violet | wheat | white | whitesmoke | yellow | yellowgreen",
- "https://www.w3.org/TR/css-values-4/#length-value": "Expands to: advance measure | cap | ch | cm | dvb | dvh | dvi | dvmax | dvmin | dvw | em | ex | ic | in | lh | lvb | lvh | lvi | lvmax | lvmin | lvw | mm | pc | pt | px | q | rcap | rch | rem | rex | ric | rlh | svb | svh | svi | svmax | svmin | svw | vb | vh | vi | vmax | vmin | vw"
+"https://www.w3.org/TR/css-color-4/#typedef-color": "Expands to: aliceblue | antiquewhite | aqua | aquamarine | azure | beige | bisque | black | blanchedalmond | blue | blueviolet | brown | burlywood | cadetblue | chartreuse | chocolate | coral | cornflowerblue | cornsilk | crimson | currentcolor | cyan | darkblue | darkcyan | darkgoldenrod | darkgray | darkgreen | darkgrey | darkkhaki | darkmagenta | darkolivegreen | darkorange | darkorchid | darkred | darksalmon | darkseagreen | darkslateblue | darkslategray | darkslategrey | darkturquoise | darkviolet | deeppink | deepskyblue | dimgray | dimgrey | dodgerblue | firebrick | floralwhite | forestgreen | fuchsia | gainsboro | ghostwhite | gold | goldenrod | gray | green | greenyellow | grey | honeydew | hotpink | indianred | indigo | ivory | khaki | lavender | lavenderblush | lawngreen | lemonchiffon | lightblue | lightcoral | lightcyan | lightgoldenrodyellow | lightgray | lightgreen | lightgrey | lightpink | lightsalmon | lightseagreen | lightskyblue | lightslategray | lightslategrey | lightsteelblue | lightyellow | lime | limegreen | linen | magenta | maroon | mediumaquamarine | mediumblue | mediumorchid | mediumpurple | mediumseagreen | mediumslateblue | mediumspringgreen | mediumturquoise | mediumvioletred | midnightblue | mintcream | mistyrose | moccasin | navajowhite | navy | none | oldlace | olive | olivedrab | orange | orangered | orchid | palegoldenrod | palegreen | paleturquoise | palevioletred | papayawhip | peachpuff | peru | pink | plum | powderblue | purple | rebeccapurple | red | rosybrown | royalblue | saddlebrown | salmon | sandybrown | seagreen | seashell | sienna | silver | skyblue | slateblue | slategray | slategrey | snow | springgreen | steelblue | tan | teal | thistle | tomato | transparent | turquoise | violet | wheat | white | whitesmoke | yellow | yellowgreen",
+"https://www.w3.org/TR/css-values-4/#length-value": "Expands to: advance measure | cap | ch | cm | dvb | dvh | dvi | dvmax | dvmin | dvw | em | ex | ic | in | lh | lvb | lvh | lvi | lvmax | lvmin | lvw | mm | pc | pt | px | q | rcap | rch | rem | rex | ric | rlh | svb | svh | svi | svmax | svmin | svw | vb | vh | vi | vmax | vmin | vw",
 };
 
 function setTypeTitles() {
@@ -2907,294 +2907,286 @@ function setTypeTitles() {
 }
 
 document.addEventListener("DOMContentLoaded", setTypeTitles);
+}
 </script>
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
+let refsData = {
+"https://www.w3.org/TR/css-values-4/#css-wide-keywords": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"snapshot","text":"css-wide keywords","type":"dfn","url":"https://www.w3.org/TR/css-values-4/#css-wide-keywords"},
+"https://www.w3.org/TR/css-display-3/#inline-box": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-display","spec":"css-display-3","status":"snapshot","text":"inline box","type":"dfn","url":"https://www.w3.org/TR/css-display-3/#inline-box"},
+"https://www.w3.org/TR/css-display-3/#box": {"export":true,"for_":["CSS"],"level":"3","normative":true,"shortname":"css-display","spec":"css-display-3","status":"snapshot","text":"box","type":"dfn","url":"https://www.w3.org/TR/css-display-3/#box"},
+"https://www.w3.org/TR/css-break-3/#fragment": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-break","spec":"css-break-3","status":"snapshot","text":"fragment","type":"dfn","url":"https://www.w3.org/TR/css-break-3/#fragment"},
+"https://www.w3.org/TR/css-display-3/#in-flow": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-display","spec":"css-display-3","status":"snapshot","text":"in-flow","type":"dfn","url":"https://www.w3.org/TR/css-display-3/#in-flow"},
+"https://www.w3.org/TR/css-display-3/#block-level": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-display","spec":"css-display-3","status":"snapshot","text":"block-level","type":"dfn","url":"https://www.w3.org/TR/css-display-3/#block-level"},
+"https://www.w3.org/TR/css-display-3/#block-container": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-display","spec":"css-display-3","status":"snapshot","text":"block container","type":"dfn","url":"https://www.w3.org/TR/css-display-3/#block-container"},
+"https://www.w3.org/TR/css-display-3/#inline-formatting-context": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-display","spec":"css-display-3","status":"snapshot","text":"inline formatting context","type":"dfn","url":"https://www.w3.org/TR/css-display-3/#inline-formatting-context"},
+"https://www.w3.org/TR/css-display-3/#anonymous": {"export":true,"for_":["CSS"],"level":"3","normative":true,"shortname":"css-display","spec":"css-display-3","status":"snapshot","text":"anonymous","type":"dfn","url":"https://www.w3.org/TR/css-display-3/#anonymous"},
+"https://www.w3.org/TR/css-display-3/#inline-level": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-display","spec":"css-display-3","status":"snapshot","text":"inline-level","type":"dfn","url":"https://www.w3.org/TR/css-display-3/#inline-level"},
+"https://www.w3.org/TR/css-ruby-1/#ruby-container": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-ruby","spec":"css-ruby-1","status":"snapshot","text":"ruby container","type":"dfn","url":"https://www.w3.org/TR/css-ruby-1/#ruby-container"},
+"https://www.w3.org/TR/css-ruby-1/#ruby-base-box": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-ruby","spec":"css-ruby-1","status":"snapshot","text":"ruby base","type":"dfn","url":"https://www.w3.org/TR/css-ruby-1/#ruby-base-box"},
+"https://www.w3.org/TR/css-display-3/#non-replaced": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-display","spec":"css-display-3","status":"snapshot","text":"non-replaced","type":"dfn","url":"https://www.w3.org/TR/css-display-3/#non-replaced"},
+"https://www.w3.org/TR/css-display-3/#atomic-inline": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-display","spec":"css-display-3","status":"snapshot","text":"atomic inline","type":"dfn","url":"https://www.w3.org/TR/css-display-3/#atomic-inline"},
+"#decorating-box": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-text-decor","spec":"css-text-decor-3","status":"local","text":"decorating box","type":"dfn","url":"#decorating-box"},
+"https://html.spec.whatwg.org/multipage/edits.html#the-ins-element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"ins","type":"element","url":"https://html.spec.whatwg.org/multipage/edits.html#the-ins-element"},
+"https://html.spec.whatwg.org/multipage/edits.html#the-del-element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"del","type":"element","url":"https://html.spec.whatwg.org/multipage/edits.html#the-del-element"},
+"https://www.w3.org/TR/css-display-3/#propdef-visibility": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-display","spec":"css-display-3","status":"snapshot","text":"visibility","type":"property","url":"https://www.w3.org/TR/css-display-3/#propdef-visibility"},
+"#propdef-text-shadow": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-text-decor","spec":"css-text-decor-3","status":"local","text":"text-shadow","type":"property","url":"#propdef-text-shadow"},
+"https://www.w3.org/TR/css-display-3/#propdef-display": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-display","spec":"css-display-3","status":"snapshot","text":"display","type":"property","url":"https://www.w3.org/TR/css-display-3/#propdef-display"},
+"#propdef-text-decoration-line": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-text-decor","spec":"css-text-decor-3","status":"local","text":"text-decoration-line","type":"property","url":"#propdef-text-decoration-line"},
+"https://www.w3.org/TR/css-values-4/#comb-one": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"snapshot","text":"|","type":"grammar","url":"https://www.w3.org/TR/css-values-4/#comb-one"},
+"https://www.w3.org/TR/css-values-4/#comb-any": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"snapshot","text":"||","type":"grammar","url":"https://www.w3.org/TR/css-values-4/#comb-any"},
+"https://www.w3.org/TR/css-writing-modes-4/#vertical-writing-mode": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"snapshot","text":"vertical writing mode","type":"dfn","url":"https://www.w3.org/TR/css-writing-modes-4/#vertical-writing-mode"},
+"#propdef-text-underline-position": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-text-decor","spec":"css-text-decor-3","status":"local","text":"text-underline-position","type":"property","url":"#propdef-text-underline-position"},
+"#propdef-text-decoration-style": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-text-decor","spec":"css-text-decor-3","status":"local","text":"text-decoration-style","type":"property","url":"#propdef-text-decoration-style"},
+"https://www.w3.org/TR/css-text-decor-4/#valdef-text-decoration-style-wavy": {"export":true,"for_":["text-decoration-style"],"level":"4","normative":true,"shortname":"css-text-decor","spec":"css-text-decor-4","status":"snapshot","text":"wavy","type":"value","url":"https://www.w3.org/TR/css-text-decor-4/#valdef-text-decoration-style-wavy"},
+"#propdef-text-decoration-color": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-text-decor","spec":"css-text-decor-3","status":"local","text":"text-decoration-color","type":"property","url":"#propdef-text-decoration-color"},
+"https://www.w3.org/TR/css-color-4/#typedef-color": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-color","spec":"css-color-4","status":"snapshot","text":"<color>","type":"type","url":"https://www.w3.org/TR/css-color-4/#typedef-color"},
+"#propdef-text-decoration": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-text-decor","spec":"css-text-decor-3","status":"local","text":"text-decoration","type":"property","url":"#propdef-text-decoration"},
+"#underline-left": {"export":true,"for_":["text-underline-position"],"level":"3","normative":true,"shortname":"css-text-decor","spec":"css-text-decor-3","status":"local","text":"left","type":"value","url":"#underline-left"},
+"#underline-right": {"export":true,"for_":["text-underline-position"],"level":"3","normative":true,"shortname":"css-text-decor","spec":"css-text-decor-3","status":"local","text":"right","type":"value","url":"#underline-right"},
+"#underline-auto": {"export":true,"for_":["text-underline-position"],"level":"3","normative":true,"shortname":"css-text-decor","spec":"css-text-decor-3","status":"local","text":"auto","type":"value","url":"#underline-auto"},
+"#underline-under": {"export":true,"for_":["text-underline-position"],"level":"3","normative":true,"shortname":"css-text-decor","spec":"css-text-decor-3","status":"local","text":"under","type":"value","url":"#underline-under"},
+"https://www.w3.org/TR/css-writing-modes-4/#under": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"snapshot","text":"under","type":"dfn","url":"https://www.w3.org/TR/css-writing-modes-4/#under"},
+"https://www.w3.org/TR/css-writing-modes-4/#typographic-mode": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"snapshot","text":"typographic mode","type":"dfn","url":"https://www.w3.org/TR/css-writing-modes-4/#typographic-mode"},
+"https://www.w3.org/TR/css-inline-3/#propdef-vertical-align": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-inline","spec":"css-inline-3","status":"snapshot","text":"vertical-align","type":"property","url":"https://www.w3.org/TR/css-inline-3/#propdef-vertical-align"},
+"https://www.w3.org/TR/css-inline-3/#valdef-alignment-baseline-baseline": {"export":true,"for_":["alignment-baseline","vertical-align"],"level":"3","normative":true,"shortname":"css-inline","spec":"css-inline-3","status":"snapshot","text":"baseline","type":"value","url":"https://www.w3.org/TR/css-inline-3/#valdef-alignment-baseline-baseline"},
+"https://www.w3.org/TR/css-fonts-4/#propdef-font-variant-position": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-fonts","spec":"css-fonts-4","status":"snapshot","text":"font-variant-position","type":"property","url":"https://www.w3.org/TR/css-fonts-4/#propdef-font-variant-position"},
+"#propdef-text-emphasis": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-text-decor","spec":"css-text-decor-3","status":"local","text":"text-emphasis","type":"property","url":"#propdef-text-emphasis"},
+"#propdef-text-emphasis-style": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-text-decor","spec":"css-text-decor-3","status":"local","text":"text-emphasis-style","type":"property","url":"#propdef-text-emphasis-style"},
+"#propdef-text-emphasis-color": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-text-decor","spec":"css-text-decor-3","status":"local","text":"text-emphasis-color","type":"property","url":"#propdef-text-emphasis-color"},
+"#propdef-text-emphasis-position": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-text-decor","spec":"css-text-decor-3","status":"local","text":"text-emphasis-position","type":"property","url":"#propdef-text-emphasis-position"},
+"https://www.w3.org/TR/css-values-4/#string-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"snapshot","text":"<string>","type":"type","url":"https://www.w3.org/TR/css-values-4/#string-value"},
+"#valdef-text-emphasis-style-none": {"export":true,"for_":["text-emphasis-style"],"level":"3","normative":true,"shortname":"css-text-decor","spec":"css-text-decor-3","status":"local","text":"none","type":"value","url":"#valdef-text-emphasis-style-none"},
+"#character": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-text-decor","spec":"css-text-decor-3","status":"local","text":"character","type":"dfn","url":"#character"},
+"#valdef-text-emphasis-style-filled": {"export":true,"for_":["text-emphasis-style"],"level":"3","normative":true,"shortname":"css-text-decor","spec":"css-text-decor-3","status":"local","text":"filled","type":"value","url":"#valdef-text-emphasis-style-filled"},
+"#valdef-text-text-emphasis-open": {"export":true,"for_":["text-text-emphasis"],"level":"3","normative":true,"shortname":"css-text-decor","spec":"css-text-decor-3","status":"local","text":"open","type":"value","url":"#valdef-text-text-emphasis-open"},
+"#valdef-text-emphasis-style-circle": {"export":true,"for_":["text-emphasis-style"],"level":"3","normative":true,"shortname":"css-text-decor","spec":"css-text-decor-3","status":"local","text":"circle","type":"value","url":"#valdef-text-emphasis-style-circle"},
+"#valdef-text-emphasis-style-sesame": {"export":true,"for_":["text-emphasis-style"],"level":"3","normative":true,"shortname":"css-text-decor","spec":"css-text-decor-3","status":"local","text":"sesame","type":"value","url":"#valdef-text-emphasis-style-sesame"},
+"https://www.w3.org/TR/css-fonts-4/#valdef-font-variant-east-asian-ruby": {"export":true,"for_":["font-variant-east-asian"],"level":"4","normative":true,"shortname":"css-fonts","spec":"css-fonts-4","status":"snapshot","text":"ruby","type":"value","url":"https://www.w3.org/TR/css-fonts-4/#valdef-font-variant-east-asian-ruby"},
+"https://www.w3.org/TR/css-writing-modes-4/#writing-mode": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"snapshot","text":"writing mode","type":"dfn","url":"https://www.w3.org/TR/css-writing-modes-4/#writing-mode"},
+"https://www.w3.org/TR/css-text-4/#typographic-character-unit": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-text","spec":"css-text-4","status":"snapshot","text":"typographic character unit","type":"dfn","url":"https://www.w3.org/TR/css-text-4/#typographic-character-unit"},
+"https://www.w3.org/TR/css-color-4/#valdef-color-currentcolor": {"export":true,"for_":["<color>"],"level":"4","normative":true,"shortname":"css-color","spec":"css-color-4","status":"snapshot","text":"currentcolor","type":"value","url":"https://www.w3.org/TR/css-color-4/#valdef-color-currentcolor"},
+"https://www.w3.org/TR/css-values-4/#comb-all": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"snapshot","text":"&&","type":"grammar","url":"https://www.w3.org/TR/css-values-4/#comb-all"},
+"https://www.w3.org/TR/css-values-4/#mult-opt": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"snapshot","text":"?","type":"grammar","url":"https://www.w3.org/TR/css-values-4/#mult-opt"},
+"#valdef-text-emphasis-position-right": {"export":true,"for_":["text-emphasis-position"],"level":"3","normative":true,"shortname":"css-text-decor","spec":"css-text-decor-3","status":"local","text":"right","type":"value","url":"#valdef-text-emphasis-position-right"},
+"https://www.w3.org/TR/css-ruby-1/#ruby-annotation-box": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-ruby","spec":"css-ruby-1","status":"snapshot","text":"ruby annotation","type":"dfn","url":"https://www.w3.org/TR/css-ruby-1/#ruby-annotation-box"},
+"https://www.w3.org/TR/css-values-4/#length-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"snapshot","text":"<length>","type":"type","url":"https://www.w3.org/TR/css-values-4/#length-value"},
+"https://www.w3.org/TR/css-values-4/#mult-num-range": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"snapshot","text":"{a,b}","type":"grammar","url":"https://www.w3.org/TR/css-values-4/#mult-num-range"},
+"https://www.w3.org/TR/css-values-4/#mult-comma": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"snapshot","text":"#","type":"grammar","url":"https://www.w3.org/TR/css-values-4/#mult-comma"},
+"https://www.w3.org/TR/css-backgrounds-3/#box-shadow-none": {"export":true,"for_":["box-shadow"],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"snapshot","text":"none","type":"value","url":"https://www.w3.org/TR/css-backgrounds-3/#box-shadow-none"},
+"https://www.w3.org/TR/css-backgrounds-3/#propdef-box-shadow": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"snapshot","text":"box-shadow","type":"property","url":"https://www.w3.org/TR/css-backgrounds-3/#propdef-box-shadow"},
+"https://www.w3.org/TR/css-backgrounds-3/#shadow-inset": {"export":true,"for_":["box-shadow"],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"snapshot","text":"inset","type":"value","url":"https://www.w3.org/TR/css-backgrounds-3/#shadow-inset"},
+"https://www.w3.org/TR/css-overflow-3/#scrollable-overflow-region": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-overflow","spec":"css-overflow-3","status":"snapshot","text":"scrollable overflow area","type":"dfn","url":"https://www.w3.org/TR/css-overflow-3/#scrollable-overflow-region"},
+"https://www.w3.org/TR/css-overflow-3/#ink-overflow": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-overflow","spec":"css-overflow-3","status":"snapshot","text":"ink overflow","type":"dfn","url":"https://www.w3.org/TR/css-overflow-3/#ink-overflow"},
+"https://www.w3.org/TR/css-writing-modes-4/#valdef-writing-mode-sideways-lr": {"export":true,"for_":["writing-mode"],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"snapshot","text":"sideways-lr","type":"value","url":"https://www.w3.org/TR/css-writing-modes-4/#valdef-writing-mode-sideways-lr"},
+"https://www.w3.org/TR/css-writing-modes-4/#valdef-writing-mode-sideways-rl": {"export":true,"for_":["writing-mode"],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"snapshot","text":"sideways-rl","type":"value","url":"https://www.w3.org/TR/css-writing-modes-4/#valdef-writing-mode-sideways-rl"},
+"https://www.w3.org/TR/css-writing-modes-4/#propdef-writing-mode": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"snapshot","text":"writing-mode","type":"property","url":"https://www.w3.org/TR/css-writing-modes-4/#propdef-writing-mode"},
+};
+
+function genRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "DFN: "),
+                mk.code({ class: "dfn-text" }, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    const forListElements = forList.length === 0 ? '' : mk.li({},
+        mk.b({}, "For: "),
+        mk.ul({},
+            ...forList.map(forItem =>
                 mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
-            mk.b({}, "For: "),
-            mk.ul({},
-                ...forList.map(forItem =>
-                    mk.li({},
-                        mk.span({}, `${forItem}`)
-                    ),
+                    mk.span({}, `${forItem}`)
                 ),
             ),
-        );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+        ),
+    );
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
-    }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    return hintPanel;
+}
+function genAllRefHints() {
+    for(const refData of Object.values(refsData)) {
+        const refUrl = refData.url;
+        const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+        if (links.length == 0) {
+            console.log(`Can't find link href="${refUrl}".`, refData);
+            continue;
+        }
+        for(const link of links) {
+            if(link.classList.contains("dfn-link")) continue;
+            const hint = genRefHint(link, refData);
+            append(document.body, hint);
+            insertLinkPopupAction(hint)
         }
     }
+}
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+function hideAllRefHints() {
+    queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    refHint.style.position = "absolute"; // unfix it
+    refHint.classList.remove("on");
+    const teardown = refHint.teardownEventListeners;
+    if (teardown) {
+        refHint.teardownEventListeners = undefined;
+        teardown();
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+function showRefHint(refHint) {
+    hideAllRefHints(); // Only display one at this time.
+
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "true");
+    refHint.classList.add("on");
+    positionRefHint(refHint);
+    setupRefHintEventListeners(refHint);
+}
+
+function setupRefHintEventListeners(refHint) {
+    if (refHint.teardownEventListeners) return;
+    const link = refHint.forLink;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
 
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
 
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+function insertLinkPopupAction(refHint) {
+    const link = refHint.forLink;
+    // link.setAttribute('role', 'button');
+    link.setAttribute('aria-expanded', 'false')
+    link.classList.add('has-ref-hint');
+    link.addEventListener('mouseover', (event) => {
+        showRefHint(refHint);
     });
+    link.addEventListener('focus', (event) => {
+        showRefHint(refHint);
+    })
+}
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+document.addEventListener("DOMContentLoaded", () => {
+    genAllRefHints();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['https://www.w3.org/TR/css-values-4/#css-wide-keywords'] = {"text": "css-wide keywords", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-4/#css-wide-keywords", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-display-3/#inline-box'] = {"text": "inline box", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-display-3/#inline-box", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-display-3/#box'] = {"text": "box", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-display-3/#box", "export": true, "normative": true, "for_": ["CSS"]};
-window.refsData['https://www.w3.org/TR/css-break-3/#fragment'] = {"text": "fragment", "type": "dfn", "spec": "css-break-3", "shortname": "css-break", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-break-3/#fragment", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-display-3/#in-flow'] = {"text": "in-flow", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-display-3/#in-flow", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-display-3/#block-level'] = {"text": "block-level", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-display-3/#block-level", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-display-3/#block-container'] = {"text": "block container", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-display-3/#block-container", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-display-3/#inline-formatting-context'] = {"text": "inline formatting context", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-display-3/#inline-formatting-context", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-display-3/#anonymous'] = {"text": "anonymous", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-display-3/#anonymous", "export": true, "normative": true, "for_": ["CSS"]};
-window.refsData['https://www.w3.org/TR/css-display-3/#inline-level'] = {"text": "inline-level", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-display-3/#inline-level", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-ruby-1/#ruby-container'] = {"text": "ruby container", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "snapshot", "url": "https://www.w3.org/TR/css-ruby-1/#ruby-container", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-ruby-1/#ruby-base-box'] = {"text": "ruby base", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "snapshot", "url": "https://www.w3.org/TR/css-ruby-1/#ruby-base-box", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-display-3/#non-replaced'] = {"text": "non-replaced", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-display-3/#non-replaced", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-display-3/#atomic-inline'] = {"text": "atomic inline", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-display-3/#atomic-inline", "export": true, "normative": true, "for_": []};
-window.refsData['#decorating-box'] = {"text": "decorating box", "type": "dfn", "spec": "css-text-decor-3", "shortname": "css-text-decor", "level": "3", "status": "local", "url": "#decorating-box", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/edits.html#the-ins-element'] = {"text": "ins", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/edits.html#the-ins-element", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/edits.html#the-del-element'] = {"text": "del", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/edits.html#the-del-element", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-display-3/#propdef-visibility'] = {"text": "visibility", "type": "property", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-display-3/#propdef-visibility", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-text-shadow'] = {"text": "text-shadow", "type": "property", "spec": "css-text-decor-3", "shortname": "css-text-decor", "level": "3", "status": "local", "url": "#propdef-text-shadow", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-display-3/#propdef-display'] = {"text": "display", "type": "property", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-display-3/#propdef-display", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-text-decoration-line'] = {"text": "text-decoration-line", "type": "property", "spec": "css-text-decor-3", "shortname": "css-text-decor", "level": "3", "status": "local", "url": "#propdef-text-decoration-line", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-values-4/#comb-any'] = {"text": "||", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-4/#comb-any", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-writing-modes-4/#vertical-writing-mode'] = {"text": "vertical writing mode", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-writing-modes-4/#vertical-writing-mode", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-text-underline-position'] = {"text": "text-underline-position", "type": "property", "spec": "css-text-decor-3", "shortname": "css-text-decor", "level": "3", "status": "local", "url": "#propdef-text-underline-position", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-text-decoration-style'] = {"text": "text-decoration-style", "type": "property", "spec": "css-text-decor-3", "shortname": "css-text-decor", "level": "3", "status": "local", "url": "#propdef-text-decoration-style", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-text-decor-4/#valdef-text-decoration-style-wavy'] = {"text": "wavy", "type": "value", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-text-decor-4/#valdef-text-decoration-style-wavy", "export": true, "normative": true, "for_": ["text-decoration-style"]};
-window.refsData['#propdef-text-decoration-color'] = {"text": "text-decoration-color", "type": "property", "spec": "css-text-decor-3", "shortname": "css-text-decor", "level": "3", "status": "local", "url": "#propdef-text-decoration-color", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-color-4/#typedef-color'] = {"text": "<color>", "type": "type", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-color-4/#typedef-color", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-text-decoration'] = {"text": "text-decoration", "type": "property", "spec": "css-text-decor-3", "shortname": "css-text-decor", "level": "3", "status": "local", "url": "#propdef-text-decoration", "export": true, "normative": true, "for_": []};
-window.refsData['#underline-left'] = {"text": "left", "type": "value", "spec": "css-text-decor-3", "shortname": "css-text-decor", "level": "3", "status": "local", "url": "#underline-left", "export": true, "normative": true, "for_": ["text-underline-position"]};
-window.refsData['#underline-right'] = {"text": "right", "type": "value", "spec": "css-text-decor-3", "shortname": "css-text-decor", "level": "3", "status": "local", "url": "#underline-right", "export": true, "normative": true, "for_": ["text-underline-position"]};
-window.refsData['#underline-auto'] = {"text": "auto", "type": "value", "spec": "css-text-decor-3", "shortname": "css-text-decor", "level": "3", "status": "local", "url": "#underline-auto", "export": true, "normative": true, "for_": ["text-underline-position"]};
-window.refsData['#underline-under'] = {"text": "under", "type": "value", "spec": "css-text-decor-3", "shortname": "css-text-decor", "level": "3", "status": "local", "url": "#underline-under", "export": true, "normative": true, "for_": ["text-underline-position"]};
-window.refsData['https://www.w3.org/TR/css-writing-modes-4/#under'] = {"text": "under", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-writing-modes-4/#under", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-writing-modes-4/#typographic-mode'] = {"text": "typographic mode", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-writing-modes-4/#typographic-mode", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-inline-3/#propdef-vertical-align'] = {"text": "vertical-align", "type": "property", "spec": "css-inline-3", "shortname": "css-inline", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-inline-3/#propdef-vertical-align", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-inline-3/#valdef-alignment-baseline-baseline'] = {"text": "baseline", "type": "value", "spec": "css-inline-3", "shortname": "css-inline", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-inline-3/#valdef-alignment-baseline-baseline", "export": true, "normative": true, "for_": ["alignment-baseline", "vertical-align"]};
-window.refsData['https://www.w3.org/TR/css-fonts-4/#propdef-font-variant-position'] = {"text": "font-variant-position", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-fonts-4/#propdef-font-variant-position", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-text-emphasis'] = {"text": "text-emphasis", "type": "property", "spec": "css-text-decor-3", "shortname": "css-text-decor", "level": "3", "status": "local", "url": "#propdef-text-emphasis", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-text-emphasis-style'] = {"text": "text-emphasis-style", "type": "property", "spec": "css-text-decor-3", "shortname": "css-text-decor", "level": "3", "status": "local", "url": "#propdef-text-emphasis-style", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-text-emphasis-color'] = {"text": "text-emphasis-color", "type": "property", "spec": "css-text-decor-3", "shortname": "css-text-decor", "level": "3", "status": "local", "url": "#propdef-text-emphasis-color", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-text-emphasis-position'] = {"text": "text-emphasis-position", "type": "property", "spec": "css-text-decor-3", "shortname": "css-text-decor", "level": "3", "status": "local", "url": "#propdef-text-emphasis-position", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-values-4/#string-value'] = {"text": "<string>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-4/#string-value", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-text-emphasis-style-none'] = {"text": "none", "type": "value", "spec": "css-text-decor-3", "shortname": "css-text-decor", "level": "3", "status": "local", "url": "#valdef-text-emphasis-style-none", "export": true, "normative": true, "for_": ["text-emphasis-style"]};
-window.refsData['#character'] = {"text": "character", "type": "dfn", "spec": "css-text-decor-3", "shortname": "css-text-decor", "level": "3", "status": "local", "url": "#character", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-text-emphasis-style-filled'] = {"text": "filled", "type": "value", "spec": "css-text-decor-3", "shortname": "css-text-decor", "level": "3", "status": "local", "url": "#valdef-text-emphasis-style-filled", "export": true, "normative": true, "for_": ["text-emphasis-style"]};
-window.refsData['#valdef-text-text-emphasis-open'] = {"text": "open", "type": "value", "spec": "css-text-decor-3", "shortname": "css-text-decor", "level": "3", "status": "local", "url": "#valdef-text-text-emphasis-open", "export": true, "normative": true, "for_": ["text-text-emphasis"]};
-window.refsData['#valdef-text-emphasis-style-circle'] = {"text": "circle", "type": "value", "spec": "css-text-decor-3", "shortname": "css-text-decor", "level": "3", "status": "local", "url": "#valdef-text-emphasis-style-circle", "export": true, "normative": true, "for_": ["text-emphasis-style"]};
-window.refsData['#valdef-text-emphasis-style-sesame'] = {"text": "sesame", "type": "value", "spec": "css-text-decor-3", "shortname": "css-text-decor", "level": "3", "status": "local", "url": "#valdef-text-emphasis-style-sesame", "export": true, "normative": true, "for_": ["text-emphasis-style"]};
-window.refsData['https://www.w3.org/TR/css-fonts-4/#valdef-font-variant-east-asian-ruby'] = {"text": "ruby", "type": "value", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-fonts-4/#valdef-font-variant-east-asian-ruby", "export": true, "normative": true, "for_": ["font-variant-east-asian"]};
-window.refsData['https://www.w3.org/TR/css-writing-modes-4/#writing-mode'] = {"text": "writing mode", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-writing-modes-4/#writing-mode", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-text-4/#typographic-character-unit'] = {"text": "typographic character unit", "type": "dfn", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-text-4/#typographic-character-unit", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-color-4/#valdef-color-currentcolor'] = {"text": "currentcolor", "type": "value", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-color-4/#valdef-color-currentcolor", "export": true, "normative": true, "for_": ["<color>"]};
-window.refsData['https://www.w3.org/TR/css-values-4/#comb-all'] = {"text": "&&", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-4/#comb-all", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-values-4/#mult-opt'] = {"text": "?", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-4/#mult-opt", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-text-emphasis-position-right'] = {"text": "right", "type": "value", "spec": "css-text-decor-3", "shortname": "css-text-decor", "level": "3", "status": "local", "url": "#valdef-text-emphasis-position-right", "export": true, "normative": true, "for_": ["text-emphasis-position"]};
-window.refsData['https://www.w3.org/TR/css-ruby-1/#ruby-annotation-box'] = {"text": "ruby annotation", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "snapshot", "url": "https://www.w3.org/TR/css-ruby-1/#ruby-annotation-box", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-values-4/#length-value'] = {"text": "<length>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-4/#length-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-values-4/#mult-num-range'] = {"text": "{a,b}", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-4/#mult-num-range", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-values-4/#mult-comma'] = {"text": "#", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-values-4/#mult-comma", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-backgrounds-3/#box-shadow-none'] = {"text": "none", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-backgrounds-3/#box-shadow-none", "export": true, "normative": true, "for_": ["box-shadow"]};
-window.refsData['https://www.w3.org/TR/css-backgrounds-3/#propdef-box-shadow'] = {"text": "box-shadow", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-backgrounds-3/#propdef-box-shadow", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-backgrounds-3/#shadow-inset'] = {"text": "inset", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-backgrounds-3/#shadow-inset", "export": true, "normative": true, "for_": ["box-shadow"]};
-window.refsData['https://www.w3.org/TR/css-overflow-3/#scrollable-overflow-region'] = {"text": "scrollable overflow area", "type": "dfn", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-overflow-3/#scrollable-overflow-region", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-overflow-3/#ink-overflow'] = {"text": "ink overflow", "type": "dfn", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-overflow-3/#ink-overflow", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-writing-modes-4/#valdef-writing-mode-sideways-lr'] = {"text": "sideways-lr", "type": "value", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-writing-modes-4/#valdef-writing-mode-sideways-lr", "export": true, "normative": true, "for_": ["writing-mode"]};
-window.refsData['https://www.w3.org/TR/css-writing-modes-4/#valdef-writing-mode-sideways-rl'] = {"text": "sideways-rl", "type": "value", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-writing-modes-4/#valdef-writing-mode-sideways-rl", "export": true, "normative": true, "for_": ["writing-mode"]};
-window.refsData['https://www.w3.org/TR/css-writing-modes-4/#propdef-writing-mode'] = {"text": "writing-mode", "type": "property", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-writing-modes-4/#propdef-writing-mode", "export": true, "normative": true, "for_": []};window.refsData['#propdef-text-decoration'] = {"text": "text-decoration", "type": "property", "spec": "css-text-decor-3", "shortname": "css-text-decor", "level": "3", "status": "local", "url": "#propdef-text-decoration", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-text-decoration-color'] = {"text": "text-decoration-color", "type": "property", "spec": "css-text-decor-3", "shortname": "css-text-decor", "level": "3", "status": "local", "url": "#propdef-text-decoration-color", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-text-decoration-line'] = {"text": "text-decoration-line", "type": "property", "spec": "css-text-decor-3", "shortname": "css-text-decor", "level": "3", "status": "local", "url": "#propdef-text-decoration-line", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-text-decoration-style'] = {"text": "text-decoration-style", "type": "property", "spec": "css-text-decor-3", "shortname": "css-text-decor", "level": "3", "status": "local", "url": "#propdef-text-decoration-style", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-text-emphasis'] = {"text": "text-emphasis", "type": "property", "spec": "css-text-decor-3", "shortname": "css-text-decor", "level": "3", "status": "local", "url": "#propdef-text-emphasis", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-text-emphasis-color'] = {"text": "text-emphasis-color", "type": "property", "spec": "css-text-decor-3", "shortname": "css-text-decor", "level": "3", "status": "local", "url": "#propdef-text-emphasis-color", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-text-emphasis-position'] = {"text": "text-emphasis-position", "type": "property", "spec": "css-text-decor-3", "shortname": "css-text-decor", "level": "3", "status": "local", "url": "#propdef-text-emphasis-position", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-text-emphasis-style'] = {"text": "text-emphasis-style", "type": "property", "spec": "css-text-decor-3", "shortname": "css-text-decor", "level": "3", "status": "local", "url": "#propdef-text-emphasis-style", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-text-shadow'] = {"text": "text-shadow", "type": "property", "spec": "css-text-decor-3", "shortname": "css-text-decor", "level": "3", "status": "local", "url": "#propdef-text-shadow", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-text-underline-position'] = {"text": "text-underline-position", "type": "property", "spec": "css-text-decor-3", "shortname": "css-text-decor", "level": "3", "status": "local", "url": "#propdef-text-underline-position", "export": true, "normative": true, "for_": []};
 </script>

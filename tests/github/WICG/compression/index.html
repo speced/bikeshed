@@ -76,7 +76,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -450,6 +449,11 @@ figcaption:not(.no-marker)::before {
     }
 }
 </style>
+<style>/* Boilerplate: style-idl-highlighting */
+pre.idl.highlight {
+    background: var(--borderedblock-bg, var(--def-bg));
+}
+</style>
 <style>/* Boilerplate: style-issues */
 a[href].issue-return {
     float: right;
@@ -727,7 +731,6 @@ a[href].issue-return {
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -787,7 +790,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -844,7 +846,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -1353,436 +1354,8 @@ specification uses that specification and terminology.</p>
     </div>
    </div>
   </details>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['3aff2fb3'] = {"dfnID": "3aff2fb3", "url": "https://webidl.spec.whatwg.org/#BufferSource", "dfnText": "BufferSource", "refSections": [{"refs": [{"id": "ref-for-BufferSource"}], "title": "3. Terminology"}, {"refs": [{"id": "ref-for-BufferSource\u2460"}], "title": "5. Interface CompressionStream"}, {"refs": [{"id": "ref-for-BufferSource\u2461"}], "title": "6. Interface DecompressionStream"}], "external": true};
-window.dfnpanelData['8855a9aa'] = {"dfnID": "8855a9aa", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "dfnText": "DOMString", "refSections": [{"refs": [{"id": "ref-for-idl-DOMString"}], "title": "5. Interface CompressionStream"}, {"refs": [{"id": "ref-for-idl-DOMString\u2460"}], "title": "6. Interface DecompressionStream"}], "external": true};
-window.dfnpanelData['889e932f'] = {"dfnID": "889e932f", "url": "https://webidl.spec.whatwg.org/#Exposed", "dfnText": "Exposed", "refSections": [{"refs": [{"id": "ref-for-Exposed"}], "title": "5. Interface CompressionStream"}, {"refs": [{"id": "ref-for-Exposed\u2460"}], "title": "6. Interface DecompressionStream"}], "external": true};
-window.dfnpanelData['82ca3efc'] = {"dfnID": "82ca3efc", "url": "https://webidl.spec.whatwg.org/#exceptiondef-typeerror", "dfnText": "TypeError", "refSections": [{"refs": [{"id": "ref-for-exceptiondef-typeerror"}, {"id": "ref-for-exceptiondef-typeerror\u2460"}], "title": "5. Interface CompressionStream"}, {"refs": [{"id": "ref-for-exceptiondef-typeerror\u2461"}, {"id": "ref-for-exceptiondef-typeerror\u2462"}, {"id": "ref-for-exceptiondef-typeerror\u2463"}, {"id": "ref-for-exceptiondef-typeerror\u2464"}], "title": "6. Interface DecompressionStream"}], "external": true};
-window.dfnpanelData['95d7775a'] = {"dfnID": "95d7775a", "url": "https://webidl.spec.whatwg.org/#idl-Uint8Array", "dfnText": "Uint8Array", "refSections": [{"refs": [{"id": "ref-for-idl-Uint8Array"}, {"id": "ref-for-idl-Uint8Array\u2460"}, {"id": "ref-for-idl-Uint8Array\u2461"}, {"id": "ref-for-idl-Uint8Array\u2462"}], "title": "5. Interface CompressionStream"}, {"refs": [{"id": "ref-for-idl-Uint8Array\u2463"}, {"id": "ref-for-idl-Uint8Array\u2464"}, {"id": "ref-for-idl-Uint8Array\u2465"}, {"id": "ref-for-idl-Uint8Array\u2466"}], "title": "6. Interface DecompressionStream"}], "external": true};
-window.dfnpanelData['56f81a8e'] = {"dfnID": "56f81a8e", "url": "https://webidl.spec.whatwg.org/#new", "dfnText": "new", "refSections": [{"refs": [{"id": "ref-for-new"}], "title": "5. Interface CompressionStream"}, {"refs": [{"id": "ref-for-new\u2460"}], "title": "6. Interface DecompressionStream"}], "external": true};
-window.dfnpanelData['4013a022'] = {"dfnID": "4013a022", "url": "https://webidl.spec.whatwg.org/#this", "dfnText": "this", "refSections": [{"refs": [{"id": "ref-for-this"}, {"id": "ref-for-this\u2460"}, {"id": "ref-for-this\u2461"}, {"id": "ref-for-this\u2462"}, {"id": "ref-for-this\u2463"}], "title": "5. Interface CompressionStream"}, {"refs": [{"id": "ref-for-this\u2464"}, {"id": "ref-for-this\u2465"}, {"id": "ref-for-this\u2466"}, {"id": "ref-for-this\u2467"}, {"id": "ref-for-this\u2468"}], "title": "6. Interface DecompressionStream"}], "external": true};
-window.dfnpanelData['d61c5cab'] = {"dfnID": "d61c5cab", "url": "https://streams.spec.whatwg.org/#generictransformstream", "dfnText": "GenericTransformStream", "refSections": [{"refs": [{"id": "ref-for-generictransformstream"}], "title": "5. Interface CompressionStream"}, {"refs": [{"id": "ref-for-generictransformstream\u2460"}], "title": "6. Interface DecompressionStream"}], "external": true};
-window.dfnpanelData['59ed4e57'] = {"dfnID": "59ed4e57", "url": "https://streams.spec.whatwg.org/#readablestream", "dfnText": "ReadableStream", "refSections": [{"refs": [{"id": "ref-for-readablestream"}], "title": "3. Terminology"}, {"refs": [{"id": "ref-for-readablestream\u2460"}], "title": "5. Interface CompressionStream"}, {"refs": [{"id": "ref-for-readablestream\u2461"}], "title": "6. Interface DecompressionStream"}], "external": true};
-window.dfnpanelData['47e93e3e'] = {"dfnID": "47e93e3e", "url": "https://streams.spec.whatwg.org/#transformstream", "dfnText": "TransformStream", "refSections": [{"refs": [{"id": "ref-for-transformstream"}], "title": "5. Interface CompressionStream"}, {"refs": [{"id": "ref-for-transformstream\u2460"}], "title": "6. Interface DecompressionStream"}], "external": true};
-window.dfnpanelData['59dc45b5'] = {"dfnID": "59dc45b5", "url": "https://streams.spec.whatwg.org/#writablestream", "dfnText": "WritableStream", "refSections": [{"refs": [{"id": "ref-for-writablestream"}], "title": "3. Terminology"}], "external": true};
-window.dfnpanelData['593deb55'] = {"dfnID": "593deb55", "url": "https://streams.spec.whatwg.org/#transformstream-enqueue", "dfnText": "enqueue", "refSections": [{"refs": [{"id": "ref-for-transformstream-enqueue"}, {"id": "ref-for-transformstream-enqueue\u2460"}], "title": "5. Interface CompressionStream"}, {"refs": [{"id": "ref-for-transformstream-enqueue\u2461"}, {"id": "ref-for-transformstream-enqueue\u2462"}], "title": "6. Interface DecompressionStream"}], "external": true};
-window.dfnpanelData['3af29886'] = {"dfnID": "3af29886", "url": "https://streams.spec.whatwg.org/#transformstream-set-up-flushalgorithm", "dfnText": "flushalgorithm", "refSections": [{"refs": [{"id": "ref-for-transformstream-set-up-flushalgorithm"}], "title": "5. Interface CompressionStream"}, {"refs": [{"id": "ref-for-transformstream-set-up-flushalgorithm\u2460"}], "title": "6. Interface DecompressionStream"}], "external": true};
-window.dfnpanelData['2a7798d8'] = {"dfnID": "2a7798d8", "url": "https://streams.spec.whatwg.org/#transformstream-set-up", "dfnText": "set up", "refSections": [{"refs": [{"id": "ref-for-transformstream-set-up"}], "title": "5. Interface CompressionStream"}, {"refs": [{"id": "ref-for-transformstream-set-up\u2460"}], "title": "6. Interface DecompressionStream"}], "external": true};
-window.dfnpanelData['eade7401'] = {"dfnID": "eade7401", "url": "https://streams.spec.whatwg.org/#generictransformstream-transform", "dfnText": "transform", "refSections": [{"refs": [{"id": "ref-for-generictransformstream-transform"}, {"id": "ref-for-generictransformstream-transform\u2460"}, {"id": "ref-for-generictransformstream-transform\u2461"}, {"id": "ref-for-generictransformstream-transform\u2462"}], "title": "5. Interface CompressionStream"}, {"refs": [{"id": "ref-for-generictransformstream-transform\u2463"}, {"id": "ref-for-generictransformstream-transform\u2464"}, {"id": "ref-for-generictransformstream-transform\u2465"}, {"id": "ref-for-generictransformstream-transform\u2466"}], "title": "6. Interface DecompressionStream"}], "external": true};
-window.dfnpanelData['c7574ff1'] = {"dfnID": "c7574ff1", "url": "https://streams.spec.whatwg.org/#transformstream-set-up-transformalgorithm", "dfnText": "transformalgorithm", "refSections": [{"refs": [{"id": "ref-for-transformstream-set-up-transformalgorithm"}], "title": "5. Interface CompressionStream"}, {"refs": [{"id": "ref-for-transformstream-set-up-transformalgorithm\u2460"}], "title": "6. Interface DecompressionStream"}], "external": true};
-window.dfnpanelData['compression-context'] = {"dfnID": "compression-context", "url": "#compression-context", "dfnText": "compression context", "refSections": [{"refs": [{"id": "ref-for-compression-context"}, {"id": "ref-for-compression-context\u2460"}], "title": "3. Terminology"}, {"refs": [{"id": "ref-for-compression-context\u2461"}], "title": "5. Interface CompressionStream"}, {"refs": [{"id": "ref-for-compression-context\u2462"}], "title": "6. Interface DecompressionStream"}], "external": false};
-window.dfnpanelData['compressionstream'] = {"dfnID": "compressionstream", "url": "#compressionstream", "dfnText": "CompressionStream", "refSections": [{"refs": [{"id": "ref-for-compressionstream"}, {"id": "ref-for-compressionstream\u2460"}, {"id": "ref-for-compressionstream\u2461"}, {"id": "ref-for-compressionstream\u2462"}, {"id": "ref-for-compressionstream\u2463"}], "title": "5. Interface CompressionStream"}], "external": false};
-window.dfnpanelData['compressionstream-format'] = {"dfnID": "compressionstream-format", "url": "#compressionstream-format", "dfnText": "format", "refSections": [{"refs": [{"id": "ref-for-compressionstream-format"}, {"id": "ref-for-compressionstream-format\u2460"}, {"id": "ref-for-compressionstream-format\u2461"}], "title": "5. Interface CompressionStream"}], "external": false};
-window.dfnpanelData['compressionstream-context'] = {"dfnID": "compressionstream-context", "url": "#compressionstream-context", "dfnText": "context", "refSections": [{"refs": [{"id": "ref-for-compressionstream-context"}, {"id": "ref-for-compressionstream-context\u2460"}], "title": "5. Interface CompressionStream"}], "external": false};
-window.dfnpanelData['dom-compressionstream-compressionstream'] = {"dfnID": "dom-compressionstream-compressionstream", "url": "#dom-compressionstream-compressionstream", "dfnText": "new CompressionStream(format)", "refSections": [{"refs": [{"id": "ref-for-dom-compressionstream-compressionstream"}], "title": "5. Interface CompressionStream"}], "external": false};
-window.dfnpanelData['compress-and-enqueue-a-chunk'] = {"dfnID": "compress-and-enqueue-a-chunk", "url": "#compress-and-enqueue-a-chunk", "dfnText": "compress and enqueue a chunk", "refSections": [{"refs": [{"id": "ref-for-compress-and-enqueue-a-chunk"}], "title": "5. Interface CompressionStream"}], "external": false};
-window.dfnpanelData['compress-flush-and-enqueue'] = {"dfnID": "compress-flush-and-enqueue", "url": "#compress-flush-and-enqueue", "dfnText": "compress flush and enqueue", "refSections": [{"refs": [{"id": "ref-for-compress-flush-and-enqueue"}], "title": "5. Interface CompressionStream"}], "external": false};
-window.dfnpanelData['decompressionstream'] = {"dfnID": "decompressionstream", "url": "#decompressionstream", "dfnText": "DecompressionStream", "refSections": [{"refs": [{"id": "ref-for-decompressionstream"}, {"id": "ref-for-decompressionstream\u2460"}, {"id": "ref-for-decompressionstream\u2461"}, {"id": "ref-for-decompressionstream\u2462"}, {"id": "ref-for-decompressionstream\u2463"}], "title": "6. Interface DecompressionStream"}], "external": false};
-window.dfnpanelData['decompressionstream-format'] = {"dfnID": "decompressionstream-format", "url": "#decompressionstream-format", "dfnText": "format", "refSections": [{"refs": [{"id": "ref-for-decompressionstream-format"}, {"id": "ref-for-decompressionstream-format\u2460"}, {"id": "ref-for-decompressionstream-format\u2461"}], "title": "6. Interface DecompressionStream"}], "external": false};
-window.dfnpanelData['decompressionstream-context'] = {"dfnID": "decompressionstream-context", "url": "#decompressionstream-context", "dfnText": "context", "refSections": [{"refs": [{"id": "ref-for-decompressionstream-context"}, {"id": "ref-for-decompressionstream-context\u2460"}], "title": "6. Interface DecompressionStream"}], "external": false};
-window.dfnpanelData['dom-decompressionstream-decompressionstream'] = {"dfnID": "dom-decompressionstream-decompressionstream", "url": "#dom-decompressionstream-decompressionstream", "dfnText": "new DecompressionStream(format)", "refSections": [{"refs": [{"id": "ref-for-dom-decompressionstream-decompressionstream"}], "title": "6. Interface DecompressionStream"}], "external": false};
-window.dfnpanelData['decompress-and-enqueue-a-chunk'] = {"dfnID": "decompress-and-enqueue-a-chunk", "url": "#decompress-and-enqueue-a-chunk", "dfnText": "decompress and enqueue a chunk", "refSections": [{"refs": [{"id": "ref-for-decompress-and-enqueue-a-chunk"}], "title": "6. Interface DecompressionStream"}], "external": false};
-window.dfnpanelData['decompress-flush-and-enqueue'] = {"dfnID": "decompress-flush-and-enqueue", "url": "#decompress-flush-and-enqueue", "dfnText": "decompress flush and enqueue", "refSections": [{"refs": [{"id": "ref-for-decompress-flush-and-enqueue"}], "title": "6. Interface DecompressionStream"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -1976,12 +1549,439 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"3aff2fb3": {"dfnID":"3aff2fb3","dfnText":"BufferSource","external":true,"refSections":[{"refs":[{"id":"ref-for-BufferSource"}],"title":"3. Terminology"},{"refs":[{"id":"ref-for-BufferSource\u2460"}],"title":"5. Interface CompressionStream"},{"refs":[{"id":"ref-for-BufferSource\u2461"}],"title":"6. Interface DecompressionStream"}],"url":"https://webidl.spec.whatwg.org/#BufferSource"},
+"8855a9aa": {"dfnID":"8855a9aa","dfnText":"DOMString","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-DOMString"}],"title":"5. Interface CompressionStream"},{"refs":[{"id":"ref-for-idl-DOMString\u2460"}],"title":"6. Interface DecompressionStream"}],"url":"https://webidl.spec.whatwg.org/#idl-DOMString"},
+"889e932f": {"dfnID":"889e932f","dfnText":"Exposed","external":true,"refSections":[{"refs":[{"id":"ref-for-Exposed"}],"title":"5. Interface CompressionStream"},{"refs":[{"id":"ref-for-Exposed\u2460"}],"title":"6. Interface DecompressionStream"}],"url":"https://webidl.spec.whatwg.org/#Exposed"},
+"82ca3efc": {"dfnID":"82ca3efc","dfnText":"TypeError","external":true,"refSections":[{"refs":[{"id":"ref-for-exceptiondef-typeerror"},{"id":"ref-for-exceptiondef-typeerror\u2460"}],"title":"5. Interface CompressionStream"},{"refs":[{"id":"ref-for-exceptiondef-typeerror\u2461"},{"id":"ref-for-exceptiondef-typeerror\u2462"},{"id":"ref-for-exceptiondef-typeerror\u2463"},{"id":"ref-for-exceptiondef-typeerror\u2464"}],"title":"6. Interface DecompressionStream"}],"url":"https://webidl.spec.whatwg.org/#exceptiondef-typeerror"},
+"95d7775a": {"dfnID":"95d7775a","dfnText":"Uint8Array","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-Uint8Array"},{"id":"ref-for-idl-Uint8Array\u2460"},{"id":"ref-for-idl-Uint8Array\u2461"},{"id":"ref-for-idl-Uint8Array\u2462"}],"title":"5. Interface CompressionStream"},{"refs":[{"id":"ref-for-idl-Uint8Array\u2463"},{"id":"ref-for-idl-Uint8Array\u2464"},{"id":"ref-for-idl-Uint8Array\u2465"},{"id":"ref-for-idl-Uint8Array\u2466"}],"title":"6. Interface DecompressionStream"}],"url":"https://webidl.spec.whatwg.org/#idl-Uint8Array"},
+"56f81a8e": {"dfnID":"56f81a8e","dfnText":"new","external":true,"refSections":[{"refs":[{"id":"ref-for-new"}],"title":"5. Interface CompressionStream"},{"refs":[{"id":"ref-for-new\u2460"}],"title":"6. Interface DecompressionStream"}],"url":"https://webidl.spec.whatwg.org/#new"},
+"4013a022": {"dfnID":"4013a022","dfnText":"this","external":true,"refSections":[{"refs":[{"id":"ref-for-this"},{"id":"ref-for-this\u2460"},{"id":"ref-for-this\u2461"},{"id":"ref-for-this\u2462"},{"id":"ref-for-this\u2463"}],"title":"5. Interface CompressionStream"},{"refs":[{"id":"ref-for-this\u2464"},{"id":"ref-for-this\u2465"},{"id":"ref-for-this\u2466"},{"id":"ref-for-this\u2467"},{"id":"ref-for-this\u2468"}],"title":"6. Interface DecompressionStream"}],"url":"https://webidl.spec.whatwg.org/#this"},
+"d61c5cab": {"dfnID":"d61c5cab","dfnText":"GenericTransformStream","external":true,"refSections":[{"refs":[{"id":"ref-for-generictransformstream"}],"title":"5. Interface CompressionStream"},{"refs":[{"id":"ref-for-generictransformstream\u2460"}],"title":"6. Interface DecompressionStream"}],"url":"https://streams.spec.whatwg.org/#generictransformstream"},
+"59ed4e57": {"dfnID":"59ed4e57","dfnText":"ReadableStream","external":true,"refSections":[{"refs":[{"id":"ref-for-readablestream"}],"title":"3. Terminology"},{"refs":[{"id":"ref-for-readablestream\u2460"}],"title":"5. Interface CompressionStream"},{"refs":[{"id":"ref-for-readablestream\u2461"}],"title":"6. Interface DecompressionStream"}],"url":"https://streams.spec.whatwg.org/#readablestream"},
+"47e93e3e": {"dfnID":"47e93e3e","dfnText":"TransformStream","external":true,"refSections":[{"refs":[{"id":"ref-for-transformstream"}],"title":"5. Interface CompressionStream"},{"refs":[{"id":"ref-for-transformstream\u2460"}],"title":"6. Interface DecompressionStream"}],"url":"https://streams.spec.whatwg.org/#transformstream"},
+"59dc45b5": {"dfnID":"59dc45b5","dfnText":"WritableStream","external":true,"refSections":[{"refs":[{"id":"ref-for-writablestream"}],"title":"3. Terminology"}],"url":"https://streams.spec.whatwg.org/#writablestream"},
+"593deb55": {"dfnID":"593deb55","dfnText":"enqueue","external":true,"refSections":[{"refs":[{"id":"ref-for-transformstream-enqueue"},{"id":"ref-for-transformstream-enqueue\u2460"}],"title":"5. Interface CompressionStream"},{"refs":[{"id":"ref-for-transformstream-enqueue\u2461"},{"id":"ref-for-transformstream-enqueue\u2462"}],"title":"6. Interface DecompressionStream"}],"url":"https://streams.spec.whatwg.org/#transformstream-enqueue"},
+"3af29886": {"dfnID":"3af29886","dfnText":"flushalgorithm","external":true,"refSections":[{"refs":[{"id":"ref-for-transformstream-set-up-flushalgorithm"}],"title":"5. Interface CompressionStream"},{"refs":[{"id":"ref-for-transformstream-set-up-flushalgorithm\u2460"}],"title":"6. Interface DecompressionStream"}],"url":"https://streams.spec.whatwg.org/#transformstream-set-up-flushalgorithm"},
+"2a7798d8": {"dfnID":"2a7798d8","dfnText":"set up","external":true,"refSections":[{"refs":[{"id":"ref-for-transformstream-set-up"}],"title":"5. Interface CompressionStream"},{"refs":[{"id":"ref-for-transformstream-set-up\u2460"}],"title":"6. Interface DecompressionStream"}],"url":"https://streams.spec.whatwg.org/#transformstream-set-up"},
+"eade7401": {"dfnID":"eade7401","dfnText":"transform","external":true,"refSections":[{"refs":[{"id":"ref-for-generictransformstream-transform"},{"id":"ref-for-generictransformstream-transform\u2460"},{"id":"ref-for-generictransformstream-transform\u2461"},{"id":"ref-for-generictransformstream-transform\u2462"}],"title":"5. Interface CompressionStream"},{"refs":[{"id":"ref-for-generictransformstream-transform\u2463"},{"id":"ref-for-generictransformstream-transform\u2464"},{"id":"ref-for-generictransformstream-transform\u2465"},{"id":"ref-for-generictransformstream-transform\u2466"}],"title":"6. Interface DecompressionStream"}],"url":"https://streams.spec.whatwg.org/#generictransformstream-transform"},
+"c7574ff1": {"dfnID":"c7574ff1","dfnText":"transformalgorithm","external":true,"refSections":[{"refs":[{"id":"ref-for-transformstream-set-up-transformalgorithm"}],"title":"5. Interface CompressionStream"},{"refs":[{"id":"ref-for-transformstream-set-up-transformalgorithm\u2460"}],"title":"6. Interface DecompressionStream"}],"url":"https://streams.spec.whatwg.org/#transformstream-set-up-transformalgorithm"},
+"compression-context": {"dfnID":"compression-context","dfnText":"compression context","external":false,"refSections":[{"refs":[{"id":"ref-for-compression-context"},{"id":"ref-for-compression-context\u2460"}],"title":"3. Terminology"},{"refs":[{"id":"ref-for-compression-context\u2461"}],"title":"5. Interface CompressionStream"},{"refs":[{"id":"ref-for-compression-context\u2462"}],"title":"6. Interface DecompressionStream"}],"url":"#compression-context"},
+"compressionstream": {"dfnID":"compressionstream","dfnText":"CompressionStream","external":false,"refSections":[{"refs":[{"id":"ref-for-compressionstream"},{"id":"ref-for-compressionstream\u2460"},{"id":"ref-for-compressionstream\u2461"},{"id":"ref-for-compressionstream\u2462"},{"id":"ref-for-compressionstream\u2463"}],"title":"5. Interface CompressionStream"}],"url":"#compressionstream"},
+"compressionstream-format": {"dfnID":"compressionstream-format","dfnText":"format","external":false,"refSections":[{"refs":[{"id":"ref-for-compressionstream-format"},{"id":"ref-for-compressionstream-format\u2460"},{"id":"ref-for-compressionstream-format\u2461"}],"title":"5. Interface CompressionStream"}],"url":"#compressionstream-format"},
+"compressionstream-context": {"dfnID":"compressionstream-context","dfnText":"context","external":false,"refSections":[{"refs":[{"id":"ref-for-compressionstream-context"},{"id":"ref-for-compressionstream-context\u2460"}],"title":"5. Interface CompressionStream"}],"url":"#compressionstream-context"},
+"dom-compressionstream-compressionstream": {"dfnID":"dom-compressionstream-compressionstream","dfnText":"new CompressionStream(format)","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-compressionstream-compressionstream"}],"title":"5. Interface CompressionStream"}],"url":"#dom-compressionstream-compressionstream"},
+"compress-and-enqueue-a-chunk": {"dfnID":"compress-and-enqueue-a-chunk","dfnText":"compress and enqueue a chunk","external":false,"refSections":[{"refs":[{"id":"ref-for-compress-and-enqueue-a-chunk"}],"title":"5. Interface CompressionStream"}],"url":"#compress-and-enqueue-a-chunk"},
+"compress-flush-and-enqueue": {"dfnID":"compress-flush-and-enqueue","dfnText":"compress flush and enqueue","external":false,"refSections":[{"refs":[{"id":"ref-for-compress-flush-and-enqueue"}],"title":"5. Interface CompressionStream"}],"url":"#compress-flush-and-enqueue"},
+"decompressionstream": {"dfnID":"decompressionstream","dfnText":"DecompressionStream","external":false,"refSections":[{"refs":[{"id":"ref-for-decompressionstream"},{"id":"ref-for-decompressionstream\u2460"},{"id":"ref-for-decompressionstream\u2461"},{"id":"ref-for-decompressionstream\u2462"},{"id":"ref-for-decompressionstream\u2463"}],"title":"6. Interface DecompressionStream"}],"url":"#decompressionstream"},
+"decompressionstream-format": {"dfnID":"decompressionstream-format","dfnText":"format","external":false,"refSections":[{"refs":[{"id":"ref-for-decompressionstream-format"},{"id":"ref-for-decompressionstream-format\u2460"},{"id":"ref-for-decompressionstream-format\u2461"}],"title":"6. Interface DecompressionStream"}],"url":"#decompressionstream-format"},
+"decompressionstream-context": {"dfnID":"decompressionstream-context","dfnText":"context","external":false,"refSections":[{"refs":[{"id":"ref-for-decompressionstream-context"},{"id":"ref-for-decompressionstream-context\u2460"}],"title":"6. Interface DecompressionStream"}],"url":"#decompressionstream-context"},
+"dom-decompressionstream-decompressionstream": {"dfnID":"dom-decompressionstream-decompressionstream","dfnText":"new DecompressionStream(format)","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-decompressionstream-decompressionstream"}],"title":"6. Interface DecompressionStream"}],"url":"#dom-decompressionstream-decompressionstream"},
+"decompress-and-enqueue-a-chunk": {"dfnID":"decompress-and-enqueue-a-chunk","dfnText":"decompress and enqueue a chunk","external":false,"refSections":[{"refs":[{"id":"ref-for-decompress-and-enqueue-a-chunk"}],"title":"6. Interface DecompressionStream"}],"url":"#decompress-and-enqueue-a-chunk"},
+"decompress-flush-and-enqueue": {"dfnID":"decompress-flush-and-enqueue","dfnText":"decompress flush and enqueue","external":false,"refSections":[{"refs":[{"id":"ref-for-decompress-flush-and-enqueue"}],"title":"6. Interface DecompressionStream"}],"url":"#decompress-flush-and-enqueue"},
+};
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+const typeFormatters = {
+    'dfn': (text) => `[=${text}=]`,
+    'abstract-op': (text) => `[\$${text}\$]`,
+    'value': (text) => `''${text}''`,
+    'http-header': (text) => `[:${text}:]`,
+    'idl': (text) => `{{${text}}}`,
+    'interface': 'idl',
+    'constructor': 'idl',
+    'method': 'idl',
+    'argument': 'idl',
+    'attribute': 'idl',
+    'callback': 'idl',
+    'dictionary': 'idl',
+    'dict-member': 'idl',
+    'enum': 'idl',
+    'enum-value': 'idl',
+    'exception': 'idl',
+    'const': 'idl',
+    'typedef': 'idl',
+    'stringifier': 'idl',
+    'serializer': 'idl',
+    'iterator': 'idl',
+    'maplike': 'idl',
+    'setlike': 'idl',
+    'extended-attribute': 'idl',
+    'event': 'idl',
+    'element': (element) => `<{${element}}>`,
+    'element-state': 'element',
+    'element-attr': 'element',
+    'attr-value': 'element',
+    'scheme': 'dfn',
+    'permission': 'dfn',
+    'grammar': (text) => `${text} (within a <pre class=prod>)`,
+    'type': (text)=> `<<${text}>>`,
+    'property': (text) => `'${text}'`,
+    'descriptor': 'property',
+    'function': 'value',
+    'at-rule': 'value',
+    'selector': 'value',
+};
+const typesUsingFor = new Set(
+    [
+        "descriptor",
+        "value",
+        "element-attr",
+        "attr-value",
+        "element-state",
+        "method",
+        "constructor",
+        "argument",
+        "attribute",
+        "const",
+        "dict-member",
+        "event",
+        "enum-value",
+        "stringifier",
+        "serializer",
+        "iterator",
+        "maplike",
+        "setlike",
+        "state",
+        "mode",
+        "context",
+        "facet",
+    ],
+)
+const typesNotUsingFor = new Set(
+    [
+        "property",
+        "element",
+        "interface",
+        "namespace",
+        "callback",
+        "dictionary",
+        "enum",
+        "exception",
+        "typedef",
+        "http-header",
+        "permission",
+    ],
+)
+function linkFormatterFromType(type) {
+    const fnOrType = typeFormatters[type];
+    if(typeof fnOrType === 'string') {
+        // follow the alias
+        return linkFormatterFromType(fnOrType);
+    }
+    return fnOrType;
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!typesUsingFor.has(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!typesNotUsingFor.has(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
+
+function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+    dfnPanel.forDfn = dfn;
+    if(!dfn) { console.log(dfnPanel); }
+    return dfnPanel;
+}
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        const panel = genDfnPanel({ ...panelData, dfn });
+        append(document.body, panel);
+        insertDfnPopupAction(panel)
+    }
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+})
+
+function hideAllDfnPanels() {
+    // Turn off any currently "on" or "activated" panels.
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
+}
+
+function showDfnPanel(dfnPanel) {
+    hideAllDfnPanels(); // Only display one at this time.
+
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "true");
+
+    dfnPanel.classList.add("on");
+    positionDfnPanel(dfnPanel);
+
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    // Increment tabindex for each anchor and button tags in panel
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.style.position = "absolute"; // unfix it
+    dfnPanel.classList.remove("on");
+    dfnPanel.classList.remove("activated");
+}
+
+function toggleDfnPanel(dfnPanel) {
+    if(dfnPanel.classList.contains("on")) {
+        hideDfnPanel(dfnPanel);
+    } else {
+        showDfnPanel(dfnPanel);
+    }
+}
+
+function insertDfnPopupAction(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        showDfnPanel(dfnPanel);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfnPanel);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel(dfnPanel, dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    })
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
 }
 </script>
 <script>/* Boilerplate: script-position-annos */
 "use strict";
 {
-
 function repositionAnnoPanels(){
     const panels = [...document.querySelectorAll("[data-anno-for]")];
     const main = document.querySelector("main");
@@ -2025,241 +2025,241 @@ window.addEventListener("resize", repositionAnnoPanels);
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
+let refsData = {
+"https://webidl.spec.whatwg.org/#BufferSource": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"BufferSource","type":"typedef","url":"https://webidl.spec.whatwg.org/#BufferSource"},
+"https://streams.spec.whatwg.org/#readablestream": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"streams","spec":"streams","status":"current","text":"ReadableStream","type":"interface","url":"https://streams.spec.whatwg.org/#readablestream"},
+"https://streams.spec.whatwg.org/#writablestream": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"streams","spec":"streams","status":"current","text":"WritableStream","type":"interface","url":"https://streams.spec.whatwg.org/#writablestream"},
+"#compression-context": {"export":true,"for_":[],"level":"","normative":true,"shortname":"compression","spec":"compression","status":"local","text":"compression context","type":"dfn","url":"#compression-context"},
+"https://webidl.spec.whatwg.org/#Exposed": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"Exposed","type":"extended-attribute","url":"https://webidl.spec.whatwg.org/#Exposed"},
+"#dom-compressionstream-compressionstream": {"export":true,"for_":["CompressionStream"],"level":"","normative":true,"shortname":"compression","spec":"compression","status":"local","text":"CompressionStream(format)","type":"constructor","url":"#dom-compressionstream-compressionstream"},
+"https://webidl.spec.whatwg.org/#idl-DOMString": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"DOMString","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-DOMString"},
+"#compressionstream": {"export":true,"for_":[],"level":"","normative":true,"shortname":"compression","spec":"compression","status":"local","text":"CompressionStream","type":"interface","url":"#compressionstream"},
+"https://streams.spec.whatwg.org/#generictransformstream": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"streams","spec":"streams","status":"current","text":"GenericTransformStream","type":"interface","url":"https://streams.spec.whatwg.org/#generictransformstream"},
+"https://webidl.spec.whatwg.org/#exceptiondef-typeerror": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"TypeError","type":"exception","url":"https://webidl.spec.whatwg.org/#exceptiondef-typeerror"},
+"https://webidl.spec.whatwg.org/#this": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"this","type":"dfn","url":"https://webidl.spec.whatwg.org/#this"},
+"#compressionstream-format": {"export":true,"for_":["CompressionStream"],"level":"","normative":true,"shortname":"compression","spec":"compression","status":"local","text":"format","type":"dfn","url":"#compressionstream-format"},
+"#compress-and-enqueue-a-chunk": {"export":true,"for_":[],"level":"","normative":true,"shortname":"compression","spec":"compression","status":"local","text":"compress and enqueue a chunk","type":"dfn","url":"#compress-and-enqueue-a-chunk"},
+"#compress-flush-and-enqueue": {"export":true,"for_":[],"level":"","normative":true,"shortname":"compression","spec":"compression","status":"local","text":"compress flush and enqueue","type":"dfn","url":"#compress-flush-and-enqueue"},
+"https://streams.spec.whatwg.org/#generictransformstream-transform": {"export":true,"for_":["GenericTransformStream"],"level":"1","normative":true,"shortname":"streams","spec":"streams","status":"current","text":"transform","type":"dfn","url":"https://streams.spec.whatwg.org/#generictransformstream-transform"},
+"https://webidl.spec.whatwg.org/#new": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"new","type":"dfn","url":"https://webidl.spec.whatwg.org/#new"},
+"https://streams.spec.whatwg.org/#transformstream": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"streams","spec":"streams","status":"current","text":"TransformStream","type":"interface","url":"https://streams.spec.whatwg.org/#transformstream"},
+"https://streams.spec.whatwg.org/#transformstream-set-up": {"export":true,"for_":["TransformStream"],"level":"1","normative":true,"shortname":"streams","spec":"streams","status":"current","text":"set up","type":"dfn","url":"https://streams.spec.whatwg.org/#transformstream-set-up"},
+"https://streams.spec.whatwg.org/#transformstream-set-up-transformalgorithm": {"export":true,"for_":["TransformStream/set up"],"level":"1","normative":true,"shortname":"streams","spec":"streams","status":"current","text":"transformalgorithm","type":"dfn","url":"https://streams.spec.whatwg.org/#transformstream-set-up-transformalgorithm"},
+"https://streams.spec.whatwg.org/#transformstream-set-up-flushalgorithm": {"export":true,"for_":["TransformStream/set up"],"level":"1","normative":true,"shortname":"streams","spec":"streams","status":"current","text":"flushalgorithm","type":"dfn","url":"https://streams.spec.whatwg.org/#transformstream-set-up-flushalgorithm"},
+"#compressionstream-context": {"export":true,"for_":["CompressionStream"],"level":"","normative":true,"shortname":"compression","spec":"compression","status":"local","text":"context","type":"dfn","url":"#compressionstream-context"},
+"https://webidl.spec.whatwg.org/#idl-Uint8Array": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"Uint8Array","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-Uint8Array"},
+"https://streams.spec.whatwg.org/#transformstream-enqueue": {"export":true,"for_":["TransformStream"],"level":"1","normative":true,"shortname":"streams","spec":"streams","status":"current","text":"enqueue","type":"dfn","url":"https://streams.spec.whatwg.org/#transformstream-enqueue"},
+"#dom-decompressionstream-decompressionstream": {"export":true,"for_":["DecompressionStream"],"level":"","normative":true,"shortname":"compression","spec":"compression","status":"local","text":"DecompressionStream(format)","type":"constructor","url":"#dom-decompressionstream-decompressionstream"},
+"#decompressionstream": {"export":true,"for_":[],"level":"","normative":true,"shortname":"compression","spec":"compression","status":"local","text":"DecompressionStream","type":"interface","url":"#decompressionstream"},
+"#decompressionstream-format": {"export":true,"for_":["DecompressionStream"],"level":"","normative":true,"shortname":"compression","spec":"compression","status":"local","text":"format","type":"dfn","url":"#decompressionstream-format"},
+"#decompress-and-enqueue-a-chunk": {"export":true,"for_":[],"level":"","normative":true,"shortname":"compression","spec":"compression","status":"local","text":"decompress and enqueue a chunk","type":"dfn","url":"#decompress-and-enqueue-a-chunk"},
+"#decompress-flush-and-enqueue": {"export":true,"for_":[],"level":"","normative":true,"shortname":"compression","spec":"compression","status":"local","text":"decompress flush and enqueue","type":"dfn","url":"#decompress-flush-and-enqueue"},
+"#decompressionstream-context": {"export":true,"for_":["DecompressionStream"],"level":"","normative":true,"shortname":"compression","spec":"compression","status":"local","text":"context","type":"dfn","url":"#decompressionstream-context"},
+};
+
+function genRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "DFN: "),
+                mk.code({ class: "dfn-text" }, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    const forListElements = forList.length === 0 ? '' : mk.li({},
+        mk.b({}, "For: "),
+        mk.ul({},
+            ...forList.map(forItem =>
                 mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
-            mk.b({}, "For: "),
-            mk.ul({},
-                ...forList.map(forItem =>
-                    mk.li({},
-                        mk.span({}, `${forItem}`)
-                    ),
+                    mk.span({}, `${forItem}`)
                 ),
             ),
-        );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+        ),
+    );
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
-    }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    return hintPanel;
+}
+function genAllRefHints() {
+    for(const refData of Object.values(refsData)) {
+        const refUrl = refData.url;
+        const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+        if (links.length == 0) {
+            console.log(`Can't find link href="${refUrl}".`, refData);
+            continue;
+        }
+        for(const link of links) {
+            if(link.classList.contains("dfn-link")) continue;
+            const hint = genRefHint(link, refData);
+            append(document.body, hint);
+            insertLinkPopupAction(hint)
         }
     }
+}
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+function hideAllRefHints() {
+    queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    refHint.style.position = "absolute"; // unfix it
+    refHint.classList.remove("on");
+    const teardown = refHint.teardownEventListeners;
+    if (teardown) {
+        refHint.teardownEventListeners = undefined;
+        teardown();
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+function showRefHint(refHint) {
+    hideAllRefHints(); // Only display one at this time.
+
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "true");
+    refHint.classList.add("on");
+    positionRefHint(refHint);
+    setupRefHintEventListeners(refHint);
+}
+
+function setupRefHintEventListeners(refHint) {
+    if (refHint.teardownEventListeners) return;
+    const link = refHint.forLink;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
 
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
 
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+function insertLinkPopupAction(refHint) {
+    const link = refHint.forLink;
+    // link.setAttribute('role', 'button');
+    link.setAttribute('aria-expanded', 'false')
+    link.classList.add('has-ref-hint');
+    link.addEventListener('mouseover', (event) => {
+        showRefHint(refHint);
     });
+    link.addEventListener('focus', (event) => {
+        showRefHint(refHint);
+    })
+}
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+document.addEventListener("DOMContentLoaded", () => {
+    genAllRefHints();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['https://webidl.spec.whatwg.org/#BufferSource'] = {"text": "BufferSource", "type": "typedef", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#BufferSource", "export": true, "normative": true, "for_": []};
-window.refsData['https://streams.spec.whatwg.org/#readablestream'] = {"text": "ReadableStream", "type": "interface", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#readablestream", "export": true, "normative": true, "for_": []};
-window.refsData['https://streams.spec.whatwg.org/#writablestream'] = {"text": "WritableStream", "type": "interface", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#writablestream", "export": true, "normative": true, "for_": []};
-window.refsData['#compression-context'] = {"text": "compression context", "type": "dfn", "spec": "compression", "shortname": "compression", "level": "", "status": "local", "url": "#compression-context", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-compressionstream-compressionstream'] = {"text": "CompressionStream(format)", "type": "constructor", "spec": "compression", "shortname": "compression", "level": "", "status": "local", "url": "#dom-compressionstream-compressionstream", "export": true, "normative": true, "for_": ["CompressionStream"]};
-window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
-window.refsData['#compressionstream'] = {"text": "CompressionStream", "type": "interface", "spec": "compression", "shortname": "compression", "level": "", "status": "local", "url": "#compressionstream", "export": true, "normative": true, "for_": []};
-window.refsData['https://streams.spec.whatwg.org/#generictransformstream'] = {"text": "GenericTransformStream", "type": "interface", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#generictransformstream", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#exceptiondef-typeerror'] = {"text": "TypeError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#exceptiondef-typeerror", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#this'] = {"text": "this", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#this", "export": true, "normative": true, "for_": []};
-window.refsData['#compressionstream-format'] = {"text": "format", "type": "dfn", "spec": "compression", "shortname": "compression", "level": "", "status": "local", "url": "#compressionstream-format", "export": true, "normative": true, "for_": ["CompressionStream"]};
-window.refsData['#compress-and-enqueue-a-chunk'] = {"text": "compress and enqueue a chunk", "type": "dfn", "spec": "compression", "shortname": "compression", "level": "", "status": "local", "url": "#compress-and-enqueue-a-chunk", "export": true, "normative": true, "for_": []};
-window.refsData['#compress-flush-and-enqueue'] = {"text": "compress flush and enqueue", "type": "dfn", "spec": "compression", "shortname": "compression", "level": "", "status": "local", "url": "#compress-flush-and-enqueue", "export": true, "normative": true, "for_": []};
-window.refsData['https://streams.spec.whatwg.org/#generictransformstream-transform'] = {"text": "transform", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#generictransformstream-transform", "export": true, "normative": true, "for_": ["GenericTransformStream"]};
-window.refsData['https://webidl.spec.whatwg.org/#new'] = {"text": "new", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#new", "export": true, "normative": true, "for_": []};
-window.refsData['https://streams.spec.whatwg.org/#transformstream'] = {"text": "TransformStream", "type": "interface", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#transformstream", "export": true, "normative": true, "for_": []};
-window.refsData['https://streams.spec.whatwg.org/#transformstream-set-up'] = {"text": "set up", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#transformstream-set-up", "export": true, "normative": true, "for_": ["TransformStream"]};
-window.refsData['https://streams.spec.whatwg.org/#transformstream-set-up-transformalgorithm'] = {"text": "transformalgorithm", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#transformstream-set-up-transformalgorithm", "export": true, "normative": true, "for_": ["TransformStream/set up"]};
-window.refsData['https://streams.spec.whatwg.org/#transformstream-set-up-flushalgorithm'] = {"text": "flushalgorithm", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#transformstream-set-up-flushalgorithm", "export": true, "normative": true, "for_": ["TransformStream/set up"]};
-window.refsData['#compressionstream-context'] = {"text": "context", "type": "dfn", "spec": "compression", "shortname": "compression", "level": "", "status": "local", "url": "#compressionstream-context", "export": true, "normative": true, "for_": ["CompressionStream"]};
-window.refsData['https://webidl.spec.whatwg.org/#idl-Uint8Array'] = {"text": "Uint8Array", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-Uint8Array", "export": true, "normative": true, "for_": []};
-window.refsData['https://streams.spec.whatwg.org/#transformstream-enqueue'] = {"text": "enqueue", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#transformstream-enqueue", "export": true, "normative": true, "for_": ["TransformStream"]};
-window.refsData['#dom-decompressionstream-decompressionstream'] = {"text": "DecompressionStream(format)", "type": "constructor", "spec": "compression", "shortname": "compression", "level": "", "status": "local", "url": "#dom-decompressionstream-decompressionstream", "export": true, "normative": true, "for_": ["DecompressionStream"]};
-window.refsData['#decompressionstream'] = {"text": "DecompressionStream", "type": "interface", "spec": "compression", "shortname": "compression", "level": "", "status": "local", "url": "#decompressionstream", "export": true, "normative": true, "for_": []};
-window.refsData['#decompressionstream-format'] = {"text": "format", "type": "dfn", "spec": "compression", "shortname": "compression", "level": "", "status": "local", "url": "#decompressionstream-format", "export": true, "normative": true, "for_": ["DecompressionStream"]};
-window.refsData['#decompress-and-enqueue-a-chunk'] = {"text": "decompress and enqueue a chunk", "type": "dfn", "spec": "compression", "shortname": "compression", "level": "", "status": "local", "url": "#decompress-and-enqueue-a-chunk", "export": true, "normative": true, "for_": []};
-window.refsData['#decompress-flush-and-enqueue'] = {"text": "decompress flush and enqueue", "type": "dfn", "spec": "compression", "shortname": "compression", "level": "", "status": "local", "url": "#decompress-flush-and-enqueue", "export": true, "normative": true, "for_": []};
-window.refsData['#decompressionstream-context'] = {"text": "context", "type": "dfn", "spec": "compression", "shortname": "compression", "level": "", "status": "local", "url": "#decompressionstream-context", "export": true, "normative": true, "for_": ["DecompressionStream"]};
 </script>

@@ -76,7 +76,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -507,7 +506,6 @@ a[href].issue-return {
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -4033,415 +4031,8 @@ that this feature should exist and be released,</p>
    <dt id="biblio-mediaqueries-4">[MEDIAQUERIES-4]
    <dd>Florian Rivoal; Tab Atkins Jr.. <a href="https://www.w3.org/TR/mediaqueries-4/"><cite>Media Queries Level 4</cite></a>. 25 December 2021. CR. URL: <a href="https://www.w3.org/TR/mediaqueries-4/">https://www.w3.org/TR/mediaqueries-4/</a>
   </dl>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['editors-draft'] = {"dfnID": "editors-draft", "url": "#editors-draft", "dfnText": "Editor\u2019s Draft", "refSections": [{"refs": [{"id": "ref-for-editors-draft"}, {"id": "ref-for-editors-draft\u2460"}], "title": "1.1. \nBackground: The W3C Process and CSS"}], "external": false};
-window.dfnpanelData['css-level-1'] = {"dfnID": "css-level-1", "url": "#css-level-1", "dfnText": "CSS Level 1", "refSections": [{"refs": [{"id": "ref-for-css-level-1"}], "title": "2.4. \nCSS Levels"}], "external": false};
-window.dfnpanelData['css-level-2'] = {"dfnID": "css-level-2", "url": "#css-level-2", "dfnText": "CSS Level 2", "refSections": [{"refs": [{"id": "ref-for-css-level-2"}, {"id": "ref-for-css-level-2\u2460"}, {"id": "ref-for-css-level-2\u2461"}], "title": "2.4. \nCSS Levels"}], "external": false};
-window.dfnpanelData['css-level-3'] = {"dfnID": "css-level-3", "url": "#css-level-3", "dfnText": "CSS Level 3", "refSections": [{"refs": [{"id": "ref-for-css-level-3"}], "title": "2.4. \nCSS Levels"}], "external": false};
-window.dfnpanelData['unstable'] = {"dfnID": "unstable", "url": "#unstable", "dfnText": "unstable", "refSections": [{"refs": [{"id": "ref-for-unstable"}], "title": "3.2. Implementations of Unstable and Proprietary Features"}, {"refs": [{"id": "ref-for-unstable\u2460"}, {"id": "ref-for-unstable\u2461"}], "title": "3.2.1. \nExperimentation and Unstable Features"}, {"refs": [{"id": "ref-for-unstable\u2462"}, {"id": "ref-for-unstable\u2463"}], "title": "3.2.3. \nMarket Pressure and De Facto Standards"}, {"refs": [{"id": "ref-for-unstable\u2464"}, {"id": "ref-for-unstable\u2465"}], "title": "3.2.3.1. \nVendor-prefixing Unstable Features"}], "external": false};
-window.dfnpanelData['vendor-prefix'] = {"dfnID": "vendor-prefix", "url": "#vendor-prefix", "dfnText": "prefixed syntax", "refSections": [{"refs": [{"id": "ref-for-vendor-prefix"}], "title": "3.2.2. \nProprietary and Non-standardized Features"}, {"refs": [{"id": "ref-for-vendor-prefix\u2460"}], "title": "3.2.3. \nMarket Pressure and De Facto Standards"}, {"refs": [{"id": "ref-for-vendor-prefix\u2461"}, {"id": "ref-for-vendor-prefix\u2462"}, {"id": "ref-for-vendor-prefix\u2463"}], "title": "3.2.3.1. \nVendor-prefixing Unstable Features"}, {"refs": [{"id": "ref-for-vendor-prefix\u2464"}], "title": "3.3. Implementations of CR-level Features"}], "external": false};
-window.dfnpanelData['proprietary-extension'] = {"dfnID": "proprietary-extension", "url": "#proprietary-extension", "dfnText": "proprietary extension", "refSections": [{"refs": [{"id": "ref-for-proprietary-extension"}], "title": "3.2. Implementations of Unstable and Proprietary Features"}, {"refs": [{"id": "ref-for-proprietary-extension\u2460"}, {"id": "ref-for-proprietary-extension\u2461"}, {"id": "ref-for-proprietary-extension\u2462"}], "title": "3.2.2. \nProprietary and Non-standardized Features"}], "external": false};
-window.dfnpanelData['rough-interoperability'] = {"dfnID": "rough-interoperability", "url": "#rough-interoperability", "dfnText": "Rough interoperability", "refSections": [{"refs": [{"id": "ref-for-rough-interoperability"}], "title": "2.3. \nModules with Rough Interoperability"}, {"refs": [{"id": "ref-for-rough-interoperability\u2460"}], "title": "3.2.3. \nMarket Pressure and De Facto Standards"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -4635,11 +4226,420 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"editors-draft": {"dfnID":"editors-draft","dfnText":"Editor\u2019s Draft","external":false,"refSections":[{"refs":[{"id":"ref-for-editors-draft"},{"id":"ref-for-editors-draft\u2460"}],"title":"1.1. \nBackground: The W3C Process and CSS"}],"url":"#editors-draft"},
+"css-level-1": {"dfnID":"css-level-1","dfnText":"CSS Level 1","external":false,"refSections":[{"refs":[{"id":"ref-for-css-level-1"}],"title":"2.4. \nCSS Levels"}],"url":"#css-level-1"},
+"css-level-2": {"dfnID":"css-level-2","dfnText":"CSS Level 2","external":false,"refSections":[{"refs":[{"id":"ref-for-css-level-2"},{"id":"ref-for-css-level-2\u2460"},{"id":"ref-for-css-level-2\u2461"}],"title":"2.4. \nCSS Levels"}],"url":"#css-level-2"},
+"css-level-3": {"dfnID":"css-level-3","dfnText":"CSS Level 3","external":false,"refSections":[{"refs":[{"id":"ref-for-css-level-3"}],"title":"2.4. \nCSS Levels"}],"url":"#css-level-3"},
+"unstable": {"dfnID":"unstable","dfnText":"unstable","external":false,"refSections":[{"refs":[{"id":"ref-for-unstable"}],"title":"3.2. Implementations of Unstable and Proprietary Features"},{"refs":[{"id":"ref-for-unstable\u2460"},{"id":"ref-for-unstable\u2461"}],"title":"3.2.1. \nExperimentation and Unstable Features"},{"refs":[{"id":"ref-for-unstable\u2462"},{"id":"ref-for-unstable\u2463"}],"title":"3.2.3. \nMarket Pressure and De Facto Standards"},{"refs":[{"id":"ref-for-unstable\u2464"},{"id":"ref-for-unstable\u2465"}],"title":"3.2.3.1. \nVendor-prefixing Unstable Features"}],"url":"#unstable"},
+"vendor-prefix": {"dfnID":"vendor-prefix","dfnText":"prefixed syntax","external":false,"refSections":[{"refs":[{"id":"ref-for-vendor-prefix"}],"title":"3.2.2. \nProprietary and Non-standardized Features"},{"refs":[{"id":"ref-for-vendor-prefix\u2460"}],"title":"3.2.3. \nMarket Pressure and De Facto Standards"},{"refs":[{"id":"ref-for-vendor-prefix\u2461"},{"id":"ref-for-vendor-prefix\u2462"},{"id":"ref-for-vendor-prefix\u2463"}],"title":"3.2.3.1. \nVendor-prefixing Unstable Features"},{"refs":[{"id":"ref-for-vendor-prefix\u2464"}],"title":"3.3. Implementations of CR-level Features"}],"url":"#vendor-prefix"},
+"proprietary-extension": {"dfnID":"proprietary-extension","dfnText":"proprietary extension","external":false,"refSections":[{"refs":[{"id":"ref-for-proprietary-extension"}],"title":"3.2. Implementations of Unstable and Proprietary Features"},{"refs":[{"id":"ref-for-proprietary-extension\u2460"},{"id":"ref-for-proprietary-extension\u2461"},{"id":"ref-for-proprietary-extension\u2462"}],"title":"3.2.2. \nProprietary and Non-standardized Features"}],"url":"#proprietary-extension"},
+"rough-interoperability": {"dfnID":"rough-interoperability","dfnText":"Rough interoperability","external":false,"refSections":[{"refs":[{"id":"ref-for-rough-interoperability"}],"title":"2.3. \nModules with Rough Interoperability"},{"refs":[{"id":"ref-for-rough-interoperability\u2460"}],"title":"3.2.3. \nMarket Pressure and De Facto Standards"}],"url":"#rough-interoperability"},
+};
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+const typeFormatters = {
+    'dfn': (text) => `[=${text}=]`,
+    'abstract-op': (text) => `[\$${text}\$]`,
+    'value': (text) => `''${text}''`,
+    'http-header': (text) => `[:${text}:]`,
+    'idl': (text) => `{{${text}}}`,
+    'interface': 'idl',
+    'constructor': 'idl',
+    'method': 'idl',
+    'argument': 'idl',
+    'attribute': 'idl',
+    'callback': 'idl',
+    'dictionary': 'idl',
+    'dict-member': 'idl',
+    'enum': 'idl',
+    'enum-value': 'idl',
+    'exception': 'idl',
+    'const': 'idl',
+    'typedef': 'idl',
+    'stringifier': 'idl',
+    'serializer': 'idl',
+    'iterator': 'idl',
+    'maplike': 'idl',
+    'setlike': 'idl',
+    'extended-attribute': 'idl',
+    'event': 'idl',
+    'element': (element) => `<{${element}}>`,
+    'element-state': 'element',
+    'element-attr': 'element',
+    'attr-value': 'element',
+    'scheme': 'dfn',
+    'permission': 'dfn',
+    'grammar': (text) => `${text} (within a <pre class=prod>)`,
+    'type': (text)=> `<<${text}>>`,
+    'property': (text) => `'${text}'`,
+    'descriptor': 'property',
+    'function': 'value',
+    'at-rule': 'value',
+    'selector': 'value',
+};
+const typesUsingFor = new Set(
+    [
+        "descriptor",
+        "value",
+        "element-attr",
+        "attr-value",
+        "element-state",
+        "method",
+        "constructor",
+        "argument",
+        "attribute",
+        "const",
+        "dict-member",
+        "event",
+        "enum-value",
+        "stringifier",
+        "serializer",
+        "iterator",
+        "maplike",
+        "setlike",
+        "state",
+        "mode",
+        "context",
+        "facet",
+    ],
+)
+const typesNotUsingFor = new Set(
+    [
+        "property",
+        "element",
+        "interface",
+        "namespace",
+        "callback",
+        "dictionary",
+        "enum",
+        "exception",
+        "typedef",
+        "http-header",
+        "permission",
+    ],
+)
+function linkFormatterFromType(type) {
+    const fnOrType = typeFormatters[type];
+    if(typeof fnOrType === 'string') {
+        // follow the alias
+        return linkFormatterFromType(fnOrType);
+    }
+    return fnOrType;
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!typesUsingFor.has(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!typesNotUsingFor.has(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
+
+function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+    dfnPanel.forDfn = dfn;
+    if(!dfn) { console.log(dfnPanel); }
+    return dfnPanel;
+}
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        const panel = genDfnPanel({ ...panelData, dfn });
+        append(document.body, panel);
+        insertDfnPopupAction(panel)
+    }
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+})
+
+function hideAllDfnPanels() {
+    // Turn off any currently "on" or "activated" panels.
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
+}
+
+function showDfnPanel(dfnPanel) {
+    hideAllDfnPanels(); // Only display one at this time.
+
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "true");
+
+    dfnPanel.classList.add("on");
+    positionDfnPanel(dfnPanel);
+
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    // Increment tabindex for each anchor and button tags in panel
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.style.position = "absolute"; // unfix it
+    dfnPanel.classList.remove("on");
+    dfnPanel.classList.remove("activated");
+}
+
+function toggleDfnPanel(dfnPanel) {
+    if(dfnPanel.classList.contains("on")) {
+        hideDfnPanel(dfnPanel);
+    } else {
+        showDfnPanel(dfnPanel);
+    }
+}
+
+function insertDfnPopupAction(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        showDfnPanel(dfnPanel);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfnPanel);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel(dfnPanel, dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    })
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
 }
 </script>
 <script>/* Boilerplate: script-link-titles */
+"use strict";
+{
 let linkTitleData = {
- "https://www.w3.org/TR/css-counter-styles-3/#typedef-counter-style": "Expands to: cjk-ideographic | japanese-formal | japanese-informal | simp-chinese-formal | simp-chinese-informal | trad-chinese-formal | trad-chinese-informal"
+"https://www.w3.org/TR/css-counter-styles-3/#typedef-counter-style": "Expands to: cjk-ideographic | japanese-formal | japanese-informal | simp-chinese-formal | simp-chinese-informal | trad-chinese-formal | trad-chinese-informal",
 };
 
 function setTypeTitles() {
@@ -4651,243 +4651,244 @@ function setTypeTitles() {
 }
 
 document.addEventListener("DOMContentLoaded", setTypeTitles);
+}
 </script>
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
+let refsData = {
+"#editors-draft": {"export":true,"for_":[],"level":"","normative":true,"shortname":"css-2020","spec":"css-2020","status":"local","text":"editor's draft","type":"dfn","url":"#editors-draft"},
+"https://www.w3.org/TR/css-conditional-3/#at-ruledef-media": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-conditional","spec":"css-conditional-3","status":"snapshot","text":"@media","type":"at-rule","url":"https://www.w3.org/TR/css-conditional-3/#at-ruledef-media"},
+"https://www.w3.org/TR/css-conditional-3/#at-ruledef-supports": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-conditional","spec":"css-conditional-3","status":"snapshot","text":"@supports","type":"at-rule","url":"https://www.w3.org/TR/css-conditional-3/#at-ruledef-supports"},
+"https://www.w3.org/TR/css-color-4/#propdef-opacity": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-color","spec":"css-color-4","status":"snapshot","text":"opacity","type":"property","url":"https://www.w3.org/TR/css-color-4/#propdef-opacity"},
+"https://www.w3.org/TR/css-ui-4/#propdef-cursor": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-ui","spec":"css-ui-4","status":"snapshot","text":"cursor","type":"property","url":"https://www.w3.org/TR/css-ui-4/#propdef-cursor"},
+"https://www.w3.org/TR/css-ui-4/#propdef-outline": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-ui","spec":"css-ui-4","status":"snapshot","text":"outline","type":"property","url":"https://www.w3.org/TR/css-ui-4/#propdef-outline"},
+"https://www.w3.org/TR/css-contain-2/#propdef-contain": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-contain","spec":"css-contain-2","status":"snapshot","text":"contain","type":"property","url":"https://www.w3.org/TR/css-contain-2/#propdef-contain"},
+"https://www.w3.org/TR/css-display-3/#propdef-display": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-display","spec":"css-display-3","status":"snapshot","text":"display","type":"property","url":"https://www.w3.org/TR/css-display-3/#propdef-display"},
+"https://www.w3.org/TR/css-counter-styles-3/#typedef-counter-style": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-counter-styles","spec":"css-counter-styles-3","status":"snapshot","text":"<counter-style>","type":"type","url":"https://www.w3.org/TR/css-counter-styles-3/#typedef-counter-style"},
+"https://www.w3.org/TR/css-counter-styles-3/#at-ruledef-counter-style": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-counter-styles","spec":"css-counter-styles-3","status":"snapshot","text":"@counter-style","type":"at-rule","url":"https://www.w3.org/TR/css-counter-styles-3/#at-ruledef-counter-style"},
+"#rough-interoperability": {"export":true,"for_":[],"level":"","normative":true,"shortname":"css-2020","spec":"css-2020","status":"local","text":"rough interoperability","type":"dfn","url":"#rough-interoperability"},
+"https://www.w3.org/TR/css-will-change-1/#propdef-will-change": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-will-change","spec":"css-will-change-1","status":"snapshot","text":"will-change","type":"property","url":"https://www.w3.org/TR/css-will-change-1/#propdef-will-change"},
+"#css-level-1": {"export":true,"for_":[],"level":"","normative":true,"shortname":"css-2020","spec":"css-2020","status":"local","text":"css level 1","type":"dfn","url":"#css-level-1"},
+"#css-level-2": {"export":true,"for_":[],"level":"","normative":true,"shortname":"css-2020","spec":"css-2020","status":"local","text":"css level 2","type":"dfn","url":"#css-level-2"},
+"#css-level-3": {"export":true,"for_":[],"level":"","normative":true,"shortname":"css-2020","spec":"css-2020","status":"local","text":"css level 3","type":"dfn","url":"#css-level-3"},
+"#unstable": {"export":true,"for_":[],"level":"","normative":true,"shortname":"css-2020","spec":"css-2020","status":"local","text":"unstable","type":"dfn","url":"#unstable"},
+"#proprietary-extension": {"export":true,"for_":[],"level":"","normative":true,"shortname":"css-2020","spec":"css-2020","status":"local","text":"proprietary extension","type":"dfn","url":"#proprietary-extension"},
+"#vendor-prefix": {"export":true,"for_":[],"level":"","normative":true,"shortname":"css-2020","spec":"css-2020","status":"local","text":"prefixed","type":"dfn","url":"#vendor-prefix"},
+"https://www.w3.org/TR/css-sizing-3/#propdef-width": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-sizing","spec":"css-sizing-3","status":"snapshot","text":"width","type":"property","url":"https://www.w3.org/TR/css-sizing-3/#propdef-width"},
+"https://www.w3.org/TR/css-sizing-3/#propdef-height": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-sizing","spec":"css-sizing-3","status":"snapshot","text":"height","type":"property","url":"https://www.w3.org/TR/css-sizing-3/#propdef-height"},
+"https://www.w3.org/TR/css-sizing-3/#valdef-width-min-content": {"export":true,"for_":["width","min-width","max-width","height","min-height","max-height"],"level":"3","normative":true,"shortname":"css-sizing","spec":"css-sizing-3","status":"snapshot","text":"min-content","type":"value","url":"https://www.w3.org/TR/css-sizing-3/#valdef-width-min-content"},
+"https://www.w3.org/TR/css-sizing-3/#valdef-width-max-content": {"export":true,"for_":["width","min-width","max-width","height","min-height","max-height"],"level":"3","normative":true,"shortname":"css-sizing","spec":"css-sizing-3","status":"snapshot","text":"max-content","type":"value","url":"https://www.w3.org/TR/css-sizing-3/#valdef-width-max-content"},
+"https://www.w3.org/TR/css-images-4/#funcdef-conic-gradient": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-images","spec":"css-images-4","status":"snapshot","text":"conic-gradient()","type":"function","url":"https://www.w3.org/TR/css-images-4/#funcdef-conic-gradient"},
+"https://www.w3.org/TR/css-sizing-4/#propdef-aspect-ratio": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-sizing","spec":"css-sizing-4","status":"snapshot","text":"aspect-ratio","type":"property","url":"https://www.w3.org/TR/css-sizing-4/#propdef-aspect-ratio"},
+"https://www.w3.org/TR/selectors-4/#dir-pseudo": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"selectors","spec":"selectors-4","status":"snapshot","text":":dir()","type":"selector","url":"https://www.w3.org/TR/selectors-4/#dir-pseudo"},
+"https://www.w3.org/TR/selectors-4/#lang-pseudo": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"selectors","spec":"selectors-4","status":"snapshot","text":":lang()","type":"selector","url":"https://www.w3.org/TR/selectors-4/#lang-pseudo"},
+"https://www.w3.org/TR/selectors-4/#focus-within-pseudo": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"selectors","spec":"selectors-4","status":"snapshot","text":":focus-within","type":"selector","url":"https://www.w3.org/TR/selectors-4/#focus-within-pseudo"},
+};
+
+function genRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "DFN: "),
+                mk.code({ class: "dfn-text" }, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    const forListElements = forList.length === 0 ? '' : mk.li({},
+        mk.b({}, "For: "),
+        mk.ul({},
+            ...forList.map(forItem =>
                 mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
-            mk.b({}, "For: "),
-            mk.ul({},
-                ...forList.map(forItem =>
-                    mk.li({},
-                        mk.span({}, `${forItem}`)
-                    ),
+                    mk.span({}, `${forItem}`)
                 ),
             ),
-        );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+        ),
+    );
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
-    }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    return hintPanel;
+}
+function genAllRefHints() {
+    for(const refData of Object.values(refsData)) {
+        const refUrl = refData.url;
+        const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+        if (links.length == 0) {
+            console.log(`Can't find link href="${refUrl}".`, refData);
+            continue;
+        }
+        for(const link of links) {
+            if(link.classList.contains("dfn-link")) continue;
+            const hint = genRefHint(link, refData);
+            append(document.body, hint);
+            insertLinkPopupAction(hint)
         }
     }
+}
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+function hideAllRefHints() {
+    queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    refHint.style.position = "absolute"; // unfix it
+    refHint.classList.remove("on");
+    const teardown = refHint.teardownEventListeners;
+    if (teardown) {
+        refHint.teardownEventListeners = undefined;
+        teardown();
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+function showRefHint(refHint) {
+    hideAllRefHints(); // Only display one at this time.
+
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "true");
+    refHint.classList.add("on");
+    positionRefHint(refHint);
+    setupRefHintEventListeners(refHint);
+}
+
+function setupRefHintEventListeners(refHint) {
+    if (refHint.teardownEventListeners) return;
+    const link = refHint.forLink;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
 
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
 
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+function insertLinkPopupAction(refHint) {
+    const link = refHint.forLink;
+    // link.setAttribute('role', 'button');
+    link.setAttribute('aria-expanded', 'false')
+    link.classList.add('has-ref-hint');
+    link.addEventListener('mouseover', (event) => {
+        showRefHint(refHint);
     });
+    link.addEventListener('focus', (event) => {
+        showRefHint(refHint);
+    })
+}
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+document.addEventListener("DOMContentLoaded", () => {
+    genAllRefHints();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['#editors-draft'] = {"text": "editor's draft", "type": "dfn", "spec": "css-2020", "shortname": "css-2020", "level": "", "status": "local", "url": "#editors-draft", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-conditional-3/#at-ruledef-media'] = {"text": "@media", "type": "at-rule", "spec": "css-conditional-3", "shortname": "css-conditional", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-conditional-3/#at-ruledef-media", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-conditional-3/#at-ruledef-supports'] = {"text": "@supports", "type": "at-rule", "spec": "css-conditional-3", "shortname": "css-conditional", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-conditional-3/#at-ruledef-supports", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-color-4/#propdef-opacity'] = {"text": "opacity", "type": "property", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-color-4/#propdef-opacity", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-ui-4/#propdef-cursor'] = {"text": "cursor", "type": "property", "spec": "css-ui-4", "shortname": "css-ui", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-ui-4/#propdef-cursor", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-ui-4/#propdef-outline'] = {"text": "outline", "type": "property", "spec": "css-ui-4", "shortname": "css-ui", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-ui-4/#propdef-outline", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-contain-2/#propdef-contain'] = {"text": "contain", "type": "property", "spec": "css-contain-2", "shortname": "css-contain", "level": "2", "status": "snapshot", "url": "https://www.w3.org/TR/css-contain-2/#propdef-contain", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-display-3/#propdef-display'] = {"text": "display", "type": "property", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-display-3/#propdef-display", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-counter-styles-3/#typedef-counter-style'] = {"text": "<counter-style>", "type": "type", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-counter-styles-3/#typedef-counter-style", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-counter-styles-3/#at-ruledef-counter-style'] = {"text": "@counter-style", "type": "at-rule", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-counter-styles-3/#at-ruledef-counter-style", "export": true, "normative": true, "for_": []};
-window.refsData['#rough-interoperability'] = {"text": "rough interoperability", "type": "dfn", "spec": "css-2020", "shortname": "css-2020", "level": "", "status": "local", "url": "#rough-interoperability", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-will-change-1/#propdef-will-change'] = {"text": "will-change", "type": "property", "spec": "css-will-change-1", "shortname": "css-will-change", "level": "1", "status": "snapshot", "url": "https://www.w3.org/TR/css-will-change-1/#propdef-will-change", "export": true, "normative": true, "for_": []};
-window.refsData['#css-level-1'] = {"text": "css level 1", "type": "dfn", "spec": "css-2020", "shortname": "css-2020", "level": "", "status": "local", "url": "#css-level-1", "export": true, "normative": true, "for_": []};
-window.refsData['#css-level-2'] = {"text": "css level 2", "type": "dfn", "spec": "css-2020", "shortname": "css-2020", "level": "", "status": "local", "url": "#css-level-2", "export": true, "normative": true, "for_": []};
-window.refsData['#css-level-3'] = {"text": "css level 3", "type": "dfn", "spec": "css-2020", "shortname": "css-2020", "level": "", "status": "local", "url": "#css-level-3", "export": true, "normative": true, "for_": []};
-window.refsData['#unstable'] = {"text": "unstable", "type": "dfn", "spec": "css-2020", "shortname": "css-2020", "level": "", "status": "local", "url": "#unstable", "export": true, "normative": true, "for_": []};
-window.refsData['#proprietary-extension'] = {"text": "proprietary extension", "type": "dfn", "spec": "css-2020", "shortname": "css-2020", "level": "", "status": "local", "url": "#proprietary-extension", "export": true, "normative": true, "for_": []};
-window.refsData['#vendor-prefix'] = {"text": "prefixed", "type": "dfn", "spec": "css-2020", "shortname": "css-2020", "level": "", "status": "local", "url": "#vendor-prefix", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-sizing-3/#propdef-width'] = {"text": "width", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-sizing-3/#propdef-width", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-sizing-3/#propdef-height'] = {"text": "height", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-sizing-3/#propdef-height", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-sizing-3/#valdef-width-min-content'] = {"text": "min-content", "type": "value", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-sizing-3/#valdef-width-min-content", "export": true, "normative": true, "for_": ["width", "min-width", "max-width", "height", "min-height", "max-height"]};
-window.refsData['https://www.w3.org/TR/css-sizing-3/#valdef-width-max-content'] = {"text": "max-content", "type": "value", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-sizing-3/#valdef-width-max-content", "export": true, "normative": true, "for_": ["width", "min-width", "max-width", "height", "min-height", "max-height"]};
-window.refsData['https://www.w3.org/TR/css-images-4/#funcdef-conic-gradient'] = {"text": "conic-gradient()", "type": "function", "spec": "css-images-4", "shortname": "css-images", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-images-4/#funcdef-conic-gradient", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-sizing-4/#propdef-aspect-ratio'] = {"text": "aspect-ratio", "type": "property", "spec": "css-sizing-4", "shortname": "css-sizing", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-sizing-4/#propdef-aspect-ratio", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/selectors-4/#dir-pseudo'] = {"text": ":dir()", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/selectors-4/#dir-pseudo", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/selectors-4/#lang-pseudo'] = {"text": ":lang()", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/selectors-4/#lang-pseudo", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/selectors-4/#focus-within-pseudo'] = {"text": ":focus-within", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/selectors-4/#focus-within-pseudo", "export": true, "normative": true, "for_": []};
 </script>

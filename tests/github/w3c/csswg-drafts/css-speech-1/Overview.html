@@ -79,7 +79,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -510,7 +509,6 @@ a[href].issue-return {
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -3151,505 +3149,8 @@ offset (if any)
       <td>silent, or a keyword value and optionally also a decibel offset (if not zero)
    </table>
   </div>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['a9734ee4'] = {"dfnID": "a9734ee4", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border", "dfnText": "border", "refSections": [{"refs": [{"id": "ref-for-propdef-border"}], "title": "5. \nThe aural formatting model"}], "external": true};
-window.dfnpanelData['cecbe9cd'] = {"dfnID": "cecbe9cd", "url": "https://drafts.csswg.org/css-box-4/#propdef-margin", "dfnText": "margin", "refSections": [{"refs": [{"id": "ref-for-propdef-margin"}], "title": "5. \nThe aural formatting model"}], "external": true};
-window.dfnpanelData['b5418f3e'] = {"dfnID": "b5418f3e", "url": "https://drafts.csswg.org/css-box-4/#propdef-padding", "dfnText": "padding", "refSections": [{"refs": [{"id": "ref-for-propdef-padding"}], "title": "5. \nThe aural formatting model"}], "external": true};
-window.dfnpanelData['37eda612'] = {"dfnID": "37eda612", "url": "https://drafts.csswg.org/css-break-4/#valdef-break-before-all", "dfnText": "all", "refSections": [{"refs": [{"id": "ref-for-valdef-break-before-all"}], "title": "2. \nBackground information, CSS 2.1"}], "external": true};
-window.dfnpanelData['c388d253'] = {"dfnID": "c388d253", "url": "https://drafts.csswg.org/css-cascade-5/#valdef-all-inherit", "dfnText": "inherit", "refSections": [{"refs": [{"id": "ref-for-valdef-all-inherit"}], "title": "11.1. \nThe voice-family property"}], "external": true};
-window.dfnpanelData['da00cf5b'] = {"dfnID": "da00cf5b", "url": "https://drafts.csswg.org/css-counter-styles-3/#armenian", "dfnText": "armenian", "refSections": [{"refs": [{"id": "ref-for-armenian"}], "title": "13. \nList items and counters styles"}], "external": true};
-window.dfnpanelData['e149ddf7'] = {"dfnID": "e149ddf7", "url": "https://drafts.csswg.org/css-counter-styles-3/#decimal", "dfnText": "decimal", "refSections": [{"refs": [{"id": "ref-for-decimal"}], "title": "13. \nList items and counters styles"}], "external": true};
-window.dfnpanelData['1f90c5c7'] = {"dfnID": "1f90c5c7", "url": "https://drafts.csswg.org/css-counter-styles-3/#decimal-leading-zero", "dfnText": "decimal-leading-zero", "refSections": [{"refs": [{"id": "ref-for-decimal-leading-zero"}], "title": "13. \nList items and counters styles"}], "external": true};
-window.dfnpanelData['a8aeaafc'] = {"dfnID": "a8aeaafc", "url": "https://drafts.csswg.org/css-counter-styles-3/#georgian", "dfnText": "georgian", "refSections": [{"refs": [{"id": "ref-for-georgian"}], "title": "13. \nList items and counters styles"}], "external": true};
-window.dfnpanelData['2e466b95'] = {"dfnID": "2e466b95", "url": "https://drafts.csswg.org/css-counter-styles-3/#lower-alpha", "dfnText": "lower-alpha", "refSections": [{"refs": [{"id": "ref-for-lower-alpha"}], "title": "13. \nList items and counters styles"}], "external": true};
-window.dfnpanelData['a9cd92d9'] = {"dfnID": "a9cd92d9", "url": "https://drafts.csswg.org/css-counter-styles-3/#lower-greek", "dfnText": "lower-greek", "refSections": [{"refs": [{"id": "ref-for-lower-greek"}, {"id": "ref-for-lower-greek\u2460"}], "title": "13. \nList items and counters styles"}], "external": true};
-window.dfnpanelData['d4922c84'] = {"dfnID": "d4922c84", "url": "https://drafts.csswg.org/css-counter-styles-3/#lower-latin", "dfnText": "lower-latin", "refSections": [{"refs": [{"id": "ref-for-lower-latin"}], "title": "13. \nList items and counters styles"}], "external": true};
-window.dfnpanelData['269ee415'] = {"dfnID": "269ee415", "url": "https://drafts.csswg.org/css-counter-styles-3/#lower-roman", "dfnText": "lower-roman", "refSections": [{"refs": [{"id": "ref-for-lower-roman"}], "title": "13. \nList items and counters styles"}], "external": true};
-window.dfnpanelData['494d86c0'] = {"dfnID": "494d86c0", "url": "https://drafts.csswg.org/css-counter-styles-3/#upper-alpha", "dfnText": "upper-alpha", "refSections": [{"refs": [{"id": "ref-for-upper-alpha"}], "title": "13. \nList items and counters styles"}], "external": true};
-window.dfnpanelData['48ba888a'] = {"dfnID": "48ba888a", "url": "https://drafts.csswg.org/css-counter-styles-3/#upper-latin", "dfnText": "upper-latin", "refSections": [{"refs": [{"id": "ref-for-upper-latin"}, {"id": "ref-for-upper-latin\u2460"}], "title": "13. \nList items and counters styles"}], "external": true};
-window.dfnpanelData['a1900547'] = {"dfnID": "a1900547", "url": "https://drafts.csswg.org/css-counter-styles-3/#upper-roman", "dfnText": "upper-roman", "refSections": [{"refs": [{"id": "ref-for-upper-roman"}], "title": "13. \nList items and counters styles"}], "external": true};
-window.dfnpanelData['e7f0dd6c'] = {"dfnID": "e7f0dd6c", "url": "https://drafts.csswg.org/css-display-4/#propdef-display", "dfnText": "display", "refSections": [{"refs": [{"id": "ref-for-propdef-display"}, {"id": "ref-for-propdef-display\u2460"}, {"id": "ref-for-propdef-display\u2461"}, {"id": "ref-for-propdef-display\u2462"}, {"id": "ref-for-propdef-display\u2463"}], "title": "7.1. \nThe speak property"}], "external": true};
-window.dfnpanelData['55e8f5de'] = {"dfnID": "55e8f5de", "url": "https://drafts.csswg.org/css-display-4/#valdef-display-none", "dfnText": "none", "refSections": [{"refs": [{"id": "ref-for-valdef-display-none"}, {"id": "ref-for-valdef-display-none\u2460"}], "title": "7.1. \nThe speak property"}], "external": true};
-window.dfnpanelData['12f8fb07'] = {"dfnID": "12f8fb07", "url": "https://drafts.csswg.org/css-display-4/#propdef-visibility", "dfnText": "visibility", "refSections": [{"refs": [{"id": "ref-for-propdef-visibility"}], "title": "7.1. \nThe speak property"}, {"refs": [{"id": "ref-for-propdef-visibility\u2460"}], "title": "\nAppendix E \u2014 Changes"}], "external": true};
-window.dfnpanelData['6420cb11'] = {"dfnID": "6420cb11", "url": "https://drafts.csswg.org/css-display-4/#valdef-visibility-visible", "dfnText": "visible", "refSections": [{"refs": [{"id": "ref-for-valdef-visibility-visible"}], "title": "7.1. \nThe speak property"}], "external": true};
-window.dfnpanelData['ba80b0b1'] = {"dfnID": "ba80b0b1", "url": "https://drafts.csswg.org/css-fonts-4/#family-name-value", "dfnText": "<family-name>", "refSections": [{"refs": [{"id": "ref-for-family-name-value"}], "title": "11.1. \nThe voice-family property"}], "external": true};
-window.dfnpanelData['d65d17df'] = {"dfnID": "d65d17df", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-family", "dfnText": "font-family", "refSections": [{"refs": [{"id": "ref-for-propdef-font-family"}, {"id": "ref-for-propdef-font-family\u2460"}], "title": "11.1. \nThe voice-family property"}], "external": true};
-window.dfnpanelData['dde41168'] = {"dfnID": "dde41168", "url": "https://drafts.csswg.org/css-position-3/#propdef-left", "dfnText": "left", "refSections": [{"refs": [{"id": "ref-for-propdef-left"}], "title": "6.2. \nThe voice-balance property"}], "external": true};
-window.dfnpanelData['b0b8d8c0'] = {"dfnID": "b0b8d8c0", "url": "https://drafts.csswg.org/css-position-3/#propdef-right", "dfnText": "right", "refSections": [{"refs": [{"id": "ref-for-propdef-right"}], "title": "6.2. \nThe voice-balance property"}], "external": true};
-window.dfnpanelData['fd0c9e35'] = {"dfnID": "fd0c9e35", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-after", "dfnText": "::after", "refSections": [{"refs": [{"id": "ref-for-selectordef-after"}], "title": "5. \nThe aural formatting model"}, {"refs": [{"id": "ref-for-selectordef-after\u2460"}], "title": "14. \nInserted and replaced content"}], "external": true};
-window.dfnpanelData['5869f885'] = {"dfnID": "5869f885", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-before", "dfnText": "::before", "refSections": [{"refs": [{"id": "ref-for-selectordef-before"}], "title": "5. \nThe aural formatting model"}, {"refs": [{"id": "ref-for-selectordef-before\u2460"}], "title": "14. \nInserted and replaced content"}], "external": true};
-window.dfnpanelData['f0809abc'] = {"dfnID": "f0809abc", "url": "https://drafts.csswg.org/css-values-4/#comb-all", "dfnText": "&&", "refSections": [{"refs": [{"id": "ref-for-comb-all"}], "title": "11.3. \nThe voice-pitch property"}, {"refs": [{"id": "ref-for-comb-all\u2460"}], "title": "11.4. \nThe voice-range property"}], "external": true};
-window.dfnpanelData['68150e76'] = {"dfnID": "68150e76", "url": "https://drafts.csswg.org/css-values-4/#mult-zero-plus", "dfnText": "*", "refSections": [{"refs": [{"id": "ref-for-mult-zero-plus"}], "title": "11.1. \nThe voice-family property"}], "external": true};
-window.dfnpanelData['9f9120ff'] = {"dfnID": "9f9120ff", "url": "https://drafts.csswg.org/css-values-4/#comb-comma", "dfnText": ",", "refSections": [{"refs": [{"id": "ref-for-comb-comma"}], "title": "11.1. \nThe voice-family property"}], "external": true};
-window.dfnpanelData['29a4aea4'] = {"dfnID": "29a4aea4", "url": "https://drafts.csswg.org/css-values-4/#frequency-value", "dfnText": "<frequency>", "refSections": [{"refs": [{"id": "ref-for-frequency-value"}, {"id": "ref-for-frequency-value\u2460"}, {"id": "ref-for-frequency-value\u2461"}], "title": "11.3. \nThe voice-pitch property"}, {"refs": [{"id": "ref-for-frequency-value\u2462"}, {"id": "ref-for-frequency-value\u2463"}, {"id": "ref-for-frequency-value\u2464"}], "title": "11.4. \nThe voice-range property"}], "external": true};
-window.dfnpanelData['70c9f859'] = {"dfnID": "70c9f859", "url": "https://drafts.csswg.org/css-values-4/#integer-value", "dfnText": "<integer>", "refSections": [{"refs": [{"id": "ref-for-integer-value"}, {"id": "ref-for-integer-value\u2460"}], "title": "11.1. \nThe voice-family property"}], "external": true};
-window.dfnpanelData['16310992'] = {"dfnID": "16310992", "url": "https://drafts.csswg.org/css-values-4/#number-value", "dfnText": "<number>", "refSections": [{"refs": [{"id": "ref-for-number-value"}, {"id": "ref-for-number-value\u2460"}], "title": "6.2. \nThe voice-balance property"}], "external": true};
-window.dfnpanelData['15f5b381'] = {"dfnID": "15f5b381", "url": "https://drafts.csswg.org/css-values-4/#percentage-value", "dfnText": "<percentage>", "refSections": [{"refs": [{"id": "ref-for-percentage-value"}, {"id": "ref-for-percentage-value\u2460"}], "title": "11.2. \nThe voice-rate property"}, {"refs": [{"id": "ref-for-percentage-value\u2461"}, {"id": "ref-for-percentage-value\u2462"}], "title": "11.3. \nThe voice-pitch property"}, {"refs": [{"id": "ref-for-percentage-value\u2463"}, {"id": "ref-for-percentage-value\u2464"}], "title": "11.4. \nThe voice-range property"}], "external": true};
-window.dfnpanelData['03570f9e'] = {"dfnID": "03570f9e", "url": "https://drafts.csswg.org/css-values-4/#time-value", "dfnText": "<time>", "refSections": [{"refs": [{"id": "ref-for-time-value"}], "title": "8.1. \nThe pause-before and pause-after properties"}, {"refs": [{"id": "ref-for-time-value\u2460"}, {"id": "ref-for-time-value\u2461"}], "title": "9.1. \nThe rest-before and rest-after properties"}, {"refs": [{"id": "ref-for-time-value\u2462"}, {"id": "ref-for-time-value\u2463"}], "title": "12.1. \nThe voice-duration property"}], "external": true};
-window.dfnpanelData['537cf076'] = {"dfnID": "537cf076", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "dfnText": "?", "refSections": [{"refs": [{"id": "ref-for-mult-opt"}], "title": "8.2. \nThe pause shorthand property"}, {"refs": [{"id": "ref-for-mult-opt\u2460"}], "title": "9.2. \nThe rest shorthand property"}, {"refs": [{"id": "ref-for-mult-opt\u2461"}], "title": "10.1. \nThe cue-before and cue-after properties"}, {"refs": [{"id": "ref-for-mult-opt\u2462"}], "title": "10.3. \nThe cue shorthand property"}], "external": true};
-window.dfnpanelData['358fd6ff'] = {"dfnID": "358fd6ff", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "dfnText": "css-wide keywords", "refSections": [{"refs": [{"id": "ref-for-css-wide-keywords"}], "title": "3.1. \nValue Definitions"}, {"refs": [{"id": "ref-for-css-wide-keywords\u2460"}], "title": "11.1. \nThe voice-family property"}], "external": true};
-window.dfnpanelData['e510368f'] = {"dfnID": "e510368f", "url": "https://drafts.csswg.org/css-values-4/#dimension", "dfnText": "dimension", "refSections": [{"refs": [{"id": "ref-for-dimension"}], "title": "6.1. \nThe voice-volume property"}, {"refs": [{"id": "ref-for-dimension\u2460"}], "title": "11.3. \nThe voice-pitch property"}], "external": true};
-window.dfnpanelData['9dc6ce48'] = {"dfnID": "9dc6ce48", "url": "https://drafts.csswg.org/css-values-4/#css-css-identifier", "dfnText": "identifier", "refSections": [{"refs": [{"id": "ref-for-css-css-identifier"}], "title": "11.1. \nThe voice-family property"}], "external": true};
-window.dfnpanelData['f0ba04de'] = {"dfnID": "f0ba04de", "url": "https://drafts.csswg.org/css-values-4/#number", "dfnText": "number", "refSections": [{"refs": [{"id": "ref-for-number"}], "title": "6.2. \nThe voice-balance property"}], "external": true};
-window.dfnpanelData['c7965b42'] = {"dfnID": "c7965b42", "url": "https://drafts.csswg.org/css-values-4/#percentage", "dfnText": "percentage", "refSections": [{"refs": [{"id": "ref-for-percentage"}], "title": "11.2. \nThe voice-rate property"}, {"refs": [{"id": "ref-for-percentage\u2460"}], "title": "11.3. \nThe voice-pitch property"}, {"refs": [{"id": "ref-for-percentage\u2461"}], "title": "11.4. \nThe voice-range property"}], "external": true};
-window.dfnpanelData['6ec67710'] = {"dfnID": "6ec67710", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "dfnText": "|", "refSections": [{"refs": [{"id": "ref-for-comb-one"}, {"id": "ref-for-comb-one\u2460"}, {"id": "ref-for-comb-one\u2461"}, {"id": "ref-for-comb-one\u2462"}, {"id": "ref-for-comb-one\u2463"}], "title": "6.1. \nThe voice-volume property"}, {"refs": [{"id": "ref-for-comb-one\u2464"}, {"id": "ref-for-comb-one\u2465"}, {"id": "ref-for-comb-one\u2466"}, {"id": "ref-for-comb-one\u2467"}, {"id": "ref-for-comb-one\u2468"}], "title": "6.2. \nThe voice-balance property"}, {"refs": [{"id": "ref-for-comb-one\u2460\u24ea"}, {"id": "ref-for-comb-one\u2460\u2460"}], "title": "7.1. \nThe speak property"}, {"refs": [{"id": "ref-for-comb-one\u2460\u2461"}, {"id": "ref-for-comb-one\u2460\u2462"}], "title": "7.2. \nThe speak-as property"}, {"refs": [{"id": "ref-for-comb-one\u2460\u2463"}, {"id": "ref-for-comb-one\u2460\u2464"}, {"id": "ref-for-comb-one\u2460\u2465"}, {"id": "ref-for-comb-one\u2460\u2466"}, {"id": "ref-for-comb-one\u2460\u2467"}, {"id": "ref-for-comb-one\u2460\u2468"}], "title": "8.1. \nThe pause-before and pause-after properties"}, {"refs": [{"id": "ref-for-comb-one\u2461\u24ea"}, {"id": "ref-for-comb-one\u2461\u2460"}, {"id": "ref-for-comb-one\u2461\u2461"}, {"id": "ref-for-comb-one\u2461\u2462"}, {"id": "ref-for-comb-one\u2461\u2463"}, {"id": "ref-for-comb-one\u2461\u2464"}], "title": "9.1. \nThe rest-before and rest-after properties"}, {"refs": [{"id": "ref-for-comb-one\u2461\u2465"}], "title": "10.1. \nThe cue-before and cue-after properties"}, {"refs": [{"id": "ref-for-comb-one\u2461\u2466"}, {"id": "ref-for-comb-one\u2461\u2467"}, {"id": "ref-for-comb-one\u2461\u2468"}], "title": "11.1. \nThe voice-family property"}, {"refs": [{"id": "ref-for-comb-one\u2462\u24ea"}, {"id": "ref-for-comb-one\u2462\u2460"}, {"id": "ref-for-comb-one\u2462\u2461"}, {"id": "ref-for-comb-one\u2462\u2462"}, {"id": "ref-for-comb-one\u2462\u2463"}], "title": "11.2. \nThe voice-rate property"}, {"refs": [{"id": "ref-for-comb-one\u2462\u2464"}, {"id": "ref-for-comb-one\u2462\u2465"}, {"id": "ref-for-comb-one\u2462\u2466"}, {"id": "ref-for-comb-one\u2462\u2467"}, {"id": "ref-for-comb-one\u2462\u2468"}, {"id": "ref-for-comb-one\u2463\u24ea"}, {"id": "ref-for-comb-one\u2463\u2460"}], "title": "11.3. \nThe voice-pitch property"}, {"refs": [{"id": "ref-for-comb-one\u2463\u2461"}, {"id": "ref-for-comb-one\u2463\u2462"}, {"id": "ref-for-comb-one\u2463\u2463"}, {"id": "ref-for-comb-one\u2463\u2464"}, {"id": "ref-for-comb-one\u2463\u2465"}, {"id": "ref-for-comb-one\u2463\u2466"}, {"id": "ref-for-comb-one\u2463\u2467"}], "title": "11.4. \nThe voice-range property"}, {"refs": [{"id": "ref-for-comb-one\u2463\u2468"}, {"id": "ref-for-comb-one\u2464\u24ea"}, {"id": "ref-for-comb-one\u2464\u2460"}, {"id": "ref-for-comb-one\u2464\u2461"}], "title": "11.5. \nThe voice-stress property"}, {"refs": [{"id": "ref-for-comb-one\u2464\u2462"}], "title": "12.1. \nThe voice-duration property"}], "external": true};
-window.dfnpanelData['8a82fda1'] = {"dfnID": "8a82fda1", "url": "https://drafts.csswg.org/css-values-4/#comb-any", "dfnText": "||", "refSections": [{"refs": [{"id": "ref-for-comb-any"}], "title": "6.1. \nThe voice-volume property"}, {"refs": [{"id": "ref-for-comb-any\u2460"}, {"id": "ref-for-comb-any\u2461"}], "title": "7.2. \nThe speak-as property"}, {"refs": [{"id": "ref-for-comb-any\u2462"}], "title": "11.2. \nThe voice-rate property"}, {"refs": [{"id": "ref-for-comb-any\u2463"}], "title": "11.3. \nThe voice-pitch property"}, {"refs": [{"id": "ref-for-comb-any\u2464"}], "title": "11.4. \nThe voice-range property"}], "external": true};
-window.dfnpanelData['d6a1ad1b'] = {"dfnID": "d6a1ad1b", "url": "https://drafts.csswg.org/css2/#value-def-uri", "dfnText": "<uri>", "refSections": [{"refs": [{"id": "ref-for-value-def-uri"}, {"id": "ref-for-value-def-uri\u2460"}], "title": "10.1. \nThe cue-before and cue-after properties"}], "external": true};
-window.dfnpanelData['fa9dd02c'] = {"dfnID": "fa9dd02c", "url": "https://drafts.csswg.org/css2/#valdef-media-screen", "dfnText": "screen", "refSections": [{"refs": [{"id": "ref-for-valdef-media-screen"}], "title": "2. \nBackground information, CSS 2.1"}], "external": true};
-window.dfnpanelData['6019a537'] = {"dfnID": "6019a537", "url": "https://drafts.csswg.org/css2/#valdef-media-speech", "dfnText": "speech", "refSections": [{"refs": [{"id": "ref-for-valdef-media-speech"}, {"id": "ref-for-valdef-media-speech\u2460"}], "title": "2. \nBackground information, CSS 2.1"}], "external": true};
-window.dfnpanelData['2467179e'] = {"dfnID": "2467179e", "url": "https://drafts.csswg.org/css-content-3/#propdef-content", "dfnText": "content", "refSections": [{"refs": [{"id": "ref-for-propdef-content"}], "title": "13. \nList items and counters styles"}, {"refs": [{"id": "ref-for-propdef-content\u2460"}], "title": "14. \nInserted and replaced content"}], "external": true};
-window.dfnpanelData['e450523b'] = {"dfnID": "e450523b", "url": "https://drafts.csswg.org/css-lists-3/#propdef-list-style-image", "dfnText": "list-style-image", "refSections": [{"refs": [{"id": "ref-for-propdef-list-style-image"}], "title": "13. \nList items and counters styles"}], "external": true};
-window.dfnpanelData['de56fbfe'] = {"dfnID": "de56fbfe", "url": "https://drafts.csswg.org/css-lists-3/#propdef-list-style-type", "dfnText": "list-style-type", "refSections": [{"refs": [{"id": "ref-for-propdef-list-style-type"}, {"id": "ref-for-propdef-list-style-type\u2460"}], "title": "13. \nList items and counters styles"}], "external": true};
-window.dfnpanelData['b32b852a'] = {"dfnID": "b32b852a", "url": "https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-span-element", "dfnText": "span", "refSections": [{"refs": [{"id": "ref-for-the-span-element"}], "title": "4. \nExample"}], "external": true};
-window.dfnpanelData['0698d556'] = {"dfnID": "0698d556", "url": "https://infra.spec.whatwg.org/#string", "dfnText": "string", "refSections": [{"refs": [{"id": "ref-for-string"}], "title": "11.1. \nThe voice-family property"}], "external": true};
-window.dfnpanelData['8343cc0f'] = {"dfnID": "8343cc0f", "url": "https://drafts.csswg.org/mediaqueries-5/#valdef-media-aural", "dfnText": "aural", "refSections": [{"refs": [{"id": "ref-for-valdef-media-aural"}], "title": "2. \nBackground information, CSS 2.1"}], "external": true};
-window.dfnpanelData['aural-box-model'] = {"dfnID": "aural-box-model", "url": "#aural-box-model", "dfnText": "aural \u201cbox\u201d model", "refSections": [{"refs": [{"id": "ref-for-aural-box-model"}, {"id": "ref-for-aural-box-model\u2460"}, {"id": "ref-for-aural-box-model\u2461"}], "title": "6.1. \nThe voice-volume property"}, {"refs": [{"id": "ref-for-aural-box-model\u2462"}, {"id": "ref-for-aural-box-model\u2463"}], "title": "8.1. \nThe pause-before and pause-after properties"}, {"refs": [{"id": "ref-for-aural-box-model\u2464"}, {"id": "ref-for-aural-box-model\u2465"}], "title": "9.1. \nThe rest-before and rest-after properties"}, {"refs": [{"id": "ref-for-aural-box-model\u2466"}, {"id": "ref-for-aural-box-model\u2467"}], "title": "10.1. \nThe cue-before and cue-after properties"}, {"refs": [{"id": "ref-for-aural-box-model\u2468"}], "title": "10.2. \nRelation between audio cues and speech synthesis volume levels"}], "external": false};
-window.dfnpanelData['propdef-voice-volume'] = {"dfnID": "propdef-voice-volume", "url": "#propdef-voice-volume", "dfnText": "voice-volume", "refSections": [{"refs": [{"id": "ref-for-propdef-voice-volume"}, {"id": "ref-for-propdef-voice-volume\u2460"}, {"id": "ref-for-propdef-voice-volume\u2461"}, {"id": "ref-for-propdef-voice-volume\u2462"}, {"id": "ref-for-propdef-voice-volume\u2463"}], "title": "6.1. \nThe voice-volume property"}, {"refs": [{"id": "ref-for-propdef-voice-volume\u2464"}, {"id": "ref-for-propdef-voice-volume\u2465"}, {"id": "ref-for-propdef-voice-volume\u2466"}, {"id": "ref-for-propdef-voice-volume\u2467"}, {"id": "ref-for-propdef-voice-volume\u2468"}, {"id": "ref-for-propdef-voice-volume\u2460\u24ea"}], "title": "10.1. \nThe cue-before and cue-after properties"}, {"refs": [{"id": "ref-for-propdef-voice-volume\u2460\u2460"}, {"id": "ref-for-propdef-voice-volume\u2460\u2461"}, {"id": "ref-for-propdef-voice-volume\u2460\u2462"}, {"id": "ref-for-propdef-voice-volume\u2460\u2463"}], "title": "10.2. \nRelation between audio cues and speech synthesis volume levels"}], "external": false};
-window.dfnpanelData['valdef-voice-volume-silent'] = {"dfnID": "valdef-voice-volume-silent", "url": "#valdef-voice-volume-silent", "dfnText": "silent", "refSections": [{"refs": [{"id": "ref-for-valdef-voice-volume-silent"}, {"id": "ref-for-valdef-voice-volume-silent\u2460"}, {"id": "ref-for-valdef-voice-volume-silent\u2461"}, {"id": "ref-for-valdef-voice-volume-silent\u2462"}], "title": "6.1. \nThe voice-volume property"}, {"refs": [{"id": "ref-for-valdef-voice-volume-silent\u2463"}, {"id": "ref-for-valdef-voice-volume-silent\u2464"}, {"id": "ref-for-valdef-voice-volume-silent\u2465"}, {"id": "ref-for-valdef-voice-volume-silent\u2466"}], "title": "10.1. \nThe cue-before and cue-after properties"}, {"refs": [{"id": "ref-for-valdef-voice-volume-silent\u2467"}], "title": "10.2. \nRelation between audio cues and speech synthesis volume levels"}], "external": false};
-window.dfnpanelData['valdef-voice-volume-x-soft'] = {"dfnID": "valdef-voice-volume-x-soft", "url": "#valdef-voice-volume-x-soft", "dfnText": "x-soft", "refSections": [{"refs": [{"id": "ref-for-valdef-voice-volume-x-soft"}, {"id": "ref-for-valdef-voice-volume-x-soft\u2460"}, {"id": "ref-for-valdef-voice-volume-x-soft\u2461"}, {"id": "ref-for-valdef-voice-volume-x-soft\u2462"}], "title": "6.1. \nThe voice-volume property"}], "external": false};
-window.dfnpanelData['valdef-voice-volume-soft'] = {"dfnID": "valdef-voice-volume-soft", "url": "#valdef-voice-volume-soft", "dfnText": "soft", "refSections": [{"refs": [{"id": "ref-for-valdef-voice-volume-soft"}], "title": "6.1. \nThe voice-volume property"}], "external": false};
-window.dfnpanelData['valdef-voice-volume-medium'] = {"dfnID": "valdef-voice-volume-medium", "url": "#valdef-voice-volume-medium", "dfnText": "medium", "refSections": [{"refs": [{"id": "ref-for-valdef-voice-volume-medium"}], "title": "6.1. \nThe voice-volume property"}], "external": false};
-window.dfnpanelData['valdef-voice-volume-loud'] = {"dfnID": "valdef-voice-volume-loud", "url": "#valdef-voice-volume-loud", "dfnText": "loud", "refSections": [{"refs": [{"id": "ref-for-valdef-voice-volume-loud"}], "title": "6.1. \nThe voice-volume property"}], "external": false};
-window.dfnpanelData['valdef-voice-volume-x-loud'] = {"dfnID": "valdef-voice-volume-x-loud", "url": "#valdef-voice-volume-x-loud", "dfnText": "x-loud", "refSections": [{"refs": [{"id": "ref-for-valdef-voice-volume-x-loud"}, {"id": "ref-for-valdef-voice-volume-x-loud\u2460"}, {"id": "ref-for-valdef-voice-volume-x-loud\u2461"}, {"id": "ref-for-valdef-voice-volume-x-loud\u2462"}], "title": "6.1. \nThe voice-volume property"}], "external": false};
-window.dfnpanelData['typedef-voice-volume-decibel'] = {"dfnID": "typedef-voice-volume-decibel", "url": "#typedef-voice-volume-decibel", "dfnText": "<decibel>", "refSections": [{"refs": [{"id": "ref-for-typedef-voice-volume-decibel"}, {"id": "ref-for-typedef-voice-volume-decibel\u2460"}, {"id": "ref-for-typedef-voice-volume-decibel\u2461"}, {"id": "ref-for-typedef-voice-volume-decibel\u2462"}], "title": "6.1. \nThe voice-volume property"}, {"refs": [{"id": "ref-for-typedef-voice-volume-decibel\u2463"}, {"id": "ref-for-typedef-voice-volume-decibel\u2464"}, {"id": "ref-for-typedef-voice-volume-decibel\u2465"}], "title": "10.1. \nThe cue-before and cue-after properties"}, {"refs": [{"id": "ref-for-typedef-voice-volume-decibel\u2466"}, {"id": "ref-for-typedef-voice-volume-decibel\u2467"}], "title": "10.2. \nRelation between audio cues and speech synthesis volume levels"}], "external": false};
-window.dfnpanelData['propdef-voice-balance'] = {"dfnID": "propdef-voice-balance", "url": "#propdef-voice-balance", "dfnText": "voice-balance", "refSections": [{"refs": [{"id": "ref-for-propdef-voice-balance\u2460"}, {"id": "ref-for-propdef-voice-balance\u2461"}, {"id": "ref-for-propdef-voice-balance\u2462"}, {"id": "ref-for-propdef-voice-balance\u2463"}, {"id": "ref-for-propdef-voice-balance\u2464"}, {"id": "ref-for-propdef-voice-balance\u2465"}, {"id": "ref-for-propdef-voice-balance\u2466"}, {"id": "ref-for-propdef-voice-balance\u2467"}, {"id": "ref-for-propdef-voice-balance\u2468"}, {"id": "ref-for-propdef-voice-balance\u2460\u24ea"}, {"id": "ref-for-propdef-voice-balance\u2460\u2460"}], "title": "6.2. \nThe voice-balance property"}], "external": false};
-window.dfnpanelData['valdef-voice-balance-center'] = {"dfnID": "valdef-voice-balance-center", "url": "#valdef-voice-balance-center", "dfnText": "center", "refSections": [{"refs": [{"id": "ref-for-valdef-voice-balance-center"}, {"id": "ref-for-valdef-voice-balance-center\u2460"}], "title": "6.2. \nThe voice-balance property"}], "external": false};
-window.dfnpanelData['propdef-speak'] = {"dfnID": "propdef-speak", "url": "#propdef-speak", "dfnText": "speak", "refSections": [{"refs": [{"id": "ref-for-propdef-speak"}, {"id": "ref-for-propdef-speak\u2460"}], "title": "6.1. \nThe voice-volume property"}, {"refs": [{"id": "ref-for-propdef-speak\u2461"}, {"id": "ref-for-propdef-speak\u2462"}, {"id": "ref-for-propdef-speak\u2463"}, {"id": "ref-for-propdef-speak\u2464"}], "title": "7.1. \nThe speak property"}, {"refs": [{"id": "ref-for-propdef-speak\u2465"}], "title": "8.3. \nCollapsing pauses"}, {"refs": [{"id": "ref-for-propdef-speak\u2466"}, {"id": "ref-for-propdef-speak\u2467"}], "title": "\nAppendix E \u2014 Changes"}], "external": false};
-window.dfnpanelData['valdef-speak-auto'] = {"dfnID": "valdef-speak-auto", "url": "#valdef-speak-auto", "dfnText": "auto", "refSections": [{"refs": [{"id": "ref-for-valdef-speak-auto"}, {"id": "ref-for-valdef-speak-auto\u2460"}, {"id": "ref-for-valdef-speak-auto\u2461"}], "title": "7.1. \nThe speak property"}, {"refs": [{"id": "ref-for-valdef-speak-auto\u2462"}], "title": "\nAppendix E \u2014 Changes"}], "external": false};
-window.dfnpanelData['valdef-speak-never'] = {"dfnID": "valdef-speak-never", "url": "#valdef-speak-never", "dfnText": "never", "refSections": [{"refs": [{"id": "ref-for-valdef-speak-never"}, {"id": "ref-for-valdef-speak-never\u2460"}, {"id": "ref-for-valdef-speak-never\u2461"}], "title": "7.1. \nThe speak property"}, {"refs": [{"id": "ref-for-valdef-speak-never\u2462"}], "title": "\nAppendix E \u2014 Changes"}], "external": false};
-window.dfnpanelData['valdef-speak-always'] = {"dfnID": "valdef-speak-always", "url": "#valdef-speak-always", "dfnText": "always", "refSections": [{"refs": [{"id": "ref-for-valdef-speak-always"}, {"id": "ref-for-valdef-speak-always\u2460"}], "title": "7.1. \nThe speak property"}, {"refs": [{"id": "ref-for-valdef-speak-always\u2461"}], "title": "\nAppendix E \u2014 Changes"}], "external": false};
-window.dfnpanelData['propdef-speak-as'] = {"dfnID": "propdef-speak-as", "url": "#propdef-speak-as", "dfnText": "speak-as", "refSections": [{"refs": [{"id": "ref-for-propdef-speak-as"}, {"id": "ref-for-propdef-speak-as\u2460"}, {"id": "ref-for-propdef-speak-as\u2461"}], "title": "7.2. \nThe speak-as property"}], "external": false};
-window.dfnpanelData['propdef-pause-before'] = {"dfnID": "propdef-pause-before", "url": "#propdef-pause-before", "dfnText": "pause-before", "refSections": [{"refs": [{"id": "ref-for-propdef-pause-before"}, {"id": "ref-for-propdef-pause-before\u2460"}], "title": "8.1. \nThe pause-before and pause-after properties"}, {"refs": [{"id": "ref-for-propdef-pause-before\u2461"}, {"id": "ref-for-propdef-pause-before\u2462"}, {"id": "ref-for-propdef-pause-before\u2463"}], "title": "8.2. \nThe pause shorthand property"}, {"refs": [{"id": "ref-for-propdef-pause-before\u2464"}, {"id": "ref-for-propdef-pause-before\u2465"}, {"id": "ref-for-propdef-pause-before\u2466"}, {"id": "ref-for-propdef-pause-before\u2467"}], "title": "8.3. \nCollapsing pauses"}], "external": false};
-window.dfnpanelData['propdef-pause-after'] = {"dfnID": "propdef-pause-after", "url": "#propdef-pause-after", "dfnText": "pause-after", "refSections": [{"refs": [{"id": "ref-for-propdef-pause-after"}, {"id": "ref-for-propdef-pause-after\u2460"}], "title": "8.1. \nThe pause-before and pause-after properties"}, {"refs": [{"id": "ref-for-propdef-pause-after\u2461"}, {"id": "ref-for-propdef-pause-after\u2462"}, {"id": "ref-for-propdef-pause-after\u2463"}], "title": "8.2. \nThe pause shorthand property"}, {"refs": [{"id": "ref-for-propdef-pause-after\u2464"}, {"id": "ref-for-propdef-pause-after\u2465"}, {"id": "ref-for-propdef-pause-after\u2466"}, {"id": "ref-for-propdef-pause-after\u2467"}], "title": "8.3. \nCollapsing pauses"}], "external": false};
-window.dfnpanelData['propdef-pause'] = {"dfnID": "propdef-pause", "url": "#propdef-pause", "dfnText": "pause", "refSections": [{"refs": [{"id": "ref-for-propdef-pause"}], "title": "5. \nThe aural formatting model"}, {"refs": [{"id": "ref-for-propdef-pause\u2460"}], "title": "8.1. \nThe pause-before and pause-after properties"}, {"refs": [{"id": "ref-for-propdef-pause\u2461"}, {"id": "ref-for-propdef-pause\u2462"}], "title": "8.2. \nThe pause shorthand property"}, {"refs": [{"id": "ref-for-propdef-pause\u2463"}], "title": "8.3. \nCollapsing pauses"}], "external": false};
-window.dfnpanelData['propdef-rest-before'] = {"dfnID": "propdef-rest-before", "url": "#propdef-rest-before", "dfnText": "rest-before", "refSections": [{"refs": [{"id": "ref-for-propdef-rest-before"}, {"id": "ref-for-propdef-rest-before\u2460"}], "title": "8.3. \nCollapsing pauses"}, {"refs": [{"id": "ref-for-propdef-rest-before\u2461"}, {"id": "ref-for-propdef-rest-before\u2462"}], "title": "9.1. \nThe rest-before and rest-after properties"}, {"refs": [{"id": "ref-for-propdef-rest-before\u2463"}, {"id": "ref-for-propdef-rest-before\u2464"}, {"id": "ref-for-propdef-rest-before\u2465"}], "title": "9.2. \nThe rest shorthand property"}], "external": false};
-window.dfnpanelData['propdef-rest-after'] = {"dfnID": "propdef-rest-after", "url": "#propdef-rest-after", "dfnText": "rest-after", "refSections": [{"refs": [{"id": "ref-for-propdef-rest-after"}, {"id": "ref-for-propdef-rest-after\u2460"}], "title": "8.3. \nCollapsing pauses"}, {"refs": [{"id": "ref-for-propdef-rest-after\u2461"}, {"id": "ref-for-propdef-rest-after\u2462"}], "title": "9.1. \nThe rest-before and rest-after properties"}, {"refs": [{"id": "ref-for-propdef-rest-after\u2463"}, {"id": "ref-for-propdef-rest-after\u2464"}, {"id": "ref-for-propdef-rest-after\u2465"}], "title": "9.2. \nThe rest shorthand property"}], "external": false};
-window.dfnpanelData['propdef-rest'] = {"dfnID": "propdef-rest", "url": "#propdef-rest", "dfnText": "rest", "refSections": [{"refs": [{"id": "ref-for-propdef-rest"}, {"id": "ref-for-propdef-rest\u2460"}], "title": "5. \nThe aural formatting model"}, {"refs": [{"id": "ref-for-propdef-rest\u2461"}], "title": "9.1. \nThe rest-before and rest-after properties"}, {"refs": [{"id": "ref-for-propdef-rest\u2462"}, {"id": "ref-for-propdef-rest\u2463"}], "title": "9.2. \nThe rest shorthand property"}], "external": false};
-window.dfnpanelData['propdef-cue-before'] = {"dfnID": "propdef-cue-before", "url": "#propdef-cue-before", "dfnText": "cue-before", "refSections": [{"refs": [{"id": "ref-for-propdef-cue-before"}], "title": "8.1. \nThe pause-before and pause-after properties"}, {"refs": [{"id": "ref-for-propdef-cue-before\u2460"}, {"id": "ref-for-propdef-cue-before\u2461"}], "title": "8.3. \nCollapsing pauses"}, {"refs": [{"id": "ref-for-propdef-cue-before\u2462"}], "title": "9.1. \nThe rest-before and rest-after properties"}, {"refs": [{"id": "ref-for-propdef-cue-before\u2463"}, {"id": "ref-for-propdef-cue-before\u2464"}], "title": "10.1. \nThe cue-before and cue-after properties"}, {"refs": [{"id": "ref-for-propdef-cue-before\u2465"}, {"id": "ref-for-propdef-cue-before\u2466"}, {"id": "ref-for-propdef-cue-before\u2467"}], "title": "10.3. \nThe cue shorthand property"}], "external": false};
-window.dfnpanelData['propdef-cue-after'] = {"dfnID": "propdef-cue-after", "url": "#propdef-cue-after", "dfnText": "cue-after", "refSections": [{"refs": [{"id": "ref-for-propdef-cue-after"}], "title": "8.1. \nThe pause-before and pause-after properties"}, {"refs": [{"id": "ref-for-propdef-cue-after\u2460"}, {"id": "ref-for-propdef-cue-after\u2461"}], "title": "8.3. \nCollapsing pauses"}, {"refs": [{"id": "ref-for-propdef-cue-after\u2462"}], "title": "9.1. \nThe rest-before and rest-after properties"}, {"refs": [{"id": "ref-for-propdef-cue-after\u2463"}, {"id": "ref-for-propdef-cue-after\u2464"}], "title": "10.1. \nThe cue-before and cue-after properties"}, {"refs": [{"id": "ref-for-propdef-cue-after\u2465"}, {"id": "ref-for-propdef-cue-after\u2466"}, {"id": "ref-for-propdef-cue-after\u2467"}], "title": "10.3. \nThe cue shorthand property"}], "external": false};
-window.dfnpanelData['propdef-cue'] = {"dfnID": "propdef-cue", "url": "#propdef-cue", "dfnText": "cue", "refSections": [{"refs": [{"id": "ref-for-propdef-cue"}], "title": "5. \nThe aural formatting model"}, {"refs": [{"id": "ref-for-propdef-cue\u2460"}, {"id": "ref-for-propdef-cue\u2461"}], "title": "8.3. \nCollapsing pauses"}, {"refs": [{"id": "ref-for-propdef-cue\u2462"}, {"id": "ref-for-propdef-cue\u2463"}], "title": "10.3. \nThe cue shorthand property"}], "external": false};
-window.dfnpanelData['propdef-voice-family'] = {"dfnID": "propdef-voice-family", "url": "#propdef-voice-family", "dfnText": "voice-family", "refSections": [{"refs": [{"id": "ref-for-propdef-voice-family"}], "title": "10.2. \nRelation between audio cues and speech synthesis volume levels"}, {"refs": [{"id": "ref-for-propdef-voice-family\u2460"}, {"id": "ref-for-propdef-voice-family\u2461"}, {"id": "ref-for-propdef-voice-family\u2462"}, {"id": "ref-for-propdef-voice-family\u2463"}], "title": "11.1. \nThe voice-family property"}, {"refs": [{"id": "ref-for-propdef-voice-family\u2464"}, {"id": "ref-for-propdef-voice-family\u2465"}, {"id": "ref-for-propdef-voice-family\u2466"}], "title": "11.1.1. \nVoice selection, content language"}, {"refs": [{"id": "ref-for-propdef-voice-family\u2467"}], "title": "11.3. \nThe voice-pitch property"}], "external": false};
-window.dfnpanelData['typedef-generic-voice'] = {"dfnID": "typedef-generic-voice", "url": "#typedef-generic-voice", "dfnText": "<generic-voice>", "refSections": [{"refs": [{"id": "ref-for-typedef-generic-voice"}], "title": "11.1. \nThe voice-family property"}], "external": false};
-window.dfnpanelData['typedef-voice-family-age'] = {"dfnID": "typedef-voice-family-age", "url": "#typedef-voice-family-age", "dfnText": "<age>", "refSections": [{"refs": [{"id": "ref-for-typedef-voice-family-age"}, {"id": "ref-for-typedef-voice-family-age\u2460"}], "title": "11.1. \nThe voice-family property"}], "external": false};
-window.dfnpanelData['valdef-voice-family-child'] = {"dfnID": "valdef-voice-family-child", "url": "#valdef-voice-family-child", "dfnText": "child", "refSections": [{"refs": [{"id": "ref-for-valdef-voice-family-child"}], "title": "11.1. \nThe voice-family property"}], "external": false};
-window.dfnpanelData['valdef-voice-family-young'] = {"dfnID": "valdef-voice-family-young", "url": "#valdef-voice-family-young", "dfnText": "young", "refSections": [{"refs": [{"id": "ref-for-valdef-voice-family-young"}], "title": "11.1. \nThe voice-family property"}], "external": false};
-window.dfnpanelData['valdef-voice-family-old'] = {"dfnID": "valdef-voice-family-old", "url": "#valdef-voice-family-old", "dfnText": "old", "refSections": [{"refs": [{"id": "ref-for-valdef-voice-family-old"}], "title": "11.1. \nThe voice-family property"}], "external": false};
-window.dfnpanelData['typedef-voice-family-gender'] = {"dfnID": "typedef-voice-family-gender", "url": "#typedef-voice-family-gender", "dfnText": "<gender>", "refSections": [{"refs": [{"id": "ref-for-typedef-voice-family-gender"}, {"id": "ref-for-typedef-voice-family-gender\u2460"}], "title": "11.1. \nThe voice-family property"}], "external": false};
-window.dfnpanelData['valdef-voice-family-male'] = {"dfnID": "valdef-voice-family-male", "url": "#valdef-voice-family-male", "dfnText": "male", "refSections": [{"refs": [{"id": "ref-for-valdef-voice-family-male"}], "title": "11.1. \nThe voice-family property"}], "external": false};
-window.dfnpanelData['valdef-voice-family-female'] = {"dfnID": "valdef-voice-family-female", "url": "#valdef-voice-family-female", "dfnText": "female", "refSections": [{"refs": [{"id": "ref-for-valdef-voice-family-female"}], "title": "11.1. \nThe voice-family property"}], "external": false};
-window.dfnpanelData['valdef-voice-family-neutral'] = {"dfnID": "valdef-voice-family-neutral", "url": "#valdef-voice-family-neutral", "dfnText": "neutral", "refSections": [{"refs": [{"id": "ref-for-valdef-voice-family-neutral"}], "title": "11.1. \nThe voice-family property"}], "external": false};
-window.dfnpanelData['valdef-voice-family-preserve'] = {"dfnID": "valdef-voice-family-preserve", "url": "#valdef-voice-family-preserve", "dfnText": "preserve", "refSections": [{"refs": [{"id": "ref-for-valdef-voice-family-preserve"}, {"id": "ref-for-valdef-voice-family-preserve\u2460"}], "title": "11.1. \nThe voice-family property"}, {"refs": [{"id": "ref-for-valdef-voice-family-preserve\u2461"}], "title": "11.1.1. \nVoice selection, content language"}], "external": false};
-window.dfnpanelData['propdef-voice-rate'] = {"dfnID": "propdef-voice-rate", "url": "#propdef-voice-rate", "dfnText": "voice-rate", "refSections": [{"refs": [{"id": "ref-for-propdef-voice-rate"}, {"id": "ref-for-propdef-voice-rate\u2460"}], "title": "11.2. \nThe voice-rate property"}, {"refs": [{"id": "ref-for-propdef-voice-rate\u2461"}, {"id": "ref-for-propdef-voice-rate\u2462"}, {"id": "ref-for-propdef-voice-rate\u2463"}], "title": "12.1. \nThe voice-duration property"}], "external": false};
-window.dfnpanelData['propdef-voice-pitch'] = {"dfnID": "propdef-voice-pitch", "url": "#propdef-voice-pitch", "dfnText": "voice-pitch", "refSections": [{"refs": [{"id": "ref-for-propdef-voice-pitch\u2460"}, {"id": "ref-for-propdef-voice-pitch\u2461"}], "title": "11.3. \nThe voice-pitch property"}], "external": false};
-window.dfnpanelData['valdef-voice-pitch-absolute'] = {"dfnID": "valdef-voice-pitch-absolute", "url": "#valdef-voice-pitch-absolute", "dfnText": "absolute", "refSections": [{"refs": [{"id": "ref-for-valdef-voice-pitch-absolute"}, {"id": "ref-for-valdef-voice-pitch-absolute\u2460"}], "title": "11.3. \nThe voice-pitch property"}], "external": false};
-window.dfnpanelData['typedef-voice-pitch-semitones'] = {"dfnID": "typedef-voice-pitch-semitones", "url": "#typedef-voice-pitch-semitones", "dfnText": "<semitones>", "refSections": [{"refs": [{"id": "ref-for-typedef-voice-pitch-semitones"}, {"id": "ref-for-typedef-voice-pitch-semitones\u2460"}, {"id": "ref-for-typedef-voice-pitch-semitones\u2461"}], "title": "11.3. \nThe voice-pitch property"}, {"refs": [{"id": "ref-for-typedef-voice-pitch-semitones\u2462"}, {"id": "ref-for-typedef-voice-pitch-semitones\u2463"}], "title": "11.4. \nThe voice-range property"}], "external": false};
-window.dfnpanelData['voice-pitch-semitone'] = {"dfnID": "voice-pitch-semitone", "url": "#voice-pitch-semitone", "dfnText": "semitone", "refSections": [{"refs": [{"id": "ref-for-voice-pitch-semitone"}, {"id": "ref-for-voice-pitch-semitone\u2460"}, {"id": "ref-for-voice-pitch-semitone\u2461"}], "title": "11.3. \nThe voice-pitch property"}, {"refs": [{"id": "ref-for-voice-pitch-semitone\u2462"}], "title": "11.4. \nThe voice-range property"}], "external": false};
-window.dfnpanelData['propdef-voice-range'] = {"dfnID": "propdef-voice-range", "url": "#propdef-voice-range", "dfnText": "voice-range", "refSections": [{"refs": [{"id": "ref-for-propdef-voice-range\u2460"}, {"id": "ref-for-propdef-voice-range\u2461"}], "title": "11.4. \nThe voice-range property"}], "external": false};
-window.dfnpanelData['valdef-voice-range-absolute'] = {"dfnID": "valdef-voice-range-absolute", "url": "#valdef-voice-range-absolute", "dfnText": "absolute", "refSections": [{"refs": [{"id": "ref-for-valdef-voice-range-absolute"}, {"id": "ref-for-valdef-voice-range-absolute\u2460"}], "title": "11.4. \nThe voice-range property"}], "external": false};
-window.dfnpanelData['propdef-voice-stress'] = {"dfnID": "propdef-voice-stress", "url": "#propdef-voice-stress", "dfnText": "voice-stress", "refSections": [{"refs": [{"id": "ref-for-propdef-voice-stress\u2460"}, {"id": "ref-for-propdef-voice-stress\u2461"}], "title": "11.5. \nThe voice-stress property"}], "external": false};
-window.dfnpanelData['valdef-voice-stress-normal'] = {"dfnID": "valdef-voice-stress-normal", "url": "#valdef-voice-stress-normal", "dfnText": "normal", "refSections": [{"refs": [{"id": "ref-for-valdef-voice-stress-normal"}], "title": "11.5. \nThe voice-stress property"}], "external": false};
-window.dfnpanelData['propdef-voice-duration'] = {"dfnID": "propdef-voice-duration", "url": "#propdef-voice-duration", "dfnText": "voice-duration", "refSections": [{"refs": [{"id": "ref-for-propdef-voice-duration\u2460"}], "title": "8.3. \nCollapsing pauses"}, {"refs": [{"id": "ref-for-propdef-voice-duration\u2461"}, {"id": "ref-for-propdef-voice-duration\u2462"}, {"id": "ref-for-propdef-voice-duration\u2463"}, {"id": "ref-for-propdef-voice-duration\u2464"}, {"id": "ref-for-propdef-voice-duration\u2465"}], "title": "12.1. \nThe voice-duration property"}], "external": false};
-window.dfnpanelData['valdef-voice-duration-auto'] = {"dfnID": "valdef-voice-duration-auto", "url": "#valdef-voice-duration-auto", "dfnText": "auto", "refSections": [{"refs": [{"id": "ref-for-valdef-voice-duration-auto"}, {"id": "ref-for-valdef-voice-duration-auto\u2460"}], "title": "12.1. \nThe voice-duration property"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -3843,12 +3344,511 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"a9734ee4": {"dfnID":"a9734ee4","dfnText":"border","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-border"}],"title":"5. \nThe aural formatting model"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-border"},
+"cecbe9cd": {"dfnID":"cecbe9cd","dfnText":"margin","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-margin"}],"title":"5. \nThe aural formatting model"}],"url":"https://drafts.csswg.org/css-box-4/#propdef-margin"},
+"b5418f3e": {"dfnID":"b5418f3e","dfnText":"padding","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-padding"}],"title":"5. \nThe aural formatting model"}],"url":"https://drafts.csswg.org/css-box-4/#propdef-padding"},
+"37eda612": {"dfnID":"37eda612","dfnText":"all","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-break-before-all"}],"title":"2. \nBackground information, CSS 2.1"}],"url":"https://drafts.csswg.org/css-break-4/#valdef-break-before-all"},
+"c388d253": {"dfnID":"c388d253","dfnText":"inherit","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-all-inherit"}],"title":"11.1. \nThe voice-family property"}],"url":"https://drafts.csswg.org/css-cascade-5/#valdef-all-inherit"},
+"da00cf5b": {"dfnID":"da00cf5b","dfnText":"armenian","external":true,"refSections":[{"refs":[{"id":"ref-for-armenian"}],"title":"13. \nList items and counters styles"}],"url":"https://drafts.csswg.org/css-counter-styles-3/#armenian"},
+"e149ddf7": {"dfnID":"e149ddf7","dfnText":"decimal","external":true,"refSections":[{"refs":[{"id":"ref-for-decimal"}],"title":"13. \nList items and counters styles"}],"url":"https://drafts.csswg.org/css-counter-styles-3/#decimal"},
+"1f90c5c7": {"dfnID":"1f90c5c7","dfnText":"decimal-leading-zero","external":true,"refSections":[{"refs":[{"id":"ref-for-decimal-leading-zero"}],"title":"13. \nList items and counters styles"}],"url":"https://drafts.csswg.org/css-counter-styles-3/#decimal-leading-zero"},
+"a8aeaafc": {"dfnID":"a8aeaafc","dfnText":"georgian","external":true,"refSections":[{"refs":[{"id":"ref-for-georgian"}],"title":"13. \nList items and counters styles"}],"url":"https://drafts.csswg.org/css-counter-styles-3/#georgian"},
+"2e466b95": {"dfnID":"2e466b95","dfnText":"lower-alpha","external":true,"refSections":[{"refs":[{"id":"ref-for-lower-alpha"}],"title":"13. \nList items and counters styles"}],"url":"https://drafts.csswg.org/css-counter-styles-3/#lower-alpha"},
+"a9cd92d9": {"dfnID":"a9cd92d9","dfnText":"lower-greek","external":true,"refSections":[{"refs":[{"id":"ref-for-lower-greek"},{"id":"ref-for-lower-greek\u2460"}],"title":"13. \nList items and counters styles"}],"url":"https://drafts.csswg.org/css-counter-styles-3/#lower-greek"},
+"d4922c84": {"dfnID":"d4922c84","dfnText":"lower-latin","external":true,"refSections":[{"refs":[{"id":"ref-for-lower-latin"}],"title":"13. \nList items and counters styles"}],"url":"https://drafts.csswg.org/css-counter-styles-3/#lower-latin"},
+"269ee415": {"dfnID":"269ee415","dfnText":"lower-roman","external":true,"refSections":[{"refs":[{"id":"ref-for-lower-roman"}],"title":"13. \nList items and counters styles"}],"url":"https://drafts.csswg.org/css-counter-styles-3/#lower-roman"},
+"494d86c0": {"dfnID":"494d86c0","dfnText":"upper-alpha","external":true,"refSections":[{"refs":[{"id":"ref-for-upper-alpha"}],"title":"13. \nList items and counters styles"}],"url":"https://drafts.csswg.org/css-counter-styles-3/#upper-alpha"},
+"48ba888a": {"dfnID":"48ba888a","dfnText":"upper-latin","external":true,"refSections":[{"refs":[{"id":"ref-for-upper-latin"},{"id":"ref-for-upper-latin\u2460"}],"title":"13. \nList items and counters styles"}],"url":"https://drafts.csswg.org/css-counter-styles-3/#upper-latin"},
+"a1900547": {"dfnID":"a1900547","dfnText":"upper-roman","external":true,"refSections":[{"refs":[{"id":"ref-for-upper-roman"}],"title":"13. \nList items and counters styles"}],"url":"https://drafts.csswg.org/css-counter-styles-3/#upper-roman"},
+"e7f0dd6c": {"dfnID":"e7f0dd6c","dfnText":"display","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-display"},{"id":"ref-for-propdef-display\u2460"},{"id":"ref-for-propdef-display\u2461"},{"id":"ref-for-propdef-display\u2462"},{"id":"ref-for-propdef-display\u2463"}],"title":"7.1. \nThe speak property"}],"url":"https://drafts.csswg.org/css-display-4/#propdef-display"},
+"55e8f5de": {"dfnID":"55e8f5de","dfnText":"none","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-display-none"},{"id":"ref-for-valdef-display-none\u2460"}],"title":"7.1. \nThe speak property"}],"url":"https://drafts.csswg.org/css-display-4/#valdef-display-none"},
+"12f8fb07": {"dfnID":"12f8fb07","dfnText":"visibility","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-visibility"}],"title":"7.1. \nThe speak property"},{"refs":[{"id":"ref-for-propdef-visibility\u2460"}],"title":"\nAppendix E \u2014 Changes"}],"url":"https://drafts.csswg.org/css-display-4/#propdef-visibility"},
+"6420cb11": {"dfnID":"6420cb11","dfnText":"visible","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-visibility-visible"}],"title":"7.1. \nThe speak property"}],"url":"https://drafts.csswg.org/css-display-4/#valdef-visibility-visible"},
+"ba80b0b1": {"dfnID":"ba80b0b1","dfnText":"<family-name>","external":true,"refSections":[{"refs":[{"id":"ref-for-family-name-value"}],"title":"11.1. \nThe voice-family property"}],"url":"https://drafts.csswg.org/css-fonts-4/#family-name-value"},
+"d65d17df": {"dfnID":"d65d17df","dfnText":"font-family","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-font-family"},{"id":"ref-for-propdef-font-family\u2460"}],"title":"11.1. \nThe voice-family property"}],"url":"https://drafts.csswg.org/css-fonts-4/#propdef-font-family"},
+"dde41168": {"dfnID":"dde41168","dfnText":"left","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-left"}],"title":"6.2. \nThe voice-balance property"}],"url":"https://drafts.csswg.org/css-position-3/#propdef-left"},
+"b0b8d8c0": {"dfnID":"b0b8d8c0","dfnText":"right","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-right"}],"title":"6.2. \nThe voice-balance property"}],"url":"https://drafts.csswg.org/css-position-3/#propdef-right"},
+"fd0c9e35": {"dfnID":"fd0c9e35","dfnText":"::after","external":true,"refSections":[{"refs":[{"id":"ref-for-selectordef-after"}],"title":"5. \nThe aural formatting model"},{"refs":[{"id":"ref-for-selectordef-after\u2460"}],"title":"14. \nInserted and replaced content"}],"url":"https://drafts.csswg.org/css-pseudo-4/#selectordef-after"},
+"5869f885": {"dfnID":"5869f885","dfnText":"::before","external":true,"refSections":[{"refs":[{"id":"ref-for-selectordef-before"}],"title":"5. \nThe aural formatting model"},{"refs":[{"id":"ref-for-selectordef-before\u2460"}],"title":"14. \nInserted and replaced content"}],"url":"https://drafts.csswg.org/css-pseudo-4/#selectordef-before"},
+"f0809abc": {"dfnID":"f0809abc","dfnText":"&&","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-all"}],"title":"11.3. \nThe voice-pitch property"},{"refs":[{"id":"ref-for-comb-all\u2460"}],"title":"11.4. \nThe voice-range property"}],"url":"https://drafts.csswg.org/css-values-4/#comb-all"},
+"68150e76": {"dfnID":"68150e76","dfnText":"*","external":true,"refSections":[{"refs":[{"id":"ref-for-mult-zero-plus"}],"title":"11.1. \nThe voice-family property"}],"url":"https://drafts.csswg.org/css-values-4/#mult-zero-plus"},
+"9f9120ff": {"dfnID":"9f9120ff","dfnText":",","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-comma"}],"title":"11.1. \nThe voice-family property"}],"url":"https://drafts.csswg.org/css-values-4/#comb-comma"},
+"29a4aea4": {"dfnID":"29a4aea4","dfnText":"<frequency>","external":true,"refSections":[{"refs":[{"id":"ref-for-frequency-value"},{"id":"ref-for-frequency-value\u2460"},{"id":"ref-for-frequency-value\u2461"}],"title":"11.3. \nThe voice-pitch property"},{"refs":[{"id":"ref-for-frequency-value\u2462"},{"id":"ref-for-frequency-value\u2463"},{"id":"ref-for-frequency-value\u2464"}],"title":"11.4. \nThe voice-range property"}],"url":"https://drafts.csswg.org/css-values-4/#frequency-value"},
+"70c9f859": {"dfnID":"70c9f859","dfnText":"<integer>","external":true,"refSections":[{"refs":[{"id":"ref-for-integer-value"},{"id":"ref-for-integer-value\u2460"}],"title":"11.1. \nThe voice-family property"}],"url":"https://drafts.csswg.org/css-values-4/#integer-value"},
+"16310992": {"dfnID":"16310992","dfnText":"<number>","external":true,"refSections":[{"refs":[{"id":"ref-for-number-value"},{"id":"ref-for-number-value\u2460"}],"title":"6.2. \nThe voice-balance property"}],"url":"https://drafts.csswg.org/css-values-4/#number-value"},
+"15f5b381": {"dfnID":"15f5b381","dfnText":"<percentage>","external":true,"refSections":[{"refs":[{"id":"ref-for-percentage-value"},{"id":"ref-for-percentage-value\u2460"}],"title":"11.2. \nThe voice-rate property"},{"refs":[{"id":"ref-for-percentage-value\u2461"},{"id":"ref-for-percentage-value\u2462"}],"title":"11.3. \nThe voice-pitch property"},{"refs":[{"id":"ref-for-percentage-value\u2463"},{"id":"ref-for-percentage-value\u2464"}],"title":"11.4. \nThe voice-range property"}],"url":"https://drafts.csswg.org/css-values-4/#percentage-value"},
+"03570f9e": {"dfnID":"03570f9e","dfnText":"<time>","external":true,"refSections":[{"refs":[{"id":"ref-for-time-value"}],"title":"8.1. \nThe pause-before and pause-after properties"},{"refs":[{"id":"ref-for-time-value\u2460"},{"id":"ref-for-time-value\u2461"}],"title":"9.1. \nThe rest-before and rest-after properties"},{"refs":[{"id":"ref-for-time-value\u2462"},{"id":"ref-for-time-value\u2463"}],"title":"12.1. \nThe voice-duration property"}],"url":"https://drafts.csswg.org/css-values-4/#time-value"},
+"537cf076": {"dfnID":"537cf076","dfnText":"?","external":true,"refSections":[{"refs":[{"id":"ref-for-mult-opt"}],"title":"8.2. \nThe pause shorthand property"},{"refs":[{"id":"ref-for-mult-opt\u2460"}],"title":"9.2. \nThe rest shorthand property"},{"refs":[{"id":"ref-for-mult-opt\u2461"}],"title":"10.1. \nThe cue-before and cue-after properties"},{"refs":[{"id":"ref-for-mult-opt\u2462"}],"title":"10.3. \nThe cue shorthand property"}],"url":"https://drafts.csswg.org/css-values-4/#mult-opt"},
+"358fd6ff": {"dfnID":"358fd6ff","dfnText":"css-wide keywords","external":true,"refSections":[{"refs":[{"id":"ref-for-css-wide-keywords"}],"title":"3.1. \nValue Definitions"},{"refs":[{"id":"ref-for-css-wide-keywords\u2460"}],"title":"11.1. \nThe voice-family property"}],"url":"https://drafts.csswg.org/css-values-4/#css-wide-keywords"},
+"e510368f": {"dfnID":"e510368f","dfnText":"dimension","external":true,"refSections":[{"refs":[{"id":"ref-for-dimension"}],"title":"6.1. \nThe voice-volume property"},{"refs":[{"id":"ref-for-dimension\u2460"}],"title":"11.3. \nThe voice-pitch property"}],"url":"https://drafts.csswg.org/css-values-4/#dimension"},
+"9dc6ce48": {"dfnID":"9dc6ce48","dfnText":"identifier","external":true,"refSections":[{"refs":[{"id":"ref-for-css-css-identifier"}],"title":"11.1. \nThe voice-family property"}],"url":"https://drafts.csswg.org/css-values-4/#css-css-identifier"},
+"f0ba04de": {"dfnID":"f0ba04de","dfnText":"number","external":true,"refSections":[{"refs":[{"id":"ref-for-number"}],"title":"6.2. \nThe voice-balance property"}],"url":"https://drafts.csswg.org/css-values-4/#number"},
+"c7965b42": {"dfnID":"c7965b42","dfnText":"percentage","external":true,"refSections":[{"refs":[{"id":"ref-for-percentage"}],"title":"11.2. \nThe voice-rate property"},{"refs":[{"id":"ref-for-percentage\u2460"}],"title":"11.3. \nThe voice-pitch property"},{"refs":[{"id":"ref-for-percentage\u2461"}],"title":"11.4. \nThe voice-range property"}],"url":"https://drafts.csswg.org/css-values-4/#percentage"},
+"6ec67710": {"dfnID":"6ec67710","dfnText":"|","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-one"},{"id":"ref-for-comb-one\u2460"},{"id":"ref-for-comb-one\u2461"},{"id":"ref-for-comb-one\u2462"},{"id":"ref-for-comb-one\u2463"}],"title":"6.1. \nThe voice-volume property"},{"refs":[{"id":"ref-for-comb-one\u2464"},{"id":"ref-for-comb-one\u2465"},{"id":"ref-for-comb-one\u2466"},{"id":"ref-for-comb-one\u2467"},{"id":"ref-for-comb-one\u2468"}],"title":"6.2. \nThe voice-balance property"},{"refs":[{"id":"ref-for-comb-one\u2460\u24ea"},{"id":"ref-for-comb-one\u2460\u2460"}],"title":"7.1. \nThe speak property"},{"refs":[{"id":"ref-for-comb-one\u2460\u2461"},{"id":"ref-for-comb-one\u2460\u2462"}],"title":"7.2. \nThe speak-as property"},{"refs":[{"id":"ref-for-comb-one\u2460\u2463"},{"id":"ref-for-comb-one\u2460\u2464"},{"id":"ref-for-comb-one\u2460\u2465"},{"id":"ref-for-comb-one\u2460\u2466"},{"id":"ref-for-comb-one\u2460\u2467"},{"id":"ref-for-comb-one\u2460\u2468"}],"title":"8.1. \nThe pause-before and pause-after properties"},{"refs":[{"id":"ref-for-comb-one\u2461\u24ea"},{"id":"ref-for-comb-one\u2461\u2460"},{"id":"ref-for-comb-one\u2461\u2461"},{"id":"ref-for-comb-one\u2461\u2462"},{"id":"ref-for-comb-one\u2461\u2463"},{"id":"ref-for-comb-one\u2461\u2464"}],"title":"9.1. \nThe rest-before and rest-after properties"},{"refs":[{"id":"ref-for-comb-one\u2461\u2465"}],"title":"10.1. \nThe cue-before and cue-after properties"},{"refs":[{"id":"ref-for-comb-one\u2461\u2466"},{"id":"ref-for-comb-one\u2461\u2467"},{"id":"ref-for-comb-one\u2461\u2468"}],"title":"11.1. \nThe voice-family property"},{"refs":[{"id":"ref-for-comb-one\u2462\u24ea"},{"id":"ref-for-comb-one\u2462\u2460"},{"id":"ref-for-comb-one\u2462\u2461"},{"id":"ref-for-comb-one\u2462\u2462"},{"id":"ref-for-comb-one\u2462\u2463"}],"title":"11.2. \nThe voice-rate property"},{"refs":[{"id":"ref-for-comb-one\u2462\u2464"},{"id":"ref-for-comb-one\u2462\u2465"},{"id":"ref-for-comb-one\u2462\u2466"},{"id":"ref-for-comb-one\u2462\u2467"},{"id":"ref-for-comb-one\u2462\u2468"},{"id":"ref-for-comb-one\u2463\u24ea"},{"id":"ref-for-comb-one\u2463\u2460"}],"title":"11.3. \nThe voice-pitch property"},{"refs":[{"id":"ref-for-comb-one\u2463\u2461"},{"id":"ref-for-comb-one\u2463\u2462"},{"id":"ref-for-comb-one\u2463\u2463"},{"id":"ref-for-comb-one\u2463\u2464"},{"id":"ref-for-comb-one\u2463\u2465"},{"id":"ref-for-comb-one\u2463\u2466"},{"id":"ref-for-comb-one\u2463\u2467"}],"title":"11.4. \nThe voice-range property"},{"refs":[{"id":"ref-for-comb-one\u2463\u2468"},{"id":"ref-for-comb-one\u2464\u24ea"},{"id":"ref-for-comb-one\u2464\u2460"},{"id":"ref-for-comb-one\u2464\u2461"}],"title":"11.5. \nThe voice-stress property"},{"refs":[{"id":"ref-for-comb-one\u2464\u2462"}],"title":"12.1. \nThe voice-duration property"}],"url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"8a82fda1": {"dfnID":"8a82fda1","dfnText":"||","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-any"}],"title":"6.1. \nThe voice-volume property"},{"refs":[{"id":"ref-for-comb-any\u2460"},{"id":"ref-for-comb-any\u2461"}],"title":"7.2. \nThe speak-as property"},{"refs":[{"id":"ref-for-comb-any\u2462"}],"title":"11.2. \nThe voice-rate property"},{"refs":[{"id":"ref-for-comb-any\u2463"}],"title":"11.3. \nThe voice-pitch property"},{"refs":[{"id":"ref-for-comb-any\u2464"}],"title":"11.4. \nThe voice-range property"}],"url":"https://drafts.csswg.org/css-values-4/#comb-any"},
+"d6a1ad1b": {"dfnID":"d6a1ad1b","dfnText":"<uri>","external":true,"refSections":[{"refs":[{"id":"ref-for-value-def-uri"},{"id":"ref-for-value-def-uri\u2460"}],"title":"10.1. \nThe cue-before and cue-after properties"}],"url":"https://drafts.csswg.org/css2/#value-def-uri"},
+"fa9dd02c": {"dfnID":"fa9dd02c","dfnText":"screen","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-media-screen"}],"title":"2. \nBackground information, CSS 2.1"}],"url":"https://drafts.csswg.org/css2/#valdef-media-screen"},
+"6019a537": {"dfnID":"6019a537","dfnText":"speech","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-media-speech"},{"id":"ref-for-valdef-media-speech\u2460"}],"title":"2. \nBackground information, CSS 2.1"}],"url":"https://drafts.csswg.org/css2/#valdef-media-speech"},
+"2467179e": {"dfnID":"2467179e","dfnText":"content","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-content"}],"title":"13. \nList items and counters styles"},{"refs":[{"id":"ref-for-propdef-content\u2460"}],"title":"14. \nInserted and replaced content"}],"url":"https://drafts.csswg.org/css-content-3/#propdef-content"},
+"e450523b": {"dfnID":"e450523b","dfnText":"list-style-image","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-list-style-image"}],"title":"13. \nList items and counters styles"}],"url":"https://drafts.csswg.org/css-lists-3/#propdef-list-style-image"},
+"de56fbfe": {"dfnID":"de56fbfe","dfnText":"list-style-type","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-list-style-type"},{"id":"ref-for-propdef-list-style-type\u2460"}],"title":"13. \nList items and counters styles"}],"url":"https://drafts.csswg.org/css-lists-3/#propdef-list-style-type"},
+"b32b852a": {"dfnID":"b32b852a","dfnText":"span","external":true,"refSections":[{"refs":[{"id":"ref-for-the-span-element"}],"title":"4. \nExample"}],"url":"https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-span-element"},
+"0698d556": {"dfnID":"0698d556","dfnText":"string","external":true,"refSections":[{"refs":[{"id":"ref-for-string"}],"title":"11.1. \nThe voice-family property"}],"url":"https://infra.spec.whatwg.org/#string"},
+"8343cc0f": {"dfnID":"8343cc0f","dfnText":"aural","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-media-aural"}],"title":"2. \nBackground information, CSS 2.1"}],"url":"https://drafts.csswg.org/mediaqueries-5/#valdef-media-aural"},
+"aural-box-model": {"dfnID":"aural-box-model","dfnText":"aural \u201cbox\u201d model","external":false,"refSections":[{"refs":[{"id":"ref-for-aural-box-model"},{"id":"ref-for-aural-box-model\u2460"},{"id":"ref-for-aural-box-model\u2461"}],"title":"6.1. \nThe voice-volume property"},{"refs":[{"id":"ref-for-aural-box-model\u2462"},{"id":"ref-for-aural-box-model\u2463"}],"title":"8.1. \nThe pause-before and pause-after properties"},{"refs":[{"id":"ref-for-aural-box-model\u2464"},{"id":"ref-for-aural-box-model\u2465"}],"title":"9.1. \nThe rest-before and rest-after properties"},{"refs":[{"id":"ref-for-aural-box-model\u2466"},{"id":"ref-for-aural-box-model\u2467"}],"title":"10.1. \nThe cue-before and cue-after properties"},{"refs":[{"id":"ref-for-aural-box-model\u2468"}],"title":"10.2. \nRelation between audio cues and speech synthesis volume levels"}],"url":"#aural-box-model"},
+"propdef-voice-volume": {"dfnID":"propdef-voice-volume","dfnText":"voice-volume","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-voice-volume"},{"id":"ref-for-propdef-voice-volume\u2460"},{"id":"ref-for-propdef-voice-volume\u2461"},{"id":"ref-for-propdef-voice-volume\u2462"},{"id":"ref-for-propdef-voice-volume\u2463"}],"title":"6.1. \nThe voice-volume property"},{"refs":[{"id":"ref-for-propdef-voice-volume\u2464"},{"id":"ref-for-propdef-voice-volume\u2465"},{"id":"ref-for-propdef-voice-volume\u2466"},{"id":"ref-for-propdef-voice-volume\u2467"},{"id":"ref-for-propdef-voice-volume\u2468"},{"id":"ref-for-propdef-voice-volume\u2460\u24ea"}],"title":"10.1. \nThe cue-before and cue-after properties"},{"refs":[{"id":"ref-for-propdef-voice-volume\u2460\u2460"},{"id":"ref-for-propdef-voice-volume\u2460\u2461"},{"id":"ref-for-propdef-voice-volume\u2460\u2462"},{"id":"ref-for-propdef-voice-volume\u2460\u2463"}],"title":"10.2. \nRelation between audio cues and speech synthesis volume levels"}],"url":"#propdef-voice-volume"},
+"valdef-voice-volume-silent": {"dfnID":"valdef-voice-volume-silent","dfnText":"silent","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-voice-volume-silent"},{"id":"ref-for-valdef-voice-volume-silent\u2460"},{"id":"ref-for-valdef-voice-volume-silent\u2461"},{"id":"ref-for-valdef-voice-volume-silent\u2462"}],"title":"6.1. \nThe voice-volume property"},{"refs":[{"id":"ref-for-valdef-voice-volume-silent\u2463"},{"id":"ref-for-valdef-voice-volume-silent\u2464"},{"id":"ref-for-valdef-voice-volume-silent\u2465"},{"id":"ref-for-valdef-voice-volume-silent\u2466"}],"title":"10.1. \nThe cue-before and cue-after properties"},{"refs":[{"id":"ref-for-valdef-voice-volume-silent\u2467"}],"title":"10.2. \nRelation between audio cues and speech synthesis volume levels"}],"url":"#valdef-voice-volume-silent"},
+"valdef-voice-volume-x-soft": {"dfnID":"valdef-voice-volume-x-soft","dfnText":"x-soft","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-voice-volume-x-soft"},{"id":"ref-for-valdef-voice-volume-x-soft\u2460"},{"id":"ref-for-valdef-voice-volume-x-soft\u2461"},{"id":"ref-for-valdef-voice-volume-x-soft\u2462"}],"title":"6.1. \nThe voice-volume property"}],"url":"#valdef-voice-volume-x-soft"},
+"valdef-voice-volume-soft": {"dfnID":"valdef-voice-volume-soft","dfnText":"soft","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-voice-volume-soft"}],"title":"6.1. \nThe voice-volume property"}],"url":"#valdef-voice-volume-soft"},
+"valdef-voice-volume-medium": {"dfnID":"valdef-voice-volume-medium","dfnText":"medium","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-voice-volume-medium"}],"title":"6.1. \nThe voice-volume property"}],"url":"#valdef-voice-volume-medium"},
+"valdef-voice-volume-loud": {"dfnID":"valdef-voice-volume-loud","dfnText":"loud","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-voice-volume-loud"}],"title":"6.1. \nThe voice-volume property"}],"url":"#valdef-voice-volume-loud"},
+"valdef-voice-volume-x-loud": {"dfnID":"valdef-voice-volume-x-loud","dfnText":"x-loud","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-voice-volume-x-loud"},{"id":"ref-for-valdef-voice-volume-x-loud\u2460"},{"id":"ref-for-valdef-voice-volume-x-loud\u2461"},{"id":"ref-for-valdef-voice-volume-x-loud\u2462"}],"title":"6.1. \nThe voice-volume property"}],"url":"#valdef-voice-volume-x-loud"},
+"typedef-voice-volume-decibel": {"dfnID":"typedef-voice-volume-decibel","dfnText":"<decibel>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-voice-volume-decibel"},{"id":"ref-for-typedef-voice-volume-decibel\u2460"},{"id":"ref-for-typedef-voice-volume-decibel\u2461"},{"id":"ref-for-typedef-voice-volume-decibel\u2462"}],"title":"6.1. \nThe voice-volume property"},{"refs":[{"id":"ref-for-typedef-voice-volume-decibel\u2463"},{"id":"ref-for-typedef-voice-volume-decibel\u2464"},{"id":"ref-for-typedef-voice-volume-decibel\u2465"}],"title":"10.1. \nThe cue-before and cue-after properties"},{"refs":[{"id":"ref-for-typedef-voice-volume-decibel\u2466"},{"id":"ref-for-typedef-voice-volume-decibel\u2467"}],"title":"10.2. \nRelation between audio cues and speech synthesis volume levels"}],"url":"#typedef-voice-volume-decibel"},
+"propdef-voice-balance": {"dfnID":"propdef-voice-balance","dfnText":"voice-balance","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-voice-balance\u2460"},{"id":"ref-for-propdef-voice-balance\u2461"},{"id":"ref-for-propdef-voice-balance\u2462"},{"id":"ref-for-propdef-voice-balance\u2463"},{"id":"ref-for-propdef-voice-balance\u2464"},{"id":"ref-for-propdef-voice-balance\u2465"},{"id":"ref-for-propdef-voice-balance\u2466"},{"id":"ref-for-propdef-voice-balance\u2467"},{"id":"ref-for-propdef-voice-balance\u2468"},{"id":"ref-for-propdef-voice-balance\u2460\u24ea"},{"id":"ref-for-propdef-voice-balance\u2460\u2460"}],"title":"6.2. \nThe voice-balance property"}],"url":"#propdef-voice-balance"},
+"valdef-voice-balance-center": {"dfnID":"valdef-voice-balance-center","dfnText":"center","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-voice-balance-center"},{"id":"ref-for-valdef-voice-balance-center\u2460"}],"title":"6.2. \nThe voice-balance property"}],"url":"#valdef-voice-balance-center"},
+"propdef-speak": {"dfnID":"propdef-speak","dfnText":"speak","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-speak"},{"id":"ref-for-propdef-speak\u2460"}],"title":"6.1. \nThe voice-volume property"},{"refs":[{"id":"ref-for-propdef-speak\u2461"},{"id":"ref-for-propdef-speak\u2462"},{"id":"ref-for-propdef-speak\u2463"},{"id":"ref-for-propdef-speak\u2464"}],"title":"7.1. \nThe speak property"},{"refs":[{"id":"ref-for-propdef-speak\u2465"}],"title":"8.3. \nCollapsing pauses"},{"refs":[{"id":"ref-for-propdef-speak\u2466"},{"id":"ref-for-propdef-speak\u2467"}],"title":"\nAppendix E \u2014 Changes"}],"url":"#propdef-speak"},
+"valdef-speak-auto": {"dfnID":"valdef-speak-auto","dfnText":"auto","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-speak-auto"},{"id":"ref-for-valdef-speak-auto\u2460"},{"id":"ref-for-valdef-speak-auto\u2461"}],"title":"7.1. \nThe speak property"},{"refs":[{"id":"ref-for-valdef-speak-auto\u2462"}],"title":"\nAppendix E \u2014 Changes"}],"url":"#valdef-speak-auto"},
+"valdef-speak-never": {"dfnID":"valdef-speak-never","dfnText":"never","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-speak-never"},{"id":"ref-for-valdef-speak-never\u2460"},{"id":"ref-for-valdef-speak-never\u2461"}],"title":"7.1. \nThe speak property"},{"refs":[{"id":"ref-for-valdef-speak-never\u2462"}],"title":"\nAppendix E \u2014 Changes"}],"url":"#valdef-speak-never"},
+"valdef-speak-always": {"dfnID":"valdef-speak-always","dfnText":"always","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-speak-always"},{"id":"ref-for-valdef-speak-always\u2460"}],"title":"7.1. \nThe speak property"},{"refs":[{"id":"ref-for-valdef-speak-always\u2461"}],"title":"\nAppendix E \u2014 Changes"}],"url":"#valdef-speak-always"},
+"propdef-speak-as": {"dfnID":"propdef-speak-as","dfnText":"speak-as","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-speak-as"},{"id":"ref-for-propdef-speak-as\u2460"},{"id":"ref-for-propdef-speak-as\u2461"}],"title":"7.2. \nThe speak-as property"}],"url":"#propdef-speak-as"},
+"propdef-pause-before": {"dfnID":"propdef-pause-before","dfnText":"pause-before","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-pause-before"},{"id":"ref-for-propdef-pause-before\u2460"}],"title":"8.1. \nThe pause-before and pause-after properties"},{"refs":[{"id":"ref-for-propdef-pause-before\u2461"},{"id":"ref-for-propdef-pause-before\u2462"},{"id":"ref-for-propdef-pause-before\u2463"}],"title":"8.2. \nThe pause shorthand property"},{"refs":[{"id":"ref-for-propdef-pause-before\u2464"},{"id":"ref-for-propdef-pause-before\u2465"},{"id":"ref-for-propdef-pause-before\u2466"},{"id":"ref-for-propdef-pause-before\u2467"}],"title":"8.3. \nCollapsing pauses"}],"url":"#propdef-pause-before"},
+"propdef-pause-after": {"dfnID":"propdef-pause-after","dfnText":"pause-after","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-pause-after"},{"id":"ref-for-propdef-pause-after\u2460"}],"title":"8.1. \nThe pause-before and pause-after properties"},{"refs":[{"id":"ref-for-propdef-pause-after\u2461"},{"id":"ref-for-propdef-pause-after\u2462"},{"id":"ref-for-propdef-pause-after\u2463"}],"title":"8.2. \nThe pause shorthand property"},{"refs":[{"id":"ref-for-propdef-pause-after\u2464"},{"id":"ref-for-propdef-pause-after\u2465"},{"id":"ref-for-propdef-pause-after\u2466"},{"id":"ref-for-propdef-pause-after\u2467"}],"title":"8.3. \nCollapsing pauses"}],"url":"#propdef-pause-after"},
+"propdef-pause": {"dfnID":"propdef-pause","dfnText":"pause","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-pause"}],"title":"5. \nThe aural formatting model"},{"refs":[{"id":"ref-for-propdef-pause\u2460"}],"title":"8.1. \nThe pause-before and pause-after properties"},{"refs":[{"id":"ref-for-propdef-pause\u2461"},{"id":"ref-for-propdef-pause\u2462"}],"title":"8.2. \nThe pause shorthand property"},{"refs":[{"id":"ref-for-propdef-pause\u2463"}],"title":"8.3. \nCollapsing pauses"}],"url":"#propdef-pause"},
+"propdef-rest-before": {"dfnID":"propdef-rest-before","dfnText":"rest-before","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-rest-before"},{"id":"ref-for-propdef-rest-before\u2460"}],"title":"8.3. \nCollapsing pauses"},{"refs":[{"id":"ref-for-propdef-rest-before\u2461"},{"id":"ref-for-propdef-rest-before\u2462"}],"title":"9.1. \nThe rest-before and rest-after properties"},{"refs":[{"id":"ref-for-propdef-rest-before\u2463"},{"id":"ref-for-propdef-rest-before\u2464"},{"id":"ref-for-propdef-rest-before\u2465"}],"title":"9.2. \nThe rest shorthand property"}],"url":"#propdef-rest-before"},
+"propdef-rest-after": {"dfnID":"propdef-rest-after","dfnText":"rest-after","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-rest-after"},{"id":"ref-for-propdef-rest-after\u2460"}],"title":"8.3. \nCollapsing pauses"},{"refs":[{"id":"ref-for-propdef-rest-after\u2461"},{"id":"ref-for-propdef-rest-after\u2462"}],"title":"9.1. \nThe rest-before and rest-after properties"},{"refs":[{"id":"ref-for-propdef-rest-after\u2463"},{"id":"ref-for-propdef-rest-after\u2464"},{"id":"ref-for-propdef-rest-after\u2465"}],"title":"9.2. \nThe rest shorthand property"}],"url":"#propdef-rest-after"},
+"propdef-rest": {"dfnID":"propdef-rest","dfnText":"rest","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-rest"},{"id":"ref-for-propdef-rest\u2460"}],"title":"5. \nThe aural formatting model"},{"refs":[{"id":"ref-for-propdef-rest\u2461"}],"title":"9.1. \nThe rest-before and rest-after properties"},{"refs":[{"id":"ref-for-propdef-rest\u2462"},{"id":"ref-for-propdef-rest\u2463"}],"title":"9.2. \nThe rest shorthand property"}],"url":"#propdef-rest"},
+"propdef-cue-before": {"dfnID":"propdef-cue-before","dfnText":"cue-before","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-cue-before"}],"title":"8.1. \nThe pause-before and pause-after properties"},{"refs":[{"id":"ref-for-propdef-cue-before\u2460"},{"id":"ref-for-propdef-cue-before\u2461"}],"title":"8.3. \nCollapsing pauses"},{"refs":[{"id":"ref-for-propdef-cue-before\u2462"}],"title":"9.1. \nThe rest-before and rest-after properties"},{"refs":[{"id":"ref-for-propdef-cue-before\u2463"},{"id":"ref-for-propdef-cue-before\u2464"}],"title":"10.1. \nThe cue-before and cue-after properties"},{"refs":[{"id":"ref-for-propdef-cue-before\u2465"},{"id":"ref-for-propdef-cue-before\u2466"},{"id":"ref-for-propdef-cue-before\u2467"}],"title":"10.3. \nThe cue shorthand property"}],"url":"#propdef-cue-before"},
+"propdef-cue-after": {"dfnID":"propdef-cue-after","dfnText":"cue-after","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-cue-after"}],"title":"8.1. \nThe pause-before and pause-after properties"},{"refs":[{"id":"ref-for-propdef-cue-after\u2460"},{"id":"ref-for-propdef-cue-after\u2461"}],"title":"8.3. \nCollapsing pauses"},{"refs":[{"id":"ref-for-propdef-cue-after\u2462"}],"title":"9.1. \nThe rest-before and rest-after properties"},{"refs":[{"id":"ref-for-propdef-cue-after\u2463"},{"id":"ref-for-propdef-cue-after\u2464"}],"title":"10.1. \nThe cue-before and cue-after properties"},{"refs":[{"id":"ref-for-propdef-cue-after\u2465"},{"id":"ref-for-propdef-cue-after\u2466"},{"id":"ref-for-propdef-cue-after\u2467"}],"title":"10.3. \nThe cue shorthand property"}],"url":"#propdef-cue-after"},
+"propdef-cue": {"dfnID":"propdef-cue","dfnText":"cue","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-cue"}],"title":"5. \nThe aural formatting model"},{"refs":[{"id":"ref-for-propdef-cue\u2460"},{"id":"ref-for-propdef-cue\u2461"}],"title":"8.3. \nCollapsing pauses"},{"refs":[{"id":"ref-for-propdef-cue\u2462"},{"id":"ref-for-propdef-cue\u2463"}],"title":"10.3. \nThe cue shorthand property"}],"url":"#propdef-cue"},
+"propdef-voice-family": {"dfnID":"propdef-voice-family","dfnText":"voice-family","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-voice-family"}],"title":"10.2. \nRelation between audio cues and speech synthesis volume levels"},{"refs":[{"id":"ref-for-propdef-voice-family\u2460"},{"id":"ref-for-propdef-voice-family\u2461"},{"id":"ref-for-propdef-voice-family\u2462"},{"id":"ref-for-propdef-voice-family\u2463"}],"title":"11.1. \nThe voice-family property"},{"refs":[{"id":"ref-for-propdef-voice-family\u2464"},{"id":"ref-for-propdef-voice-family\u2465"},{"id":"ref-for-propdef-voice-family\u2466"}],"title":"11.1.1. \nVoice selection, content language"},{"refs":[{"id":"ref-for-propdef-voice-family\u2467"}],"title":"11.3. \nThe voice-pitch property"}],"url":"#propdef-voice-family"},
+"typedef-generic-voice": {"dfnID":"typedef-generic-voice","dfnText":"<generic-voice>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-generic-voice"}],"title":"11.1. \nThe voice-family property"}],"url":"#typedef-generic-voice"},
+"typedef-voice-family-age": {"dfnID":"typedef-voice-family-age","dfnText":"<age>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-voice-family-age"},{"id":"ref-for-typedef-voice-family-age\u2460"}],"title":"11.1. \nThe voice-family property"}],"url":"#typedef-voice-family-age"},
+"valdef-voice-family-child": {"dfnID":"valdef-voice-family-child","dfnText":"child","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-voice-family-child"}],"title":"11.1. \nThe voice-family property"}],"url":"#valdef-voice-family-child"},
+"valdef-voice-family-young": {"dfnID":"valdef-voice-family-young","dfnText":"young","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-voice-family-young"}],"title":"11.1. \nThe voice-family property"}],"url":"#valdef-voice-family-young"},
+"valdef-voice-family-old": {"dfnID":"valdef-voice-family-old","dfnText":"old","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-voice-family-old"}],"title":"11.1. \nThe voice-family property"}],"url":"#valdef-voice-family-old"},
+"typedef-voice-family-gender": {"dfnID":"typedef-voice-family-gender","dfnText":"<gender>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-voice-family-gender"},{"id":"ref-for-typedef-voice-family-gender\u2460"}],"title":"11.1. \nThe voice-family property"}],"url":"#typedef-voice-family-gender"},
+"valdef-voice-family-male": {"dfnID":"valdef-voice-family-male","dfnText":"male","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-voice-family-male"}],"title":"11.1. \nThe voice-family property"}],"url":"#valdef-voice-family-male"},
+"valdef-voice-family-female": {"dfnID":"valdef-voice-family-female","dfnText":"female","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-voice-family-female"}],"title":"11.1. \nThe voice-family property"}],"url":"#valdef-voice-family-female"},
+"valdef-voice-family-neutral": {"dfnID":"valdef-voice-family-neutral","dfnText":"neutral","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-voice-family-neutral"}],"title":"11.1. \nThe voice-family property"}],"url":"#valdef-voice-family-neutral"},
+"valdef-voice-family-preserve": {"dfnID":"valdef-voice-family-preserve","dfnText":"preserve","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-voice-family-preserve"},{"id":"ref-for-valdef-voice-family-preserve\u2460"}],"title":"11.1. \nThe voice-family property"},{"refs":[{"id":"ref-for-valdef-voice-family-preserve\u2461"}],"title":"11.1.1. \nVoice selection, content language"}],"url":"#valdef-voice-family-preserve"},
+"propdef-voice-rate": {"dfnID":"propdef-voice-rate","dfnText":"voice-rate","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-voice-rate"},{"id":"ref-for-propdef-voice-rate\u2460"}],"title":"11.2. \nThe voice-rate property"},{"refs":[{"id":"ref-for-propdef-voice-rate\u2461"},{"id":"ref-for-propdef-voice-rate\u2462"},{"id":"ref-for-propdef-voice-rate\u2463"}],"title":"12.1. \nThe voice-duration property"}],"url":"#propdef-voice-rate"},
+"propdef-voice-pitch": {"dfnID":"propdef-voice-pitch","dfnText":"voice-pitch","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-voice-pitch\u2460"},{"id":"ref-for-propdef-voice-pitch\u2461"}],"title":"11.3. \nThe voice-pitch property"}],"url":"#propdef-voice-pitch"},
+"valdef-voice-pitch-absolute": {"dfnID":"valdef-voice-pitch-absolute","dfnText":"absolute","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-voice-pitch-absolute"},{"id":"ref-for-valdef-voice-pitch-absolute\u2460"}],"title":"11.3. \nThe voice-pitch property"}],"url":"#valdef-voice-pitch-absolute"},
+"typedef-voice-pitch-semitones": {"dfnID":"typedef-voice-pitch-semitones","dfnText":"<semitones>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-voice-pitch-semitones"},{"id":"ref-for-typedef-voice-pitch-semitones\u2460"},{"id":"ref-for-typedef-voice-pitch-semitones\u2461"}],"title":"11.3. \nThe voice-pitch property"},{"refs":[{"id":"ref-for-typedef-voice-pitch-semitones\u2462"},{"id":"ref-for-typedef-voice-pitch-semitones\u2463"}],"title":"11.4. \nThe voice-range property"}],"url":"#typedef-voice-pitch-semitones"},
+"voice-pitch-semitone": {"dfnID":"voice-pitch-semitone","dfnText":"semitone","external":false,"refSections":[{"refs":[{"id":"ref-for-voice-pitch-semitone"},{"id":"ref-for-voice-pitch-semitone\u2460"},{"id":"ref-for-voice-pitch-semitone\u2461"}],"title":"11.3. \nThe voice-pitch property"},{"refs":[{"id":"ref-for-voice-pitch-semitone\u2462"}],"title":"11.4. \nThe voice-range property"}],"url":"#voice-pitch-semitone"},
+"propdef-voice-range": {"dfnID":"propdef-voice-range","dfnText":"voice-range","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-voice-range\u2460"},{"id":"ref-for-propdef-voice-range\u2461"}],"title":"11.4. \nThe voice-range property"}],"url":"#propdef-voice-range"},
+"valdef-voice-range-absolute": {"dfnID":"valdef-voice-range-absolute","dfnText":"absolute","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-voice-range-absolute"},{"id":"ref-for-valdef-voice-range-absolute\u2460"}],"title":"11.4. \nThe voice-range property"}],"url":"#valdef-voice-range-absolute"},
+"propdef-voice-stress": {"dfnID":"propdef-voice-stress","dfnText":"voice-stress","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-voice-stress\u2460"},{"id":"ref-for-propdef-voice-stress\u2461"}],"title":"11.5. \nThe voice-stress property"}],"url":"#propdef-voice-stress"},
+"valdef-voice-stress-normal": {"dfnID":"valdef-voice-stress-normal","dfnText":"normal","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-voice-stress-normal"}],"title":"11.5. \nThe voice-stress property"}],"url":"#valdef-voice-stress-normal"},
+"propdef-voice-duration": {"dfnID":"propdef-voice-duration","dfnText":"voice-duration","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-voice-duration\u2460"}],"title":"8.3. \nCollapsing pauses"},{"refs":[{"id":"ref-for-propdef-voice-duration\u2461"},{"id":"ref-for-propdef-voice-duration\u2462"},{"id":"ref-for-propdef-voice-duration\u2463"},{"id":"ref-for-propdef-voice-duration\u2464"},{"id":"ref-for-propdef-voice-duration\u2465"}],"title":"12.1. \nThe voice-duration property"}],"url":"#propdef-voice-duration"},
+"valdef-voice-duration-auto": {"dfnID":"valdef-voice-duration-auto","dfnText":"auto","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-voice-duration-auto"},{"id":"ref-for-valdef-voice-duration-auto\u2460"}],"title":"12.1. \nThe voice-duration property"}],"url":"#valdef-voice-duration-auto"},
+};
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+const typeFormatters = {
+    'dfn': (text) => `[=${text}=]`,
+    'abstract-op': (text) => `[\$${text}\$]`,
+    'value': (text) => `''${text}''`,
+    'http-header': (text) => `[:${text}:]`,
+    'idl': (text) => `{{${text}}}`,
+    'interface': 'idl',
+    'constructor': 'idl',
+    'method': 'idl',
+    'argument': 'idl',
+    'attribute': 'idl',
+    'callback': 'idl',
+    'dictionary': 'idl',
+    'dict-member': 'idl',
+    'enum': 'idl',
+    'enum-value': 'idl',
+    'exception': 'idl',
+    'const': 'idl',
+    'typedef': 'idl',
+    'stringifier': 'idl',
+    'serializer': 'idl',
+    'iterator': 'idl',
+    'maplike': 'idl',
+    'setlike': 'idl',
+    'extended-attribute': 'idl',
+    'event': 'idl',
+    'element': (element) => `<{${element}}>`,
+    'element-state': 'element',
+    'element-attr': 'element',
+    'attr-value': 'element',
+    'scheme': 'dfn',
+    'permission': 'dfn',
+    'grammar': (text) => `${text} (within a <pre class=prod>)`,
+    'type': (text)=> `<<${text}>>`,
+    'property': (text) => `'${text}'`,
+    'descriptor': 'property',
+    'function': 'value',
+    'at-rule': 'value',
+    'selector': 'value',
+};
+const typesUsingFor = new Set(
+    [
+        "descriptor",
+        "value",
+        "element-attr",
+        "attr-value",
+        "element-state",
+        "method",
+        "constructor",
+        "argument",
+        "attribute",
+        "const",
+        "dict-member",
+        "event",
+        "enum-value",
+        "stringifier",
+        "serializer",
+        "iterator",
+        "maplike",
+        "setlike",
+        "state",
+        "mode",
+        "context",
+        "facet",
+    ],
+)
+const typesNotUsingFor = new Set(
+    [
+        "property",
+        "element",
+        "interface",
+        "namespace",
+        "callback",
+        "dictionary",
+        "enum",
+        "exception",
+        "typedef",
+        "http-header",
+        "permission",
+    ],
+)
+function linkFormatterFromType(type) {
+    const fnOrType = typeFormatters[type];
+    if(typeof fnOrType === 'string') {
+        // follow the alias
+        return linkFormatterFromType(fnOrType);
+    }
+    return fnOrType;
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!typesUsingFor.has(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!typesNotUsingFor.has(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
+
+function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+    dfnPanel.forDfn = dfn;
+    if(!dfn) { console.log(dfnPanel); }
+    return dfnPanel;
+}
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        const panel = genDfnPanel({ ...panelData, dfn });
+        append(document.body, panel);
+        insertDfnPopupAction(panel)
+    }
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+})
+
+function hideAllDfnPanels() {
+    // Turn off any currently "on" or "activated" panels.
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
+}
+
+function showDfnPanel(dfnPanel) {
+    hideAllDfnPanels(); // Only display one at this time.
+
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "true");
+
+    dfnPanel.classList.add("on");
+    positionDfnPanel(dfnPanel);
+
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    // Increment tabindex for each anchor and button tags in panel
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.style.position = "absolute"; // unfix it
+    dfnPanel.classList.remove("on");
+    dfnPanel.classList.remove("activated");
+}
+
+function toggleDfnPanel(dfnPanel) {
+    if(dfnPanel.classList.contains("on")) {
+        hideDfnPanel(dfnPanel);
+    } else {
+        showDfnPanel(dfnPanel);
+    }
+}
+
+function insertDfnPopupAction(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        showDfnPanel(dfnPanel);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfnPanel);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel(dfnPanel, dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    })
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
 }
 </script>
 <script>/* Boilerplate: script-link-titles */
+"use strict";
+{
 let linkTitleData = {
- "https://drafts.csswg.org/css-values-4/#frequency-value": "Expands to: hz | khz",
- "https://drafts.csswg.org/css-values-4/#time-value": "Expands to: ms | s"
+"https://drafts.csswg.org/css-values-4/#time-value": "Expands to: ms | s",
+"https://drafts.csswg.org/css-values-4/#frequency-value": "Expands to: hz | khz",
 };
 
 function setTypeTitles() {
@@ -3860,332 +3860,315 @@ function setTypeTitles() {
 }
 
 document.addEventListener("DOMContentLoaded", setTypeTitles);
+}
 </script>
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
+let refsData = {
+"#propdef-voice-balance": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"voice-balance","type":"property","url":"#propdef-voice-balance"},
+"#propdef-voice-duration": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"voice-duration","type":"property","url":"#propdef-voice-duration"},
+"#propdef-voice-pitch": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"voice-pitch","type":"property","url":"#propdef-voice-pitch"},
+"#propdef-voice-range": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"voice-range","type":"property","url":"#propdef-voice-range"},
+"#propdef-voice-stress": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"voice-stress","type":"property","url":"#propdef-voice-stress"},
+"https://drafts.csswg.org/mediaqueries-5/#valdef-media-aural": {"export":true,"for_":["@media"],"level":"5","normative":true,"shortname":"mediaqueries","spec":"mediaqueries-5","status":"current","text":"aural","type":"value","url":"https://drafts.csswg.org/mediaqueries-5/#valdef-media-aural"},
+"https://drafts.csswg.org/css2/#valdef-media-speech": {"export":true,"for_":["@media"],"level":"1","normative":true,"shortname":"css","spec":"css22","status":"current","text":"speech","type":"value","url":"https://drafts.csswg.org/css2/#valdef-media-speech"},
+"https://drafts.csswg.org/css-break-4/#valdef-break-before-all": {"export":true,"for_":["break-before","break-after"],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"current","text":"all","type":"value","url":"https://drafts.csswg.org/css-break-4/#valdef-break-before-all"},
+"https://drafts.csswg.org/css2/#valdef-media-screen": {"export":true,"for_":["@media"],"level":"1","normative":true,"shortname":"css","spec":"css22","status":"current","text":"screen","type":"value","url":"https://drafts.csswg.org/css2/#valdef-media-screen"},
+"https://drafts.csswg.org/css-values-4/#css-wide-keywords": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"css-wide keywords","type":"dfn","url":"https://drafts.csswg.org/css-values-4/#css-wide-keywords"},
+"https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-span-element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"span","type":"element","url":"https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-span-element"},
+"#propdef-rest": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"rest","type":"property","url":"#propdef-rest"},
+"#propdef-cue": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"cue","type":"property","url":"#propdef-cue"},
+"#propdef-pause": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"pause","type":"property","url":"#propdef-pause"},
+"https://drafts.csswg.org/css-box-4/#propdef-padding": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"current","text":"padding","type":"property","url":"https://drafts.csswg.org/css-box-4/#propdef-padding"},
+"https://drafts.csswg.org/css-backgrounds-3/#propdef-border": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"current","text":"border","type":"property","url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-border"},
+"https://drafts.csswg.org/css-box-4/#propdef-margin": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"current","text":"margin","type":"property","url":"https://drafts.csswg.org/css-box-4/#propdef-margin"},
+"https://drafts.csswg.org/css-pseudo-4/#selectordef-before": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-pseudo","spec":"css-pseudo-4","status":"current","text":"::before","type":"selector","url":"https://drafts.csswg.org/css-pseudo-4/#selectordef-before"},
+"https://drafts.csswg.org/css-pseudo-4/#selectordef-after": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-pseudo","spec":"css-pseudo-4","status":"current","text":"::after","type":"selector","url":"https://drafts.csswg.org/css-pseudo-4/#selectordef-after"},
+"#propdef-voice-volume": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"voice-volume","type":"property","url":"#propdef-voice-volume"},
+"https://drafts.csswg.org/css-values-4/#comb-one": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"|","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"https://drafts.csswg.org/css-values-4/#comb-any": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"||","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-any"},
+"#typedef-voice-volume-decibel": {"export":true,"for_":["voice-volume"],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"<decibel>","type":"type","url":"#typedef-voice-volume-decibel"},
+"#valdef-voice-volume-silent": {"export":true,"for_":["voice-volume"],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"silent","type":"value","url":"#valdef-voice-volume-silent"},
+"#aural-box-model": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"aural box model","type":"dfn","url":"#aural-box-model"},
+"#propdef-speak": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"speak","type":"property","url":"#propdef-speak"},
+"#valdef-voice-volume-x-soft": {"export":true,"for_":["voice-volume"],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"x-soft","type":"value","url":"#valdef-voice-volume-x-soft"},
+"#valdef-voice-volume-x-loud": {"export":true,"for_":["voice-volume"],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"x-loud","type":"value","url":"#valdef-voice-volume-x-loud"},
+"#valdef-voice-volume-medium": {"export":true,"for_":["voice-volume"],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"medium","type":"value","url":"#valdef-voice-volume-medium"},
+"#valdef-voice-volume-soft": {"export":true,"for_":["voice-volume"],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"soft","type":"value","url":"#valdef-voice-volume-soft"},
+"#valdef-voice-volume-loud": {"export":true,"for_":["voice-volume"],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"loud","type":"value","url":"#valdef-voice-volume-loud"},
+"https://drafts.csswg.org/css-values-4/#dimension": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"dimension","type":"dfn","url":"https://drafts.csswg.org/css-values-4/#dimension"},
+"https://drafts.csswg.org/css-values-4/#number-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<number>","type":"type","url":"https://drafts.csswg.org/css-values-4/#number-value"},
+"https://drafts.csswg.org/css-values-4/#number": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"number","type":"dfn","url":"https://drafts.csswg.org/css-values-4/#number"},
+"#valdef-voice-balance-center": {"export":true,"for_":["voice-balance"],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"center","type":"value","url":"#valdef-voice-balance-center"},
+"https://drafts.csswg.org/css-position-3/#propdef-left": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-position","spec":"css-position-3","status":"current","text":"left","type":"property","url":"https://drafts.csswg.org/css-position-3/#propdef-left"},
+"https://drafts.csswg.org/css-position-3/#propdef-right": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-position","spec":"css-position-3","status":"current","text":"right","type":"property","url":"https://drafts.csswg.org/css-position-3/#propdef-right"},
+"#valdef-speak-never": {"export":true,"for_":["speak"],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"never","type":"value","url":"#valdef-speak-never"},
+"https://drafts.csswg.org/css-display-4/#propdef-display": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"display","type":"property","url":"https://drafts.csswg.org/css-display-4/#propdef-display"},
+"https://drafts.csswg.org/css-display-4/#valdef-display-none": {"export":true,"for_":["display","<display-box>"],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"none","type":"value","url":"https://drafts.csswg.org/css-display-4/#valdef-display-none"},
+"#valdef-speak-auto": {"export":true,"for_":["speak"],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"auto","type":"value","url":"#valdef-speak-auto"},
+"#valdef-speak-always": {"export":true,"for_":["speak"],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"always","type":"value","url":"#valdef-speak-always"},
+"https://drafts.csswg.org/css-display-4/#propdef-visibility": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"visibility","type":"property","url":"https://drafts.csswg.org/css-display-4/#propdef-visibility"},
+"https://drafts.csswg.org/css-display-4/#valdef-visibility-visible": {"export":true,"for_":["visibility"],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"visible","type":"value","url":"https://drafts.csswg.org/css-display-4/#valdef-visibility-visible"},
+"#propdef-speak-as": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"speak-as","type":"property","url":"#propdef-speak-as"},
+"#propdef-pause-before": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"pause-before","type":"property","url":"#propdef-pause-before"},
+"#propdef-pause-after": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"pause-after","type":"property","url":"#propdef-pause-after"},
+"#propdef-cue-before": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"cue-before","type":"property","url":"#propdef-cue-before"},
+"#propdef-cue-after": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"cue-after","type":"property","url":"#propdef-cue-after"},
+"https://drafts.csswg.org/css-values-4/#time-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<time>","type":"type","url":"https://drafts.csswg.org/css-values-4/#time-value"},
+"https://drafts.csswg.org/css-values-4/#mult-opt": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"?","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#mult-opt"},
+"#propdef-rest-after": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"rest-after","type":"property","url":"#propdef-rest-after"},
+"#propdef-rest-before": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"rest-before","type":"property","url":"#propdef-rest-before"},
+"https://drafts.csswg.org/css2/#value-def-uri": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css","spec":"css22","status":"current","text":"<uri>","type":"type","url":"https://drafts.csswg.org/css2/#value-def-uri"},
+"#propdef-voice-family": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"voice-family","type":"property","url":"#propdef-voice-family"},
+"https://drafts.csswg.org/css-values-4/#comb-comma": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":",","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-comma"},
+"https://drafts.csswg.org/css-values-4/#mult-zero-plus": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"*","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#mult-zero-plus"},
+"https://drafts.csswg.org/css-fonts-4/#propdef-font-family": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-fonts","spec":"css-fonts-4","status":"current","text":"font-family","type":"property","url":"https://drafts.csswg.org/css-fonts-4/#propdef-font-family"},
+"#typedef-generic-voice": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"<generic-voice>","type":"type","url":"#typedef-generic-voice"},
+"#typedef-voice-family-age": {"export":true,"for_":["voice-family"],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"<age>","type":"type","url":"#typedef-voice-family-age"},
+"#typedef-voice-family-gender": {"export":true,"for_":["voice-family"],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"<gender>","type":"type","url":"#typedef-voice-family-gender"},
+"https://drafts.csswg.org/css-values-4/#integer-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<integer>","type":"type","url":"https://drafts.csswg.org/css-values-4/#integer-value"},
+"https://drafts.csswg.org/css-fonts-4/#family-name-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-fonts","spec":"css-fonts-4","status":"current","text":"<family-name>","type":"type","url":"https://drafts.csswg.org/css-fonts-4/#family-name-value"},
+"https://infra.spec.whatwg.org/#string": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"string","type":"dfn","url":"https://infra.spec.whatwg.org/#string"},
+"https://drafts.csswg.org/css-values-4/#css-css-identifier": {"export":true,"for_":["CSS"],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"identifier","type":"dfn","url":"https://drafts.csswg.org/css-values-4/#css-css-identifier"},
+"#valdef-voice-family-male": {"export":true,"for_":["voice-family"],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"male","type":"value","url":"#valdef-voice-family-male"},
+"#valdef-voice-family-female": {"export":true,"for_":["voice-family"],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"female","type":"value","url":"#valdef-voice-family-female"},
+"#valdef-voice-family-neutral": {"export":true,"for_":["voice-family"],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"neutral","type":"value","url":"#valdef-voice-family-neutral"},
+"#valdef-voice-family-preserve": {"export":true,"for_":["voice-family"],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"preserve","type":"value","url":"#valdef-voice-family-preserve"},
+"#valdef-voice-family-child": {"export":true,"for_":["voice-family"],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"child","type":"value","url":"#valdef-voice-family-child"},
+"#valdef-voice-family-young": {"export":true,"for_":["voice-family"],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"young","type":"value","url":"#valdef-voice-family-young"},
+"#valdef-voice-family-old": {"export":true,"for_":["voice-family"],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"old","type":"value","url":"#valdef-voice-family-old"},
+"https://drafts.csswg.org/css-cascade-5/#valdef-all-inherit": {"export":true,"for_":["all"],"level":"5","normative":true,"shortname":"css-cascade","spec":"css-cascade-5","status":"current","text":"inherit","type":"value","url":"https://drafts.csswg.org/css-cascade-5/#valdef-all-inherit"},
+"#propdef-voice-rate": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"voice-rate","type":"property","url":"#propdef-voice-rate"},
+"https://drafts.csswg.org/css-values-4/#percentage-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<percentage>","type":"type","url":"https://drafts.csswg.org/css-values-4/#percentage-value"},
+"https://drafts.csswg.org/css-values-4/#percentage": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"percentage","type":"dfn","url":"https://drafts.csswg.org/css-values-4/#percentage"},
+"https://drafts.csswg.org/css-values-4/#frequency-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<frequency>","type":"type","url":"https://drafts.csswg.org/css-values-4/#frequency-value"},
+"https://drafts.csswg.org/css-values-4/#comb-all": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"&&","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-all"},
+"#typedef-voice-pitch-semitones": {"export":true,"for_":["voice-pitch"],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"<semitones>","type":"type","url":"#typedef-voice-pitch-semitones"},
+"#valdef-voice-pitch-absolute": {"export":true,"for_":["voice-pitch"],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"absolute","type":"value","url":"#valdef-voice-pitch-absolute"},
+"#voice-pitch-semitone": {"export":true,"for_":["voice-pitch"],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"semitone","type":"dfn","url":"#voice-pitch-semitone"},
+"#valdef-voice-range-absolute": {"export":true,"for_":["voice-range"],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"absolute","type":"value","url":"#valdef-voice-range-absolute"},
+"#valdef-voice-stress-normal": {"export":true,"for_":["voice-stress"],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"normal","type":"value","url":"#valdef-voice-stress-normal"},
+"#valdef-voice-duration-auto": {"export":true,"for_":["voice-duration"],"level":"1","normative":true,"shortname":"css-speech","spec":"css-speech-1","status":"local","text":"auto","type":"value","url":"#valdef-voice-duration-auto"},
+"https://drafts.csswg.org/css-lists-3/#propdef-list-style-type": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-lists","spec":"css-lists-3","status":"current","text":"list-style-type","type":"property","url":"https://drafts.csswg.org/css-lists-3/#propdef-list-style-type"},
+"https://drafts.csswg.org/css-content-3/#propdef-content": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"current","text":"content","type":"property","url":"https://drafts.csswg.org/css-content-3/#propdef-content"},
+"https://drafts.csswg.org/css-lists-3/#propdef-list-style-image": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-lists","spec":"css-lists-3","status":"current","text":"list-style-image","type":"property","url":"https://drafts.csswg.org/css-lists-3/#propdef-list-style-image"},
+"https://drafts.csswg.org/css-counter-styles-3/#decimal": {"export":true,"for_":["<counter-style-name>"],"level":"3","normative":true,"shortname":"css-counter-styles","spec":"css-counter-styles-3","status":"current","text":"decimal","type":"value","url":"https://drafts.csswg.org/css-counter-styles-3/#decimal"},
+"https://drafts.csswg.org/css-counter-styles-3/#decimal-leading-zero": {"export":true,"for_":["<counter-style-name>"],"level":"3","normative":true,"shortname":"css-counter-styles","spec":"css-counter-styles-3","status":"current","text":"decimal-leading-zero","type":"value","url":"https://drafts.csswg.org/css-counter-styles-3/#decimal-leading-zero"},
+"https://drafts.csswg.org/css-counter-styles-3/#lower-roman": {"export":true,"for_":["<counter-style-name>"],"level":"3","normative":true,"shortname":"css-counter-styles","spec":"css-counter-styles-3","status":"current","text":"lower-roman","type":"value","url":"https://drafts.csswg.org/css-counter-styles-3/#lower-roman"},
+"https://drafts.csswg.org/css-counter-styles-3/#upper-roman": {"export":true,"for_":["<counter-style-name>"],"level":"3","normative":true,"shortname":"css-counter-styles","spec":"css-counter-styles-3","status":"current","text":"upper-roman","type":"value","url":"https://drafts.csswg.org/css-counter-styles-3/#upper-roman"},
+"https://drafts.csswg.org/css-counter-styles-3/#georgian": {"export":true,"for_":["<counter-style-name>"],"level":"3","normative":true,"shortname":"css-counter-styles","spec":"css-counter-styles-3","status":"current","text":"georgian","type":"value","url":"https://drafts.csswg.org/css-counter-styles-3/#georgian"},
+"https://drafts.csswg.org/css-counter-styles-3/#armenian": {"export":true,"for_":["<counter-style-name>"],"level":"3","normative":true,"shortname":"css-counter-styles","spec":"css-counter-styles-3","status":"current","text":"armenian","type":"value","url":"https://drafts.csswg.org/css-counter-styles-3/#armenian"},
+"https://drafts.csswg.org/css-counter-styles-3/#lower-latin": {"export":true,"for_":["<counter-style-name>"],"level":"3","normative":true,"shortname":"css-counter-styles","spec":"css-counter-styles-3","status":"current","text":"lower-latin","type":"value","url":"https://drafts.csswg.org/css-counter-styles-3/#lower-latin"},
+"https://drafts.csswg.org/css-counter-styles-3/#lower-alpha": {"export":true,"for_":["<counter-style-name>"],"level":"3","normative":true,"shortname":"css-counter-styles","spec":"css-counter-styles-3","status":"current","text":"lower-alpha","type":"value","url":"https://drafts.csswg.org/css-counter-styles-3/#lower-alpha"},
+"https://drafts.csswg.org/css-counter-styles-3/#upper-latin": {"export":true,"for_":["<counter-style-name>"],"level":"3","normative":true,"shortname":"css-counter-styles","spec":"css-counter-styles-3","status":"current","text":"upper-latin","type":"value","url":"https://drafts.csswg.org/css-counter-styles-3/#upper-latin"},
+"https://drafts.csswg.org/css-counter-styles-3/#upper-alpha": {"export":true,"for_":["<counter-style-name>"],"level":"3","normative":true,"shortname":"css-counter-styles","spec":"css-counter-styles-3","status":"current","text":"upper-alpha","type":"value","url":"https://drafts.csswg.org/css-counter-styles-3/#upper-alpha"},
+"https://drafts.csswg.org/css-counter-styles-3/#lower-greek": {"export":true,"for_":["<counter-style-name>"],"level":"3","normative":true,"shortname":"css-counter-styles","spec":"css-counter-styles-3","status":"current","text":"lower-greek","type":"value","url":"https://drafts.csswg.org/css-counter-styles-3/#lower-greek"},
+};
+
+function genRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "DFN: "),
+                mk.code({ class: "dfn-text" }, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    const forListElements = forList.length === 0 ? '' : mk.li({},
+        mk.b({}, "For: "),
+        mk.ul({},
+            ...forList.map(forItem =>
                 mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
-            mk.b({}, "For: "),
-            mk.ul({},
-                ...forList.map(forItem =>
-                    mk.li({},
-                        mk.span({}, `${forItem}`)
-                    ),
+                    mk.span({}, `${forItem}`)
                 ),
             ),
-        );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+        ),
+    );
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
-    }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    return hintPanel;
+}
+function genAllRefHints() {
+    for(const refData of Object.values(refsData)) {
+        const refUrl = refData.url;
+        const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+        if (links.length == 0) {
+            console.log(`Can't find link href="${refUrl}".`, refData);
+            continue;
+        }
+        for(const link of links) {
+            if(link.classList.contains("dfn-link")) continue;
+            const hint = genRefHint(link, refData);
+            append(document.body, hint);
+            insertLinkPopupAction(hint)
         }
     }
+}
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+function hideAllRefHints() {
+    queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    refHint.style.position = "absolute"; // unfix it
+    refHint.classList.remove("on");
+    const teardown = refHint.teardownEventListeners;
+    if (teardown) {
+        refHint.teardownEventListeners = undefined;
+        teardown();
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+function showRefHint(refHint) {
+    hideAllRefHints(); // Only display one at this time.
+
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "true");
+    refHint.classList.add("on");
+    positionRefHint(refHint);
+    setupRefHintEventListeners(refHint);
+}
+
+function setupRefHintEventListeners(refHint) {
+    if (refHint.teardownEventListeners) return;
+    const link = refHint.forLink;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
 
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
 
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+function insertLinkPopupAction(refHint) {
+    const link = refHint.forLink;
+    // link.setAttribute('role', 'button');
+    link.setAttribute('aria-expanded', 'false')
+    link.classList.add('has-ref-hint');
+    link.addEventListener('mouseover', (event) => {
+        showRefHint(refHint);
     });
+    link.addEventListener('focus', (event) => {
+        showRefHint(refHint);
+    })
+}
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+document.addEventListener("DOMContentLoaded", () => {
+    genAllRefHints();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['#propdef-voice-balance'] = {"text": "voice-balance", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-voice-balance", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-voice-duration'] = {"text": "voice-duration", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-voice-duration", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-voice-pitch'] = {"text": "voice-pitch", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-voice-pitch", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-voice-range'] = {"text": "voice-range", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-voice-range", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-voice-stress'] = {"text": "voice-stress", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-voice-stress", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/mediaqueries-5/#valdef-media-aural'] = {"text": "aural", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-5/#valdef-media-aural", "export": true, "normative": true, "for_": ["@media"]};
-window.refsData['https://drafts.csswg.org/css2/#valdef-media-speech'] = {"text": "speech", "type": "value", "spec": "css22", "shortname": "css", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css2/#valdef-media-speech", "export": true, "normative": true, "for_": ["@media"]};
-window.refsData['https://drafts.csswg.org/css-break-4/#valdef-break-before-all'] = {"text": "all", "type": "value", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-break-4/#valdef-break-before-all", "export": true, "normative": true, "for_": ["break-before", "break-after"]};
-window.refsData['https://drafts.csswg.org/css2/#valdef-media-screen'] = {"text": "screen", "type": "value", "spec": "css22", "shortname": "css", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css2/#valdef-media-screen", "export": true, "normative": true, "for_": ["@media"]};
-window.refsData['https://drafts.csswg.org/css-values-4/#css-wide-keywords'] = {"text": "css-wide keywords", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-span-element'] = {"text": "span", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-span-element", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-rest'] = {"text": "rest", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-rest", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-cue'] = {"text": "cue", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-cue", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-pause'] = {"text": "pause", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-pause", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-box-4/#propdef-padding'] = {"text": "padding", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#propdef-padding", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border'] = {"text": "border", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-box-4/#propdef-margin'] = {"text": "margin", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#propdef-margin", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-before'] = {"text": "::before", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-before", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-after'] = {"text": "::after", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-after", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-voice-volume'] = {"text": "voice-volume", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-voice-volume", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-any'] = {"text": "||", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-any", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-voice-volume-decibel'] = {"text": "<decibel>", "type": "type", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#typedef-voice-volume-decibel", "export": true, "normative": true, "for_": ["voice-volume"]};
-window.refsData['#valdef-voice-volume-silent'] = {"text": "silent", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-volume-silent", "export": true, "normative": true, "for_": ["voice-volume"]};
-window.refsData['#aural-box-model'] = {"text": "aural box model", "type": "dfn", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#aural-box-model", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-speak'] = {"text": "speak", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-speak", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-voice-volume-x-soft'] = {"text": "x-soft", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-volume-x-soft", "export": true, "normative": true, "for_": ["voice-volume"]};
-window.refsData['#valdef-voice-volume-x-loud'] = {"text": "x-loud", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-volume-x-loud", "export": true, "normative": true, "for_": ["voice-volume"]};
-window.refsData['#valdef-voice-volume-medium'] = {"text": "medium", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-volume-medium", "export": true, "normative": true, "for_": ["voice-volume"]};
-window.refsData['#valdef-voice-volume-soft'] = {"text": "soft", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-volume-soft", "export": true, "normative": true, "for_": ["voice-volume"]};
-window.refsData['#valdef-voice-volume-loud'] = {"text": "loud", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-volume-loud", "export": true, "normative": true, "for_": ["voice-volume"]};
-window.refsData['https://drafts.csswg.org/css-values-4/#dimension'] = {"text": "dimension", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#dimension", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#number-value'] = {"text": "<number>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#number-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#number'] = {"text": "number", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#number", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-voice-balance-center'] = {"text": "center", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-balance-center", "export": true, "normative": true, "for_": ["voice-balance"]};
-window.refsData['https://drafts.csswg.org/css-position-3/#propdef-left'] = {"text": "left", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-left", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-position-3/#propdef-right'] = {"text": "right", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-right", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-speak-never'] = {"text": "never", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-speak-never", "export": true, "normative": true, "for_": ["speak"]};
-window.refsData['https://drafts.csswg.org/css-display-4/#propdef-display'] = {"text": "display", "type": "property", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#propdef-display", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#valdef-display-none'] = {"text": "none", "type": "value", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#valdef-display-none", "export": true, "normative": true, "for_": ["display", "<display-box>"]};
-window.refsData['#valdef-speak-auto'] = {"text": "auto", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-speak-auto", "export": true, "normative": true, "for_": ["speak"]};
-window.refsData['#valdef-speak-always'] = {"text": "always", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-speak-always", "export": true, "normative": true, "for_": ["speak"]};
-window.refsData['https://drafts.csswg.org/css-display-4/#propdef-visibility'] = {"text": "visibility", "type": "property", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#propdef-visibility", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#valdef-visibility-visible'] = {"text": "visible", "type": "value", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#valdef-visibility-visible", "export": true, "normative": true, "for_": ["visibility"]};
-window.refsData['#propdef-speak-as'] = {"text": "speak-as", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-speak-as", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-pause-before'] = {"text": "pause-before", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-pause-before", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-pause-after'] = {"text": "pause-after", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-pause-after", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-cue-before'] = {"text": "cue-before", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-cue-before", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-cue-after'] = {"text": "cue-after", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-cue-after", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#time-value'] = {"text": "<time>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#time-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#mult-opt'] = {"text": "?", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-rest-after'] = {"text": "rest-after", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-rest-after", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-rest-before'] = {"text": "rest-before", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-rest-before", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css2/#value-def-uri'] = {"text": "<uri>", "type": "type", "spec": "css22", "shortname": "css", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css2/#value-def-uri", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-voice-family'] = {"text": "voice-family", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-voice-family", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-comma'] = {"text": ",", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-comma", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#mult-zero-plus'] = {"text": "*", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-zero-plus", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font-family'] = {"text": "font-family", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-family", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-generic-voice'] = {"text": "<generic-voice>", "type": "type", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#typedef-generic-voice", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-voice-family-age'] = {"text": "<age>", "type": "type", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#typedef-voice-family-age", "export": true, "normative": true, "for_": ["voice-family"]};
-window.refsData['#typedef-voice-family-gender'] = {"text": "<gender>", "type": "type", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#typedef-voice-family-gender", "export": true, "normative": true, "for_": ["voice-family"]};
-window.refsData['https://drafts.csswg.org/css-values-4/#integer-value'] = {"text": "<integer>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#integer-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-fonts-4/#family-name-value'] = {"text": "<family-name>", "type": "type", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#family-name-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#string'] = {"text": "string", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#string", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#css-css-identifier'] = {"text": "identifier", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-css-identifier", "export": true, "normative": true, "for_": ["CSS"]};
-window.refsData['#valdef-voice-family-male'] = {"text": "male", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-family-male", "export": true, "normative": true, "for_": ["voice-family"]};
-window.refsData['#valdef-voice-family-female'] = {"text": "female", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-family-female", "export": true, "normative": true, "for_": ["voice-family"]};
-window.refsData['#valdef-voice-family-neutral'] = {"text": "neutral", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-family-neutral", "export": true, "normative": true, "for_": ["voice-family"]};
-window.refsData['#valdef-voice-family-preserve'] = {"text": "preserve", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-family-preserve", "export": true, "normative": true, "for_": ["voice-family"]};
-window.refsData['#valdef-voice-family-child'] = {"text": "child", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-family-child", "export": true, "normative": true, "for_": ["voice-family"]};
-window.refsData['#valdef-voice-family-young'] = {"text": "young", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-family-young", "export": true, "normative": true, "for_": ["voice-family"]};
-window.refsData['#valdef-voice-family-old'] = {"text": "old", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-family-old", "export": true, "normative": true, "for_": ["voice-family"]};
-window.refsData['https://drafts.csswg.org/css-cascade-5/#valdef-all-inherit'] = {"text": "inherit", "type": "value", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#valdef-all-inherit", "export": true, "normative": true, "for_": ["all"]};
-window.refsData['#propdef-voice-rate'] = {"text": "voice-rate", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-voice-rate", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#percentage-value'] = {"text": "<percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#percentage-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#percentage'] = {"text": "percentage", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#percentage", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#frequency-value'] = {"text": "<frequency>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#frequency-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-all'] = {"text": "&&", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-all", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-voice-pitch-semitones'] = {"text": "<semitones>", "type": "type", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#typedef-voice-pitch-semitones", "export": true, "normative": true, "for_": ["voice-pitch"]};
-window.refsData['#valdef-voice-pitch-absolute'] = {"text": "absolute", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-pitch-absolute", "export": true, "normative": true, "for_": ["voice-pitch"]};
-window.refsData['#voice-pitch-semitone'] = {"text": "semitone", "type": "dfn", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#voice-pitch-semitone", "export": true, "normative": true, "for_": ["voice-pitch"]};
-window.refsData['#valdef-voice-range-absolute'] = {"text": "absolute", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-range-absolute", "export": true, "normative": true, "for_": ["voice-range"]};
-window.refsData['#valdef-voice-stress-normal'] = {"text": "normal", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-stress-normal", "export": true, "normative": true, "for_": ["voice-stress"]};
-window.refsData['#valdef-voice-duration-auto'] = {"text": "auto", "type": "value", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#valdef-voice-duration-auto", "export": true, "normative": true, "for_": ["voice-duration"]};
-window.refsData['https://drafts.csswg.org/css-lists-3/#propdef-list-style-type'] = {"text": "list-style-type", "type": "property", "spec": "css-lists-3", "shortname": "css-lists", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-lists-3/#propdef-list-style-type", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-content-3/#propdef-content'] = {"text": "content", "type": "property", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-content-3/#propdef-content", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-lists-3/#propdef-list-style-image'] = {"text": "list-style-image", "type": "property", "spec": "css-lists-3", "shortname": "css-lists", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-lists-3/#propdef-list-style-image", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-counter-styles-3/#decimal'] = {"text": "decimal", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-counter-styles-3/#decimal", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
-window.refsData['https://drafts.csswg.org/css-counter-styles-3/#decimal-leading-zero'] = {"text": "decimal-leading-zero", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-counter-styles-3/#decimal-leading-zero", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
-window.refsData['https://drafts.csswg.org/css-counter-styles-3/#lower-roman'] = {"text": "lower-roman", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-counter-styles-3/#lower-roman", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
-window.refsData['https://drafts.csswg.org/css-counter-styles-3/#upper-roman'] = {"text": "upper-roman", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-counter-styles-3/#upper-roman", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
-window.refsData['https://drafts.csswg.org/css-counter-styles-3/#georgian'] = {"text": "georgian", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-counter-styles-3/#georgian", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
-window.refsData['https://drafts.csswg.org/css-counter-styles-3/#armenian'] = {"text": "armenian", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-counter-styles-3/#armenian", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
-window.refsData['https://drafts.csswg.org/css-counter-styles-3/#lower-latin'] = {"text": "lower-latin", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-counter-styles-3/#lower-latin", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
-window.refsData['https://drafts.csswg.org/css-counter-styles-3/#lower-alpha'] = {"text": "lower-alpha", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-counter-styles-3/#lower-alpha", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
-window.refsData['https://drafts.csswg.org/css-counter-styles-3/#upper-latin'] = {"text": "upper-latin", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-counter-styles-3/#upper-latin", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
-window.refsData['https://drafts.csswg.org/css-counter-styles-3/#upper-alpha'] = {"text": "upper-alpha", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-counter-styles-3/#upper-alpha", "export": true, "normative": true, "for_": ["<counter-style-name>"]};
-window.refsData['https://drafts.csswg.org/css-counter-styles-3/#lower-greek'] = {"text": "lower-greek", "type": "value", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-counter-styles-3/#lower-greek", "export": true, "normative": true, "for_": ["<counter-style-name>"]};window.refsData['#propdef-cue'] = {"text": "cue", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-cue", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-cue-after'] = {"text": "cue-after", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-cue-after", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-cue-before'] = {"text": "cue-before", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-cue-before", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-pause'] = {"text": "pause", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-pause", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-pause-after'] = {"text": "pause-after", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-pause-after", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-pause-before'] = {"text": "pause-before", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-pause-before", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-rest'] = {"text": "rest", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-rest", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-rest-after'] = {"text": "rest-after", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-rest-after", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-rest-before'] = {"text": "rest-before", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-rest-before", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-speak'] = {"text": "speak", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-speak", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-speak-as'] = {"text": "speak-as", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-speak-as", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-voice-balance'] = {"text": "voice-balance", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-voice-balance", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-voice-duration'] = {"text": "voice-duration", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-voice-duration", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-voice-family'] = {"text": "voice-family", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-voice-family", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-voice-pitch'] = {"text": "voice-pitch", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-voice-pitch", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-voice-range'] = {"text": "voice-range", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-voice-range", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-voice-rate'] = {"text": "voice-rate", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-voice-rate", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-voice-stress'] = {"text": "voice-stress", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-voice-stress", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-voice-volume'] = {"text": "voice-volume", "type": "property", "spec": "css-speech-1", "shortname": "css-speech", "level": "1", "status": "local", "url": "#propdef-voice-volume", "export": true, "normative": true, "for_": []};
 </script>

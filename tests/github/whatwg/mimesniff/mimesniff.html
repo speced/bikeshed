@@ -1856,493 +1856,8 @@ if ("serviceWorker" in navigator) {
    <dt id="biblio-mediaqueries">[MEDIAQUERIES]
    <dd>Florian Rivoal; Tab Atkins Jr.. <a href="https://drafts.csswg.org/mediaqueries-4/"><cite>Media Queries Level 4</cite></a>. URL: <a href="https://drafts.csswg.org/mediaqueries-4/">https://drafts.csswg.org/mediaqueries-4/</a>
   </dl>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['4456bfd9'] = {"dfnID": "4456bfd9", "url": "https://fetch.spec.whatwg.org/#collect-an-http-quoted-string", "dfnText": "collecting an http quoted string", "refSections": [{"refs": [{"id": "ref-for-collect-an-http-quoted-string"}], "title": "4.4. Parsing a MIME type"}], "external": true};
-window.dfnpanelData['a33db89a'] = {"dfnID": "a33db89a", "url": "https://fetch.spec.whatwg.org/#concept-fetch", "dfnText": "fetch", "refSections": [{"refs": [{"id": "ref-for-concept-fetch"}], "title": "8.4. Sniffing in a plugin context"}, {"refs": [{"id": "ref-for-concept-fetch\u2460"}], "title": "8.5. Sniffing in a style context"}, {"refs": [{"id": "ref-for-concept-fetch\u2461"}], "title": "8.6. Sniffing in a script context"}], "external": true};
-window.dfnpanelData['5fe4ff5e'] = {"dfnID": "5fe4ff5e", "url": "https://fetch.spec.whatwg.org/#http-whitespace", "dfnText": "http whitespace", "refSections": [{"refs": [{"id": "ref-for-http-whitespace"}, {"id": "ref-for-http-whitespace\u2460"}, {"id": "ref-for-http-whitespace\u2461"}, {"id": "ref-for-http-whitespace\u2462"}, {"id": "ref-for-http-whitespace\u2463"}], "title": "4.4. Parsing a MIME type"}], "external": true};
-window.dfnpanelData['0cf3964f'] = {"dfnID": "0cf3964f", "url": "https://html.spec.whatwg.org/multipage/scripting.html#script", "dfnText": "script", "refSections": [{"refs": [{"id": "ref-for-script"}], "title": "4.6. MIME type groups"}], "external": true};
-window.dfnpanelData['ee18ab25'] = {"dfnID": "ee18ab25", "url": "https://html.spec.whatwg.org/multipage/scripting.html#attr-script-type", "dfnText": "type", "refSections": [{"refs": [{"id": "ref-for-attr-script-type"}], "title": "4.6. MIME type groups"}], "external": true};
-window.dfnpanelData['58a7f8cc'] = {"dfnID": "58a7f8cc", "url": "https://tools.ietf.org/html/rfc7231#section-3.1.1.1", "dfnText": "media-type", "refSections": [{"refs": [{"id": "ref-for-section-3.1.1.1"}], "title": "4.3. MIME type writing"}], "external": true};
-window.dfnpanelData['c5610ee2'] = {"dfnID": "c5610ee2", "url": "https://tools.ietf.org/html/rfc7230#section-3.2.6", "dfnText": "quoted-string", "refSections": [{"refs": [{"id": "ref-for-section-3.2.6"}, {"id": "ref-for-section-3.2.6\u2460"}], "title": "3. Terminology"}], "external": true};
-window.dfnpanelData['4a4e79bc'] = {"dfnID": "4a4e79bc", "url": "https://tools.ietf.org/html/rfc7230#section-3.2.6", "dfnText": "token", "refSections": [{"refs": [{"id": "ref-for-section-3.2.6"}, {"id": "ref-for-section-3.2.6\u2460"}], "title": "3. Terminology"}], "external": true};
-window.dfnpanelData['f43d6978'] = {"dfnID": "f43d6978", "url": "https://infra.spec.whatwg.org/#ascii-alphanumeric", "dfnText": "ascii alphanumeric", "refSections": [{"refs": [{"id": "ref-for-ascii-alphanumeric"}], "title": "3. Terminology"}], "external": true};
-window.dfnpanelData['7f9469b5'] = {"dfnID": "7f9469b5", "url": "https://infra.spec.whatwg.org/#ascii-case-insensitive", "dfnText": "ascii case-insensitive", "refSections": [{"refs": [{"id": "ref-for-ascii-case-insensitive"}], "title": "4.6. MIME type groups"}], "external": true};
-window.dfnpanelData['6f2dfa22'] = {"dfnID": "6f2dfa22", "url": "https://infra.spec.whatwg.org/#ascii-lowercase", "dfnText": "ascii lowercase", "refSections": [{"refs": [{"id": "ref-for-ascii-lowercase"}, {"id": "ref-for-ascii-lowercase\u2460"}, {"id": "ref-for-ascii-lowercase\u2461"}], "title": "4.4. Parsing a MIME type"}], "external": true};
-window.dfnpanelData['2d5a2765'] = {"dfnID": "2d5a2765", "url": "https://infra.spec.whatwg.org/#ascii-string", "dfnText": "ascii string", "refSections": [{"refs": [{"id": "ref-for-ascii-string"}, {"id": "ref-for-ascii-string\u2460"}, {"id": "ref-for-ascii-string\u2461"}], "title": "4.1. MIME type representation"}], "external": true};
-window.dfnpanelData['5fb1ed8a'] = {"dfnID": "5fb1ed8a", "url": "https://infra.spec.whatwg.org/#ascii-whitespace", "dfnText": "ascii whitespace", "refSections": [{"refs": [{"id": "ref-for-ascii-whitespace"}], "title": "4.4. Parsing a MIME type"}], "external": true};
-window.dfnpanelData['7b0d918d'] = {"dfnID": "7b0d918d", "url": "https://infra.spec.whatwg.org/#iteration-break", "dfnText": "break", "refSections": [{"refs": [{"id": "ref-for-iteration-break"}], "title": "4.4. Parsing a MIME type"}, {"refs": [{"id": "ref-for-iteration-break\u2460"}], "title": "6. Matching a MIME type pattern"}], "external": true};
-window.dfnpanelData['f5354b9d'] = {"dfnID": "f5354b9d", "url": "https://infra.spec.whatwg.org/#byte", "dfnText": "byte", "refSections": [{"refs": [{"id": "ref-for-byte"}, {"id": "ref-for-byte\u2460"}, {"id": "ref-for-byte\u2461"}, {"id": "ref-for-byte\u2462"}, {"id": "ref-for-byte\u2463"}, {"id": "ref-for-byte\u2464"}], "title": "3. Terminology"}, {"refs": [{"id": "ref-for-byte\u2465"}], "title": "5.1. Interpreting the resource metadata"}, {"refs": [{"id": "ref-for-byte\u2466"}, {"id": "ref-for-byte\u2467"}, {"id": "ref-for-byte\u2468"}, {"id": "ref-for-byte\u2460\u24ea"}], "title": "5.2. Reading the resource header"}, {"refs": [{"id": "ref-for-byte\u2460\u2460"}, {"id": "ref-for-byte\u2460\u2461"}, {"id": "ref-for-byte\u2460\u2462"}, {"id": "ref-for-byte\u2460\u2463"}, {"id": "ref-for-byte\u2460\u2464"}], "title": "6. Matching a MIME type pattern"}, {"refs": [{"id": "ref-for-byte\u2460\u2465"}, {"id": "ref-for-byte\u2460\u2466"}, {"id": "ref-for-byte\u2460\u2467"}, {"id": "ref-for-byte\u2460\u2468"}], "title": "6.1. Matching an image type pattern"}, {"refs": [{"id": "ref-for-byte\u2461\u24ea"}, {"id": "ref-for-byte\u2461\u2460"}, {"id": "ref-for-byte\u2461\u2461"}, {"id": "ref-for-byte\u2461\u2462"}, {"id": "ref-for-byte\u2461\u2463"}], "title": "6.2. Matching an audio or video type pattern"}, {"refs": [{"id": "ref-for-byte\u2461\u2464"}, {"id": "ref-for-byte\u2461\u2465"}, {"id": "ref-for-byte\u2461\u2466"}, {"id": "ref-for-byte\u2461\u2467"}, {"id": "ref-for-byte\u2461\u2468"}, {"id": "ref-for-byte\u2462\u24ea"}, {"id": "ref-for-byte\u2462\u2460"}, {"id": "ref-for-byte\u2462\u2461"}], "title": "6.2.1. Signature for MP4"}, {"refs": [{"id": "ref-for-byte\u2462\u2462"}, {"id": "ref-for-byte\u2462\u2463"}, {"id": "ref-for-byte\u2462\u2464"}, {"id": "ref-for-byte\u2462\u2465"}], "title": "6.2.2. Signature for WebM"}, {"refs": [{"id": "ref-for-byte\u2462\u2466"}, {"id": "ref-for-byte\u2462\u2467"}, {"id": "ref-for-byte\u2462\u2468"}], "title": "6.2.3. Signature for MP3 without ID3"}, {"refs": [{"id": "ref-for-byte\u2463\u24ea"}, {"id": "ref-for-byte\u2463\u2460"}, {"id": "ref-for-byte\u2463\u2461"}], "title": "6.3. Matching a font type pattern"}, {"refs": [{"id": "ref-for-byte\u2463\u2462"}], "title": "6.4. Matching an archive type pattern"}, {"refs": [{"id": "ref-for-byte\u2463\u2463"}, {"id": "ref-for-byte\u2463\u2464"}], "title": "7.1. Identifying a resource with an unknown MIME type"}, {"refs": [{"id": "ref-for-byte\u2463\u2465"}], "title": "7.2. Sniffing a mislabeled binary resource"}, {"refs": [{"id": "ref-for-byte\u2463\u2466"}, {"id": "ref-for-byte\u2463\u2467"}, {"id": "ref-for-byte\u2463\u2468"}, {"id": "ref-for-byte\u2464\u24ea"}, {"id": "ref-for-byte\u2464\u2460"}, {"id": "ref-for-byte\u2464\u2461"}, {"id": "ref-for-byte\u2464\u2462"}, {"id": "ref-for-byte\u2464\u2463"}, {"id": "ref-for-byte\u2464\u2464"}, {"id": "ref-for-byte\u2464\u2465"}, {"id": "ref-for-byte\u2464\u2466"}, {"id": "ref-for-byte\u2464\u2467"}, {"id": "ref-for-byte\u2464\u2468"}, {"id": "ref-for-byte\u2465\u24ea"}], "title": "7.3. Sniffing a mislabeled feed"}], "external": true};
-window.dfnpanelData['3de9e659'] = {"dfnID": "3de9e659", "url": "https://infra.spec.whatwg.org/#byte-sequence", "dfnText": "byte sequence", "refSections": [{"refs": [{"id": "ref-for-byte-sequence"}], "title": "4.4. Parsing a MIME type"}, {"refs": [{"id": "ref-for-byte-sequence\u2460"}, {"id": "ref-for-byte-sequence\u2461"}], "title": "5.2. Reading the resource header"}, {"refs": [{"id": "ref-for-byte-sequence\u2462"}, {"id": "ref-for-byte-sequence\u2463"}, {"id": "ref-for-byte-sequence\u2464"}, {"id": "ref-for-byte-sequence\u2465"}], "title": "6. Matching a MIME type pattern"}, {"refs": [{"id": "ref-for-byte-sequence\u2466"}], "title": "6.1. Matching an image type pattern"}, {"refs": [{"id": "ref-for-byte-sequence\u2467"}], "title": "6.2. Matching an audio or video type pattern"}, {"refs": [{"id": "ref-for-byte-sequence\u2468"}, {"id": "ref-for-byte-sequence\u2460\u24ea"}], "title": "6.2.1. Signature for MP4"}, {"refs": [{"id": "ref-for-byte-sequence\u2460\u2460"}, {"id": "ref-for-byte-sequence\u2460\u2461"}, {"id": "ref-for-byte-sequence\u2460\u2462"}], "title": "6.2.2. Signature for WebM"}, {"refs": [{"id": "ref-for-byte-sequence\u2460\u2463"}, {"id": "ref-for-byte-sequence\u2460\u2464"}, {"id": "ref-for-byte-sequence\u2460\u2465"}], "title": "6.2.3. Signature for MP3 without ID3"}, {"refs": [{"id": "ref-for-byte-sequence\u2460\u2466"}], "title": "6.3. Matching a font type pattern"}, {"refs": [{"id": "ref-for-byte-sequence\u2460\u2467"}], "title": "6.4. Matching an archive type pattern"}, {"refs": [{"id": "ref-for-byte-sequence\u2460\u2468"}, {"id": "ref-for-byte-sequence\u2461\u24ea"}], "title": "7. Determining the computed MIME type of a resource"}, {"refs": [{"id": "ref-for-byte-sequence\u2461\u2460"}], "title": "8.2. Sniffing in an image context"}, {"refs": [{"id": "ref-for-byte-sequence\u2461\u2461"}], "title": "8.3. Sniffing in an audio or video context"}, {"refs": [{"id": "ref-for-byte-sequence\u2461\u2462"}], "title": "8.7. Sniffing in a font context"}], "external": true};
-window.dfnpanelData['915aff5e'] = {"dfnID": "915aff5e", "url": "https://infra.spec.whatwg.org/#code-point", "dfnText": "code point", "refSections": [{"refs": [{"id": "ref-for-code-point"}, {"id": "ref-for-code-point\u2460"}], "title": "3. Terminology"}, {"refs": [{"id": "ref-for-code-point\u2461"}, {"id": "ref-for-code-point\u2462"}], "title": "4.4. Parsing a MIME type"}], "external": true};
-window.dfnpanelData['d24334b4'] = {"dfnID": "d24334b4", "url": "https://infra.spec.whatwg.org/#collect-a-sequence-of-code-points", "dfnText": "collect a sequence of code points", "refSections": [{"refs": [{"id": "ref-for-collect-a-sequence-of-code-points"}, {"id": "ref-for-collect-a-sequence-of-code-points\u2460"}, {"id": "ref-for-collect-a-sequence-of-code-points\u2461"}, {"id": "ref-for-collect-a-sequence-of-code-points\u2462"}, {"id": "ref-for-collect-a-sequence-of-code-points\u2463"}, {"id": "ref-for-collect-a-sequence-of-code-points\u2464"}], "title": "4.4. Parsing a MIME type"}], "external": true};
-window.dfnpanelData['60184fa5'] = {"dfnID": "60184fa5", "url": "https://infra.spec.whatwg.org/#collect-a-sequence-of-code-points", "dfnText": "collecting a sequence of code points", "refSections": [{"refs": [{"id": "ref-for-collect-a-sequence-of-code-points"}, {"id": "ref-for-collect-a-sequence-of-code-points\u2460"}, {"id": "ref-for-collect-a-sequence-of-code-points\u2461"}, {"id": "ref-for-collect-a-sequence-of-code-points\u2462"}, {"id": "ref-for-collect-a-sequence-of-code-points\u2463"}, {"id": "ref-for-collect-a-sequence-of-code-points\u2464"}], "title": "4.4. Parsing a MIME type"}], "external": true};
-window.dfnpanelData['ae8def21'] = {"dfnID": "ae8def21", "url": "https://infra.spec.whatwg.org/#list-contain", "dfnText": "contain", "refSections": [{"refs": [{"id": "ref-for-list-contain"}], "title": "6. Matching a MIME type pattern"}], "external": true};
-window.dfnpanelData['f937b7b6'] = {"dfnID": "f937b7b6", "url": "https://infra.spec.whatwg.org/#iteration-continue", "dfnText": "continue", "refSections": [{"refs": [{"id": "ref-for-iteration-continue"}, {"id": "ref-for-iteration-continue\u2460"}], "title": "4.4. Parsing a MIME type"}], "external": true};
-window.dfnpanelData['1243a891'] = {"dfnID": "1243a891", "url": "https://infra.spec.whatwg.org/#map-exists", "dfnText": "exist", "refSections": [{"refs": [{"id": "ref-for-map-exists"}], "title": "4.4. Parsing a MIME type"}], "external": true};
-window.dfnpanelData['45209803'] = {"dfnID": "45209803", "url": "https://infra.spec.whatwg.org/#map-iterate", "dfnText": "for each", "refSections": [{"refs": [{"id": "ref-for-map-iterate"}], "title": "4.5. Serializing a MIME type"}], "external": true};
-window.dfnpanelData['d8b963e8'] = {"dfnID": "d8b963e8", "url": "https://infra.spec.whatwg.org/#isomorphic-decode", "dfnText": "isomorphic decode", "refSections": [{"refs": [{"id": "ref-for-isomorphic-decode"}], "title": "4.4. Parsing a MIME type"}], "external": true};
-window.dfnpanelData['16b1470a'] = {"dfnID": "16b1470a", "url": "https://infra.spec.whatwg.org/#isomorphic-encode", "dfnText": "isomorphic encode", "refSections": [{"refs": [{"id": "ref-for-isomorphic-encode"}], "title": "4.5. Serializing a MIME type"}], "external": true};
-window.dfnpanelData['31db57e6'] = {"dfnID": "31db57e6", "url": "https://infra.spec.whatwg.org/#map-getting-the-keys", "dfnText": "keys", "refSections": [{"refs": [{"id": "ref-for-map-getting-the-keys"}], "title": "4.1. MIME type representation"}], "external": true};
-window.dfnpanelData['36333997'] = {"dfnID": "36333997", "url": "https://infra.spec.whatwg.org/#byte-sequence-length", "dfnText": "length", "refSections": [{"refs": [{"id": "ref-for-byte-sequence-length"}, {"id": "ref-for-byte-sequence-length\u2460"}, {"id": "ref-for-byte-sequence-length\u2461"}, {"id": "ref-for-byte-sequence-length\u2462"}, {"id": "ref-for-byte-sequence-length\u2463"}, {"id": "ref-for-byte-sequence-length\u2464"}], "title": "6. Matching a MIME type pattern"}], "external": true};
-window.dfnpanelData['84b454ff'] = {"dfnID": "84b454ff", "url": "https://infra.spec.whatwg.org/#ordered-map", "dfnText": "ordered map", "refSections": [{"refs": [{"id": "ref-for-ordered-map"}], "title": "4.1. MIME type representation"}], "external": true};
-window.dfnpanelData['75bee4d5'] = {"dfnID": "75bee4d5", "url": "https://infra.spec.whatwg.org/#string-position-variable", "dfnText": "position variable", "refSections": [{"refs": [{"id": "ref-for-string-position-variable"}], "title": "4.4. Parsing a MIME type"}], "external": true};
-window.dfnpanelData['15e48c39'] = {"dfnID": "15e48c39", "url": "https://infra.spec.whatwg.org/#ordered-set", "dfnText": "set", "refSections": [{"refs": [{"id": "ref-for-ordered-set"}], "title": "6. Matching a MIME type pattern"}], "external": true};
-window.dfnpanelData['0e6b2056'] = {"dfnID": "0e6b2056", "url": "https://infra.spec.whatwg.org/#map-set", "dfnText": "set (for map)", "refSections": [{"refs": [{"id": "ref-for-map-set"}], "title": "4.4. Parsing a MIME type"}], "external": true};
-window.dfnpanelData['50c91fa5'] = {"dfnID": "50c91fa5", "url": "https://infra.spec.whatwg.org/#skip-ascii-whitespace", "dfnText": "skip ascii whitespace", "refSections": [{"refs": [{"id": "ref-for-skip-ascii-whitespace"}], "title": "4.4. Parsing a MIME type"}], "external": true};
-window.dfnpanelData['0698d556'] = {"dfnID": "0698d556", "url": "https://infra.spec.whatwg.org/#string", "dfnText": "string", "refSections": [{"refs": [{"id": "ref-for-string"}], "title": "4.6. MIME type groups"}], "external": true};
-window.dfnpanelData['12d6b9a8'] = {"dfnID": "12d6b9a8", "url": "https://infra.spec.whatwg.org/#map-getting-the-values", "dfnText": "values", "refSections": [{"refs": [{"id": "ref-for-map-getting-the-values"}], "title": "4.1. MIME type representation"}], "external": true};
-window.dfnpanelData['http-token-code-point'] = {"dfnID": "http-token-code-point", "url": "#http-token-code-point", "dfnText": "HTTP token code point", "refSections": [{"refs": [{"id": "ref-for-http-token-code-point"}], "title": "3. Terminology"}, {"refs": [{"id": "ref-for-http-token-code-point\u2460"}, {"id": "ref-for-http-token-code-point\u2461"}, {"id": "ref-for-http-token-code-point\u2462"}], "title": "4.4. Parsing a MIME type"}, {"refs": [{"id": "ref-for-http-token-code-point\u2463"}], "title": "4.5. Serializing a MIME type"}], "external": false};
-window.dfnpanelData['http-quoted-string-token-code-point'] = {"dfnID": "http-quoted-string-token-code-point", "url": "#http-quoted-string-token-code-point", "dfnText": "HTTP quoted-string token code point", "refSections": [{"refs": [{"id": "ref-for-http-quoted-string-token-code-point"}], "title": "4.4. Parsing a MIME type"}], "external": false};
-window.dfnpanelData['binary-data-byte'] = {"dfnID": "binary-data-byte", "url": "#binary-data-byte", "dfnText": "binary data byte", "refSections": [{"refs": [{"id": "ref-for-binary-data-byte"}], "title": "7.1. Identifying a resource with an unknown MIME type"}, {"refs": [{"id": "ref-for-binary-data-byte\u2460"}], "title": "7.2. Sniffing a mislabeled binary resource"}], "external": false};
-window.dfnpanelData['whitespace-byte'] = {"dfnID": "whitespace-byte", "url": "#whitespace-byte", "dfnText": "whitespace byte", "refSections": [{"refs": [{"id": "ref-for-whitespace-byte"}, {"id": "ref-for-whitespace-byte\u2460"}, {"id": "ref-for-whitespace-byte\u2461"}, {"id": "ref-for-whitespace-byte\u2462"}, {"id": "ref-for-whitespace-byte\u2463"}, {"id": "ref-for-whitespace-byte\u2464"}, {"id": "ref-for-whitespace-byte\u2465"}, {"id": "ref-for-whitespace-byte\u2466"}, {"id": "ref-for-whitespace-byte\u2467"}, {"id": "ref-for-whitespace-byte\u2468"}, {"id": "ref-for-whitespace-byte\u2460\u24ea"}, {"id": "ref-for-whitespace-byte\u2460\u2460"}, {"id": "ref-for-whitespace-byte\u2460\u2461"}, {"id": "ref-for-whitespace-byte\u2460\u2462"}, {"id": "ref-for-whitespace-byte\u2460\u2463"}, {"id": "ref-for-whitespace-byte\u2460\u2464"}, {"id": "ref-for-whitespace-byte\u2460\u2465"}, {"id": "ref-for-whitespace-byte\u2460\u2466"}], "title": "7.1. Identifying a resource with an unknown MIME type"}, {"refs": [{"id": "ref-for-whitespace-byte\u2460\u2467"}], "title": "7.3. Sniffing a mislabeled feed"}], "external": false};
-window.dfnpanelData['tag-terminating-byte'] = {"dfnID": "tag-terminating-byte", "url": "#tag-terminating-byte", "dfnText": "tag-terminating byte", "refSections": [{"refs": [{"id": "ref-for-tag-terminating-byte"}, {"id": "ref-for-tag-terminating-byte\u2460"}, {"id": "ref-for-tag-terminating-byte\u2461"}, {"id": "ref-for-tag-terminating-byte\u2462"}, {"id": "ref-for-tag-terminating-byte\u2463"}, {"id": "ref-for-tag-terminating-byte\u2464"}, {"id": "ref-for-tag-terminating-byte\u2465"}, {"id": "ref-for-tag-terminating-byte\u2466"}, {"id": "ref-for-tag-terminating-byte\u2467"}, {"id": "ref-for-tag-terminating-byte\u2468"}, {"id": "ref-for-tag-terminating-byte\u2460\u24ea"}, {"id": "ref-for-tag-terminating-byte\u2460\u2460"}, {"id": "ref-for-tag-terminating-byte\u2460\u2461"}, {"id": "ref-for-tag-terminating-byte\u2460\u2462"}, {"id": "ref-for-tag-terminating-byte\u2460\u2463"}, {"id": "ref-for-tag-terminating-byte\u2460\u2464"}, {"id": "ref-for-tag-terminating-byte\u2460\u2465"}], "title": "7.1. Identifying a resource with an unknown MIME type"}], "external": false};
-window.dfnpanelData['mime-type'] = {"dfnID": "mime-type", "url": "#mime-type", "dfnText": "MIME type", "refSections": [{"refs": [{"id": "ref-for-mime-type"}, {"id": "ref-for-mime-type\u2460"}, {"id": "ref-for-mime-type\u2461"}, {"id": "ref-for-mime-type\u2462"}, {"id": "ref-for-mime-type\u2463"}], "title": "4.1. MIME type representation"}, {"refs": [{"id": "ref-for-mime-type\u2464"}, {"id": "ref-for-mime-type\u2465"}, {"id": "ref-for-mime-type\u2466"}], "title": "4.2. MIME type miscellaneous"}, {"refs": [{"id": "ref-for-mime-type\u2467"}], "title": "4.3. MIME type writing"}, {"refs": [{"id": "ref-for-mime-type\u2468"}], "title": "4.4. Parsing a MIME type"}, {"refs": [{"id": "ref-for-mime-type\u2460\u24ea"}, {"id": "ref-for-mime-type\u2460\u2460"}], "title": "4.5. Serializing a MIME type"}, {"refs": [{"id": "ref-for-mime-type\u2460\u2461"}, {"id": "ref-for-mime-type\u2460\u2462"}, {"id": "ref-for-mime-type\u2460\u2463"}, {"id": "ref-for-mime-type\u2460\u2464"}, {"id": "ref-for-mime-type\u2460\u2465"}, {"id": "ref-for-mime-type\u2460\u2466"}, {"id": "ref-for-mime-type\u2460\u2467"}, {"id": "ref-for-mime-type\u2460\u2468"}, {"id": "ref-for-mime-type\u2461\u24ea"}, {"id": "ref-for-mime-type\u2461\u2460"}], "title": "4.6. MIME type groups"}, {"refs": [{"id": "ref-for-mime-type\u2461\u2461"}, {"id": "ref-for-mime-type\u2461\u2462"}], "title": "5. Handling a resource"}, {"refs": [{"id": "ref-for-mime-type\u2461\u2463"}, {"id": "ref-for-mime-type\u2461\u2464"}, {"id": "ref-for-mime-type\u2461\u2465"}, {"id": "ref-for-mime-type\u2461\u2466"}], "title": "5.1. Interpreting the resource metadata"}, {"refs": [{"id": "ref-for-mime-type\u2461\u2467"}, {"id": "ref-for-mime-type\u2461\u2468"}], "title": "7.1. Identifying a resource with an unknown MIME type"}, {"refs": [{"id": "ref-for-mime-type\u2462\u24ea"}, {"id": "ref-for-mime-type\u2462\u2460"}], "title": "8. Context-specific sniffing"}], "external": false};
-window.dfnpanelData['type'] = {"dfnID": "type", "url": "#type", "dfnText": "type", "refSections": [{"refs": [{"id": "ref-for-type"}], "title": "4.2. MIME type miscellaneous"}, {"refs": [{"id": "ref-for-type\u2460"}], "title": "4.4. Parsing a MIME type"}, {"refs": [{"id": "ref-for-type\u2461"}], "title": "4.5. Serializing a MIME type"}, {"refs": [{"id": "ref-for-type\u2462"}, {"id": "ref-for-type\u2463"}, {"id": "ref-for-type\u2464"}], "title": "4.6. MIME type groups"}], "external": false};
-window.dfnpanelData['subtype'] = {"dfnID": "subtype", "url": "#subtype", "dfnText": "subtype", "refSections": [{"refs": [{"id": "ref-for-subtype"}], "title": "4.2. MIME type miscellaneous"}, {"refs": [{"id": "ref-for-subtype\u2460"}], "title": "4.4. Parsing a MIME type"}, {"refs": [{"id": "ref-for-subtype\u2461"}], "title": "4.5. Serializing a MIME type"}, {"refs": [{"id": "ref-for-subtype\u2462"}, {"id": "ref-for-subtype\u2463"}, {"id": "ref-for-subtype\u2464"}], "title": "4.6. MIME type groups"}], "external": false};
-window.dfnpanelData['parameters'] = {"dfnID": "parameters", "url": "#parameters", "dfnText": "parameters", "refSections": [{"refs": [{"id": "ref-for-parameters"}], "title": "4.3. MIME type writing"}, {"refs": [{"id": "ref-for-parameters\u2460"}, {"id": "ref-for-parameters\u2461"}], "title": "4.4. Parsing a MIME type"}, {"refs": [{"id": "ref-for-parameters\u2462"}], "title": "4.5. Serializing a MIME type"}], "external": false};
-window.dfnpanelData['mime-type-essence'] = {"dfnID": "mime-type-essence", "url": "#mime-type-essence", "dfnText": "essence", "refSections": [{"refs": [{"id": "ref-for-mime-type-essence"}, {"id": "ref-for-mime-type-essence\u2460"}, {"id": "ref-for-mime-type-essence\u2461"}, {"id": "ref-for-mime-type-essence\u2462"}, {"id": "ref-for-mime-type-essence\u2463"}, {"id": "ref-for-mime-type-essence\u2464"}, {"id": "ref-for-mime-type-essence\u2465"}, {"id": "ref-for-mime-type-essence\u2466"}, {"id": "ref-for-mime-type-essence\u2467"}], "title": "4.6. MIME type groups"}, {"refs": [{"id": "ref-for-mime-type-essence\u2468"}, {"id": "ref-for-mime-type-essence\u2460\u24ea"}], "title": "7. Determining the computed MIME type of a resource"}], "external": false};
-window.dfnpanelData['supported-by-the-user-agent'] = {"dfnID": "supported-by-the-user-agent", "url": "#supported-by-the-user-agent", "dfnText": "supported by the user agent", "refSections": [{"refs": [{"id": "ref-for-supported-by-the-user-agent"}, {"id": "ref-for-supported-by-the-user-agent\u2460"}], "title": "7. Determining the computed MIME type of a resource"}], "external": false};
-window.dfnpanelData['valid-mime-type'] = {"dfnID": "valid-mime-type", "url": "#valid-mime-type", "dfnText": "valid MIME type string", "refSections": [{"refs": [{"id": "ref-for-valid-mime-type"}, {"id": "ref-for-valid-mime-type\u2460"}, {"id": "ref-for-valid-mime-type\u2461"}, {"id": "ref-for-valid-mime-type\u2462"}, {"id": "ref-for-valid-mime-type\u2463"}], "title": "4.3. MIME type writing"}], "external": false};
-window.dfnpanelData['parse-a-mime-type'] = {"dfnID": "parse-a-mime-type", "url": "#parse-a-mime-type", "dfnText": "parse a MIME type", "refSections": [{"refs": [{"id": "ref-for-parse-a-mime-type"}], "title": "4.3. MIME type writing"}, {"refs": [{"id": "ref-for-parse-a-mime-type\u2460"}], "title": "4.4. Parsing a MIME type"}], "external": false};
-window.dfnpanelData['serialize-a-mime-type'] = {"dfnID": "serialize-a-mime-type", "url": "#serialize-a-mime-type", "dfnText": "serialize a MIME type", "refSections": [{"refs": [{"id": "ref-for-serialize-a-mime-type"}], "title": "4.5. Serializing a MIME type"}], "external": false};
-window.dfnpanelData['image-mime-type'] = {"dfnID": "image-mime-type", "url": "#image-mime-type", "dfnText": "image MIME type", "refSections": [{"refs": [{"id": "ref-for-image-mime-type"}, {"id": "ref-for-image-mime-type\u2460"}], "title": "6.1. Matching an image type pattern"}, {"refs": [{"id": "ref-for-image-mime-type\u2461"}], "title": "7. Determining the computed MIME type of a resource"}, {"refs": [{"id": "ref-for-image-mime-type\u2462"}], "title": "8.2. Sniffing in an image context"}], "external": false};
-window.dfnpanelData['audio-or-video-mime-type'] = {"dfnID": "audio-or-video-mime-type", "url": "#audio-or-video-mime-type", "dfnText": "audio or video MIME type", "refSections": [{"refs": [{"id": "ref-for-audio-or-video-mime-type"}, {"id": "ref-for-audio-or-video-mime-type\u2460"}], "title": "6.2. Matching an audio or video type pattern"}, {"refs": [{"id": "ref-for-audio-or-video-mime-type\u2461"}], "title": "7. Determining the computed MIME type of a resource"}, {"refs": [{"id": "ref-for-audio-or-video-mime-type\u2462"}], "title": "8.3. Sniffing in an audio or video context"}], "external": false};
-window.dfnpanelData['font-mime-type'] = {"dfnID": "font-mime-type", "url": "#font-mime-type", "dfnText": "font MIME type", "refSections": [{"refs": [{"id": "ref-for-font-mime-type"}, {"id": "ref-for-font-mime-type\u2460"}], "title": "6.3. Matching a font type pattern"}, {"refs": [{"id": "ref-for-font-mime-type\u2461"}], "title": "8.7. Sniffing in a font context"}], "external": false};
-window.dfnpanelData['archive-mime-type'] = {"dfnID": "archive-mime-type", "url": "#archive-mime-type", "dfnText": "archive MIME type", "refSections": [{"refs": [{"id": "ref-for-archive-mime-type"}, {"id": "ref-for-archive-mime-type\u2460"}], "title": "6.4. Matching an archive type pattern"}], "external": false};
-window.dfnpanelData['xml-mime-type'] = {"dfnID": "xml-mime-type", "url": "#xml-mime-type", "dfnText": "XML MIME type", "refSections": [{"refs": [{"id": "ref-for-xml-mime-type"}], "title": "4.6. MIME type groups"}, {"refs": [{"id": "ref-for-xml-mime-type\u2460"}], "title": "7. Determining the computed MIME type of a resource"}, {"refs": [{"id": "ref-for-xml-mime-type\u2461"}], "title": "8.2. Sniffing in an image context"}, {"refs": [{"id": "ref-for-xml-mime-type\u2462"}], "title": "8.3. Sniffing in an audio or video context"}, {"refs": [{"id": "ref-for-xml-mime-type\u2463"}], "title": "8.7. Sniffing in a font context"}], "external": false};
-window.dfnpanelData['html-mime-type'] = {"dfnID": "html-mime-type", "url": "#html-mime-type", "dfnText": "HTML MIME type", "refSections": [{"refs": [{"id": "ref-for-html-mime-type"}], "title": "4.6. MIME type groups"}], "external": false};
-window.dfnpanelData['scriptable-mime-type'] = {"dfnID": "scriptable-mime-type", "url": "#scriptable-mime-type", "dfnText": "scriptable MIME type", "refSections": [{"refs": [{"id": "ref-for-scriptable-mime-type"}], "title": "7.1. Identifying a resource with an unknown MIME type"}, {"refs": [{"id": "ref-for-scriptable-mime-type\u2460"}], "title": "7.2. Sniffing a mislabeled binary resource"}], "external": false};
-window.dfnpanelData['javascript-mime-type'] = {"dfnID": "javascript-mime-type", "url": "#javascript-mime-type", "dfnText": "JavaScript MIME type", "refSections": [{"refs": [{"id": "ref-for-javascript-mime-type"}], "title": "4.6. MIME type groups"}], "external": false};
-window.dfnpanelData['resource'] = {"dfnID": "resource", "url": "#resource", "dfnText": "resource", "refSections": [{"refs": [{"id": "ref-for-resource"}], "title": "4.2. MIME type miscellaneous"}, {"refs": [{"id": "ref-for-resource\u2460"}, {"id": "ref-for-resource\u2461"}, {"id": "ref-for-resource\u2462"}, {"id": "ref-for-resource\u2463"}], "title": "5. Handling a resource"}, {"refs": [{"id": "ref-for-resource\u2464"}, {"id": "ref-for-resource\u2465"}, {"id": "ref-for-resource\u2466"}, {"id": "ref-for-resource\u2467"}, {"id": "ref-for-resource\u2468"}, {"id": "ref-for-resource\u2460\u24ea"}, {"id": "ref-for-resource\u2460\u2460"}, {"id": "ref-for-resource\u2460\u2461"}, {"id": "ref-for-resource\u2460\u2462"}, {"id": "ref-for-resource\u2460\u2463"}], "title": "5.1. Interpreting the resource metadata"}, {"refs": [{"id": "ref-for-resource\u2460\u2464"}, {"id": "ref-for-resource\u2460\u2465"}, {"id": "ref-for-resource\u2460\u2466"}, {"id": "ref-for-resource\u2460\u2467"}], "title": "5.2. Reading the resource header"}, {"refs": [{"id": "ref-for-resource\u2460\u2468"}], "title": "7. Determining the computed MIME type of a resource"}, {"refs": [{"id": "ref-for-resource\u2461\u24ea"}], "title": "7.1. Identifying a resource with an unknown MIME type"}, {"refs": [{"id": "ref-for-resource\u2461\u2460"}], "title": "7.2. Sniffing a mislabeled binary resource"}, {"refs": [{"id": "ref-for-resource\u2461\u2461"}, {"id": "ref-for-resource\u2461\u2462"}, {"id": "ref-for-resource\u2461\u2463"}, {"id": "ref-for-resource\u2461\u2464"}], "title": "8. Context-specific sniffing"}, {"refs": [{"id": "ref-for-resource\u2461\u2465"}], "title": "8.2. Sniffing in an image context"}, {"refs": [{"id": "ref-for-resource\u2461\u2466"}], "title": "8.3. Sniffing in an audio or video context"}, {"refs": [{"id": "ref-for-resource\u2461\u2467"}], "title": "8.4. Sniffing in a plugin context"}, {"refs": [{"id": "ref-for-resource\u2461\u2468"}], "title": "8.5. Sniffing in a style context"}, {"refs": [{"id": "ref-for-resource\u2462\u24ea"}], "title": "8.6. Sniffing in a script context"}, {"refs": [{"id": "ref-for-resource\u2462\u2460"}], "title": "8.7. Sniffing in a font context"}], "external": false};
-window.dfnpanelData['supplied-mime-type'] = {"dfnID": "supplied-mime-type", "url": "#supplied-mime-type", "dfnText": "supplied MIME type", "refSections": [{"refs": [{"id": "ref-for-supplied-mime-type"}, {"id": "ref-for-supplied-mime-type\u2460"}, {"id": "ref-for-supplied-mime-type\u2461"}, {"id": "ref-for-supplied-mime-type\u2462"}, {"id": "ref-for-supplied-mime-type\u2463"}], "title": "5.1. Interpreting the resource metadata"}, {"refs": [{"id": "ref-for-supplied-mime-type\u2464"}, {"id": "ref-for-supplied-mime-type\u2465"}, {"id": "ref-for-supplied-mime-type\u2466"}, {"id": "ref-for-supplied-mime-type\u2467"}, {"id": "ref-for-supplied-mime-type\u2468"}, {"id": "ref-for-supplied-mime-type\u2460\u24ea"}, {"id": "ref-for-supplied-mime-type\u2460\u2460"}, {"id": "ref-for-supplied-mime-type\u2460\u2461"}, {"id": "ref-for-supplied-mime-type\u2460\u2462"}], "title": "7. Determining the computed MIME type of a resource"}, {"refs": [{"id": "ref-for-supplied-mime-type\u2460\u2463"}, {"id": "ref-for-supplied-mime-type\u2460\u2464"}, {"id": "ref-for-supplied-mime-type\u2460\u2465"}, {"id": "ref-for-supplied-mime-type\u2460\u2466"}, {"id": "ref-for-supplied-mime-type\u2460\u2467"}, {"id": "ref-for-supplied-mime-type\u2460\u2468"}, {"id": "ref-for-supplied-mime-type\u2461\u24ea"}, {"id": "ref-for-supplied-mime-type\u2461\u2460"}, {"id": "ref-for-supplied-mime-type\u2461\u2461"}, {"id": "ref-for-supplied-mime-type\u2461\u2462"}, {"id": "ref-for-supplied-mime-type\u2461\u2463"}], "title": "7.3. Sniffing a mislabeled feed"}, {"refs": [{"id": "ref-for-supplied-mime-type\u2461\u2464"}, {"id": "ref-for-supplied-mime-type\u2461\u2465"}, {"id": "ref-for-supplied-mime-type\u2461\u2466"}], "title": "8.2. Sniffing in an image context"}, {"refs": [{"id": "ref-for-supplied-mime-type\u2461\u2467"}, {"id": "ref-for-supplied-mime-type\u2461\u2468"}, {"id": "ref-for-supplied-mime-type\u2462\u24ea"}], "title": "8.3. Sniffing in an audio or video context"}, {"refs": [{"id": "ref-for-supplied-mime-type\u2462\u2460"}, {"id": "ref-for-supplied-mime-type\u2462\u2461"}], "title": "8.4. Sniffing in a plugin context"}, {"refs": [{"id": "ref-for-supplied-mime-type\u2462\u2462"}, {"id": "ref-for-supplied-mime-type\u2462\u2463"}], "title": "8.5. Sniffing in a style context"}, {"refs": [{"id": "ref-for-supplied-mime-type\u2462\u2464"}, {"id": "ref-for-supplied-mime-type\u2462\u2465"}], "title": "8.6. Sniffing in a script context"}, {"refs": [{"id": "ref-for-supplied-mime-type\u2462\u2466"}, {"id": "ref-for-supplied-mime-type\u2462\u2467"}, {"id": "ref-for-supplied-mime-type\u2462\u2468"}], "title": "8.7. Sniffing in a font context"}], "external": false};
-window.dfnpanelData['check-for-apache-bug-flag'] = {"dfnID": "check-for-apache-bug-flag", "url": "#check-for-apache-bug-flag", "dfnText": "check-for-apache-bug flag", "refSections": [{"refs": [{"id": "ref-for-check-for-apache-bug-flag"}], "title": "5.1. Interpreting the resource metadata"}, {"refs": [{"id": "ref-for-check-for-apache-bug-flag\u2460"}], "title": "7. Determining the computed MIME type of a resource"}], "external": false};
-window.dfnpanelData['no-sniff-flag'] = {"dfnID": "no-sniff-flag", "url": "#no-sniff-flag", "dfnText": "no-sniff flag", "refSections": [{"refs": [{"id": "ref-for-no-sniff-flag"}, {"id": "ref-for-no-sniff-flag\u2460"}], "title": "7. Determining the computed MIME type of a resource"}], "external": false};
-window.dfnpanelData['computed-mime-type'] = {"dfnID": "computed-mime-type", "url": "#computed-mime-type", "dfnText": "computed MIME type", "refSections": [{"refs": [{"id": "ref-for-computed-mime-type"}, {"id": "ref-for-computed-mime-type\u2460"}, {"id": "ref-for-computed-mime-type\u2461"}, {"id": "ref-for-computed-mime-type\u2462"}, {"id": "ref-for-computed-mime-type\u2463"}, {"id": "ref-for-computed-mime-type\u2464"}], "title": "7. Determining the computed MIME type of a resource"}, {"refs": [{"id": "ref-for-computed-mime-type\u2465"}, {"id": "ref-for-computed-mime-type\u2466"}, {"id": "ref-for-computed-mime-type\u2467"}, {"id": "ref-for-computed-mime-type\u2468"}], "title": "7.1. Identifying a resource with an unknown MIME type"}, {"refs": [{"id": "ref-for-computed-mime-type\u2460\u24ea"}, {"id": "ref-for-computed-mime-type\u2460\u2460"}, {"id": "ref-for-computed-mime-type\u2460\u2461"}, {"id": "ref-for-computed-mime-type\u2460\u2462"}, {"id": "ref-for-computed-mime-type\u2460\u2463"}], "title": "7.2. Sniffing a mislabeled binary resource"}, {"refs": [{"id": "ref-for-computed-mime-type\u2460\u2464"}, {"id": "ref-for-computed-mime-type\u2460\u2465"}, {"id": "ref-for-computed-mime-type\u2460\u2466"}, {"id": "ref-for-computed-mime-type\u2460\u2467"}, {"id": "ref-for-computed-mime-type\u2460\u2468"}, {"id": "ref-for-computed-mime-type\u2461\u24ea"}, {"id": "ref-for-computed-mime-type\u2461\u2460"}, {"id": "ref-for-computed-mime-type\u2461\u2461"}, {"id": "ref-for-computed-mime-type\u2461\u2462"}, {"id": "ref-for-computed-mime-type\u2461\u2463"}, {"id": "ref-for-computed-mime-type\u2461\u2464"}, {"id": "ref-for-computed-mime-type\u2461\u2465"}, {"id": "ref-for-computed-mime-type\u2461\u2466"}, {"id": "ref-for-computed-mime-type\u2461\u2467"}, {"id": "ref-for-computed-mime-type\u2461\u2468"}], "title": "7.3. Sniffing a mislabeled feed"}, {"refs": [{"id": "ref-for-computed-mime-type\u2462\u24ea"}, {"id": "ref-for-computed-mime-type\u2462\u2460"}], "title": "8. Context-specific sniffing"}, {"refs": [{"id": "ref-for-computed-mime-type\u2462\u2461"}, {"id": "ref-for-computed-mime-type\u2462\u2462"}, {"id": "ref-for-computed-mime-type\u2462\u2463"}, {"id": "ref-for-computed-mime-type\u2462\u2464"}], "title": "8.2. Sniffing in an image context"}, {"refs": [{"id": "ref-for-computed-mime-type\u2462\u2465"}, {"id": "ref-for-computed-mime-type\u2462\u2466"}, {"id": "ref-for-computed-mime-type\u2462\u2467"}, {"id": "ref-for-computed-mime-type\u2462\u2468"}], "title": "8.3. Sniffing in an audio or video context"}, {"refs": [{"id": "ref-for-computed-mime-type\u2463\u24ea"}, {"id": "ref-for-computed-mime-type\u2463\u2460"}, {"id": "ref-for-computed-mime-type\u2463\u2461"}], "title": "8.4. Sniffing in a plugin context"}, {"refs": [{"id": "ref-for-computed-mime-type\u2463\u2462"}, {"id": "ref-for-computed-mime-type\u2463\u2463"}], "title": "8.5. Sniffing in a style context"}, {"refs": [{"id": "ref-for-computed-mime-type\u2463\u2464"}, {"id": "ref-for-computed-mime-type\u2463\u2465"}], "title": "8.6. Sniffing in a script context"}, {"refs": [{"id": "ref-for-computed-mime-type\u2463\u2466"}, {"id": "ref-for-computed-mime-type\u2463\u2467"}, {"id": "ref-for-computed-mime-type\u2463\u2468"}, {"id": "ref-for-computed-mime-type\u2464\u24ea"}], "title": "8.7. Sniffing in a font context"}, {"refs": [{"id": "ref-for-computed-mime-type\u2464\u2460"}], "title": "8.8. Sniffing in a text track context"}, {"refs": [{"id": "ref-for-computed-mime-type\u2464\u2461"}], "title": "8.9. Sniffing in a cache manifest context"}], "external": false};
-window.dfnpanelData['supplied-mime-type-detection-algorithm'] = {"dfnID": "supplied-mime-type-detection-algorithm", "url": "#supplied-mime-type-detection-algorithm", "dfnText": "supplied MIME type detection\n algorithm", "refSections": [{"refs": [{"id": "ref-for-supplied-mime-type-detection-algorithm"}], "title": "5. Handling a resource"}, {"refs": [{"id": "ref-for-supplied-mime-type-detection-algorithm\u2460"}], "title": "5.1. Interpreting the resource metadata"}], "external": false};
-window.dfnpanelData['resource-header'] = {"dfnID": "resource-header", "url": "#resource-header", "dfnText": "resource header", "refSections": [{"refs": [{"id": "ref-for-resource-header"}, {"id": "ref-for-resource-header\u2460"}], "title": "5.2. Reading the resource header"}, {"refs": [{"id": "ref-for-resource-header\u2461"}, {"id": "ref-for-resource-header\u2462"}], "title": "7. Determining the computed MIME type of a resource"}, {"refs": [{"id": "ref-for-resource-header\u2463"}, {"id": "ref-for-resource-header\u2464"}, {"id": "ref-for-resource-header\u2465"}, {"id": "ref-for-resource-header\u2466"}, {"id": "ref-for-resource-header\u2467"}, {"id": "ref-for-resource-header\u2468"}], "title": "7.1. Identifying a resource with an unknown MIME type"}, {"refs": [{"id": "ref-for-resource-header\u2460\u24ea"}, {"id": "ref-for-resource-header\u2460\u2460"}, {"id": "ref-for-resource-header\u2460\u2461"}, {"id": "ref-for-resource-header\u2460\u2462"}], "title": "7.2. Sniffing a mislabeled binary resource"}, {"refs": [{"id": "ref-for-resource-header\u2460\u2463"}], "title": "7.3. Sniffing a mislabeled feed"}, {"refs": [{"id": "ref-for-resource-header\u2460\u2464"}], "title": "8.2. Sniffing in an image context"}, {"refs": [{"id": "ref-for-resource-header\u2460\u2465"}], "title": "8.3. Sniffing in an audio or video context"}, {"refs": [{"id": "ref-for-resource-header\u2460\u2466"}], "title": "8.7. Sniffing in a font context"}], "external": false};
-window.dfnpanelData['read-the-resource-header'] = {"dfnID": "read-the-resource-header", "url": "#read-the-resource-header", "dfnText": "read the resource header", "refSections": [{"refs": [{"id": "ref-for-read-the-resource-header"}], "title": "5.2. Reading the resource header"}], "external": false};
-window.dfnpanelData['byte-pattern'] = {"dfnID": "byte-pattern", "url": "#byte-pattern", "dfnText": "byte pattern", "refSections": [{"refs": [{"id": "ref-for-byte-pattern"}, {"id": "ref-for-byte-pattern\u2460"}, {"id": "ref-for-byte-pattern\u2461"}], "title": "6. Matching a MIME type pattern"}, {"refs": [{"id": "ref-for-byte-pattern\u2462"}, {"id": "ref-for-byte-pattern\u2463"}], "title": "6.1. Matching an image type pattern"}, {"refs": [{"id": "ref-for-byte-pattern\u2464"}, {"id": "ref-for-byte-pattern\u2465"}], "title": "6.2. Matching an audio or video type pattern"}, {"refs": [{"id": "ref-for-byte-pattern\u2466"}, {"id": "ref-for-byte-pattern\u2467"}], "title": "6.3. Matching a font type pattern"}, {"refs": [{"id": "ref-for-byte-pattern\u2468"}, {"id": "ref-for-byte-pattern\u2460\u24ea"}], "title": "6.4. Matching an archive type pattern"}, {"refs": [{"id": "ref-for-byte-pattern\u2460\u2460"}, {"id": "ref-for-byte-pattern\u2460\u2461"}, {"id": "ref-for-byte-pattern\u2460\u2462"}], "title": "7.1. Identifying a resource with an unknown MIME type"}], "external": false};
-window.dfnpanelData['pattern-mask'] = {"dfnID": "pattern-mask", "url": "#pattern-mask", "dfnText": "pattern mask", "refSections": [{"refs": [{"id": "ref-for-pattern-mask"}, {"id": "ref-for-pattern-mask\u2460"}], "title": "6. Matching a MIME type pattern"}, {"refs": [{"id": "ref-for-pattern-mask\u2461"}], "title": "6.1. Matching an image type pattern"}, {"refs": [{"id": "ref-for-pattern-mask\u2462"}], "title": "6.2. Matching an audio or video type pattern"}, {"refs": [{"id": "ref-for-pattern-mask\u2463"}], "title": "6.3. Matching a font type pattern"}, {"refs": [{"id": "ref-for-pattern-mask\u2464"}], "title": "6.4. Matching an archive type pattern"}, {"refs": [{"id": "ref-for-pattern-mask\u2465"}, {"id": "ref-for-pattern-mask\u2466"}], "title": "7.1. Identifying a resource with an unknown MIME type"}], "external": false};
-window.dfnpanelData['pattern-matching-algorithm'] = {"dfnID": "pattern-matching-algorithm", "url": "#pattern-matching-algorithm", "dfnText": "pattern matching algorithm", "refSections": [{"refs": [{"id": "ref-for-pattern-matching-algorithm"}, {"id": "ref-for-pattern-matching-algorithm\u2460"}], "title": "6. Matching a MIME type pattern"}, {"refs": [{"id": "ref-for-pattern-matching-algorithm\u2461"}], "title": "6.1. Matching an image type pattern"}, {"refs": [{"id": "ref-for-pattern-matching-algorithm\u2462"}], "title": "6.2. Matching an audio or video type pattern"}, {"refs": [{"id": "ref-for-pattern-matching-algorithm\u2463"}], "title": "6.3. Matching a font type pattern"}, {"refs": [{"id": "ref-for-pattern-matching-algorithm\u2464"}], "title": "6.4. Matching an archive type pattern"}, {"refs": [{"id": "ref-for-pattern-matching-algorithm\u2465"}, {"id": "ref-for-pattern-matching-algorithm\u2466"}], "title": "7.1. Identifying a resource with an unknown MIME type"}], "external": false};
-window.dfnpanelData['image-type-pattern-matching-algorithm'] = {"dfnID": "image-type-pattern-matching-algorithm", "url": "#image-type-pattern-matching-algorithm", "dfnText": "image type pattern matching algorithm", "refSections": [{"refs": [{"id": "ref-for-image-type-pattern-matching-algorithm"}], "title": "7. Determining the computed MIME type of a resource"}, {"refs": [{"id": "ref-for-image-type-pattern-matching-algorithm\u2460"}], "title": "7.1. Identifying a resource with an unknown MIME type"}, {"refs": [{"id": "ref-for-image-type-pattern-matching-algorithm\u2461"}], "title": "8.2. Sniffing in an image context"}], "external": false};
-window.dfnpanelData['audio-or-video-type-pattern-matching-algorithm'] = {"dfnID": "audio-or-video-type-pattern-matching-algorithm", "url": "#audio-or-video-type-pattern-matching-algorithm", "dfnText": "audio or video type pattern matching\nalgorithm", "refSections": [{"refs": [{"id": "ref-for-audio-or-video-type-pattern-matching-algorithm"}], "title": "7. Determining the computed MIME type of a resource"}, {"refs": [{"id": "ref-for-audio-or-video-type-pattern-matching-algorithm\u2460"}], "title": "7.1. Identifying a resource with an unknown MIME type"}, {"refs": [{"id": "ref-for-audio-or-video-type-pattern-matching-algorithm\u2461"}], "title": "8.3. Sniffing in an audio or video context"}], "external": false};
-window.dfnpanelData['matches-the-signature-for-mp4'] = {"dfnID": "matches-the-signature-for-mp4", "url": "#matches-the-signature-for-mp4", "dfnText": "matches the signature\n for MP4", "refSections": [{"refs": [{"id": "ref-for-matches-the-signature-for-mp4"}], "title": "6.2. Matching an audio or video type pattern"}], "external": false};
-window.dfnpanelData['matches-the-signature-for-webm'] = {"dfnID": "matches-the-signature-for-webm", "url": "#matches-the-signature-for-webm", "dfnText": "matches the signature\n for WebM", "refSections": [{"refs": [{"id": "ref-for-matches-the-signature-for-webm"}], "title": "6.2. Matching an audio or video type pattern"}], "external": false};
-window.dfnpanelData['parse-a-vint'] = {"dfnID": "parse-a-vint", "url": "#parse-a-vint", "dfnText": "parse a vint", "refSections": [{"refs": [{"id": "ref-for-parse-a-vint"}], "title": "6.2.2. Signature for WebM"}], "external": false};
-window.dfnpanelData['matching-a-padded-sequence'] = {"dfnID": "matching-a-padded-sequence", "url": "#matching-a-padded-sequence", "dfnText": "Matching a padded sequence", "refSections": [{"refs": [{"id": "ref-for-matching-a-padded-sequence"}], "title": "6.2.2. Signature for WebM"}], "external": false};
-window.dfnpanelData['matches-the-signature-for-mp3-without-id3'] = {"dfnID": "matches-the-signature-for-mp3-without-id3", "url": "#matches-the-signature-for-mp3-without-id3", "dfnText": "matches the signature\nfor MP3 without ID3", "refSections": [{"refs": [{"id": "ref-for-matches-the-signature-for-mp3-without-id3"}], "title": "6.2. Matching an audio or video type pattern"}], "external": false};
-window.dfnpanelData['match-an-mp3-header'] = {"dfnID": "match-an-mp3-header", "url": "#match-an-mp3-header", "dfnText": "match an mp3 header", "refSections": [{"refs": [{"id": "ref-for-match-an-mp3-header"}, {"id": "ref-for-match-an-mp3-header"}], "title": "6.2.3. Signature for MP3 without ID3"}], "external": false};
-window.dfnpanelData['compute-an-mp3-frame-size'] = {"dfnID": "compute-an-mp3-frame-size", "url": "#compute-an-mp3-frame-size", "dfnText": "compute an mp3 frame size", "refSections": [{"refs": [{"id": "ref-for-compute-an-mp3-frame-size"}], "title": "6.2.3. Signature for MP3 without ID3"}], "external": false};
-window.dfnpanelData['parse-an-mp3-frame'] = {"dfnID": "parse-an-mp3-frame", "url": "#parse-an-mp3-frame", "dfnText": "parse an mp3 frame", "refSections": [{"refs": [{"id": "ref-for-parse-an-mp3-frame"}], "title": "6.2.3. Signature for MP3 without ID3"}], "external": false};
-window.dfnpanelData['font-type-pattern-matching-algorithm'] = {"dfnID": "font-type-pattern-matching-algorithm", "url": "#font-type-pattern-matching-algorithm", "dfnText": "font type pattern matching algorithm", "refSections": [{"refs": [{"id": "ref-for-font-type-pattern-matching-algorithm"}], "title": "8.7. Sniffing in a font context"}], "external": false};
-window.dfnpanelData['archive-type-pattern-matching-algorithm'] = {"dfnID": "archive-type-pattern-matching-algorithm", "url": "#archive-type-pattern-matching-algorithm", "dfnText": "archive type pattern matching\nalgorithm", "refSections": [{"refs": [{"id": "ref-for-archive-type-pattern-matching-algorithm"}], "title": "7.1. Identifying a resource with an unknown MIME type"}], "external": false};
-window.dfnpanelData['mime-type-sniffing-algorithm'] = {"dfnID": "mime-type-sniffing-algorithm", "url": "#mime-type-sniffing-algorithm", "dfnText": "MIME type sniffing algorithm", "refSections": [{"refs": [{"id": "ref-for-mime-type-sniffing-algorithm"}, {"id": "ref-for-mime-type-sniffing-algorithm\u2460"}], "title": "5. Handling a resource"}, {"refs": [{"id": "ref-for-mime-type-sniffing-algorithm\u2461"}], "title": "5.2. Reading the resource header"}, {"refs": [{"id": "ref-for-mime-type-sniffing-algorithm\u2462"}], "title": "8. Context-specific sniffing"}, {"refs": [{"id": "ref-for-mime-type-sniffing-algorithm\u2463"}], "title": "8.1. Sniffing in a browsing context"}], "external": false};
-window.dfnpanelData['sniff-scriptable-flag'] = {"dfnID": "sniff-scriptable-flag", "url": "#sniff-scriptable-flag", "dfnText": "sniff-scriptable flag", "refSections": [{"refs": [{"id": "ref-for-sniff-scriptable-flag"}], "title": "7. Determining the computed MIME type of a resource"}, {"refs": [{"id": "ref-for-sniff-scriptable-flag\u2460"}, {"id": "ref-for-sniff-scriptable-flag\u2461"}, {"id": "ref-for-sniff-scriptable-flag\u2462"}], "title": "7.1. Identifying a resource with an unknown MIME type"}], "external": false};
-window.dfnpanelData['rules-for-identifying-an-unknown-mime-type'] = {"dfnID": "rules-for-identifying-an-unknown-mime-type", "url": "#rules-for-identifying-an-unknown-mime-type", "dfnText": "rules for identifying an unknown MIME\ntype", "refSections": [{"refs": [{"id": "ref-for-rules-for-identifying-an-unknown-mime-type"}], "title": "7. Determining the computed MIME type of a resource"}, {"refs": [{"id": "ref-for-rules-for-identifying-an-unknown-mime-type\u2460"}, {"id": "ref-for-rules-for-identifying-an-unknown-mime-type\u2461"}], "title": "7.1. Identifying a resource with an unknown MIME type"}], "external": false};
-window.dfnpanelData['rules-for-text-or-binary'] = {"dfnID": "rules-for-text-or-binary", "url": "#rules-for-text-or-binary", "dfnText": "rules for\n distinguishing if a resource is text or binary", "refSections": [{"refs": [{"id": "ref-for-rules-for-text-or-binary"}], "title": "7. Determining the computed MIME type of a resource"}, {"refs": [{"id": "ref-for-rules-for-text-or-binary\u2460"}], "title": "7.2. Sniffing a mislabeled binary resource"}], "external": false};
-window.dfnpanelData['rules-for-distinguishing-if-a-resource-is-a-feed-or-html'] = {"dfnID": "rules-for-distinguishing-if-a-resource-is-a-feed-or-html", "url": "#rules-for-distinguishing-if-a-resource-is-a-feed-or-html", "dfnText": "rules for distinguishing if a resource is a feed or\n HTML", "refSections": [{"refs": [{"id": "ref-for-rules-for-distinguishing-if-a-resource-is-a-feed-or-html"}], "title": "7. Determining the computed MIME type of a resource"}, {"refs": [{"id": "ref-for-rules-for-distinguishing-if-a-resource-is-a-feed-or-html\u2460"}], "title": "7.3. Sniffing a mislabeled feed"}], "external": false};
-window.dfnpanelData['context'] = {"dfnID": "context", "url": "#context", "dfnText": "context", "refSections": [{"refs": [{"id": "ref-for-context"}, {"id": "ref-for-context\u2460"}, {"id": "ref-for-context\u2461"}], "title": "8. Context-specific sniffing"}], "external": false};
-window.dfnpanelData['context-specific-sniffing-algorithm'] = {"dfnID": "context-specific-sniffing-algorithm", "url": "#context-specific-sniffing-algorithm", "dfnText": "context-specific sniffing algorithm", "refSections": [{"refs": [{"id": "ref-for-context-specific-sniffing-algorithm"}], "title": "8. Context-specific sniffing"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -2536,296 +2051,781 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"4456bfd9": {"dfnID":"4456bfd9","dfnText":"collecting an http quoted string","external":true,"refSections":[{"refs":[{"id":"ref-for-collect-an-http-quoted-string"}],"title":"4.4. Parsing a MIME type"}],"url":"https://fetch.spec.whatwg.org/#collect-an-http-quoted-string"},
+"a33db89a": {"dfnID":"a33db89a","dfnText":"fetch","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-fetch"}],"title":"8.4. Sniffing in a plugin context"},{"refs":[{"id":"ref-for-concept-fetch\u2460"}],"title":"8.5. Sniffing in a style context"},{"refs":[{"id":"ref-for-concept-fetch\u2461"}],"title":"8.6. Sniffing in a script context"}],"url":"https://fetch.spec.whatwg.org/#concept-fetch"},
+"5fe4ff5e": {"dfnID":"5fe4ff5e","dfnText":"http whitespace","external":true,"refSections":[{"refs":[{"id":"ref-for-http-whitespace"},{"id":"ref-for-http-whitespace\u2460"},{"id":"ref-for-http-whitespace\u2461"},{"id":"ref-for-http-whitespace\u2462"},{"id":"ref-for-http-whitespace\u2463"}],"title":"4.4. Parsing a MIME type"}],"url":"https://fetch.spec.whatwg.org/#http-whitespace"},
+"0cf3964f": {"dfnID":"0cf3964f","dfnText":"script","external":true,"refSections":[{"refs":[{"id":"ref-for-script"}],"title":"4.6. MIME type groups"}],"url":"https://html.spec.whatwg.org/multipage/scripting.html#script"},
+"ee18ab25": {"dfnID":"ee18ab25","dfnText":"type","external":true,"refSections":[{"refs":[{"id":"ref-for-attr-script-type"}],"title":"4.6. MIME type groups"}],"url":"https://html.spec.whatwg.org/multipage/scripting.html#attr-script-type"},
+"58a7f8cc": {"dfnID":"58a7f8cc","dfnText":"media-type","external":true,"refSections":[{"refs":[{"id":"ref-for-section-3.1.1.1"}],"title":"4.3. MIME type writing"}],"url":"https://tools.ietf.org/html/rfc7231#section-3.1.1.1"},
+"c5610ee2": {"dfnID":"c5610ee2","dfnText":"quoted-string","external":true,"refSections":[{"refs":[{"id":"ref-for-section-3.2.6"},{"id":"ref-for-section-3.2.6\u2460"}],"title":"3. Terminology"}],"url":"https://tools.ietf.org/html/rfc7230#section-3.2.6"},
+"4a4e79bc": {"dfnID":"4a4e79bc","dfnText":"token","external":true,"refSections":[{"refs":[{"id":"ref-for-section-3.2.6"},{"id":"ref-for-section-3.2.6\u2460"}],"title":"3. Terminology"}],"url":"https://tools.ietf.org/html/rfc7230#section-3.2.6"},
+"f43d6978": {"dfnID":"f43d6978","dfnText":"ascii alphanumeric","external":true,"refSections":[{"refs":[{"id":"ref-for-ascii-alphanumeric"}],"title":"3. Terminology"}],"url":"https://infra.spec.whatwg.org/#ascii-alphanumeric"},
+"7f9469b5": {"dfnID":"7f9469b5","dfnText":"ascii case-insensitive","external":true,"refSections":[{"refs":[{"id":"ref-for-ascii-case-insensitive"}],"title":"4.6. MIME type groups"}],"url":"https://infra.spec.whatwg.org/#ascii-case-insensitive"},
+"6f2dfa22": {"dfnID":"6f2dfa22","dfnText":"ascii lowercase","external":true,"refSections":[{"refs":[{"id":"ref-for-ascii-lowercase"},{"id":"ref-for-ascii-lowercase\u2460"},{"id":"ref-for-ascii-lowercase\u2461"}],"title":"4.4. Parsing a MIME type"}],"url":"https://infra.spec.whatwg.org/#ascii-lowercase"},
+"2d5a2765": {"dfnID":"2d5a2765","dfnText":"ascii string","external":true,"refSections":[{"refs":[{"id":"ref-for-ascii-string"},{"id":"ref-for-ascii-string\u2460"},{"id":"ref-for-ascii-string\u2461"}],"title":"4.1. MIME type representation"}],"url":"https://infra.spec.whatwg.org/#ascii-string"},
+"5fb1ed8a": {"dfnID":"5fb1ed8a","dfnText":"ascii whitespace","external":true,"refSections":[{"refs":[{"id":"ref-for-ascii-whitespace"}],"title":"4.4. Parsing a MIME type"}],"url":"https://infra.spec.whatwg.org/#ascii-whitespace"},
+"7b0d918d": {"dfnID":"7b0d918d","dfnText":"break","external":true,"refSections":[{"refs":[{"id":"ref-for-iteration-break"}],"title":"4.4. Parsing a MIME type"},{"refs":[{"id":"ref-for-iteration-break\u2460"}],"title":"6. Matching a MIME type pattern"}],"url":"https://infra.spec.whatwg.org/#iteration-break"},
+"f5354b9d": {"dfnID":"f5354b9d","dfnText":"byte","external":true,"refSections":[{"refs":[{"id":"ref-for-byte"},{"id":"ref-for-byte\u2460"},{"id":"ref-for-byte\u2461"},{"id":"ref-for-byte\u2462"},{"id":"ref-for-byte\u2463"},{"id":"ref-for-byte\u2464"}],"title":"3. Terminology"},{"refs":[{"id":"ref-for-byte\u2465"}],"title":"5.1. Interpreting the resource metadata"},{"refs":[{"id":"ref-for-byte\u2466"},{"id":"ref-for-byte\u2467"},{"id":"ref-for-byte\u2468"},{"id":"ref-for-byte\u2460\u24ea"}],"title":"5.2. Reading the resource header"},{"refs":[{"id":"ref-for-byte\u2460\u2460"},{"id":"ref-for-byte\u2460\u2461"},{"id":"ref-for-byte\u2460\u2462"},{"id":"ref-for-byte\u2460\u2463"},{"id":"ref-for-byte\u2460\u2464"}],"title":"6. Matching a MIME type pattern"},{"refs":[{"id":"ref-for-byte\u2460\u2465"},{"id":"ref-for-byte\u2460\u2466"},{"id":"ref-for-byte\u2460\u2467"},{"id":"ref-for-byte\u2460\u2468"}],"title":"6.1. Matching an image type pattern"},{"refs":[{"id":"ref-for-byte\u2461\u24ea"},{"id":"ref-for-byte\u2461\u2460"},{"id":"ref-for-byte\u2461\u2461"},{"id":"ref-for-byte\u2461\u2462"},{"id":"ref-for-byte\u2461\u2463"}],"title":"6.2. Matching an audio or video type pattern"},{"refs":[{"id":"ref-for-byte\u2461\u2464"},{"id":"ref-for-byte\u2461\u2465"},{"id":"ref-for-byte\u2461\u2466"},{"id":"ref-for-byte\u2461\u2467"},{"id":"ref-for-byte\u2461\u2468"},{"id":"ref-for-byte\u2462\u24ea"},{"id":"ref-for-byte\u2462\u2460"},{"id":"ref-for-byte\u2462\u2461"}],"title":"6.2.1. Signature for MP4"},{"refs":[{"id":"ref-for-byte\u2462\u2462"},{"id":"ref-for-byte\u2462\u2463"},{"id":"ref-for-byte\u2462\u2464"},{"id":"ref-for-byte\u2462\u2465"}],"title":"6.2.2. Signature for WebM"},{"refs":[{"id":"ref-for-byte\u2462\u2466"},{"id":"ref-for-byte\u2462\u2467"},{"id":"ref-for-byte\u2462\u2468"}],"title":"6.2.3. Signature for MP3 without ID3"},{"refs":[{"id":"ref-for-byte\u2463\u24ea"},{"id":"ref-for-byte\u2463\u2460"},{"id":"ref-for-byte\u2463\u2461"}],"title":"6.3. Matching a font type pattern"},{"refs":[{"id":"ref-for-byte\u2463\u2462"}],"title":"6.4. Matching an archive type pattern"},{"refs":[{"id":"ref-for-byte\u2463\u2463"},{"id":"ref-for-byte\u2463\u2464"}],"title":"7.1. Identifying a resource with an unknown MIME type"},{"refs":[{"id":"ref-for-byte\u2463\u2465"}],"title":"7.2. Sniffing a mislabeled binary resource"},{"refs":[{"id":"ref-for-byte\u2463\u2466"},{"id":"ref-for-byte\u2463\u2467"},{"id":"ref-for-byte\u2463\u2468"},{"id":"ref-for-byte\u2464\u24ea"},{"id":"ref-for-byte\u2464\u2460"},{"id":"ref-for-byte\u2464\u2461"},{"id":"ref-for-byte\u2464\u2462"},{"id":"ref-for-byte\u2464\u2463"},{"id":"ref-for-byte\u2464\u2464"},{"id":"ref-for-byte\u2464\u2465"},{"id":"ref-for-byte\u2464\u2466"},{"id":"ref-for-byte\u2464\u2467"},{"id":"ref-for-byte\u2464\u2468"},{"id":"ref-for-byte\u2465\u24ea"}],"title":"7.3. Sniffing a mislabeled feed"}],"url":"https://infra.spec.whatwg.org/#byte"},
+"3de9e659": {"dfnID":"3de9e659","dfnText":"byte sequence","external":true,"refSections":[{"refs":[{"id":"ref-for-byte-sequence"}],"title":"4.4. Parsing a MIME type"},{"refs":[{"id":"ref-for-byte-sequence\u2460"},{"id":"ref-for-byte-sequence\u2461"}],"title":"5.2. Reading the resource header"},{"refs":[{"id":"ref-for-byte-sequence\u2462"},{"id":"ref-for-byte-sequence\u2463"},{"id":"ref-for-byte-sequence\u2464"},{"id":"ref-for-byte-sequence\u2465"}],"title":"6. Matching a MIME type pattern"},{"refs":[{"id":"ref-for-byte-sequence\u2466"}],"title":"6.1. Matching an image type pattern"},{"refs":[{"id":"ref-for-byte-sequence\u2467"}],"title":"6.2. Matching an audio or video type pattern"},{"refs":[{"id":"ref-for-byte-sequence\u2468"},{"id":"ref-for-byte-sequence\u2460\u24ea"}],"title":"6.2.1. Signature for MP4"},{"refs":[{"id":"ref-for-byte-sequence\u2460\u2460"},{"id":"ref-for-byte-sequence\u2460\u2461"},{"id":"ref-for-byte-sequence\u2460\u2462"}],"title":"6.2.2. Signature for WebM"},{"refs":[{"id":"ref-for-byte-sequence\u2460\u2463"},{"id":"ref-for-byte-sequence\u2460\u2464"},{"id":"ref-for-byte-sequence\u2460\u2465"}],"title":"6.2.3. Signature for MP3 without ID3"},{"refs":[{"id":"ref-for-byte-sequence\u2460\u2466"}],"title":"6.3. Matching a font type pattern"},{"refs":[{"id":"ref-for-byte-sequence\u2460\u2467"}],"title":"6.4. Matching an archive type pattern"},{"refs":[{"id":"ref-for-byte-sequence\u2460\u2468"},{"id":"ref-for-byte-sequence\u2461\u24ea"}],"title":"7. Determining the computed MIME type of a resource"},{"refs":[{"id":"ref-for-byte-sequence\u2461\u2460"}],"title":"8.2. Sniffing in an image context"},{"refs":[{"id":"ref-for-byte-sequence\u2461\u2461"}],"title":"8.3. Sniffing in an audio or video context"},{"refs":[{"id":"ref-for-byte-sequence\u2461\u2462"}],"title":"8.7. Sniffing in a font context"}],"url":"https://infra.spec.whatwg.org/#byte-sequence"},
+"915aff5e": {"dfnID":"915aff5e","dfnText":"code point","external":true,"refSections":[{"refs":[{"id":"ref-for-code-point"},{"id":"ref-for-code-point\u2460"}],"title":"3. Terminology"},{"refs":[{"id":"ref-for-code-point\u2461"},{"id":"ref-for-code-point\u2462"}],"title":"4.4. Parsing a MIME type"}],"url":"https://infra.spec.whatwg.org/#code-point"},
+"d24334b4": {"dfnID":"d24334b4","dfnText":"collect a sequence of code points","external":true,"refSections":[{"refs":[{"id":"ref-for-collect-a-sequence-of-code-points"},{"id":"ref-for-collect-a-sequence-of-code-points\u2460"},{"id":"ref-for-collect-a-sequence-of-code-points\u2461"},{"id":"ref-for-collect-a-sequence-of-code-points\u2462"},{"id":"ref-for-collect-a-sequence-of-code-points\u2463"},{"id":"ref-for-collect-a-sequence-of-code-points\u2464"}],"title":"4.4. Parsing a MIME type"}],"url":"https://infra.spec.whatwg.org/#collect-a-sequence-of-code-points"},
+"60184fa5": {"dfnID":"60184fa5","dfnText":"collecting a sequence of code points","external":true,"refSections":[{"refs":[{"id":"ref-for-collect-a-sequence-of-code-points"},{"id":"ref-for-collect-a-sequence-of-code-points\u2460"},{"id":"ref-for-collect-a-sequence-of-code-points\u2461"},{"id":"ref-for-collect-a-sequence-of-code-points\u2462"},{"id":"ref-for-collect-a-sequence-of-code-points\u2463"},{"id":"ref-for-collect-a-sequence-of-code-points\u2464"}],"title":"4.4. Parsing a MIME type"}],"url":"https://infra.spec.whatwg.org/#collect-a-sequence-of-code-points"},
+"ae8def21": {"dfnID":"ae8def21","dfnText":"contain","external":true,"refSections":[{"refs":[{"id":"ref-for-list-contain"}],"title":"6. Matching a MIME type pattern"}],"url":"https://infra.spec.whatwg.org/#list-contain"},
+"f937b7b6": {"dfnID":"f937b7b6","dfnText":"continue","external":true,"refSections":[{"refs":[{"id":"ref-for-iteration-continue"},{"id":"ref-for-iteration-continue\u2460"}],"title":"4.4. Parsing a MIME type"}],"url":"https://infra.spec.whatwg.org/#iteration-continue"},
+"1243a891": {"dfnID":"1243a891","dfnText":"exist","external":true,"refSections":[{"refs":[{"id":"ref-for-map-exists"}],"title":"4.4. Parsing a MIME type"}],"url":"https://infra.spec.whatwg.org/#map-exists"},
+"45209803": {"dfnID":"45209803","dfnText":"for each","external":true,"refSections":[{"refs":[{"id":"ref-for-map-iterate"}],"title":"4.5. Serializing a MIME type"}],"url":"https://infra.spec.whatwg.org/#map-iterate"},
+"d8b963e8": {"dfnID":"d8b963e8","dfnText":"isomorphic decode","external":true,"refSections":[{"refs":[{"id":"ref-for-isomorphic-decode"}],"title":"4.4. Parsing a MIME type"}],"url":"https://infra.spec.whatwg.org/#isomorphic-decode"},
+"16b1470a": {"dfnID":"16b1470a","dfnText":"isomorphic encode","external":true,"refSections":[{"refs":[{"id":"ref-for-isomorphic-encode"}],"title":"4.5. Serializing a MIME type"}],"url":"https://infra.spec.whatwg.org/#isomorphic-encode"},
+"31db57e6": {"dfnID":"31db57e6","dfnText":"keys","external":true,"refSections":[{"refs":[{"id":"ref-for-map-getting-the-keys"}],"title":"4.1. MIME type representation"}],"url":"https://infra.spec.whatwg.org/#map-getting-the-keys"},
+"36333997": {"dfnID":"36333997","dfnText":"length","external":true,"refSections":[{"refs":[{"id":"ref-for-byte-sequence-length"},{"id":"ref-for-byte-sequence-length\u2460"},{"id":"ref-for-byte-sequence-length\u2461"},{"id":"ref-for-byte-sequence-length\u2462"},{"id":"ref-for-byte-sequence-length\u2463"},{"id":"ref-for-byte-sequence-length\u2464"}],"title":"6. Matching a MIME type pattern"}],"url":"https://infra.spec.whatwg.org/#byte-sequence-length"},
+"84b454ff": {"dfnID":"84b454ff","dfnText":"ordered map","external":true,"refSections":[{"refs":[{"id":"ref-for-ordered-map"}],"title":"4.1. MIME type representation"}],"url":"https://infra.spec.whatwg.org/#ordered-map"},
+"75bee4d5": {"dfnID":"75bee4d5","dfnText":"position variable","external":true,"refSections":[{"refs":[{"id":"ref-for-string-position-variable"}],"title":"4.4. Parsing a MIME type"}],"url":"https://infra.spec.whatwg.org/#string-position-variable"},
+"15e48c39": {"dfnID":"15e48c39","dfnText":"set","external":true,"refSections":[{"refs":[{"id":"ref-for-ordered-set"}],"title":"6. Matching a MIME type pattern"}],"url":"https://infra.spec.whatwg.org/#ordered-set"},
+"0e6b2056": {"dfnID":"0e6b2056","dfnText":"set (for map)","external":true,"refSections":[{"refs":[{"id":"ref-for-map-set"}],"title":"4.4. Parsing a MIME type"}],"url":"https://infra.spec.whatwg.org/#map-set"},
+"50c91fa5": {"dfnID":"50c91fa5","dfnText":"skip ascii whitespace","external":true,"refSections":[{"refs":[{"id":"ref-for-skip-ascii-whitespace"}],"title":"4.4. Parsing a MIME type"}],"url":"https://infra.spec.whatwg.org/#skip-ascii-whitespace"},
+"0698d556": {"dfnID":"0698d556","dfnText":"string","external":true,"refSections":[{"refs":[{"id":"ref-for-string"}],"title":"4.6. MIME type groups"}],"url":"https://infra.spec.whatwg.org/#string"},
+"12d6b9a8": {"dfnID":"12d6b9a8","dfnText":"values","external":true,"refSections":[{"refs":[{"id":"ref-for-map-getting-the-values"}],"title":"4.1. MIME type representation"}],"url":"https://infra.spec.whatwg.org/#map-getting-the-values"},
+"http-token-code-point": {"dfnID":"http-token-code-point","dfnText":"HTTP token code point","external":false,"refSections":[{"refs":[{"id":"ref-for-http-token-code-point"}],"title":"3. Terminology"},{"refs":[{"id":"ref-for-http-token-code-point\u2460"},{"id":"ref-for-http-token-code-point\u2461"},{"id":"ref-for-http-token-code-point\u2462"}],"title":"4.4. Parsing a MIME type"},{"refs":[{"id":"ref-for-http-token-code-point\u2463"}],"title":"4.5. Serializing a MIME type"}],"url":"#http-token-code-point"},
+"http-quoted-string-token-code-point": {"dfnID":"http-quoted-string-token-code-point","dfnText":"HTTP quoted-string token code point","external":false,"refSections":[{"refs":[{"id":"ref-for-http-quoted-string-token-code-point"}],"title":"4.4. Parsing a MIME type"}],"url":"#http-quoted-string-token-code-point"},
+"binary-data-byte": {"dfnID":"binary-data-byte","dfnText":"binary data byte","external":false,"refSections":[{"refs":[{"id":"ref-for-binary-data-byte"}],"title":"7.1. Identifying a resource with an unknown MIME type"},{"refs":[{"id":"ref-for-binary-data-byte\u2460"}],"title":"7.2. Sniffing a mislabeled binary resource"}],"url":"#binary-data-byte"},
+"whitespace-byte": {"dfnID":"whitespace-byte","dfnText":"whitespace byte","external":false,"refSections":[{"refs":[{"id":"ref-for-whitespace-byte"},{"id":"ref-for-whitespace-byte\u2460"},{"id":"ref-for-whitespace-byte\u2461"},{"id":"ref-for-whitespace-byte\u2462"},{"id":"ref-for-whitespace-byte\u2463"},{"id":"ref-for-whitespace-byte\u2464"},{"id":"ref-for-whitespace-byte\u2465"},{"id":"ref-for-whitespace-byte\u2466"},{"id":"ref-for-whitespace-byte\u2467"},{"id":"ref-for-whitespace-byte\u2468"},{"id":"ref-for-whitespace-byte\u2460\u24ea"},{"id":"ref-for-whitespace-byte\u2460\u2460"},{"id":"ref-for-whitespace-byte\u2460\u2461"},{"id":"ref-for-whitespace-byte\u2460\u2462"},{"id":"ref-for-whitespace-byte\u2460\u2463"},{"id":"ref-for-whitespace-byte\u2460\u2464"},{"id":"ref-for-whitespace-byte\u2460\u2465"},{"id":"ref-for-whitespace-byte\u2460\u2466"}],"title":"7.1. Identifying a resource with an unknown MIME type"},{"refs":[{"id":"ref-for-whitespace-byte\u2460\u2467"}],"title":"7.3. Sniffing a mislabeled feed"}],"url":"#whitespace-byte"},
+"tag-terminating-byte": {"dfnID":"tag-terminating-byte","dfnText":"tag-terminating byte","external":false,"refSections":[{"refs":[{"id":"ref-for-tag-terminating-byte"},{"id":"ref-for-tag-terminating-byte\u2460"},{"id":"ref-for-tag-terminating-byte\u2461"},{"id":"ref-for-tag-terminating-byte\u2462"},{"id":"ref-for-tag-terminating-byte\u2463"},{"id":"ref-for-tag-terminating-byte\u2464"},{"id":"ref-for-tag-terminating-byte\u2465"},{"id":"ref-for-tag-terminating-byte\u2466"},{"id":"ref-for-tag-terminating-byte\u2467"},{"id":"ref-for-tag-terminating-byte\u2468"},{"id":"ref-for-tag-terminating-byte\u2460\u24ea"},{"id":"ref-for-tag-terminating-byte\u2460\u2460"},{"id":"ref-for-tag-terminating-byte\u2460\u2461"},{"id":"ref-for-tag-terminating-byte\u2460\u2462"},{"id":"ref-for-tag-terminating-byte\u2460\u2463"},{"id":"ref-for-tag-terminating-byte\u2460\u2464"},{"id":"ref-for-tag-terminating-byte\u2460\u2465"}],"title":"7.1. Identifying a resource with an unknown MIME type"}],"url":"#tag-terminating-byte"},
+"mime-type": {"dfnID":"mime-type","dfnText":"MIME type","external":false,"refSections":[{"refs":[{"id":"ref-for-mime-type"},{"id":"ref-for-mime-type\u2460"},{"id":"ref-for-mime-type\u2461"},{"id":"ref-for-mime-type\u2462"},{"id":"ref-for-mime-type\u2463"}],"title":"4.1. MIME type representation"},{"refs":[{"id":"ref-for-mime-type\u2464"},{"id":"ref-for-mime-type\u2465"},{"id":"ref-for-mime-type\u2466"}],"title":"4.2. MIME type miscellaneous"},{"refs":[{"id":"ref-for-mime-type\u2467"}],"title":"4.3. MIME type writing"},{"refs":[{"id":"ref-for-mime-type\u2468"}],"title":"4.4. Parsing a MIME type"},{"refs":[{"id":"ref-for-mime-type\u2460\u24ea"},{"id":"ref-for-mime-type\u2460\u2460"}],"title":"4.5. Serializing a MIME type"},{"refs":[{"id":"ref-for-mime-type\u2460\u2461"},{"id":"ref-for-mime-type\u2460\u2462"},{"id":"ref-for-mime-type\u2460\u2463"},{"id":"ref-for-mime-type\u2460\u2464"},{"id":"ref-for-mime-type\u2460\u2465"},{"id":"ref-for-mime-type\u2460\u2466"},{"id":"ref-for-mime-type\u2460\u2467"},{"id":"ref-for-mime-type\u2460\u2468"},{"id":"ref-for-mime-type\u2461\u24ea"},{"id":"ref-for-mime-type\u2461\u2460"}],"title":"4.6. MIME type groups"},{"refs":[{"id":"ref-for-mime-type\u2461\u2461"},{"id":"ref-for-mime-type\u2461\u2462"}],"title":"5. Handling a resource"},{"refs":[{"id":"ref-for-mime-type\u2461\u2463"},{"id":"ref-for-mime-type\u2461\u2464"},{"id":"ref-for-mime-type\u2461\u2465"},{"id":"ref-for-mime-type\u2461\u2466"}],"title":"5.1. Interpreting the resource metadata"},{"refs":[{"id":"ref-for-mime-type\u2461\u2467"},{"id":"ref-for-mime-type\u2461\u2468"}],"title":"7.1. Identifying a resource with an unknown MIME type"},{"refs":[{"id":"ref-for-mime-type\u2462\u24ea"},{"id":"ref-for-mime-type\u2462\u2460"}],"title":"8. Context-specific sniffing"}],"url":"#mime-type"},
+"type": {"dfnID":"type","dfnText":"type","external":false,"refSections":[{"refs":[{"id":"ref-for-type"}],"title":"4.2. MIME type miscellaneous"},{"refs":[{"id":"ref-for-type\u2460"}],"title":"4.4. Parsing a MIME type"},{"refs":[{"id":"ref-for-type\u2461"}],"title":"4.5. Serializing a MIME type"},{"refs":[{"id":"ref-for-type\u2462"},{"id":"ref-for-type\u2463"},{"id":"ref-for-type\u2464"}],"title":"4.6. MIME type groups"}],"url":"#type"},
+"subtype": {"dfnID":"subtype","dfnText":"subtype","external":false,"refSections":[{"refs":[{"id":"ref-for-subtype"}],"title":"4.2. MIME type miscellaneous"},{"refs":[{"id":"ref-for-subtype\u2460"}],"title":"4.4. Parsing a MIME type"},{"refs":[{"id":"ref-for-subtype\u2461"}],"title":"4.5. Serializing a MIME type"},{"refs":[{"id":"ref-for-subtype\u2462"},{"id":"ref-for-subtype\u2463"},{"id":"ref-for-subtype\u2464"}],"title":"4.6. MIME type groups"}],"url":"#subtype"},
+"parameters": {"dfnID":"parameters","dfnText":"parameters","external":false,"refSections":[{"refs":[{"id":"ref-for-parameters"}],"title":"4.3. MIME type writing"},{"refs":[{"id":"ref-for-parameters\u2460"},{"id":"ref-for-parameters\u2461"}],"title":"4.4. Parsing a MIME type"},{"refs":[{"id":"ref-for-parameters\u2462"}],"title":"4.5. Serializing a MIME type"}],"url":"#parameters"},
+"mime-type-essence": {"dfnID":"mime-type-essence","dfnText":"essence","external":false,"refSections":[{"refs":[{"id":"ref-for-mime-type-essence"},{"id":"ref-for-mime-type-essence\u2460"},{"id":"ref-for-mime-type-essence\u2461"},{"id":"ref-for-mime-type-essence\u2462"},{"id":"ref-for-mime-type-essence\u2463"},{"id":"ref-for-mime-type-essence\u2464"},{"id":"ref-for-mime-type-essence\u2465"},{"id":"ref-for-mime-type-essence\u2466"},{"id":"ref-for-mime-type-essence\u2467"}],"title":"4.6. MIME type groups"},{"refs":[{"id":"ref-for-mime-type-essence\u2468"},{"id":"ref-for-mime-type-essence\u2460\u24ea"}],"title":"7. Determining the computed MIME type of a resource"}],"url":"#mime-type-essence"},
+"supported-by-the-user-agent": {"dfnID":"supported-by-the-user-agent","dfnText":"supported by the user agent","external":false,"refSections":[{"refs":[{"id":"ref-for-supported-by-the-user-agent"},{"id":"ref-for-supported-by-the-user-agent\u2460"}],"title":"7. Determining the computed MIME type of a resource"}],"url":"#supported-by-the-user-agent"},
+"valid-mime-type": {"dfnID":"valid-mime-type","dfnText":"valid MIME type string","external":false,"refSections":[{"refs":[{"id":"ref-for-valid-mime-type"},{"id":"ref-for-valid-mime-type\u2460"},{"id":"ref-for-valid-mime-type\u2461"},{"id":"ref-for-valid-mime-type\u2462"},{"id":"ref-for-valid-mime-type\u2463"}],"title":"4.3. MIME type writing"}],"url":"#valid-mime-type"},
+"parse-a-mime-type": {"dfnID":"parse-a-mime-type","dfnText":"parse a MIME type","external":false,"refSections":[{"refs":[{"id":"ref-for-parse-a-mime-type"}],"title":"4.3. MIME type writing"},{"refs":[{"id":"ref-for-parse-a-mime-type\u2460"}],"title":"4.4. Parsing a MIME type"}],"url":"#parse-a-mime-type"},
+"serialize-a-mime-type": {"dfnID":"serialize-a-mime-type","dfnText":"serialize a MIME type","external":false,"refSections":[{"refs":[{"id":"ref-for-serialize-a-mime-type"}],"title":"4.5. Serializing a MIME type"}],"url":"#serialize-a-mime-type"},
+"image-mime-type": {"dfnID":"image-mime-type","dfnText":"image MIME type","external":false,"refSections":[{"refs":[{"id":"ref-for-image-mime-type"},{"id":"ref-for-image-mime-type\u2460"}],"title":"6.1. Matching an image type pattern"},{"refs":[{"id":"ref-for-image-mime-type\u2461"}],"title":"7. Determining the computed MIME type of a resource"},{"refs":[{"id":"ref-for-image-mime-type\u2462"}],"title":"8.2. Sniffing in an image context"}],"url":"#image-mime-type"},
+"audio-or-video-mime-type": {"dfnID":"audio-or-video-mime-type","dfnText":"audio or video MIME type","external":false,"refSections":[{"refs":[{"id":"ref-for-audio-or-video-mime-type"},{"id":"ref-for-audio-or-video-mime-type\u2460"}],"title":"6.2. Matching an audio or video type pattern"},{"refs":[{"id":"ref-for-audio-or-video-mime-type\u2461"}],"title":"7. Determining the computed MIME type of a resource"},{"refs":[{"id":"ref-for-audio-or-video-mime-type\u2462"}],"title":"8.3. Sniffing in an audio or video context"}],"url":"#audio-or-video-mime-type"},
+"font-mime-type": {"dfnID":"font-mime-type","dfnText":"font MIME type","external":false,"refSections":[{"refs":[{"id":"ref-for-font-mime-type"},{"id":"ref-for-font-mime-type\u2460"}],"title":"6.3. Matching a font type pattern"},{"refs":[{"id":"ref-for-font-mime-type\u2461"}],"title":"8.7. Sniffing in a font context"}],"url":"#font-mime-type"},
+"archive-mime-type": {"dfnID":"archive-mime-type","dfnText":"archive MIME type","external":false,"refSections":[{"refs":[{"id":"ref-for-archive-mime-type"},{"id":"ref-for-archive-mime-type\u2460"}],"title":"6.4. Matching an archive type pattern"}],"url":"#archive-mime-type"},
+"xml-mime-type": {"dfnID":"xml-mime-type","dfnText":"XML MIME type","external":false,"refSections":[{"refs":[{"id":"ref-for-xml-mime-type"}],"title":"4.6. MIME type groups"},{"refs":[{"id":"ref-for-xml-mime-type\u2460"}],"title":"7. Determining the computed MIME type of a resource"},{"refs":[{"id":"ref-for-xml-mime-type\u2461"}],"title":"8.2. Sniffing in an image context"},{"refs":[{"id":"ref-for-xml-mime-type\u2462"}],"title":"8.3. Sniffing in an audio or video context"},{"refs":[{"id":"ref-for-xml-mime-type\u2463"}],"title":"8.7. Sniffing in a font context"}],"url":"#xml-mime-type"},
+"html-mime-type": {"dfnID":"html-mime-type","dfnText":"HTML MIME type","external":false,"refSections":[{"refs":[{"id":"ref-for-html-mime-type"}],"title":"4.6. MIME type groups"}],"url":"#html-mime-type"},
+"scriptable-mime-type": {"dfnID":"scriptable-mime-type","dfnText":"scriptable MIME type","external":false,"refSections":[{"refs":[{"id":"ref-for-scriptable-mime-type"}],"title":"7.1. Identifying a resource with an unknown MIME type"},{"refs":[{"id":"ref-for-scriptable-mime-type\u2460"}],"title":"7.2. Sniffing a mislabeled binary resource"}],"url":"#scriptable-mime-type"},
+"javascript-mime-type": {"dfnID":"javascript-mime-type","dfnText":"JavaScript MIME type","external":false,"refSections":[{"refs":[{"id":"ref-for-javascript-mime-type"}],"title":"4.6. MIME type groups"}],"url":"#javascript-mime-type"},
+"resource": {"dfnID":"resource","dfnText":"resource","external":false,"refSections":[{"refs":[{"id":"ref-for-resource"}],"title":"4.2. MIME type miscellaneous"},{"refs":[{"id":"ref-for-resource\u2460"},{"id":"ref-for-resource\u2461"},{"id":"ref-for-resource\u2462"},{"id":"ref-for-resource\u2463"}],"title":"5. Handling a resource"},{"refs":[{"id":"ref-for-resource\u2464"},{"id":"ref-for-resource\u2465"},{"id":"ref-for-resource\u2466"},{"id":"ref-for-resource\u2467"},{"id":"ref-for-resource\u2468"},{"id":"ref-for-resource\u2460\u24ea"},{"id":"ref-for-resource\u2460\u2460"},{"id":"ref-for-resource\u2460\u2461"},{"id":"ref-for-resource\u2460\u2462"},{"id":"ref-for-resource\u2460\u2463"}],"title":"5.1. Interpreting the resource metadata"},{"refs":[{"id":"ref-for-resource\u2460\u2464"},{"id":"ref-for-resource\u2460\u2465"},{"id":"ref-for-resource\u2460\u2466"},{"id":"ref-for-resource\u2460\u2467"}],"title":"5.2. Reading the resource header"},{"refs":[{"id":"ref-for-resource\u2460\u2468"}],"title":"7. Determining the computed MIME type of a resource"},{"refs":[{"id":"ref-for-resource\u2461\u24ea"}],"title":"7.1. Identifying a resource with an unknown MIME type"},{"refs":[{"id":"ref-for-resource\u2461\u2460"}],"title":"7.2. Sniffing a mislabeled binary resource"},{"refs":[{"id":"ref-for-resource\u2461\u2461"},{"id":"ref-for-resource\u2461\u2462"},{"id":"ref-for-resource\u2461\u2463"},{"id":"ref-for-resource\u2461\u2464"}],"title":"8. Context-specific sniffing"},{"refs":[{"id":"ref-for-resource\u2461\u2465"}],"title":"8.2. Sniffing in an image context"},{"refs":[{"id":"ref-for-resource\u2461\u2466"}],"title":"8.3. Sniffing in an audio or video context"},{"refs":[{"id":"ref-for-resource\u2461\u2467"}],"title":"8.4. Sniffing in a plugin context"},{"refs":[{"id":"ref-for-resource\u2461\u2468"}],"title":"8.5. Sniffing in a style context"},{"refs":[{"id":"ref-for-resource\u2462\u24ea"}],"title":"8.6. Sniffing in a script context"},{"refs":[{"id":"ref-for-resource\u2462\u2460"}],"title":"8.7. Sniffing in a font context"}],"url":"#resource"},
+"supplied-mime-type": {"dfnID":"supplied-mime-type","dfnText":"supplied MIME type","external":false,"refSections":[{"refs":[{"id":"ref-for-supplied-mime-type"},{"id":"ref-for-supplied-mime-type\u2460"},{"id":"ref-for-supplied-mime-type\u2461"},{"id":"ref-for-supplied-mime-type\u2462"},{"id":"ref-for-supplied-mime-type\u2463"}],"title":"5.1. Interpreting the resource metadata"},{"refs":[{"id":"ref-for-supplied-mime-type\u2464"},{"id":"ref-for-supplied-mime-type\u2465"},{"id":"ref-for-supplied-mime-type\u2466"},{"id":"ref-for-supplied-mime-type\u2467"},{"id":"ref-for-supplied-mime-type\u2468"},{"id":"ref-for-supplied-mime-type\u2460\u24ea"},{"id":"ref-for-supplied-mime-type\u2460\u2460"},{"id":"ref-for-supplied-mime-type\u2460\u2461"},{"id":"ref-for-supplied-mime-type\u2460\u2462"}],"title":"7. Determining the computed MIME type of a resource"},{"refs":[{"id":"ref-for-supplied-mime-type\u2460\u2463"},{"id":"ref-for-supplied-mime-type\u2460\u2464"},{"id":"ref-for-supplied-mime-type\u2460\u2465"},{"id":"ref-for-supplied-mime-type\u2460\u2466"},{"id":"ref-for-supplied-mime-type\u2460\u2467"},{"id":"ref-for-supplied-mime-type\u2460\u2468"},{"id":"ref-for-supplied-mime-type\u2461\u24ea"},{"id":"ref-for-supplied-mime-type\u2461\u2460"},{"id":"ref-for-supplied-mime-type\u2461\u2461"},{"id":"ref-for-supplied-mime-type\u2461\u2462"},{"id":"ref-for-supplied-mime-type\u2461\u2463"}],"title":"7.3. Sniffing a mislabeled feed"},{"refs":[{"id":"ref-for-supplied-mime-type\u2461\u2464"},{"id":"ref-for-supplied-mime-type\u2461\u2465"},{"id":"ref-for-supplied-mime-type\u2461\u2466"}],"title":"8.2. Sniffing in an image context"},{"refs":[{"id":"ref-for-supplied-mime-type\u2461\u2467"},{"id":"ref-for-supplied-mime-type\u2461\u2468"},{"id":"ref-for-supplied-mime-type\u2462\u24ea"}],"title":"8.3. Sniffing in an audio or video context"},{"refs":[{"id":"ref-for-supplied-mime-type\u2462\u2460"},{"id":"ref-for-supplied-mime-type\u2462\u2461"}],"title":"8.4. Sniffing in a plugin context"},{"refs":[{"id":"ref-for-supplied-mime-type\u2462\u2462"},{"id":"ref-for-supplied-mime-type\u2462\u2463"}],"title":"8.5. Sniffing in a style context"},{"refs":[{"id":"ref-for-supplied-mime-type\u2462\u2464"},{"id":"ref-for-supplied-mime-type\u2462\u2465"}],"title":"8.6. Sniffing in a script context"},{"refs":[{"id":"ref-for-supplied-mime-type\u2462\u2466"},{"id":"ref-for-supplied-mime-type\u2462\u2467"},{"id":"ref-for-supplied-mime-type\u2462\u2468"}],"title":"8.7. Sniffing in a font context"}],"url":"#supplied-mime-type"},
+"check-for-apache-bug-flag": {"dfnID":"check-for-apache-bug-flag","dfnText":"check-for-apache-bug flag","external":false,"refSections":[{"refs":[{"id":"ref-for-check-for-apache-bug-flag"}],"title":"5.1. Interpreting the resource metadata"},{"refs":[{"id":"ref-for-check-for-apache-bug-flag\u2460"}],"title":"7. Determining the computed MIME type of a resource"}],"url":"#check-for-apache-bug-flag"},
+"no-sniff-flag": {"dfnID":"no-sniff-flag","dfnText":"no-sniff flag","external":false,"refSections":[{"refs":[{"id":"ref-for-no-sniff-flag"},{"id":"ref-for-no-sniff-flag\u2460"}],"title":"7. Determining the computed MIME type of a resource"}],"url":"#no-sniff-flag"},
+"computed-mime-type": {"dfnID":"computed-mime-type","dfnText":"computed MIME type","external":false,"refSections":[{"refs":[{"id":"ref-for-computed-mime-type"},{"id":"ref-for-computed-mime-type\u2460"},{"id":"ref-for-computed-mime-type\u2461"},{"id":"ref-for-computed-mime-type\u2462"},{"id":"ref-for-computed-mime-type\u2463"},{"id":"ref-for-computed-mime-type\u2464"}],"title":"7. Determining the computed MIME type of a resource"},{"refs":[{"id":"ref-for-computed-mime-type\u2465"},{"id":"ref-for-computed-mime-type\u2466"},{"id":"ref-for-computed-mime-type\u2467"},{"id":"ref-for-computed-mime-type\u2468"}],"title":"7.1. Identifying a resource with an unknown MIME type"},{"refs":[{"id":"ref-for-computed-mime-type\u2460\u24ea"},{"id":"ref-for-computed-mime-type\u2460\u2460"},{"id":"ref-for-computed-mime-type\u2460\u2461"},{"id":"ref-for-computed-mime-type\u2460\u2462"},{"id":"ref-for-computed-mime-type\u2460\u2463"}],"title":"7.2. Sniffing a mislabeled binary resource"},{"refs":[{"id":"ref-for-computed-mime-type\u2460\u2464"},{"id":"ref-for-computed-mime-type\u2460\u2465"},{"id":"ref-for-computed-mime-type\u2460\u2466"},{"id":"ref-for-computed-mime-type\u2460\u2467"},{"id":"ref-for-computed-mime-type\u2460\u2468"},{"id":"ref-for-computed-mime-type\u2461\u24ea"},{"id":"ref-for-computed-mime-type\u2461\u2460"},{"id":"ref-for-computed-mime-type\u2461\u2461"},{"id":"ref-for-computed-mime-type\u2461\u2462"},{"id":"ref-for-computed-mime-type\u2461\u2463"},{"id":"ref-for-computed-mime-type\u2461\u2464"},{"id":"ref-for-computed-mime-type\u2461\u2465"},{"id":"ref-for-computed-mime-type\u2461\u2466"},{"id":"ref-for-computed-mime-type\u2461\u2467"},{"id":"ref-for-computed-mime-type\u2461\u2468"}],"title":"7.3. Sniffing a mislabeled feed"},{"refs":[{"id":"ref-for-computed-mime-type\u2462\u24ea"},{"id":"ref-for-computed-mime-type\u2462\u2460"}],"title":"8. Context-specific sniffing"},{"refs":[{"id":"ref-for-computed-mime-type\u2462\u2461"},{"id":"ref-for-computed-mime-type\u2462\u2462"},{"id":"ref-for-computed-mime-type\u2462\u2463"},{"id":"ref-for-computed-mime-type\u2462\u2464"}],"title":"8.2. Sniffing in an image context"},{"refs":[{"id":"ref-for-computed-mime-type\u2462\u2465"},{"id":"ref-for-computed-mime-type\u2462\u2466"},{"id":"ref-for-computed-mime-type\u2462\u2467"},{"id":"ref-for-computed-mime-type\u2462\u2468"}],"title":"8.3. Sniffing in an audio or video context"},{"refs":[{"id":"ref-for-computed-mime-type\u2463\u24ea"},{"id":"ref-for-computed-mime-type\u2463\u2460"},{"id":"ref-for-computed-mime-type\u2463\u2461"}],"title":"8.4. Sniffing in a plugin context"},{"refs":[{"id":"ref-for-computed-mime-type\u2463\u2462"},{"id":"ref-for-computed-mime-type\u2463\u2463"}],"title":"8.5. Sniffing in a style context"},{"refs":[{"id":"ref-for-computed-mime-type\u2463\u2464"},{"id":"ref-for-computed-mime-type\u2463\u2465"}],"title":"8.6. Sniffing in a script context"},{"refs":[{"id":"ref-for-computed-mime-type\u2463\u2466"},{"id":"ref-for-computed-mime-type\u2463\u2467"},{"id":"ref-for-computed-mime-type\u2463\u2468"},{"id":"ref-for-computed-mime-type\u2464\u24ea"}],"title":"8.7. Sniffing in a font context"},{"refs":[{"id":"ref-for-computed-mime-type\u2464\u2460"}],"title":"8.8. Sniffing in a text track context"},{"refs":[{"id":"ref-for-computed-mime-type\u2464\u2461"}],"title":"8.9. Sniffing in a cache manifest context"}],"url":"#computed-mime-type"},
+"supplied-mime-type-detection-algorithm": {"dfnID":"supplied-mime-type-detection-algorithm","dfnText":"supplied MIME type detection\n algorithm","external":false,"refSections":[{"refs":[{"id":"ref-for-supplied-mime-type-detection-algorithm"}],"title":"5. Handling a resource"},{"refs":[{"id":"ref-for-supplied-mime-type-detection-algorithm\u2460"}],"title":"5.1. Interpreting the resource metadata"}],"url":"#supplied-mime-type-detection-algorithm"},
+"resource-header": {"dfnID":"resource-header","dfnText":"resource header","external":false,"refSections":[{"refs":[{"id":"ref-for-resource-header"},{"id":"ref-for-resource-header\u2460"}],"title":"5.2. Reading the resource header"},{"refs":[{"id":"ref-for-resource-header\u2461"},{"id":"ref-for-resource-header\u2462"}],"title":"7. Determining the computed MIME type of a resource"},{"refs":[{"id":"ref-for-resource-header\u2463"},{"id":"ref-for-resource-header\u2464"},{"id":"ref-for-resource-header\u2465"},{"id":"ref-for-resource-header\u2466"},{"id":"ref-for-resource-header\u2467"},{"id":"ref-for-resource-header\u2468"}],"title":"7.1. Identifying a resource with an unknown MIME type"},{"refs":[{"id":"ref-for-resource-header\u2460\u24ea"},{"id":"ref-for-resource-header\u2460\u2460"},{"id":"ref-for-resource-header\u2460\u2461"},{"id":"ref-for-resource-header\u2460\u2462"}],"title":"7.2. Sniffing a mislabeled binary resource"},{"refs":[{"id":"ref-for-resource-header\u2460\u2463"}],"title":"7.3. Sniffing a mislabeled feed"},{"refs":[{"id":"ref-for-resource-header\u2460\u2464"}],"title":"8.2. Sniffing in an image context"},{"refs":[{"id":"ref-for-resource-header\u2460\u2465"}],"title":"8.3. Sniffing in an audio or video context"},{"refs":[{"id":"ref-for-resource-header\u2460\u2466"}],"title":"8.7. Sniffing in a font context"}],"url":"#resource-header"},
+"read-the-resource-header": {"dfnID":"read-the-resource-header","dfnText":"read the resource header","external":false,"refSections":[{"refs":[{"id":"ref-for-read-the-resource-header"}],"title":"5.2. Reading the resource header"}],"url":"#read-the-resource-header"},
+"byte-pattern": {"dfnID":"byte-pattern","dfnText":"byte pattern","external":false,"refSections":[{"refs":[{"id":"ref-for-byte-pattern"},{"id":"ref-for-byte-pattern\u2460"},{"id":"ref-for-byte-pattern\u2461"}],"title":"6. Matching a MIME type pattern"},{"refs":[{"id":"ref-for-byte-pattern\u2462"},{"id":"ref-for-byte-pattern\u2463"}],"title":"6.1. Matching an image type pattern"},{"refs":[{"id":"ref-for-byte-pattern\u2464"},{"id":"ref-for-byte-pattern\u2465"}],"title":"6.2. Matching an audio or video type pattern"},{"refs":[{"id":"ref-for-byte-pattern\u2466"},{"id":"ref-for-byte-pattern\u2467"}],"title":"6.3. Matching a font type pattern"},{"refs":[{"id":"ref-for-byte-pattern\u2468"},{"id":"ref-for-byte-pattern\u2460\u24ea"}],"title":"6.4. Matching an archive type pattern"},{"refs":[{"id":"ref-for-byte-pattern\u2460\u2460"},{"id":"ref-for-byte-pattern\u2460\u2461"},{"id":"ref-for-byte-pattern\u2460\u2462"}],"title":"7.1. Identifying a resource with an unknown MIME type"}],"url":"#byte-pattern"},
+"pattern-mask": {"dfnID":"pattern-mask","dfnText":"pattern mask","external":false,"refSections":[{"refs":[{"id":"ref-for-pattern-mask"},{"id":"ref-for-pattern-mask\u2460"}],"title":"6. Matching a MIME type pattern"},{"refs":[{"id":"ref-for-pattern-mask\u2461"}],"title":"6.1. Matching an image type pattern"},{"refs":[{"id":"ref-for-pattern-mask\u2462"}],"title":"6.2. Matching an audio or video type pattern"},{"refs":[{"id":"ref-for-pattern-mask\u2463"}],"title":"6.3. Matching a font type pattern"},{"refs":[{"id":"ref-for-pattern-mask\u2464"}],"title":"6.4. Matching an archive type pattern"},{"refs":[{"id":"ref-for-pattern-mask\u2465"},{"id":"ref-for-pattern-mask\u2466"}],"title":"7.1. Identifying a resource with an unknown MIME type"}],"url":"#pattern-mask"},
+"pattern-matching-algorithm": {"dfnID":"pattern-matching-algorithm","dfnText":"pattern matching algorithm","external":false,"refSections":[{"refs":[{"id":"ref-for-pattern-matching-algorithm"},{"id":"ref-for-pattern-matching-algorithm\u2460"}],"title":"6. Matching a MIME type pattern"},{"refs":[{"id":"ref-for-pattern-matching-algorithm\u2461"}],"title":"6.1. Matching an image type pattern"},{"refs":[{"id":"ref-for-pattern-matching-algorithm\u2462"}],"title":"6.2. Matching an audio or video type pattern"},{"refs":[{"id":"ref-for-pattern-matching-algorithm\u2463"}],"title":"6.3. Matching a font type pattern"},{"refs":[{"id":"ref-for-pattern-matching-algorithm\u2464"}],"title":"6.4. Matching an archive type pattern"},{"refs":[{"id":"ref-for-pattern-matching-algorithm\u2465"},{"id":"ref-for-pattern-matching-algorithm\u2466"}],"title":"7.1. Identifying a resource with an unknown MIME type"}],"url":"#pattern-matching-algorithm"},
+"image-type-pattern-matching-algorithm": {"dfnID":"image-type-pattern-matching-algorithm","dfnText":"image type pattern matching algorithm","external":false,"refSections":[{"refs":[{"id":"ref-for-image-type-pattern-matching-algorithm"}],"title":"7. Determining the computed MIME type of a resource"},{"refs":[{"id":"ref-for-image-type-pattern-matching-algorithm\u2460"}],"title":"7.1. Identifying a resource with an unknown MIME type"},{"refs":[{"id":"ref-for-image-type-pattern-matching-algorithm\u2461"}],"title":"8.2. Sniffing in an image context"}],"url":"#image-type-pattern-matching-algorithm"},
+"audio-or-video-type-pattern-matching-algorithm": {"dfnID":"audio-or-video-type-pattern-matching-algorithm","dfnText":"audio or video type pattern matching\nalgorithm","external":false,"refSections":[{"refs":[{"id":"ref-for-audio-or-video-type-pattern-matching-algorithm"}],"title":"7. Determining the computed MIME type of a resource"},{"refs":[{"id":"ref-for-audio-or-video-type-pattern-matching-algorithm\u2460"}],"title":"7.1. Identifying a resource with an unknown MIME type"},{"refs":[{"id":"ref-for-audio-or-video-type-pattern-matching-algorithm\u2461"}],"title":"8.3. Sniffing in an audio or video context"}],"url":"#audio-or-video-type-pattern-matching-algorithm"},
+"matches-the-signature-for-mp4": {"dfnID":"matches-the-signature-for-mp4","dfnText":"matches the signature\n for MP4","external":false,"refSections":[{"refs":[{"id":"ref-for-matches-the-signature-for-mp4"}],"title":"6.2. Matching an audio or video type pattern"}],"url":"#matches-the-signature-for-mp4"},
+"matches-the-signature-for-webm": {"dfnID":"matches-the-signature-for-webm","dfnText":"matches the signature\n for WebM","external":false,"refSections":[{"refs":[{"id":"ref-for-matches-the-signature-for-webm"}],"title":"6.2. Matching an audio or video type pattern"}],"url":"#matches-the-signature-for-webm"},
+"parse-a-vint": {"dfnID":"parse-a-vint","dfnText":"parse a vint","external":false,"refSections":[{"refs":[{"id":"ref-for-parse-a-vint"}],"title":"6.2.2. Signature for WebM"}],"url":"#parse-a-vint"},
+"matching-a-padded-sequence": {"dfnID":"matching-a-padded-sequence","dfnText":"Matching a padded sequence","external":false,"refSections":[{"refs":[{"id":"ref-for-matching-a-padded-sequence"}],"title":"6.2.2. Signature for WebM"}],"url":"#matching-a-padded-sequence"},
+"matches-the-signature-for-mp3-without-id3": {"dfnID":"matches-the-signature-for-mp3-without-id3","dfnText":"matches the signature\nfor MP3 without ID3","external":false,"refSections":[{"refs":[{"id":"ref-for-matches-the-signature-for-mp3-without-id3"}],"title":"6.2. Matching an audio or video type pattern"}],"url":"#matches-the-signature-for-mp3-without-id3"},
+"match-an-mp3-header": {"dfnID":"match-an-mp3-header","dfnText":"match an mp3 header","external":false,"refSections":[{"refs":[{"id":"ref-for-match-an-mp3-header"},{"id":"ref-for-match-an-mp3-header"}],"title":"6.2.3. Signature for MP3 without ID3"}],"url":"#match-an-mp3-header"},
+"compute-an-mp3-frame-size": {"dfnID":"compute-an-mp3-frame-size","dfnText":"compute an mp3 frame size","external":false,"refSections":[{"refs":[{"id":"ref-for-compute-an-mp3-frame-size"}],"title":"6.2.3. Signature for MP3 without ID3"}],"url":"#compute-an-mp3-frame-size"},
+"parse-an-mp3-frame": {"dfnID":"parse-an-mp3-frame","dfnText":"parse an mp3 frame","external":false,"refSections":[{"refs":[{"id":"ref-for-parse-an-mp3-frame"}],"title":"6.2.3. Signature for MP3 without ID3"}],"url":"#parse-an-mp3-frame"},
+"font-type-pattern-matching-algorithm": {"dfnID":"font-type-pattern-matching-algorithm","dfnText":"font type pattern matching algorithm","external":false,"refSections":[{"refs":[{"id":"ref-for-font-type-pattern-matching-algorithm"}],"title":"8.7. Sniffing in a font context"}],"url":"#font-type-pattern-matching-algorithm"},
+"archive-type-pattern-matching-algorithm": {"dfnID":"archive-type-pattern-matching-algorithm","dfnText":"archive type pattern matching\nalgorithm","external":false,"refSections":[{"refs":[{"id":"ref-for-archive-type-pattern-matching-algorithm"}],"title":"7.1. Identifying a resource with an unknown MIME type"}],"url":"#archive-type-pattern-matching-algorithm"},
+"mime-type-sniffing-algorithm": {"dfnID":"mime-type-sniffing-algorithm","dfnText":"MIME type sniffing algorithm","external":false,"refSections":[{"refs":[{"id":"ref-for-mime-type-sniffing-algorithm"},{"id":"ref-for-mime-type-sniffing-algorithm\u2460"}],"title":"5. Handling a resource"},{"refs":[{"id":"ref-for-mime-type-sniffing-algorithm\u2461"}],"title":"5.2. Reading the resource header"},{"refs":[{"id":"ref-for-mime-type-sniffing-algorithm\u2462"}],"title":"8. Context-specific sniffing"},{"refs":[{"id":"ref-for-mime-type-sniffing-algorithm\u2463"}],"title":"8.1. Sniffing in a browsing context"}],"url":"#mime-type-sniffing-algorithm"},
+"sniff-scriptable-flag": {"dfnID":"sniff-scriptable-flag","dfnText":"sniff-scriptable flag","external":false,"refSections":[{"refs":[{"id":"ref-for-sniff-scriptable-flag"}],"title":"7. Determining the computed MIME type of a resource"},{"refs":[{"id":"ref-for-sniff-scriptable-flag\u2460"},{"id":"ref-for-sniff-scriptable-flag\u2461"},{"id":"ref-for-sniff-scriptable-flag\u2462"}],"title":"7.1. Identifying a resource with an unknown MIME type"}],"url":"#sniff-scriptable-flag"},
+"rules-for-identifying-an-unknown-mime-type": {"dfnID":"rules-for-identifying-an-unknown-mime-type","dfnText":"rules for identifying an unknown MIME\ntype","external":false,"refSections":[{"refs":[{"id":"ref-for-rules-for-identifying-an-unknown-mime-type"}],"title":"7. Determining the computed MIME type of a resource"},{"refs":[{"id":"ref-for-rules-for-identifying-an-unknown-mime-type\u2460"},{"id":"ref-for-rules-for-identifying-an-unknown-mime-type\u2461"}],"title":"7.1. Identifying a resource with an unknown MIME type"}],"url":"#rules-for-identifying-an-unknown-mime-type"},
+"rules-for-text-or-binary": {"dfnID":"rules-for-text-or-binary","dfnText":"rules for\n distinguishing if a resource is text or binary","external":false,"refSections":[{"refs":[{"id":"ref-for-rules-for-text-or-binary"}],"title":"7. Determining the computed MIME type of a resource"},{"refs":[{"id":"ref-for-rules-for-text-or-binary\u2460"}],"title":"7.2. Sniffing a mislabeled binary resource"}],"url":"#rules-for-text-or-binary"},
+"rules-for-distinguishing-if-a-resource-is-a-feed-or-html": {"dfnID":"rules-for-distinguishing-if-a-resource-is-a-feed-or-html","dfnText":"rules for distinguishing if a resource is a feed or\n HTML","external":false,"refSections":[{"refs":[{"id":"ref-for-rules-for-distinguishing-if-a-resource-is-a-feed-or-html"}],"title":"7. Determining the computed MIME type of a resource"},{"refs":[{"id":"ref-for-rules-for-distinguishing-if-a-resource-is-a-feed-or-html\u2460"}],"title":"7.3. Sniffing a mislabeled feed"}],"url":"#rules-for-distinguishing-if-a-resource-is-a-feed-or-html"},
+"context": {"dfnID":"context","dfnText":"context","external":false,"refSections":[{"refs":[{"id":"ref-for-context"},{"id":"ref-for-context\u2460"},{"id":"ref-for-context\u2461"}],"title":"8. Context-specific sniffing"}],"url":"#context"},
+"context-specific-sniffing-algorithm": {"dfnID":"context-specific-sniffing-algorithm","dfnText":"context-specific sniffing algorithm","external":false,"refSections":[{"refs":[{"id":"ref-for-context-specific-sniffing-algorithm"}],"title":"8. Context-specific sniffing"}],"url":"#context-specific-sniffing-algorithm"},
+};
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+const typeFormatters = {
+    'dfn': (text) => `[=${text}=]`,
+    'abstract-op': (text) => `[\$${text}\$]`,
+    'value': (text) => `''${text}''`,
+    'http-header': (text) => `[:${text}:]`,
+    'idl': (text) => `{{${text}}}`,
+    'interface': 'idl',
+    'constructor': 'idl',
+    'method': 'idl',
+    'argument': 'idl',
+    'attribute': 'idl',
+    'callback': 'idl',
+    'dictionary': 'idl',
+    'dict-member': 'idl',
+    'enum': 'idl',
+    'enum-value': 'idl',
+    'exception': 'idl',
+    'const': 'idl',
+    'typedef': 'idl',
+    'stringifier': 'idl',
+    'serializer': 'idl',
+    'iterator': 'idl',
+    'maplike': 'idl',
+    'setlike': 'idl',
+    'extended-attribute': 'idl',
+    'event': 'idl',
+    'element': (element) => `<{${element}}>`,
+    'element-state': 'element',
+    'element-attr': 'element',
+    'attr-value': 'element',
+    'scheme': 'dfn',
+    'permission': 'dfn',
+    'grammar': (text) => `${text} (within a <pre class=prod>)`,
+    'type': (text)=> `<<${text}>>`,
+    'property': (text) => `'${text}'`,
+    'descriptor': 'property',
+    'function': 'value',
+    'at-rule': 'value',
+    'selector': 'value',
+};
+const typesUsingFor = new Set(
+    [
+        "descriptor",
+        "value",
+        "element-attr",
+        "attr-value",
+        "element-state",
+        "method",
+        "constructor",
+        "argument",
+        "attribute",
+        "const",
+        "dict-member",
+        "event",
+        "enum-value",
+        "stringifier",
+        "serializer",
+        "iterator",
+        "maplike",
+        "setlike",
+        "state",
+        "mode",
+        "context",
+        "facet",
+    ],
+)
+const typesNotUsingFor = new Set(
+    [
+        "property",
+        "element",
+        "interface",
+        "namespace",
+        "callback",
+        "dictionary",
+        "enum",
+        "exception",
+        "typedef",
+        "http-header",
+        "permission",
+    ],
+)
+function linkFormatterFromType(type) {
+    const fnOrType = typeFormatters[type];
+    if(typeof fnOrType === 'string') {
+        // follow the alias
+        return linkFormatterFromType(fnOrType);
+    }
+    return fnOrType;
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!typesUsingFor.has(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!typesNotUsingFor.has(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
+
+function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+    dfnPanel.forDfn = dfn;
+    if(!dfn) { console.log(dfnPanel); }
+    return dfnPanel;
+}
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        const panel = genDfnPanel({ ...panelData, dfn });
+        append(document.body, panel);
+        insertDfnPopupAction(panel)
+    }
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+})
+
+function hideAllDfnPanels() {
+    // Turn off any currently "on" or "activated" panels.
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
+}
+
+function showDfnPanel(dfnPanel) {
+    hideAllDfnPanels(); // Only display one at this time.
+
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "true");
+
+    dfnPanel.classList.add("on");
+    positionDfnPanel(dfnPanel);
+
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    // Increment tabindex for each anchor and button tags in panel
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.style.position = "absolute"; // unfix it
+    dfnPanel.classList.remove("on");
+    dfnPanel.classList.remove("activated");
+}
+
+function toggleDfnPanel(dfnPanel) {
+    if(dfnPanel.classList.contains("on")) {
+        hideDfnPanel(dfnPanel);
+    } else {
+        showDfnPanel(dfnPanel);
+    }
+}
+
+function insertDfnPopupAction(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        showDfnPanel(dfnPanel);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfnPanel);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel(dfnPanel, dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    })
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
 }
 </script>
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
+let refsData = {
+"https://infra.spec.whatwg.org/#ascii-alphanumeric": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"ascii alphanumeric","type":"dfn","url":"https://infra.spec.whatwg.org/#ascii-alphanumeric"},
+"https://tools.ietf.org/html/rfc7230#section-3.2.6": {"export":true,"for_":[],"level":"","normative":true,"shortname":"http","spec":"http","status":"anchor-block","text":"token","type":"dfn","url":"https://tools.ietf.org/html/rfc7230#section-3.2.6"},
+"https://infra.spec.whatwg.org/#code-point": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"code point","type":"dfn","url":"https://infra.spec.whatwg.org/#code-point"},
+"#http-token-code-point": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"http token code point","type":"dfn","url":"#http-token-code-point"},
+"https://infra.spec.whatwg.org/#byte": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"byte","type":"dfn","url":"https://infra.spec.whatwg.org/#byte"},
+"#mime-type": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"mime type record","type":"dfn","url":"#mime-type"},
+"https://infra.spec.whatwg.org/#ascii-string": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"ascii string","type":"dfn","url":"https://infra.spec.whatwg.org/#ascii-string"},
+"https://infra.spec.whatwg.org/#ordered-map": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"ordered map","type":"dfn","url":"https://infra.spec.whatwg.org/#ordered-map"},
+"https://infra.spec.whatwg.org/#map-getting-the-keys": {"export":true,"for_":["map"],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"keys","type":"dfn","url":"https://infra.spec.whatwg.org/#map-getting-the-keys"},
+"https://infra.spec.whatwg.org/#map-getting-the-values": {"export":true,"for_":["map"],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"values","type":"dfn","url":"https://infra.spec.whatwg.org/#map-getting-the-values"},
+"#type": {"export":true,"for_":["MIME type"],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"type","type":"dfn","url":"#type"},
+"#subtype": {"export":true,"for_":["MIME type"],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"subtype","type":"dfn","url":"#subtype"},
+"#resource": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"resource","type":"dfn","url":"#resource"},
+"https://tools.ietf.org/html/rfc7231#section-3.1.1.1": {"export":true,"for_":[],"level":"","normative":true,"shortname":"http","spec":"http","status":"anchor-block","text":"media-type","type":"dfn","url":"https://tools.ietf.org/html/rfc7231#section-3.1.1.1"},
+"#valid-mime-type": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"valid mime type string","type":"dfn","url":"#valid-mime-type"},
+"#parameters": {"export":true,"for_":["MIME type"],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"parameters","type":"dfn","url":"#parameters"},
+"#parse-a-mime-type": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"parse a mime type","type":"dfn","url":"#parse-a-mime-type"},
+"https://fetch.spec.whatwg.org/#http-whitespace": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"http whitespace","type":"dfn","url":"https://fetch.spec.whatwg.org/#http-whitespace"},
+"https://infra.spec.whatwg.org/#string-position-variable": {"export":true,"for_":["string"],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"position variable","type":"dfn","url":"https://infra.spec.whatwg.org/#string-position-variable"},
+"https://infra.spec.whatwg.org/#collect-a-sequence-of-code-points": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"collecting a sequence of code points","type":"dfn","url":"https://infra.spec.whatwg.org/#collect-a-sequence-of-code-points"},
+"https://infra.spec.whatwg.org/#ascii-lowercase": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"ascii lowercase","type":"dfn","url":"https://infra.spec.whatwg.org/#ascii-lowercase"},
+"https://infra.spec.whatwg.org/#skip-ascii-whitespace": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"skip ascii whitespace","type":"dfn","url":"https://infra.spec.whatwg.org/#skip-ascii-whitespace"},
+"https://infra.spec.whatwg.org/#ascii-whitespace": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"ascii whitespace","type":"dfn","url":"https://infra.spec.whatwg.org/#ascii-whitespace"},
+"https://infra.spec.whatwg.org/#iteration-continue": {"export":true,"for_":["iteration"],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"continue","type":"dfn","url":"https://infra.spec.whatwg.org/#iteration-continue"},
+"https://infra.spec.whatwg.org/#iteration-break": {"export":true,"for_":["iteration"],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"break","type":"dfn","url":"https://infra.spec.whatwg.org/#iteration-break"},
+"https://fetch.spec.whatwg.org/#collect-an-http-quoted-string": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"collecting an http quoted string","type":"dfn","url":"https://fetch.spec.whatwg.org/#collect-an-http-quoted-string"},
+"#http-quoted-string-token-code-point": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"http quoted-string token code point","type":"dfn","url":"#http-quoted-string-token-code-point"},
+"https://infra.spec.whatwg.org/#map-exists": {"export":true,"for_":["map"],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"exist","type":"dfn","url":"https://infra.spec.whatwg.org/#map-exists"},
+"https://infra.spec.whatwg.org/#map-set": {"export":true,"for_":["map"],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"set","type":"dfn","url":"https://infra.spec.whatwg.org/#map-set"},
+"https://infra.spec.whatwg.org/#byte-sequence": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"byte sequence","type":"dfn","url":"https://infra.spec.whatwg.org/#byte-sequence"},
+"https://infra.spec.whatwg.org/#isomorphic-decode": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"isomorphic decode","type":"dfn","url":"https://infra.spec.whatwg.org/#isomorphic-decode"},
+"https://infra.spec.whatwg.org/#map-iterate": {"export":true,"for_":["map"],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"for each","type":"dfn","url":"https://infra.spec.whatwg.org/#map-iterate"},
+"#serialize-a-mime-type": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"serialize a mime type","type":"dfn","url":"#serialize-a-mime-type"},
+"https://infra.spec.whatwg.org/#isomorphic-encode": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"isomorphic encode","type":"dfn","url":"https://infra.spec.whatwg.org/#isomorphic-encode"},
+"#mime-type-essence": {"export":true,"for_":["MIME type"],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"essence","type":"dfn","url":"#mime-type-essence"},
+"#xml-mime-type": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"xml mime type","type":"dfn","url":"#xml-mime-type"},
+"#html-mime-type": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"html mime type","type":"dfn","url":"#html-mime-type"},
+"https://infra.spec.whatwg.org/#string": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"string","type":"dfn","url":"https://infra.spec.whatwg.org/#string"},
+"https://infra.spec.whatwg.org/#ascii-case-insensitive": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"ascii case-insensitive","type":"dfn","url":"https://infra.spec.whatwg.org/#ascii-case-insensitive"},
+"#javascript-mime-type": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"javascript mime type","type":"dfn","url":"#javascript-mime-type"},
+"https://html.spec.whatwg.org/multipage/scripting.html#attr-script-type": {"export":true,"for_":["script"],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"type","type":"element-attr","url":"https://html.spec.whatwg.org/multipage/scripting.html#attr-script-type"},
+"https://html.spec.whatwg.org/multipage/scripting.html#script": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"script","type":"element","url":"https://html.spec.whatwg.org/multipage/scripting.html#script"},
+"#supplied-mime-type-detection-algorithm": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"supplied mime type detection algorithm","type":"dfn","url":"#supplied-mime-type-detection-algorithm"},
+"#mime-type-sniffing-algorithm": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"mime type sniffing algorithm","type":"dfn","url":"#mime-type-sniffing-algorithm"},
+"#supplied-mime-type": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"supplied mime type","type":"dfn","url":"#supplied-mime-type"},
+"#check-for-apache-bug-flag": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"check-for-apache-bug flag","type":"dfn","url":"#check-for-apache-bug-flag"},
+"#read-the-resource-header": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"read the resource header","type":"dfn","url":"#read-the-resource-header"},
+"#resource-header": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"resource header","type":"dfn","url":"#resource-header"},
+"#pattern-matching-algorithm": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"pattern matching algorithm","type":"dfn","url":"#pattern-matching-algorithm"},
+"#byte-pattern": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"byte pattern","type":"dfn","url":"#byte-pattern"},
+"#pattern-mask": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"pattern mask","type":"dfn","url":"#pattern-mask"},
+"https://infra.spec.whatwg.org/#ordered-set": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"set","type":"dfn","url":"https://infra.spec.whatwg.org/#ordered-set"},
+"https://infra.spec.whatwg.org/#byte-sequence-length": {"export":true,"for_":["byte sequence"],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"length","type":"dfn","url":"https://infra.spec.whatwg.org/#byte-sequence-length"},
+"https://infra.spec.whatwg.org/#list-contain": {"export":true,"for_":["list","stack","queue","set"],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"contain","type":"dfn","url":"https://infra.spec.whatwg.org/#list-contain"},
+"#image-mime-type": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"image mime type","type":"dfn","url":"#image-mime-type"},
+"#audio-or-video-mime-type": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"audio or video mime type","type":"dfn","url":"#audio-or-video-mime-type"},
+"#matches-the-signature-for-mp4": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"matches the signature for mp4","type":"dfn","url":"#matches-the-signature-for-mp4"},
+"#matches-the-signature-for-webm": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"matches the signature for webm","type":"dfn","url":"#matches-the-signature-for-webm"},
+"#matches-the-signature-for-mp3-without-id3": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"matches the signature for mp3 without id3","type":"dfn","url":"#matches-the-signature-for-mp3-without-id3"},
+"#font-mime-type": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"font mime type","type":"dfn","url":"#font-mime-type"},
+"#archive-mime-type": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"archive mime type","type":"dfn","url":"#archive-mime-type"},
+"#computed-mime-type": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"computed mime type","type":"dfn","url":"#computed-mime-type"},
+"#rules-for-identifying-an-unknown-mime-type": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"rules for identifying an unknown mime type","type":"dfn","url":"#rules-for-identifying-an-unknown-mime-type"},
+"#sniff-scriptable-flag": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"sniff-scriptable flag","type":"dfn","url":"#sniff-scriptable-flag"},
+"#no-sniff-flag": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"no-sniff flag","type":"dfn","url":"#no-sniff-flag"},
+"#rules-for-text-or-binary": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"rules for distinguishing if a resource is text or binary","type":"dfn","url":"#rules-for-text-or-binary"},
+"#rules-for-distinguishing-if-a-resource-is-a-feed-or-html": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"rules for distinguishing if a resource is a feed or html","type":"dfn","url":"#rules-for-distinguishing-if-a-resource-is-a-feed-or-html"},
+"#supported-by-the-user-agent": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"supported by the user agent","type":"dfn","url":"#supported-by-the-user-agent"},
+"#image-type-pattern-matching-algorithm": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"image type pattern matching algorithm","type":"dfn","url":"#image-type-pattern-matching-algorithm"},
+"#audio-or-video-type-pattern-matching-algorithm": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"audio or video type pattern matching algorithm","type":"dfn","url":"#audio-or-video-type-pattern-matching-algorithm"},
+"#scriptable-mime-type": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"scriptable mime type","type":"dfn","url":"#scriptable-mime-type"},
+"#whitespace-byte": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"whitespace byte","type":"dfn","url":"#whitespace-byte"},
+"#tag-terminating-byte": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"tag-terminating byte","type":"dfn","url":"#tag-terminating-byte"},
+"#archive-type-pattern-matching-algorithm": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"archive type pattern matching algorithm","type":"dfn","url":"#archive-type-pattern-matching-algorithm"},
+"#binary-data-byte": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"binary data byte","type":"dfn","url":"#binary-data-byte"},
+"#context": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"context","type":"dfn","url":"#context"},
+"#context-specific-sniffing-algorithm": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"context-specific sniffing algorithm","type":"dfn","url":"#context-specific-sniffing-algorithm"},
+"https://fetch.spec.whatwg.org/#concept-fetch": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"fetch","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-fetch"},
+"#font-type-pattern-matching-algorithm": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mimesniff","spec":"mimesniff","status":"local","text":"font type pattern matching algorithm","type":"dfn","url":"#font-type-pattern-matching-algorithm"},
+};
+
+function genRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "DFN: "),
+                mk.code({ class: "dfn-text" }, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    const forListElements = forList.length === 0 ? '' : mk.li({},
+        mk.b({}, "For: "),
+        mk.ul({},
+            ...forList.map(forItem =>
                 mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
-            mk.b({}, "For: "),
-            mk.ul({},
-                ...forList.map(forItem =>
-                    mk.li({},
-                        mk.span({}, `${forItem}`)
-                    ),
+                    mk.span({}, `${forItem}`)
                 ),
             ),
-        );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+        ),
+    );
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
-    }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    return hintPanel;
+}
+function genAllRefHints() {
+    for(const refData of Object.values(refsData)) {
+        const refUrl = refData.url;
+        const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+        if (links.length == 0) {
+            console.log(`Can't find link href="${refUrl}".`, refData);
+            continue;
+        }
+        for(const link of links) {
+            if(link.classList.contains("dfn-link")) continue;
+            const hint = genRefHint(link, refData);
+            append(document.body, hint);
+            insertLinkPopupAction(hint)
         }
     }
+}
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+function hideAllRefHints() {
+    queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    refHint.style.position = "absolute"; // unfix it
+    refHint.classList.remove("on");
+    const teardown = refHint.teardownEventListeners;
+    if (teardown) {
+        refHint.teardownEventListeners = undefined;
+        teardown();
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+function showRefHint(refHint) {
+    hideAllRefHints(); // Only display one at this time.
+
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "true");
+    refHint.classList.add("on");
+    positionRefHint(refHint);
+    setupRefHintEventListeners(refHint);
+}
+
+function setupRefHintEventListeners(refHint) {
+    if (refHint.teardownEventListeners) return;
+    const link = refHint.forLink;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
 
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
 
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+function insertLinkPopupAction(refHint) {
+    const link = refHint.forLink;
+    // link.setAttribute('role', 'button');
+    link.setAttribute('aria-expanded', 'false')
+    link.classList.add('has-ref-hint');
+    link.addEventListener('mouseover', (event) => {
+        showRefHint(refHint);
     });
+    link.addEventListener('focus', (event) => {
+        showRefHint(refHint);
+    })
+}
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+document.addEventListener("DOMContentLoaded", () => {
+    genAllRefHints();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['https://infra.spec.whatwg.org/#ascii-alphanumeric'] = {"text": "ascii alphanumeric", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-alphanumeric", "export": true, "normative": true, "for_": []};
-window.refsData['https://tools.ietf.org/html/rfc7230#section-3.2.6'] = {"text": "token", "type": "dfn", "spec": "http", "shortname": "http", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc7230#section-3.2.6", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#code-point'] = {"text": "code point", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#code-point", "export": true, "normative": true, "for_": []};
-window.refsData['#http-token-code-point'] = {"text": "http token code point", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#http-token-code-point", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#byte'] = {"text": "byte", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#byte", "export": true, "normative": true, "for_": []};
-window.refsData['#mime-type'] = {"text": "mime type record", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#mime-type", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#ascii-string'] = {"text": "ascii string", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-string", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#ordered-map'] = {"text": "ordered map", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ordered-map", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#map-getting-the-keys'] = {"text": "keys", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-getting-the-keys", "export": true, "normative": true, "for_": ["map"]};
-window.refsData['https://infra.spec.whatwg.org/#map-getting-the-values'] = {"text": "values", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-getting-the-values", "export": true, "normative": true, "for_": ["map"]};
-window.refsData['#type'] = {"text": "type", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#type", "export": true, "normative": true, "for_": ["MIME type"]};
-window.refsData['#subtype'] = {"text": "subtype", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#subtype", "export": true, "normative": true, "for_": ["MIME type"]};
-window.refsData['#resource'] = {"text": "resource", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#resource", "export": true, "normative": true, "for_": []};
-window.refsData['https://tools.ietf.org/html/rfc7231#section-3.1.1.1'] = {"text": "media-type", "type": "dfn", "spec": "http", "shortname": "http", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc7231#section-3.1.1.1", "export": true, "normative": true, "for_": []};
-window.refsData['#valid-mime-type'] = {"text": "valid mime type string", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#valid-mime-type", "export": true, "normative": true, "for_": []};
-window.refsData['#parameters'] = {"text": "parameters", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#parameters", "export": true, "normative": true, "for_": ["MIME type"]};
-window.refsData['#parse-a-mime-type'] = {"text": "parse a mime type", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#parse-a-mime-type", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#http-whitespace'] = {"text": "http whitespace", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#http-whitespace", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#string-position-variable'] = {"text": "position variable", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#string-position-variable", "export": true, "normative": true, "for_": ["string"]};
-window.refsData['https://infra.spec.whatwg.org/#collect-a-sequence-of-code-points'] = {"text": "collecting a sequence of code points", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#collect-a-sequence-of-code-points", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#ascii-lowercase'] = {"text": "ascii lowercase", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-lowercase", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#skip-ascii-whitespace'] = {"text": "skip ascii whitespace", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#skip-ascii-whitespace", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#ascii-whitespace'] = {"text": "ascii whitespace", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-whitespace", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#iteration-continue'] = {"text": "continue", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#iteration-continue", "export": true, "normative": true, "for_": ["iteration"]};
-window.refsData['https://infra.spec.whatwg.org/#iteration-break'] = {"text": "break", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#iteration-break", "export": true, "normative": true, "for_": ["iteration"]};
-window.refsData['https://fetch.spec.whatwg.org/#collect-an-http-quoted-string'] = {"text": "collecting an http quoted string", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#collect-an-http-quoted-string", "export": true, "normative": true, "for_": []};
-window.refsData['#http-quoted-string-token-code-point'] = {"text": "http quoted-string token code point", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#http-quoted-string-token-code-point", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#map-exists'] = {"text": "exist", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-exists", "export": true, "normative": true, "for_": ["map"]};
-window.refsData['https://infra.spec.whatwg.org/#map-set'] = {"text": "set", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-set", "export": true, "normative": true, "for_": ["map"]};
-window.refsData['https://infra.spec.whatwg.org/#byte-sequence'] = {"text": "byte sequence", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#byte-sequence", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#isomorphic-decode'] = {"text": "isomorphic decode", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#isomorphic-decode", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#map-iterate'] = {"text": "for each", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-iterate", "export": true, "normative": true, "for_": ["map"]};
-window.refsData['#serialize-a-mime-type'] = {"text": "serialize a mime type", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#serialize-a-mime-type", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#isomorphic-encode'] = {"text": "isomorphic encode", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#isomorphic-encode", "export": true, "normative": true, "for_": []};
-window.refsData['#mime-type-essence'] = {"text": "essence", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#mime-type-essence", "export": true, "normative": true, "for_": ["MIME type"]};
-window.refsData['#xml-mime-type'] = {"text": "xml mime type", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#xml-mime-type", "export": true, "normative": true, "for_": []};
-window.refsData['#html-mime-type'] = {"text": "html mime type", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#html-mime-type", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#string'] = {"text": "string", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#string", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#ascii-case-insensitive'] = {"text": "ascii case-insensitive", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-case-insensitive", "export": true, "normative": true, "for_": []};
-window.refsData['#javascript-mime-type'] = {"text": "javascript mime type", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#javascript-mime-type", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/scripting.html#attr-script-type'] = {"text": "type", "type": "element-attr", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/scripting.html#attr-script-type", "export": true, "normative": true, "for_": ["script"]};
-window.refsData['https://html.spec.whatwg.org/multipage/scripting.html#script'] = {"text": "script", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/scripting.html#script", "export": true, "normative": true, "for_": []};
-window.refsData['#supplied-mime-type-detection-algorithm'] = {"text": "supplied mime type detection algorithm", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#supplied-mime-type-detection-algorithm", "export": true, "normative": true, "for_": []};
-window.refsData['#mime-type-sniffing-algorithm'] = {"text": "mime type sniffing algorithm", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#mime-type-sniffing-algorithm", "export": true, "normative": true, "for_": []};
-window.refsData['#supplied-mime-type'] = {"text": "supplied mime type", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#supplied-mime-type", "export": true, "normative": true, "for_": []};
-window.refsData['#check-for-apache-bug-flag'] = {"text": "check-for-apache-bug flag", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#check-for-apache-bug-flag", "export": true, "normative": true, "for_": []};
-window.refsData['#read-the-resource-header'] = {"text": "read the resource header", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#read-the-resource-header", "export": true, "normative": true, "for_": []};
-window.refsData['#resource-header'] = {"text": "resource header", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#resource-header", "export": true, "normative": true, "for_": []};
-window.refsData['#pattern-matching-algorithm'] = {"text": "pattern matching algorithm", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#pattern-matching-algorithm", "export": true, "normative": true, "for_": []};
-window.refsData['#byte-pattern'] = {"text": "byte pattern", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#byte-pattern", "export": true, "normative": true, "for_": []};
-window.refsData['#pattern-mask'] = {"text": "pattern mask", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#pattern-mask", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#ordered-set'] = {"text": "set", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ordered-set", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#byte-sequence-length'] = {"text": "length", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#byte-sequence-length", "export": true, "normative": true, "for_": ["byte sequence"]};
-window.refsData['https://infra.spec.whatwg.org/#list-contain'] = {"text": "contain", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-contain", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
-window.refsData['#image-mime-type'] = {"text": "image mime type", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#image-mime-type", "export": true, "normative": true, "for_": []};
-window.refsData['#audio-or-video-mime-type'] = {"text": "audio or video mime type", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#audio-or-video-mime-type", "export": true, "normative": true, "for_": []};
-window.refsData['#matches-the-signature-for-mp4'] = {"text": "matches the signature for mp4", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#matches-the-signature-for-mp4", "export": true, "normative": true, "for_": []};
-window.refsData['#matches-the-signature-for-webm'] = {"text": "matches the signature for webm", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#matches-the-signature-for-webm", "export": true, "normative": true, "for_": []};
-window.refsData['#matches-the-signature-for-mp3-without-id3'] = {"text": "matches the signature for mp3 without id3", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#matches-the-signature-for-mp3-without-id3", "export": true, "normative": true, "for_": []};
-window.refsData['#font-mime-type'] = {"text": "font mime type", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#font-mime-type", "export": true, "normative": true, "for_": []};
-window.refsData['#archive-mime-type'] = {"text": "archive mime type", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#archive-mime-type", "export": true, "normative": true, "for_": []};
-window.refsData['#computed-mime-type'] = {"text": "computed mime type", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#computed-mime-type", "export": true, "normative": true, "for_": []};
-window.refsData['#rules-for-identifying-an-unknown-mime-type'] = {"text": "rules for identifying an unknown mime type", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#rules-for-identifying-an-unknown-mime-type", "export": true, "normative": true, "for_": []};
-window.refsData['#sniff-scriptable-flag'] = {"text": "sniff-scriptable flag", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#sniff-scriptable-flag", "export": true, "normative": true, "for_": []};
-window.refsData['#no-sniff-flag'] = {"text": "no-sniff flag", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#no-sniff-flag", "export": true, "normative": true, "for_": []};
-window.refsData['#rules-for-text-or-binary'] = {"text": "rules for distinguishing if a resource is text or binary", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#rules-for-text-or-binary", "export": true, "normative": true, "for_": []};
-window.refsData['#rules-for-distinguishing-if-a-resource-is-a-feed-or-html'] = {"text": "rules for distinguishing if a resource is a feed or html", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#rules-for-distinguishing-if-a-resource-is-a-feed-or-html", "export": true, "normative": true, "for_": []};
-window.refsData['#supported-by-the-user-agent'] = {"text": "supported by the user agent", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#supported-by-the-user-agent", "export": true, "normative": true, "for_": []};
-window.refsData['#image-type-pattern-matching-algorithm'] = {"text": "image type pattern matching algorithm", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#image-type-pattern-matching-algorithm", "export": true, "normative": true, "for_": []};
-window.refsData['#audio-or-video-type-pattern-matching-algorithm'] = {"text": "audio or video type pattern matching algorithm", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#audio-or-video-type-pattern-matching-algorithm", "export": true, "normative": true, "for_": []};
-window.refsData['#scriptable-mime-type'] = {"text": "scriptable mime type", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#scriptable-mime-type", "export": true, "normative": true, "for_": []};
-window.refsData['#whitespace-byte'] = {"text": "whitespace byte", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#whitespace-byte", "export": true, "normative": true, "for_": []};
-window.refsData['#tag-terminating-byte'] = {"text": "tag-terminating byte", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#tag-terminating-byte", "export": true, "normative": true, "for_": []};
-window.refsData['#archive-type-pattern-matching-algorithm'] = {"text": "archive type pattern matching algorithm", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#archive-type-pattern-matching-algorithm", "export": true, "normative": true, "for_": []};
-window.refsData['#binary-data-byte'] = {"text": "binary data byte", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#binary-data-byte", "export": true, "normative": true, "for_": []};
-window.refsData['#context'] = {"text": "context", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#context", "export": true, "normative": true, "for_": []};
-window.refsData['#context-specific-sniffing-algorithm'] = {"text": "context-specific sniffing algorithm", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#context-specific-sniffing-algorithm", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#concept-fetch'] = {"text": "fetch", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-fetch", "export": true, "normative": true, "for_": []};
-window.refsData['#font-type-pattern-matching-algorithm'] = {"text": "font type pattern matching algorithm", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "", "status": "local", "url": "#font-type-pattern-matching-algorithm", "export": true, "normative": true, "for_": []};
 </script>

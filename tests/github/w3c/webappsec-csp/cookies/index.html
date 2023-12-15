@@ -78,7 +78,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -509,7 +508,6 @@ a[href].issue-return {
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -926,429 +924,8 @@ directive-value = <a data-link-type="grammar" href="#grammardef-scoping-rules" i
    <div class="issue"> We’ll need a mechanism to restrict reading from <code>document.cookie</code>, but I’d like something less specific than <code>cookie-scope   disable-dom-access</code> or something similar. The linked GitHub bug is a proposal
   that’s a bit more general and widely applicable. <a href="https://github.com/w3c/webappsec-csp/issues/42">[Issue #w3c/webappsec-csp#42]</a> <a class="issue-return" href="#issue-324fe3fa" title="Jump to section">↵</a></div>
   </div>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['e3b5fbd4'] = {"dfnID": "e3b5fbd4", "url": "https://mikewest.github.io/webappsec/specs/content-security-policy/#content_security_policy", "dfnText": "content-security-policy", "refSections": [{"refs": [{"id": "ref-for-content_security_policy"}, {"id": "ref-for-content_security_policy\u2460"}, {"id": "ref-for-content_security_policy\u2461"}], "title": "1.1. Examples"}], "external": true};
-window.dfnpanelData['7cc511b5'] = {"dfnID": "7cc511b5", "url": "https://mikewest.github.io/webappsec/specs/content-security-policy/#directive", "dfnText": "directive", "refSections": [{"refs": [{"id": "ref-for-directive"}], "title": "2. The cookie-scope directive"}], "external": true};
-window.dfnpanelData['36e44a52'] = {"dfnID": "36e44a52", "url": "https://mikewest.github.io/webappsec/specs/content-security-policy/#enforced-content-security-policies", "dfnText": "enforced content security policies", "refSections": [{"refs": [{"id": "ref-for-enforced-content-security-policies"}], "title": "3.1. \n    Is cookie blocked for settings?\n  "}], "external": true};
-window.dfnpanelData['b63d92d2'] = {"dfnID": "b63d92d2", "url": "https://mikewest.github.io/webappsec/specs/content-security-policy/#monitored-content-security-policies", "dfnText": "monitored content security policies", "refSections": [{"refs": [{"id": "ref-for-monitored-content-security-policies"}], "title": "3.1. \n    Is cookie blocked for settings?\n  "}], "external": true};
-window.dfnpanelData['642c3d99'] = {"dfnID": "642c3d99", "url": "https://mikewest.github.io/webappsec/specs/content-security-policy/#protected-resource", "dfnText": "protected resource", "refSections": [{"refs": [{"id": "ref-for-protected-resource"}], "title": "1. Introduction"}], "external": true};
-window.dfnpanelData['4efcb7f7'] = {"dfnID": "4efcb7f7", "url": "https://mikewest.github.io/webappsec/specs/content-security-policy/#report-a-violation", "dfnText": "report a violation", "refSections": [{"refs": [{"id": "ref-for-report-a-violation"}, {"id": "ref-for-report-a-violation\u2460"}], "title": "3.1. \n    Is cookie blocked for settings?\n  "}], "external": true};
-window.dfnpanelData['8cef3259'] = {"dfnID": "8cef3259", "url": "http://www.w3.org/TR/html5/webappapis.html#settings-object", "dfnText": "environment settings object", "refSections": [{"refs": [{"id": "ref-for-settings-object"}], "title": "3.1. \n    Is cookie blocked for settings?\n  "}], "external": true};
-window.dfnpanelData['483076e1'] = {"dfnID": "483076e1", "url": "http://www.w3.org/TR/html5/webappapis.html#incumbent-settings-object", "dfnText": "incumbent settings object", "refSections": [{"refs": [{"id": "ref-for-incumbent-settings-object"}], "title": "2.1. Processing Model"}], "external": true};
-window.dfnpanelData['866fd3bd'] = {"dfnID": "866fd3bd", "url": "http://www.w3.org/TR/html5/infrastructure.html#split-a-string-on-spaces", "dfnText": "split a string on spaces", "refSections": [{"refs": [{"id": "ref-for-split-a-string-on-spaces"}], "title": "3.3. \n    Parse string as a cookie-scope value\n  "}], "external": true};
-window.dfnpanelData['2280b762'] = {"dfnID": "2280b762", "url": "http://www.w3.org/TR/html5/infrastructure.html#strip-leading-and-trailing-whitespace", "dfnText": "strip leading and trailing whitespace", "refSections": [{"refs": [{"id": "ref-for-strip-leading-and-trailing-whitespace"}], "title": "3.3. \n    Parse string as a cookie-scope value\n  "}], "external": true};
-window.dfnpanelData['b9793e1e'] = {"dfnID": "b9793e1e", "url": "https://tools.ietf.org/html/rfc6265#section-1", "dfnText": "cookie", "refSections": [{"refs": [{"id": "ref-for-section-1"}], "title": "2. The cookie-scope directive"}, {"refs": [{"id": "ref-for-section-1\u2460"}], "title": "3.1. \n    Is cookie blocked for settings?\n  "}], "external": true};
-window.dfnpanelData['19353784'] = {"dfnID": "19353784", "url": "https://tools.ietf.org/html/rfc6265#section-5.3", "dfnText": "cookie store", "refSections": [{"refs": [{"id": "7b0843440"}, {"id": "ref-for-section-5.3"}], "title": "2.1. Processing Model"}, {"refs": [{"id": "ref-for-section-5.3\u2460"}], "title": "4.1. Existing Cookies"}], "external": true};
-window.dfnpanelData['c99fa6fa'] = {"dfnID": "c99fa6fa", "url": "https://tools.ietf.org/html/rfc6454#section-3.2", "dfnText": "origin", "refSections": [{"refs": [{"id": "ref-for-section-3.2"}], "title": "1. Introduction"}], "external": true};
-window.dfnpanelData['32f92e64'] = {"dfnID": "32f92e64", "url": "https://tools.ietf.org/html/rfc7230#section-3.2.3", "dfnText": "rws", "refSections": [{"refs": [{"id": "ref-for-section-3.2.3"}, {"id": "ref-for-section-3.2.3\u2460"}], "title": "2. The cookie-scope directive"}], "external": true};
-window.dfnpanelData['98b9d39f'] = {"dfnID": "98b9d39f", "url": "http://www.w3.org/TR/url/#concept-url-port", "dfnText": "port", "refSections": [{"refs": [{"id": "ref-for-concept-url-port"}], "title": "1. Introduction"}], "external": true};
-window.dfnpanelData['1b0577a6'] = {"dfnID": "1b0577a6", "url": "http://www.w3.org/TR/url/#concept-url-scheme", "dfnText": "scheme", "refSections": [{"refs": [{"id": "ref-for-concept-url-scheme"}], "title": "1. Introduction"}], "external": true};
-window.dfnpanelData['cookie-scope'] = {"dfnID": "cookie-scope", "url": "#cookie-scope", "dfnText": "cookie-scope", "refSections": [{"refs": [{"id": "ref-for-cookie-scope"}, {"id": "ref-for-cookie-scope\u2460"}, {"id": "ref-for-cookie-scope\u2461"}], "title": "1.1. Examples"}, {"refs": [{"id": "ref-for-cookie-scope\u2462"}], "title": "3.2. \n    Does cookie violate policy?\n  "}, {"refs": [{"id": "ref-for-cookie-scope\u2463"}], "title": "3.3. \n    Parse string as a cookie-scope value\n  "}], "external": false};
-window.dfnpanelData['grammardef-scoping-rules'] = {"dfnID": "grammardef-scoping-rules", "url": "#grammardef-scoping-rules", "dfnText": "scoping-rules", "refSections": [{"refs": [{"id": "ref-for-grammardef-scoping-rules"}, {"id": "ref-for-grammardef-scoping-rules\u2460"}], "title": "2. The cookie-scope directive"}, {"refs": [{"id": "ref-for-grammardef-scoping-rules\u2461"}], "title": "3.3. \n    Parse string as a cookie-scope value\n  "}], "external": false};
-window.dfnpanelData['grammardef-host'] = {"dfnID": "grammardef-host", "url": "#grammardef-host", "dfnText": "host", "refSections": [{"refs": [{"id": "ref-for-grammardef-host"}, {"id": "ref-for-grammardef-host\u2460"}, {"id": "ref-for-grammardef-host\u2461"}], "title": "1.1. Examples"}, {"refs": [{"id": "ref-for-grammardef-host\u2462"}, {"id": "ref-for-grammardef-host\u2463"}], "title": "2. The cookie-scope directive"}, {"refs": [{"id": "ref-for-grammardef-host\u2464"}], "title": "3.2. \n    Does cookie violate policy?\n  "}], "external": false};
-window.dfnpanelData['grammardef-http'] = {"dfnID": "grammardef-http", "url": "#grammardef-http", "dfnText": "http", "refSections": [{"refs": [{"id": "ref-for-grammardef-http"}], "title": "2. The cookie-scope directive"}, {"refs": [{"id": "ref-for-grammardef-http\u2460"}], "title": "3.2. \n    Does cookie violate policy?\n  "}], "external": false};
-window.dfnpanelData['grammardef-none'] = {"dfnID": "grammardef-none", "url": "#grammardef-none", "dfnText": "none", "refSections": [{"refs": [{"id": "ref-for-grammardef-none"}], "title": "1.1. Examples"}, {"refs": [{"id": "ref-for-grammardef-none\u2460"}, {"id": "ref-for-grammardef-none\u2461"}], "title": "2. The cookie-scope directive"}, {"refs": [{"id": "ref-for-grammardef-none\u2462"}], "title": "3.2. \n    Does cookie violate policy?\n  "}], "external": false};
-window.dfnpanelData['grammardef-secure'] = {"dfnID": "grammardef-secure", "url": "#grammardef-secure", "dfnText": "secure", "refSections": [{"refs": [{"id": "ref-for-grammardef-secure"}], "title": "1.1. Examples"}, {"refs": [{"id": "ref-for-grammardef-secure\u2460"}, {"id": "ref-for-grammardef-secure\u2461"}], "title": "2. The cookie-scope directive"}, {"refs": [{"id": "ref-for-grammardef-secure\u2462"}], "title": "3.2. \n    Does cookie violate policy?\n  "}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -1542,239 +1119,660 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"e3b5fbd4": {"dfnID":"e3b5fbd4","dfnText":"content-security-policy","external":true,"refSections":[{"refs":[{"id":"ref-for-content_security_policy"},{"id":"ref-for-content_security_policy\u2460"},{"id":"ref-for-content_security_policy\u2461"}],"title":"1.1. Examples"}],"url":"https://mikewest.github.io/webappsec/specs/content-security-policy/#content_security_policy"},
+"7cc511b5": {"dfnID":"7cc511b5","dfnText":"directive","external":true,"refSections":[{"refs":[{"id":"ref-for-directive"}],"title":"2. The cookie-scope directive"}],"url":"https://mikewest.github.io/webappsec/specs/content-security-policy/#directive"},
+"36e44a52": {"dfnID":"36e44a52","dfnText":"enforced content security policies","external":true,"refSections":[{"refs":[{"id":"ref-for-enforced-content-security-policies"}],"title":"3.1. \n    Is cookie blocked for settings?\n  "}],"url":"https://mikewest.github.io/webappsec/specs/content-security-policy/#enforced-content-security-policies"},
+"b63d92d2": {"dfnID":"b63d92d2","dfnText":"monitored content security policies","external":true,"refSections":[{"refs":[{"id":"ref-for-monitored-content-security-policies"}],"title":"3.1. \n    Is cookie blocked for settings?\n  "}],"url":"https://mikewest.github.io/webappsec/specs/content-security-policy/#monitored-content-security-policies"},
+"642c3d99": {"dfnID":"642c3d99","dfnText":"protected resource","external":true,"refSections":[{"refs":[{"id":"ref-for-protected-resource"}],"title":"1. Introduction"}],"url":"https://mikewest.github.io/webappsec/specs/content-security-policy/#protected-resource"},
+"4efcb7f7": {"dfnID":"4efcb7f7","dfnText":"report a violation","external":true,"refSections":[{"refs":[{"id":"ref-for-report-a-violation"},{"id":"ref-for-report-a-violation\u2460"}],"title":"3.1. \n    Is cookie blocked for settings?\n  "}],"url":"https://mikewest.github.io/webappsec/specs/content-security-policy/#report-a-violation"},
+"8cef3259": {"dfnID":"8cef3259","dfnText":"environment settings object","external":true,"refSections":[{"refs":[{"id":"ref-for-settings-object"}],"title":"3.1. \n    Is cookie blocked for settings?\n  "}],"url":"http://www.w3.org/TR/html5/webappapis.html#settings-object"},
+"483076e1": {"dfnID":"483076e1","dfnText":"incumbent settings object","external":true,"refSections":[{"refs":[{"id":"ref-for-incumbent-settings-object"}],"title":"2.1. Processing Model"}],"url":"http://www.w3.org/TR/html5/webappapis.html#incumbent-settings-object"},
+"866fd3bd": {"dfnID":"866fd3bd","dfnText":"split a string on spaces","external":true,"refSections":[{"refs":[{"id":"ref-for-split-a-string-on-spaces"}],"title":"3.3. \n    Parse string as a cookie-scope value\n  "}],"url":"http://www.w3.org/TR/html5/infrastructure.html#split-a-string-on-spaces"},
+"2280b762": {"dfnID":"2280b762","dfnText":"strip leading and trailing whitespace","external":true,"refSections":[{"refs":[{"id":"ref-for-strip-leading-and-trailing-whitespace"}],"title":"3.3. \n    Parse string as a cookie-scope value\n  "}],"url":"http://www.w3.org/TR/html5/infrastructure.html#strip-leading-and-trailing-whitespace"},
+"b9793e1e": {"dfnID":"b9793e1e","dfnText":"cookie","external":true,"refSections":[{"refs":[{"id":"ref-for-section-1"}],"title":"2. The cookie-scope directive"},{"refs":[{"id":"ref-for-section-1\u2460"}],"title":"3.1. \n    Is cookie blocked for settings?\n  "}],"url":"https://tools.ietf.org/html/rfc6265#section-1"},
+"19353784": {"dfnID":"19353784","dfnText":"cookie store","external":true,"refSections":[{"refs":[{"id":"7b0843440"},{"id":"ref-for-section-5.3"}],"title":"2.1. Processing Model"},{"refs":[{"id":"ref-for-section-5.3\u2460"}],"title":"4.1. Existing Cookies"}],"url":"https://tools.ietf.org/html/rfc6265#section-5.3"},
+"c99fa6fa": {"dfnID":"c99fa6fa","dfnText":"origin","external":true,"refSections":[{"refs":[{"id":"ref-for-section-3.2"}],"title":"1. Introduction"}],"url":"https://tools.ietf.org/html/rfc6454#section-3.2"},
+"32f92e64": {"dfnID":"32f92e64","dfnText":"rws","external":true,"refSections":[{"refs":[{"id":"ref-for-section-3.2.3"},{"id":"ref-for-section-3.2.3\u2460"}],"title":"2. The cookie-scope directive"}],"url":"https://tools.ietf.org/html/rfc7230#section-3.2.3"},
+"98b9d39f": {"dfnID":"98b9d39f","dfnText":"port","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-url-port"}],"title":"1. Introduction"}],"url":"http://www.w3.org/TR/url/#concept-url-port"},
+"1b0577a6": {"dfnID":"1b0577a6","dfnText":"scheme","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-url-scheme"}],"title":"1. Introduction"}],"url":"http://www.w3.org/TR/url/#concept-url-scheme"},
+"cookie-scope": {"dfnID":"cookie-scope","dfnText":"cookie-scope","external":false,"refSections":[{"refs":[{"id":"ref-for-cookie-scope"},{"id":"ref-for-cookie-scope\u2460"},{"id":"ref-for-cookie-scope\u2461"}],"title":"1.1. Examples"},{"refs":[{"id":"ref-for-cookie-scope\u2462"}],"title":"3.2. \n    Does cookie violate policy?\n  "},{"refs":[{"id":"ref-for-cookie-scope\u2463"}],"title":"3.3. \n    Parse string as a cookie-scope value\n  "}],"url":"#cookie-scope"},
+"grammardef-scoping-rules": {"dfnID":"grammardef-scoping-rules","dfnText":"scoping-rules","external":false,"refSections":[{"refs":[{"id":"ref-for-grammardef-scoping-rules"},{"id":"ref-for-grammardef-scoping-rules\u2460"}],"title":"2. The cookie-scope directive"},{"refs":[{"id":"ref-for-grammardef-scoping-rules\u2461"}],"title":"3.3. \n    Parse string as a cookie-scope value\n  "}],"url":"#grammardef-scoping-rules"},
+"grammardef-host": {"dfnID":"grammardef-host","dfnText":"host","external":false,"refSections":[{"refs":[{"id":"ref-for-grammardef-host"},{"id":"ref-for-grammardef-host\u2460"},{"id":"ref-for-grammardef-host\u2461"}],"title":"1.1. Examples"},{"refs":[{"id":"ref-for-grammardef-host\u2462"},{"id":"ref-for-grammardef-host\u2463"}],"title":"2. The cookie-scope directive"},{"refs":[{"id":"ref-for-grammardef-host\u2464"}],"title":"3.2. \n    Does cookie violate policy?\n  "}],"url":"#grammardef-host"},
+"grammardef-http": {"dfnID":"grammardef-http","dfnText":"http","external":false,"refSections":[{"refs":[{"id":"ref-for-grammardef-http"}],"title":"2. The cookie-scope directive"},{"refs":[{"id":"ref-for-grammardef-http\u2460"}],"title":"3.2. \n    Does cookie violate policy?\n  "}],"url":"#grammardef-http"},
+"grammardef-none": {"dfnID":"grammardef-none","dfnText":"none","external":false,"refSections":[{"refs":[{"id":"ref-for-grammardef-none"}],"title":"1.1. Examples"},{"refs":[{"id":"ref-for-grammardef-none\u2460"},{"id":"ref-for-grammardef-none\u2461"}],"title":"2. The cookie-scope directive"},{"refs":[{"id":"ref-for-grammardef-none\u2462"}],"title":"3.2. \n    Does cookie violate policy?\n  "}],"url":"#grammardef-none"},
+"grammardef-secure": {"dfnID":"grammardef-secure","dfnText":"secure","external":false,"refSections":[{"refs":[{"id":"ref-for-grammardef-secure"}],"title":"1.1. Examples"},{"refs":[{"id":"ref-for-grammardef-secure\u2460"},{"id":"ref-for-grammardef-secure\u2461"}],"title":"2. The cookie-scope directive"},{"refs":[{"id":"ref-for-grammardef-secure\u2462"}],"title":"3.2. \n    Does cookie violate policy?\n  "}],"url":"#grammardef-secure"},
+};
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+const typeFormatters = {
+    'dfn': (text) => `[=${text}=]`,
+    'abstract-op': (text) => `[\$${text}\$]`,
+    'value': (text) => `''${text}''`,
+    'http-header': (text) => `[:${text}:]`,
+    'idl': (text) => `{{${text}}}`,
+    'interface': 'idl',
+    'constructor': 'idl',
+    'method': 'idl',
+    'argument': 'idl',
+    'attribute': 'idl',
+    'callback': 'idl',
+    'dictionary': 'idl',
+    'dict-member': 'idl',
+    'enum': 'idl',
+    'enum-value': 'idl',
+    'exception': 'idl',
+    'const': 'idl',
+    'typedef': 'idl',
+    'stringifier': 'idl',
+    'serializer': 'idl',
+    'iterator': 'idl',
+    'maplike': 'idl',
+    'setlike': 'idl',
+    'extended-attribute': 'idl',
+    'event': 'idl',
+    'element': (element) => `<{${element}}>`,
+    'element-state': 'element',
+    'element-attr': 'element',
+    'attr-value': 'element',
+    'scheme': 'dfn',
+    'permission': 'dfn',
+    'grammar': (text) => `${text} (within a <pre class=prod>)`,
+    'type': (text)=> `<<${text}>>`,
+    'property': (text) => `'${text}'`,
+    'descriptor': 'property',
+    'function': 'value',
+    'at-rule': 'value',
+    'selector': 'value',
+};
+const typesUsingFor = new Set(
+    [
+        "descriptor",
+        "value",
+        "element-attr",
+        "attr-value",
+        "element-state",
+        "method",
+        "constructor",
+        "argument",
+        "attribute",
+        "const",
+        "dict-member",
+        "event",
+        "enum-value",
+        "stringifier",
+        "serializer",
+        "iterator",
+        "maplike",
+        "setlike",
+        "state",
+        "mode",
+        "context",
+        "facet",
+    ],
+)
+const typesNotUsingFor = new Set(
+    [
+        "property",
+        "element",
+        "interface",
+        "namespace",
+        "callback",
+        "dictionary",
+        "enum",
+        "exception",
+        "typedef",
+        "http-header",
+        "permission",
+    ],
+)
+function linkFormatterFromType(type) {
+    const fnOrType = typeFormatters[type];
+    if(typeof fnOrType === 'string') {
+        // follow the alias
+        return linkFormatterFromType(fnOrType);
+    }
+    return fnOrType;
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!typesUsingFor.has(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!typesNotUsingFor.has(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
+
+function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+    dfnPanel.forDfn = dfn;
+    if(!dfn) { console.log(dfnPanel); }
+    return dfnPanel;
+}
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        const panel = genDfnPanel({ ...panelData, dfn });
+        append(document.body, panel);
+        insertDfnPopupAction(panel)
+    }
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+})
+
+function hideAllDfnPanels() {
+    // Turn off any currently "on" or "activated" panels.
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
+}
+
+function showDfnPanel(dfnPanel) {
+    hideAllDfnPanels(); // Only display one at this time.
+
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "true");
+
+    dfnPanel.classList.add("on");
+    positionDfnPanel(dfnPanel);
+
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    // Increment tabindex for each anchor and button tags in panel
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.style.position = "absolute"; // unfix it
+    dfnPanel.classList.remove("on");
+    dfnPanel.classList.remove("activated");
+}
+
+function toggleDfnPanel(dfnPanel) {
+    if(dfnPanel.classList.contains("on")) {
+        hideDfnPanel(dfnPanel);
+    } else {
+        showDfnPanel(dfnPanel);
+    }
+}
+
+function insertDfnPopupAction(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        showDfnPanel(dfnPanel);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfnPanel);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel(dfnPanel, dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    })
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
 }
 </script>
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
+let refsData = {
+"https://tools.ietf.org/html/rfc6454#section-3.2": {"export":true,"for_":[],"level":"","normative":true,"shortname":"rfc6454","spec":"rfc6454","status":"anchor-block","text":"origin","type":"dfn","url":"https://tools.ietf.org/html/rfc6454#section-3.2"},
+"http://www.w3.org/TR/url/#concept-url-scheme": {"export":true,"for_":["URL"],"level":"","normative":true,"shortname":"url","spec":"url","status":"anchor-block","text":"scheme","type":"attribute","url":"http://www.w3.org/TR/url/#concept-url-scheme"},
+"http://www.w3.org/TR/url/#concept-url-port": {"export":true,"for_":["URL"],"level":"","normative":true,"shortname":"url","spec":"url","status":"anchor-block","text":"port","type":"attribute","url":"http://www.w3.org/TR/url/#concept-url-port"},
+"https://mikewest.github.io/webappsec/specs/content-security-policy/#protected-resource": {"export":true,"for_":[],"level":"","normative":true,"shortname":"csp3","spec":"csp3","status":"anchor-block","text":"protected resource","type":"dfn","url":"https://mikewest.github.io/webappsec/specs/content-security-policy/#protected-resource"},
+"https://mikewest.github.io/webappsec/specs/content-security-policy/#content_security_policy": {"export":true,"for_":[],"level":"","normative":true,"shortname":"csp3","spec":"csp3","status":"anchor-block","text":"content-security-policy","type":"dfn","url":"https://mikewest.github.io/webappsec/specs/content-security-policy/#content_security_policy"},
+"#cookie-scope": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"csp-cookies","spec":"csp-cookies-1","status":"local","text":"cookie-scope","type":"dfn","url":"#cookie-scope"},
+"#grammardef-none": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"csp-cookies","spec":"csp-cookies-1","status":"local","text":"none","type":"grammar","url":"#grammardef-none"},
+"#grammardef-host": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"csp-cookies","spec":"csp-cookies-1","status":"local","text":"host","type":"grammar","url":"#grammardef-host"},
+"#grammardef-secure": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"csp-cookies","spec":"csp-cookies-1","status":"local","text":"secure","type":"grammar","url":"#grammardef-secure"},
+"https://mikewest.github.io/webappsec/specs/content-security-policy/#directive": {"export":true,"for_":[],"level":"","normative":true,"shortname":"csp3","spec":"csp3","status":"anchor-block","text":"directive","type":"dfn","url":"https://mikewest.github.io/webappsec/specs/content-security-policy/#directive"},
+"https://tools.ietf.org/html/rfc6265#section-1": {"export":true,"for_":[],"level":"","normative":true,"shortname":"rfc6265","spec":"rfc6265","status":"anchor-block","text":"cookie","type":"dfn","url":"https://tools.ietf.org/html/rfc6265#section-1"},
+"https://tools.ietf.org/html/rfc7230#section-3.2.3": {"export":true,"for_":[],"level":"","normative":true,"shortname":"rfc7230","spec":"rfc7230","status":"anchor-block","text":"rws","type":"grammar","url":"https://tools.ietf.org/html/rfc7230#section-3.2.3"},
+"#grammardef-scoping-rules": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"csp-cookies","spec":"csp-cookies-1","status":"local","text":"scoping-rules","type":"grammar","url":"#grammardef-scoping-rules"},
+"#grammardef-http": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"csp-cookies","spec":"csp-cookies-1","status":"local","text":"http","type":"grammar","url":"#grammardef-http"},
+"http://www.w3.org/TR/html5/webappapis.html#incumbent-settings-object": {"export":true,"for_":[],"level":"","normative":true,"shortname":"html5","spec":"html5","status":"anchor-block","text":"incumbent settings object","type":"dfn","url":"http://www.w3.org/TR/html5/webappapis.html#incumbent-settings-object"},
+"https://tools.ietf.org/html/rfc6265#section-5.3": {"export":true,"for_":[],"level":"","normative":true,"shortname":"rfc6265","spec":"rfc6265","status":"anchor-block","text":"cookie store","type":"dfn","url":"https://tools.ietf.org/html/rfc6265#section-5.3"},
+"http://www.w3.org/TR/html5/webappapis.html#settings-object": {"export":true,"for_":[],"level":"","normative":true,"shortname":"html5","spec":"html5","status":"anchor-block","text":"environment settings object","type":"dfn","url":"http://www.w3.org/TR/html5/webappapis.html#settings-object"},
+"https://mikewest.github.io/webappsec/specs/content-security-policy/#monitored-content-security-policies": {"export":true,"for_":[],"level":"","normative":true,"shortname":"csp3","spec":"csp3","status":"anchor-block","text":"monitored content security policies","type":"dfn","url":"https://mikewest.github.io/webappsec/specs/content-security-policy/#monitored-content-security-policies"},
+"https://mikewest.github.io/webappsec/specs/content-security-policy/#report-a-violation": {"export":true,"for_":[],"level":"","normative":true,"shortname":"csp3","spec":"csp3","status":"anchor-block","text":"report a violation","type":"dfn","url":"https://mikewest.github.io/webappsec/specs/content-security-policy/#report-a-violation"},
+"https://mikewest.github.io/webappsec/specs/content-security-policy/#enforced-content-security-policies": {"export":true,"for_":[],"level":"","normative":true,"shortname":"csp3","spec":"csp3","status":"anchor-block","text":"enforced content security policies","type":"dfn","url":"https://mikewest.github.io/webappsec/specs/content-security-policy/#enforced-content-security-policies"},
+"http://www.w3.org/TR/html5/infrastructure.html#strip-leading-and-trailing-whitespace": {"export":true,"for_":[],"level":"","normative":true,"shortname":"html5","spec":"html5","status":"anchor-block","text":"strip leading and trailing whitespace","type":"dfn","url":"http://www.w3.org/TR/html5/infrastructure.html#strip-leading-and-trailing-whitespace"},
+"http://www.w3.org/TR/html5/infrastructure.html#split-a-string-on-spaces": {"export":true,"for_":[],"level":"","normative":true,"shortname":"html5","spec":"html5","status":"anchor-block","text":"split a string on spaces","type":"dfn","url":"http://www.w3.org/TR/html5/infrastructure.html#split-a-string-on-spaces"},
+};
+
+function genRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "DFN: "),
+                mk.code({ class: "dfn-text" }, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    const forListElements = forList.length === 0 ? '' : mk.li({},
+        mk.b({}, "For: "),
+        mk.ul({},
+            ...forList.map(forItem =>
                 mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
-            mk.b({}, "For: "),
-            mk.ul({},
-                ...forList.map(forItem =>
-                    mk.li({},
-                        mk.span({}, `${forItem}`)
-                    ),
+                    mk.span({}, `${forItem}`)
                 ),
             ),
-        );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+        ),
+    );
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
-    }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    return hintPanel;
+}
+function genAllRefHints() {
+    for(const refData of Object.values(refsData)) {
+        const refUrl = refData.url;
+        const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+        if (links.length == 0) {
+            console.log(`Can't find link href="${refUrl}".`, refData);
+            continue;
+        }
+        for(const link of links) {
+            if(link.classList.contains("dfn-link")) continue;
+            const hint = genRefHint(link, refData);
+            append(document.body, hint);
+            insertLinkPopupAction(hint)
         }
     }
+}
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+function hideAllRefHints() {
+    queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    refHint.style.position = "absolute"; // unfix it
+    refHint.classList.remove("on");
+    const teardown = refHint.teardownEventListeners;
+    if (teardown) {
+        refHint.teardownEventListeners = undefined;
+        teardown();
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+function showRefHint(refHint) {
+    hideAllRefHints(); // Only display one at this time.
+
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "true");
+    refHint.classList.add("on");
+    positionRefHint(refHint);
+    setupRefHintEventListeners(refHint);
+}
+
+function setupRefHintEventListeners(refHint) {
+    if (refHint.teardownEventListeners) return;
+    const link = refHint.forLink;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
 
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
 
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+function insertLinkPopupAction(refHint) {
+    const link = refHint.forLink;
+    // link.setAttribute('role', 'button');
+    link.setAttribute('aria-expanded', 'false')
+    link.classList.add('has-ref-hint');
+    link.addEventListener('mouseover', (event) => {
+        showRefHint(refHint);
     });
+    link.addEventListener('focus', (event) => {
+        showRefHint(refHint);
+    })
+}
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+document.addEventListener("DOMContentLoaded", () => {
+    genAllRefHints();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['https://tools.ietf.org/html/rfc6454#section-3.2'] = {"text": "origin", "type": "dfn", "spec": "rfc6454", "shortname": "rfc6454", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc6454#section-3.2", "export": true, "normative": true, "for_": []};
-window.refsData['http://www.w3.org/TR/url/#concept-url-scheme'] = {"text": "scheme", "type": "attribute", "spec": "url", "shortname": "url", "level": "", "status": "anchor-block", "url": "http://www.w3.org/TR/url/#concept-url-scheme", "export": true, "normative": true, "for_": ["URL"]};
-window.refsData['http://www.w3.org/TR/url/#concept-url-port'] = {"text": "port", "type": "attribute", "spec": "url", "shortname": "url", "level": "", "status": "anchor-block", "url": "http://www.w3.org/TR/url/#concept-url-port", "export": true, "normative": true, "for_": ["URL"]};
-window.refsData['https://mikewest.github.io/webappsec/specs/content-security-policy/#protected-resource'] = {"text": "protected resource", "type": "dfn", "spec": "csp3", "shortname": "csp3", "level": "", "status": "anchor-block", "url": "https://mikewest.github.io/webappsec/specs/content-security-policy/#protected-resource", "export": true, "normative": true, "for_": []};
-window.refsData['https://mikewest.github.io/webappsec/specs/content-security-policy/#content_security_policy'] = {"text": "content-security-policy", "type": "dfn", "spec": "csp3", "shortname": "csp3", "level": "", "status": "anchor-block", "url": "https://mikewest.github.io/webappsec/specs/content-security-policy/#content_security_policy", "export": true, "normative": true, "for_": []};
-window.refsData['#cookie-scope'] = {"text": "cookie-scope", "type": "dfn", "spec": "csp-cookies-1", "shortname": "csp-cookies", "level": "1", "status": "local", "url": "#cookie-scope", "export": true, "normative": true, "for_": []};
-window.refsData['#grammardef-none'] = {"text": "none", "type": "grammar", "spec": "csp-cookies-1", "shortname": "csp-cookies", "level": "1", "status": "local", "url": "#grammardef-none", "export": true, "normative": true, "for_": []};
-window.refsData['#grammardef-host'] = {"text": "host", "type": "grammar", "spec": "csp-cookies-1", "shortname": "csp-cookies", "level": "1", "status": "local", "url": "#grammardef-host", "export": true, "normative": true, "for_": []};
-window.refsData['#grammardef-secure'] = {"text": "secure", "type": "grammar", "spec": "csp-cookies-1", "shortname": "csp-cookies", "level": "1", "status": "local", "url": "#grammardef-secure", "export": true, "normative": true, "for_": []};
-window.refsData['https://mikewest.github.io/webappsec/specs/content-security-policy/#directive'] = {"text": "directive", "type": "dfn", "spec": "csp3", "shortname": "csp3", "level": "", "status": "anchor-block", "url": "https://mikewest.github.io/webappsec/specs/content-security-policy/#directive", "export": true, "normative": true, "for_": []};
-window.refsData['https://tools.ietf.org/html/rfc6265#section-1'] = {"text": "cookie", "type": "dfn", "spec": "rfc6265", "shortname": "rfc6265", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc6265#section-1", "export": true, "normative": true, "for_": []};
-window.refsData['https://tools.ietf.org/html/rfc7230#section-3.2.3'] = {"text": "rws", "type": "grammar", "spec": "rfc7230", "shortname": "rfc7230", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc7230#section-3.2.3", "export": true, "normative": true, "for_": []};
-window.refsData['#grammardef-scoping-rules'] = {"text": "scoping-rules", "type": "grammar", "spec": "csp-cookies-1", "shortname": "csp-cookies", "level": "1", "status": "local", "url": "#grammardef-scoping-rules", "export": true, "normative": true, "for_": []};
-window.refsData['#grammardef-http'] = {"text": "http", "type": "grammar", "spec": "csp-cookies-1", "shortname": "csp-cookies", "level": "1", "status": "local", "url": "#grammardef-http", "export": true, "normative": true, "for_": []};
-window.refsData['http://www.w3.org/TR/html5/webappapis.html#incumbent-settings-object'] = {"text": "incumbent settings object", "type": "dfn", "spec": "html5", "shortname": "html5", "level": "", "status": "anchor-block", "url": "http://www.w3.org/TR/html5/webappapis.html#incumbent-settings-object", "export": true, "normative": true, "for_": []};
-window.refsData['https://tools.ietf.org/html/rfc6265#section-5.3'] = {"text": "cookie store", "type": "dfn", "spec": "rfc6265", "shortname": "rfc6265", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc6265#section-5.3", "export": true, "normative": true, "for_": []};
-window.refsData['http://www.w3.org/TR/html5/webappapis.html#settings-object'] = {"text": "environment settings object", "type": "dfn", "spec": "html5", "shortname": "html5", "level": "", "status": "anchor-block", "url": "http://www.w3.org/TR/html5/webappapis.html#settings-object", "export": true, "normative": true, "for_": []};
-window.refsData['https://mikewest.github.io/webappsec/specs/content-security-policy/#monitored-content-security-policies'] = {"text": "monitored content security policies", "type": "dfn", "spec": "csp3", "shortname": "csp3", "level": "", "status": "anchor-block", "url": "https://mikewest.github.io/webappsec/specs/content-security-policy/#monitored-content-security-policies", "export": true, "normative": true, "for_": []};
-window.refsData['https://mikewest.github.io/webappsec/specs/content-security-policy/#report-a-violation'] = {"text": "report a violation", "type": "dfn", "spec": "csp3", "shortname": "csp3", "level": "", "status": "anchor-block", "url": "https://mikewest.github.io/webappsec/specs/content-security-policy/#report-a-violation", "export": true, "normative": true, "for_": []};
-window.refsData['https://mikewest.github.io/webappsec/specs/content-security-policy/#enforced-content-security-policies'] = {"text": "enforced content security policies", "type": "dfn", "spec": "csp3", "shortname": "csp3", "level": "", "status": "anchor-block", "url": "https://mikewest.github.io/webappsec/specs/content-security-policy/#enforced-content-security-policies", "export": true, "normative": true, "for_": []};
-window.refsData['http://www.w3.org/TR/html5/infrastructure.html#strip-leading-and-trailing-whitespace'] = {"text": "strip leading and trailing whitespace", "type": "dfn", "spec": "html5", "shortname": "html5", "level": "", "status": "anchor-block", "url": "http://www.w3.org/TR/html5/infrastructure.html#strip-leading-and-trailing-whitespace", "export": true, "normative": true, "for_": []};
-window.refsData['http://www.w3.org/TR/html5/infrastructure.html#split-a-string-on-spaces'] = {"text": "split a string on spaces", "type": "dfn", "spec": "html5", "shortname": "html5", "level": "", "status": "anchor-block", "url": "http://www.w3.org/TR/html5/infrastructure.html#split-a-string-on-spaces", "export": true, "normative": true, "for_": []};
 </script>

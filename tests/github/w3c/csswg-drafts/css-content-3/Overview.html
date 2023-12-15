@@ -79,7 +79,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -730,7 +729,6 @@ a[href].issue-return {
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -790,7 +788,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -847,7 +844,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -2651,468 +2647,8 @@ section section section h1 <c- p>{</c-> <c- k>bookmark-level</c-><c- p>:</c-> <c
     </div>
    </div>
   </details>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['a4eb3c57'] = {"dfnID": "a4eb3c57", "url": "https://drafts.csswg.org/css-cascade-5/#used-value", "dfnText": "used value", "refSections": [{"refs": [{"id": "ref-for-used-value"}], "title": "2.4.1. \nSpecifying quotes with the quotes property"}], "external": true};
-window.dfnpanelData['9b54ada7'] = {"dfnID": "9b54ada7", "url": "https://drafts.csswg.org/css-contain-2/#style-containment", "dfnText": "style containment", "refSections": [{"refs": [{"id": "ref-for-style-containment"}], "title": "2.7.1. \nThe string-set property"}, {"refs": [{"id": "ref-for-style-containment\u2460"}], "title": "4. \nBookmarks"}], "external": true};
-window.dfnpanelData['ab039d4e'] = {"dfnID": "ab039d4e", "url": "https://drafts.csswg.org/css-counter-styles-3/#typedef-counter-style", "dfnText": "<counter-style>", "refSections": [{"refs": [{"id": "ref-for-typedef-counter-style"}], "title": "2.6.1. \nThe target-counter() function"}, {"refs": [{"id": "ref-for-typedef-counter-style\u2460"}], "title": "2.6.2. \nThe target-counters() function\n"}], "external": true};
-window.dfnpanelData['e7f0dd6c'] = {"dfnID": "e7f0dd6c", "url": "https://drafts.csswg.org/css-display-4/#propdef-display", "dfnText": "display", "refSections": [{"refs": [{"id": "ref-for-propdef-display"}, {"id": "ref-for-propdef-display\u2460"}, {"id": "ref-for-propdef-display\u2461"}], "title": "1. \nInserting and replacing content with the content property"}], "external": true};
-window.dfnpanelData['998b9e6e'] = {"dfnID": "998b9e6e", "url": "https://drafts.csswg.org/css-images-3/#typedef-image", "dfnText": "<image>", "refSections": [{"refs": [{"id": "ref-for-typedef-image"}, {"id": "ref-for-typedef-image\u2460"}, {"id": "ref-for-typedef-image\u2461"}, {"id": "ref-for-typedef-image\u2462"}, {"id": "ref-for-typedef-image\u2463"}, {"id": "ref-for-typedef-image\u2464"}, {"id": "ref-for-typedef-image\u2465"}, {"id": "ref-for-typedef-image\u2466"}, {"id": "ref-for-typedef-image\u2467"}], "title": "1. \nInserting and replacing content with the content property"}, {"refs": [{"id": "ref-for-typedef-image\u2468"}, {"id": "ref-for-typedef-image\u2460\u24ea"}, {"id": "ref-for-typedef-image\u2460\u2460"}, {"id": "ref-for-typedef-image\u2460\u2461"}], "title": "2.2. \n<image>"}], "external": true};
-window.dfnpanelData['d3936525'] = {"dfnID": "d3936525", "url": "https://drafts.csswg.org/css-images-3/#natural-dimensions", "dfnText": "natural dimension", "refSections": [{"refs": [{"id": "ref-for-natural-dimensions"}], "title": "1. \nInserting and replacing content with the content property"}], "external": true};
-window.dfnpanelData['e1b8b09d'] = {"dfnID": "e1b8b09d", "url": "https://drafts.csswg.org/css-images-4/#invalid-image", "dfnText": "invalid image", "refSections": [{"refs": [{"id": "ref-for-invalid-image"}, {"id": "ref-for-invalid-image\u2460"}, {"id": "ref-for-invalid-image\u2461"}], "title": "1. \nInserting and replacing content with the content property"}, {"refs": [{"id": "ref-for-invalid-image\u2462"}], "title": "2.2. \n<image>"}], "external": true};
-window.dfnpanelData['fd0c9e35'] = {"dfnID": "fd0c9e35", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-after", "dfnText": "::after", "refSections": [{"refs": [{"id": "ref-for-selectordef-after"}, {"id": "ref-for-selectordef-after\u2460"}], "title": "1. \nInserting and replacing content with the content property"}, {"refs": [{"id": "ref-for-selectordef-after\u2461"}], "title": "2.7.3. \nThe content() function"}], "external": true};
-window.dfnpanelData['5869f885'] = {"dfnID": "5869f885", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-before", "dfnText": "::before", "refSections": [{"refs": [{"id": "ref-for-selectordef-before"}, {"id": "ref-for-selectordef-before\u2460"}], "title": "1. \nInserting and replacing content with the content property"}, {"refs": [{"id": "ref-for-selectordef-before\u2461"}], "title": "2.7.3. \nThe content() function"}], "external": true};
-window.dfnpanelData['a1addf6c'] = {"dfnID": "a1addf6c", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-first-letter", "dfnText": "::first-letter", "refSections": [{"refs": [{"id": "ref-for-selectordef-first-letter"}], "title": "2.7.3. \nThe content() function"}], "external": true};
-window.dfnpanelData['5875aeb9'] = {"dfnID": "5875aeb9", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-marker", "dfnText": "::marker", "refSections": [{"refs": [{"id": "ref-for-selectordef-marker"}], "title": "1. \nInserting and replacing content with the content property"}, {"refs": [{"id": "ref-for-selectordef-marker\u2460"}], "title": "2.3. \nElement Content"}, {"refs": [{"id": "ref-for-selectordef-marker\u2461"}], "title": "2.7.3. \nThe content() function"}], "external": true};
-window.dfnpanelData['5879b11d'] = {"dfnID": "5879b11d", "url": "https://drafts.csswg.org/css-text-4/#content-language", "dfnText": "content language", "refSections": [{"refs": [{"id": "ref-for-content-language"}], "title": "2.4.1. \nSpecifying quotes with the quotes property"}], "external": true};
-window.dfnpanelData['09e0ad83'] = {"dfnID": "09e0ad83", "url": "https://drafts.csswg.org/css-text-4/#white-space", "dfnText": "white space", "refSections": [{"refs": [{"id": "ref-for-white-space"}, {"id": "ref-for-white-space\u2460"}], "title": "2.1. \nString"}], "external": true};
-window.dfnpanelData['68487d22'] = {"dfnID": "68487d22", "url": "https://drafts.csswg.org/css-values-4/#mult-comma", "dfnText": "#", "refSections": [{"refs": [{"id": "ref-for-mult-comma"}], "title": "2.7.1. \nThe string-set property"}], "external": true};
-window.dfnpanelData['bedd9d42'] = {"dfnID": "bedd9d42", "url": "https://drafts.csswg.org/css-values-4/#mult-one-plus", "dfnText": "+", "refSections": [{"refs": [{"id": "ref-for-mult-one-plus"}, {"id": "ref-for-mult-one-plus\u2460"}], "title": "1. \nInserting and replacing content with the content property"}, {"refs": [{"id": "ref-for-mult-one-plus\u2461"}], "title": "2.4.1. \nSpecifying quotes with the quotes property"}, {"refs": [{"id": "ref-for-mult-one-plus\u2462"}], "title": "2.7.1. \nThe string-set property"}], "external": true};
-window.dfnpanelData['9f9120ff'] = {"dfnID": "9f9120ff", "url": "https://drafts.csswg.org/css-values-4/#comb-comma", "dfnText": ",", "refSections": [{"refs": [{"id": "ref-for-comb-comma"}, {"id": "ref-for-comb-comma\u2460"}], "title": "2.6.1. \nThe target-counter() function"}, {"refs": [{"id": "ref-for-comb-comma\u2461"}, {"id": "ref-for-comb-comma\u2462"}, {"id": "ref-for-comb-comma\u2463"}], "title": "2.6.2. \nThe target-counters() function\n"}, {"refs": [{"id": "ref-for-comb-comma\u2464"}], "title": "2.6.3. \nThe target-text() function"}, {"refs": [{"id": "ref-for-comb-comma\u2465"}], "title": "2.7.2. \nThe string() function"}], "external": true};
-window.dfnpanelData['e274345c'] = {"dfnID": "e274345c", "url": "https://drafts.csswg.org/css-values-4/#identifier-value", "dfnText": "<custom-ident>", "refSections": [{"refs": [{"id": "ref-for-identifier-value"}], "title": "2.6.1. \nThe target-counter() function"}, {"refs": [{"id": "ref-for-identifier-value\u2460"}], "title": "2.6.2. \nThe target-counters() function\n"}, {"refs": [{"id": "ref-for-identifier-value\u2461"}, {"id": "ref-for-identifier-value\u2462"}, {"id": "ref-for-identifier-value\u2463"}], "title": "2.7.1. \nThe string-set property"}, {"refs": [{"id": "ref-for-identifier-value\u2464"}], "title": "2.7.2. \nThe string() function"}], "external": true};
-window.dfnpanelData['70c9f859'] = {"dfnID": "70c9f859", "url": "https://drafts.csswg.org/css-values-4/#integer-value", "dfnText": "<integer>", "refSections": [{"refs": [{"id": "ref-for-integer-value"}, {"id": "ref-for-integer-value\u2460"}], "title": "4.1. \nbookmark-level\n"}], "external": true};
-window.dfnpanelData['977d3003'] = {"dfnID": "977d3003", "url": "https://drafts.csswg.org/css-values-4/#string-value", "dfnText": "<string>", "refSections": [{"refs": [{"id": "ref-for-string-value"}, {"id": "ref-for-string-value\u2460"}, {"id": "ref-for-string-value\u2461"}], "title": "1. \nInserting and replacing content with the content property"}, {"refs": [{"id": "ref-for-string-value\u2462"}], "title": "2.1. \nString"}, {"refs": [{"id": "ref-for-string-value\u2463"}, {"id": "ref-for-string-value\u2464"}, {"id": "ref-for-string-value\u2465"}, {"id": "ref-for-string-value\u2466"}], "title": "2.4.1. \nSpecifying quotes with the quotes property"}, {"refs": [{"id": "ref-for-string-value\u2467"}, {"id": "ref-for-string-value\u2468"}], "title": "2.5.1. \nThe leader() function"}, {"refs": [{"id": "ref-for-string-value\u2460\u24ea"}], "title": "2.6.1. \nThe target-counter() function"}, {"refs": [{"id": "ref-for-string-value\u2460\u2460"}, {"id": "ref-for-string-value\u2460\u2461"}], "title": "2.6.2. \nThe target-counters() function\n"}, {"refs": [{"id": "ref-for-string-value\u2460\u2462"}], "title": "2.6.3. \nThe target-text() function"}, {"refs": [{"id": "ref-for-string-value\u2460\u2463"}, {"id": "ref-for-string-value\u2460\u2464"}, {"id": "ref-for-string-value\u2460\u2465"}], "title": "2.7.1. \nThe string-set property"}], "external": true};
-window.dfnpanelData['fa293cdd'] = {"dfnID": "fa293cdd", "url": "https://drafts.csswg.org/css-values-4/#url-value", "dfnText": "<url>", "refSections": [{"refs": [{"id": "ref-for-url-value"}], "title": "2.6.1. \nThe target-counter() function"}, {"refs": [{"id": "ref-for-url-value\u2460"}], "title": "2.6.2. \nThe target-counters() function\n"}, {"refs": [{"id": "ref-for-url-value\u2461"}], "title": "2.6.3. \nThe target-text() function"}], "external": true};
-window.dfnpanelData['537cf076'] = {"dfnID": "537cf076", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "dfnText": "?", "refSections": [{"refs": [{"id": "ref-for-mult-opt"}], "title": "1. \nInserting and replacing content with the content property"}, {"refs": [{"id": "ref-for-mult-opt\u2460"}], "title": "2.6.1. \nThe target-counter() function"}, {"refs": [{"id": "ref-for-mult-opt\u2461"}], "title": "2.6.2. \nThe target-counters() function\n"}, {"refs": [{"id": "ref-for-mult-opt\u2462"}], "title": "2.6.3. \nThe target-text() function"}, {"refs": [{"id": "ref-for-mult-opt\u2463"}], "title": "2.7.2. \nThe string() function"}, {"refs": [{"id": "ref-for-mult-opt\u2464"}], "title": "2.7.3. \nThe content() function"}], "external": true};
-window.dfnpanelData['358fd6ff'] = {"dfnID": "358fd6ff", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "dfnText": "css-wide keywords", "refSections": [{"refs": [{"id": "ref-for-css-wide-keywords"}], "title": "\nValue Definitions"}], "external": true};
-window.dfnpanelData['6ec67710'] = {"dfnID": "6ec67710", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "dfnText": "|", "refSections": [{"refs": [{"id": "ref-for-comb-one"}, {"id": "ref-for-comb-one\u2460"}, {"id": "ref-for-comb-one\u2461"}, {"id": "ref-for-comb-one\u2462"}, {"id": "ref-for-comb-one\u2463"}, {"id": "ref-for-comb-one\u2464"}, {"id": "ref-for-comb-one\u2465"}, {"id": "ref-for-comb-one\u2466"}, {"id": "ref-for-comb-one\u2467"}, {"id": "ref-for-comb-one\u2468"}], "title": "1. \nInserting and replacing content with the content property"}, {"refs": [{"id": "ref-for-comb-one\u2460\u24ea"}, {"id": "ref-for-comb-one\u2460\u2460"}], "title": "2.4.1. \nSpecifying quotes with the quotes property"}, {"refs": [{"id": "ref-for-comb-one\u2460\u2461"}, {"id": "ref-for-comb-one\u2460\u2462"}, {"id": "ref-for-comb-one\u2460\u2463"}], "title": "2.4.2. \nThe *-quote values of the content property"}, {"refs": [{"id": "ref-for-comb-one\u2460\u2464"}, {"id": "ref-for-comb-one\u2460\u2465"}, {"id": "ref-for-comb-one\u2460\u2466"}], "title": "2.5.1. \nThe leader() function"}, {"refs": [{"id": "ref-for-comb-one\u2460\u2467"}, {"id": "ref-for-comb-one\u2460\u2468"}], "title": "2.6. \nCross references and the target-* functions"}, {"refs": [{"id": "ref-for-comb-one\u2461\u24ea"}], "title": "2.6.1. \nThe target-counter() function"}, {"refs": [{"id": "ref-for-comb-one\u2461\u2460"}], "title": "2.6.2. \nThe target-counters() function\n"}, {"refs": [{"id": "ref-for-comb-one\u2461\u2461"}, {"id": "ref-for-comb-one\u2461\u2462"}, {"id": "ref-for-comb-one\u2461\u2463"}, {"id": "ref-for-comb-one\u2461\u2464"}], "title": "2.6.3. \nThe target-text() function"}, {"refs": [{"id": "ref-for-comb-one\u2461\u2465"}], "title": "2.7.1. \nThe string-set property"}, {"refs": [{"id": "ref-for-comb-one\u2461\u2466"}, {"id": "ref-for-comb-one\u2461\u2467"}, {"id": "ref-for-comb-one\u2461\u2468"}], "title": "2.7.2. \nThe string() function"}, {"refs": [{"id": "ref-for-comb-one\u2462\u24ea"}, {"id": "ref-for-comb-one\u2462\u2460"}, {"id": "ref-for-comb-one\u2462\u2461"}, {"id": "ref-for-comb-one\u2462\u2462"}], "title": "2.7.3. \nThe content() function"}, {"refs": [{"id": "ref-for-comb-one\u2462\u2463"}], "title": "4.1. \nbookmark-level\n"}, {"refs": [{"id": "ref-for-comb-one\u2462\u2464"}], "title": "4.3. \nbookmark-state"}], "external": true};
-window.dfnpanelData['64fba2c3'] = {"dfnID": "64fba2c3", "url": "https://drafts.csswg.org/css-lists-3/#typedef-counter", "dfnText": "<counter>", "refSections": [{"refs": [{"id": "ref-for-typedef-counter"}, {"id": "ref-for-typedef-counter\u2460"}, {"id": "ref-for-typedef-counter\u2461"}], "title": "1. \nInserting and replacing content with the content property"}], "external": true};
-window.dfnpanelData['b8d7db46'] = {"dfnID": "b8d7db46", "url": "https://drafts.csswg.org/css-lists-3/#propdef-counter-increment", "dfnText": "counter-increment", "refSections": [{"refs": [{"id": "ref-for-propdef-counter-increment"}], "title": "3. \nAutomatic counters and numbering: the counter-increment and counter-reset properties (moved)"}], "external": true};
-window.dfnpanelData['17d6dd37'] = {"dfnID": "17d6dd37", "url": "https://drafts.csswg.org/css-lists-3/#propdef-counter-reset", "dfnText": "counter-reset", "refSections": [{"refs": [{"id": "ref-for-propdef-counter-reset"}], "title": "3. \nAutomatic counters and numbering: the counter-increment and counter-reset properties (moved)"}], "external": true};
-window.dfnpanelData['f0811ff8'] = {"dfnID": "f0811ff8", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element", "dfnText": "img", "refSections": [{"refs": [{"id": "ref-for-the-img-element"}], "title": "1. \nInserting and replacing content with the content property"}], "external": true};
-window.dfnpanelData['efe16f32'] = {"dfnID": "efe16f32", "url": "https://drafts.csswg.org/selectors-4/#target-pseudo", "dfnText": ":target", "refSections": [{"refs": [{"id": "ref-for-target-pseudo"}], "title": "4. \nBookmarks"}], "external": true};
-window.dfnpanelData['82805a4e'] = {"dfnID": "82805a4e", "url": "https://drafts.csswg.org/selectors-4/#originating-element", "dfnText": "originating element", "refSections": [{"refs": [{"id": "ref-for-originating-element"}], "title": "1. \nInserting and replacing content with the content property"}], "external": true};
-window.dfnpanelData['propdef-content'] = {"dfnID": "propdef-content", "url": "#propdef-content", "dfnText": "content", "refSections": [{"refs": [{"id": "ref-for-propdef-content"}, {"id": "ref-for-propdef-content\u2460"}, {"id": "ref-for-propdef-content\u2461"}], "title": "1. \nInserting and replacing content with the content property"}, {"refs": [{"id": "ref-for-propdef-content\u2462"}], "title": "1.1. \nAccessibility of Generated Content"}, {"refs": [{"id": "ref-for-propdef-content\u2463"}], "title": "1.2. \nAlternative Text for Accessibility"}, {"refs": [{"id": "ref-for-propdef-content\u2464"}], "title": "2. \n<content-list> Values and Functions"}, {"refs": [{"id": "ref-for-propdef-content\u2465"}], "title": "2.1. \nString"}, {"refs": [{"id": "ref-for-propdef-content\u2466"}, {"id": "ref-for-propdef-content\u2467"}, {"id": "ref-for-propdef-content\u2468"}], "title": "2.3. \nElement Content"}, {"refs": [{"id": "ref-for-propdef-content\u2460\u24ea"}], "title": "2.4. \nQuotes"}, {"refs": [{"id": "ref-for-propdef-content\u2460\u2460"}, {"id": "ref-for-propdef-content\u2460\u2461"}], "title": "2.4.1. \nSpecifying quotes with the quotes property"}, {"refs": [{"id": "ref-for-propdef-content\u2460\u2462"}], "title": "2.4.2. \nThe *-quote values of the content property"}, {"refs": [{"id": "ref-for-propdef-content\u2460\u2463"}], "title": "2.7. \nNamed strings"}, {"refs": [{"id": "ref-for-propdef-content\u2460\u2464"}], "title": "2.7.2. \nThe string() function"}], "external": false};
-window.dfnpanelData['valdef-content-normal'] = {"dfnID": "valdef-content-normal", "url": "#valdef-content-normal", "dfnText": "normal", "refSections": [{"refs": [{"id": "ref-for-valdef-content-normal"}], "title": "1. \nInserting and replacing content with the content property"}, {"refs": [{"id": "ref-for-valdef-content-normal\u2460"}, {"id": "ref-for-valdef-content-normal\u2461"}], "title": "2.3. \nElement Content"}], "external": false};
-window.dfnpanelData['valdef-content-none'] = {"dfnID": "valdef-content-none", "url": "#valdef-content-none", "dfnText": "none", "refSections": [{"refs": [{"id": "ref-for-valdef-content-none"}], "title": "1. \nInserting and replacing content with the content property"}, {"refs": [{"id": "ref-for-valdef-content-none\u2460"}, {"id": "ref-for-valdef-content-none\u2461"}, {"id": "ref-for-valdef-content-none\u2462"}], "title": "2.3. \nElement Content"}, {"refs": [{"id": "ref-for-valdef-content-none\u2463"}], "title": "2.4.2. \nThe *-quote values of the content property"}], "external": false};
-window.dfnpanelData['typedef-content-content-replacement'] = {"dfnID": "typedef-content-content-replacement", "url": "#typedef-content-content-replacement", "dfnText": "<content-replacement>", "refSections": [{"refs": [{"id": "ref-for-typedef-content-content-replacement"}, {"id": "ref-for-typedef-content-content-replacement\u2460"}, {"id": "ref-for-typedef-content-content-replacement\u2461"}], "title": "1. \nInserting and replacing content with the content property"}], "external": false};
-window.dfnpanelData['typedef-content-content-list'] = {"dfnID": "typedef-content-content-list", "url": "#typedef-content-content-list", "dfnText": "<content-list>", "refSections": [{"refs": [{"id": "ref-for-typedef-content-content-list"}, {"id": "ref-for-typedef-content-content-list\u2460"}, {"id": "ref-for-typedef-content-content-list\u2461"}], "title": "1. \nInserting and replacing content with the content property"}, {"refs": [{"id": "ref-for-typedef-content-content-list\u2462"}], "title": "1.2. \nAlternative Text for Accessibility"}, {"refs": [{"id": "ref-for-typedef-content-content-list\u2463"}, {"id": "ref-for-typedef-content-content-list\u2464"}], "title": "2. \n<content-list> Values and Functions"}, {"refs": [{"id": "ref-for-typedef-content-content-list\u2465"}, {"id": "ref-for-typedef-content-content-list\u2466"}, {"id": "ref-for-typedef-content-content-list\u2467"}, {"id": "ref-for-typedef-content-content-list\u2468"}], "title": "4.2. \nbookmark-label"}], "external": false};
-window.dfnpanelData['valdef-content-contents'] = {"dfnID": "valdef-content-contents", "url": "#valdef-content-contents", "dfnText": "contents", "refSections": [{"refs": [{"id": "ref-for-valdef-content-contents"}], "title": "1. \nInserting and replacing content with the content property"}, {"refs": [{"id": "ref-for-valdef-content-contents\u2460"}, {"id": "ref-for-valdef-content-contents\u2461"}, {"id": "ref-for-valdef-content-contents\u2462"}], "title": "2.3. \nElement Content"}], "external": false};
-window.dfnpanelData['propdef-quotes'] = {"dfnID": "propdef-quotes", "url": "#propdef-quotes", "dfnText": "quotes", "refSections": [{"refs": [{"id": "ref-for-propdef-quotes"}, {"id": "ref-for-propdef-quotes\u2460"}], "title": "2.4.1. \nSpecifying quotes with the quotes property"}, {"refs": [{"id": "ref-for-propdef-quotes\u2461"}, {"id": "ref-for-propdef-quotes\u2462"}, {"id": "ref-for-propdef-quotes\u2463"}], "title": "2.4.2. \nThe *-quote values of the content property"}, {"refs": [{"id": "ref-for-propdef-quotes\u2464"}], "title": "5. Changes since the 2 June 2016 Working Draft"}], "external": false};
-window.dfnpanelData['valdef-quotes-none'] = {"dfnID": "valdef-quotes-none", "url": "#valdef-quotes-none", "dfnText": "none", "refSections": [{"refs": [{"id": "ref-for-valdef-quotes-none"}], "title": "2.4.1. \nSpecifying quotes with the quotes property"}], "external": false};
-window.dfnpanelData['valdef-quotes-auto'] = {"dfnID": "valdef-quotes-auto", "url": "#valdef-quotes-auto", "dfnText": "auto", "refSections": [{"refs": [{"id": "ref-for-valdef-quotes-auto"}], "title": "2.4.1. \nSpecifying quotes with the quotes property"}, {"refs": [{"id": "ref-for-valdef-quotes-auto\u2460"}], "title": "5. Changes since the 2 June 2016 Working Draft"}], "external": false};
-window.dfnpanelData['typedef-quote'] = {"dfnID": "typedef-quote", "url": "#typedef-quote", "dfnText": "<quote>", "refSections": [{"refs": [{"id": "ref-for-typedef-quote"}], "title": "1. \nInserting and replacing content with the content property"}, {"refs": [{"id": "ref-for-typedef-quote\u2460"}], "title": "2.4.2. \nThe *-quote values of the content property"}], "external": false};
-window.dfnpanelData['valdef-content-open-quote'] = {"dfnID": "valdef-content-open-quote", "url": "#valdef-content-open-quote", "dfnText": "open-quote", "refSections": [{"refs": [{"id": "ref-for-valdef-content-open-quote"}, {"id": "ref-for-valdef-content-open-quote\u2460"}], "title": "2.4.1. \nSpecifying quotes with the quotes property"}, {"refs": [{"id": "ref-for-valdef-content-open-quote\u2461"}, {"id": "ref-for-valdef-content-open-quote\u2462"}, {"id": "ref-for-valdef-content-open-quote\u2463"}, {"id": "ref-for-valdef-content-open-quote\u2464"}, {"id": "ref-for-valdef-content-open-quote\u2465"}], "title": "2.4.2. \nThe *-quote values of the content property"}], "external": false};
-window.dfnpanelData['valdef-content-close-quote'] = {"dfnID": "valdef-content-close-quote", "url": "#valdef-content-close-quote", "dfnText": "close-quote", "refSections": [{"refs": [{"id": "ref-for-valdef-content-close-quote"}, {"id": "ref-for-valdef-content-close-quote\u2460"}], "title": "2.4.1. \nSpecifying quotes with the quotes property"}, {"refs": [{"id": "ref-for-valdef-content-close-quote\u2461"}, {"id": "ref-for-valdef-content-close-quote\u2462"}, {"id": "ref-for-valdef-content-close-quote\u2463"}, {"id": "ref-for-valdef-content-close-quote\u2464"}, {"id": "ref-for-valdef-content-close-quote\u2465"}], "title": "2.4.2. \nThe *-quote values of the content property"}], "external": false};
-window.dfnpanelData['valdef-content-no-open-quote'] = {"dfnID": "valdef-content-no-open-quote", "url": "#valdef-content-no-open-quote", "dfnText": "no-open-quote", "refSections": [{"refs": [{"id": "ref-for-valdef-content-no-open-quote"}], "title": "2.4.1. \nSpecifying quotes with the quotes property"}, {"refs": [{"id": "ref-for-valdef-content-no-open-quote\u2460"}], "title": "2.4.2. \nThe *-quote values of the content property"}], "external": false};
-window.dfnpanelData['valdef-content-no-close-quote'] = {"dfnID": "valdef-content-no-close-quote", "url": "#valdef-content-no-close-quote", "dfnText": "no-close-quote", "refSections": [{"refs": [{"id": "ref-for-valdef-content-no-close-quote"}], "title": "2.4.1. \nSpecifying quotes with the quotes property"}, {"refs": [{"id": "ref-for-valdef-content-no-close-quote\u2460"}], "title": "2.4.2. \nThe *-quote values of the content property"}], "external": false};
-window.dfnpanelData['typedef-leader-type'] = {"dfnID": "typedef-leader-type", "url": "#typedef-leader-type", "dfnText": "<leader-type>", "refSections": [{"refs": [{"id": "ref-for-typedef-leader-type"}, {"id": "ref-for-typedef-leader-type\u2460"}, {"id": "ref-for-typedef-leader-type\u2461"}], "title": "2.5.1. \nThe leader() function"}], "external": false};
-window.dfnpanelData['typedef-target'] = {"dfnID": "typedef-target", "url": "#typedef-target", "dfnText": "<target>", "refSections": [{"refs": [{"id": "ref-for-typedef-target"}], "title": "1. \nInserting and replacing content with the content property"}, {"refs": [{"id": "ref-for-typedef-target\u2460"}], "title": "2.6. \nCross references and the target-* functions"}], "external": false};
-window.dfnpanelData['funcdef-target-counter'] = {"dfnID": "funcdef-target-counter", "url": "#funcdef-target-counter", "dfnText": "target-counter()", "refSections": [{"refs": [{"id": "ref-for-funcdef-target-counter"}, {"id": "ref-for-funcdef-target-counter\u2460"}], "title": "2.6. \nCross references and the target-* functions"}, {"refs": [{"id": "ref-for-funcdef-target-counter\u2461"}, {"id": "ref-for-funcdef-target-counter\u2462"}], "title": "2.6.1. \nThe target-counter() function"}], "external": false};
-window.dfnpanelData['funcdef-target-counters'] = {"dfnID": "funcdef-target-counters", "url": "#funcdef-target-counters", "dfnText": "target-counters()", "refSections": [{"refs": [{"id": "ref-for-funcdef-target-counters"}, {"id": "ref-for-funcdef-target-counters\u2460"}], "title": "2.6. \nCross references and the target-* functions"}, {"refs": [{"id": "ref-for-funcdef-target-counters\u2461"}], "title": "2.6.2. \nThe target-counters() function\n"}], "external": false};
-window.dfnpanelData['target-text-function'] = {"dfnID": "target-text-function", "url": "#target-text-function", "dfnText": "target-text()", "refSections": [{"refs": [{"id": "ref-for-target-text-function"}, {"id": "ref-for-target-text-function\u2460"}], "title": "2.6. \nCross references and the target-* functions"}, {"refs": [{"id": "ref-for-target-text-function\u2461"}, {"id": "ref-for-target-text-function\u2462"}], "title": "2.6.3. \nThe target-text() function"}], "external": false};
-window.dfnpanelData['named-string'] = {"dfnID": "named-string", "url": "#named-string", "dfnText": "named strings", "refSections": [{"refs": [{"id": "ref-for-named-string"}], "title": "2.7.2. \nThe string() function"}], "external": false};
-window.dfnpanelData['propdef-string-set'] = {"dfnID": "propdef-string-set", "url": "#propdef-string-set", "dfnText": "string-set", "refSections": [{"refs": [{"id": "ref-for-propdef-string-set"}], "title": "2.6.3. \nThe target-text() function"}, {"refs": [{"id": "ref-for-propdef-string-set\u2460"}], "title": "2.7. \nNamed strings"}, {"refs": [{"id": "ref-for-propdef-string-set\u2461"}, {"id": "ref-for-propdef-string-set\u2462"}], "title": "2.7.1. \nThe string-set property"}, {"refs": [{"id": "ref-for-propdef-string-set\u2463"}], "title": "4.2. \nbookmark-label"}], "external": false};
-window.dfnpanelData['valdef-string-set-none'] = {"dfnID": "valdef-string-set-none", "url": "#valdef-string-set-none", "dfnText": "none", "refSections": [{"refs": [{"id": "ref-for-valdef-string-set-none"}], "title": "2.7.1. \nThe string-set property"}], "external": false};
-window.dfnpanelData['funcdef-string'] = {"dfnID": "funcdef-string", "url": "#funcdef-string", "dfnText": "string()", "refSections": [{"refs": [{"id": "ref-for-funcdef-string"}, {"id": "ref-for-funcdef-string\u2460"}], "title": "2.7.1. \nThe string-set property"}, {"refs": [{"id": "ref-for-funcdef-string\u2461"}, {"id": "ref-for-funcdef-string\u2462"}, {"id": "ref-for-funcdef-string\u2463"}], "title": "2.7.2. \nThe string() function"}], "external": false};
-window.dfnpanelData['valdef-string-first'] = {"dfnID": "valdef-string-first", "url": "#valdef-string-first", "dfnText": "first", "refSections": [{"refs": [{"id": "ref-for-valdef-string-first"}], "title": "2.7.2. \nThe string() function"}], "external": false};
-window.dfnpanelData['entry-value'] = {"dfnID": "entry-value", "url": "#entry-value", "dfnText": "entry value", "refSections": [{"refs": [{"id": "ref-for-entry-value"}, {"id": "ref-for-entry-value\u2460"}, {"id": "ref-for-entry-value\u2461"}], "title": "2.7.2. \nThe string() function"}], "external": false};
-window.dfnpanelData['exit-value'] = {"dfnID": "exit-value", "url": "#exit-value", "dfnText": "exit value", "refSections": [{"refs": [{"id": "ref-for-exit-value"}, {"id": "ref-for-exit-value\u2460"}], "title": "2.7.2. \nThe string() function"}], "external": false};
-window.dfnpanelData['funcdef-content'] = {"dfnID": "funcdef-content", "url": "#funcdef-content", "dfnText": "content()", "refSections": [{"refs": [{"id": "ref-for-funcdef-content"}], "title": "1. \nInserting and replacing content with the content property"}, {"refs": [{"id": "ref-for-funcdef-content\u2460"}, {"id": "ref-for-funcdef-content\u2461"}], "title": "2.7.3. \nThe content() function"}], "external": false};
-window.dfnpanelData['valdef-content-text'] = {"dfnID": "valdef-content-text", "url": "#valdef-content-text", "dfnText": "text", "refSections": [{"refs": [{"id": "ref-for-valdef-content-text"}], "title": "2.7.3. \nThe content() function"}], "external": false};
-window.dfnpanelData['propdef-bookmark-level'] = {"dfnID": "propdef-bookmark-level", "url": "#propdef-bookmark-level", "dfnText": "bookmark-level", "refSections": [{"refs": [{"id": "ref-for-propdef-bookmark-level"}, {"id": "ref-for-propdef-bookmark-level\u2460"}], "title": "4. \nBookmarks"}, {"refs": [{"id": "ref-for-propdef-bookmark-level\u2461"}], "title": "4.1. \nbookmark-level\n"}, {"refs": [{"id": "ref-for-propdef-bookmark-level\u2462"}], "title": "4.3. \nbookmark-state"}], "external": false};
-window.dfnpanelData['valdef-bookmark-level-none'] = {"dfnID": "valdef-bookmark-level-none", "url": "#valdef-bookmark-level-none", "dfnText": "none", "refSections": [{"refs": [{"id": "ref-for-valdef-bookmark-level-none"}, {"id": "ref-for-valdef-bookmark-level-none\u2460"}], "title": "4.1. \nbookmark-level\n"}], "external": false};
-window.dfnpanelData['propdef-bookmark-label'] = {"dfnID": "propdef-bookmark-label", "url": "#propdef-bookmark-label", "dfnText": "bookmark-label", "refSections": [{"refs": [{"id": "ref-for-propdef-bookmark-label"}, {"id": "ref-for-propdef-bookmark-label\u2460"}], "title": "4. \nBookmarks"}, {"refs": [{"id": "ref-for-propdef-bookmark-label\u2461"}], "title": "4.1. \nbookmark-level\n"}], "external": false};
-window.dfnpanelData['propdef-bookmark-state'] = {"dfnID": "propdef-bookmark-state", "url": "#propdef-bookmark-state", "dfnText": "bookmark-state", "refSections": [{"refs": [{"id": "ref-for-propdef-bookmark-state"}, {"id": "ref-for-propdef-bookmark-state\u2460"}], "title": "4. \nBookmarks"}, {"refs": [{"id": "ref-for-propdef-bookmark-state\u2461"}], "title": "4.1. \nbookmark-level\n"}, {"refs": [{"id": "ref-for-propdef-bookmark-state\u2462"}], "title": "4.3. \nbookmark-state"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -3306,14 +2842,476 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"a4eb3c57": {"dfnID":"a4eb3c57","dfnText":"used value","external":true,"refSections":[{"refs":[{"id":"ref-for-used-value"}],"title":"2.4.1. \nSpecifying quotes with the quotes property"}],"url":"https://drafts.csswg.org/css-cascade-5/#used-value"},
+"9b54ada7": {"dfnID":"9b54ada7","dfnText":"style containment","external":true,"refSections":[{"refs":[{"id":"ref-for-style-containment"}],"title":"2.7.1. \nThe string-set property"},{"refs":[{"id":"ref-for-style-containment\u2460"}],"title":"4. \nBookmarks"}],"url":"https://drafts.csswg.org/css-contain-2/#style-containment"},
+"ab039d4e": {"dfnID":"ab039d4e","dfnText":"<counter-style>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-counter-style"}],"title":"2.6.1. \nThe target-counter() function"},{"refs":[{"id":"ref-for-typedef-counter-style\u2460"}],"title":"2.6.2. \nThe target-counters() function\n"}],"url":"https://drafts.csswg.org/css-counter-styles-3/#typedef-counter-style"},
+"e7f0dd6c": {"dfnID":"e7f0dd6c","dfnText":"display","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-display"},{"id":"ref-for-propdef-display\u2460"},{"id":"ref-for-propdef-display\u2461"}],"title":"1. \nInserting and replacing content with the content property"}],"url":"https://drafts.csswg.org/css-display-4/#propdef-display"},
+"998b9e6e": {"dfnID":"998b9e6e","dfnText":"<image>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-image"},{"id":"ref-for-typedef-image\u2460"},{"id":"ref-for-typedef-image\u2461"},{"id":"ref-for-typedef-image\u2462"},{"id":"ref-for-typedef-image\u2463"},{"id":"ref-for-typedef-image\u2464"},{"id":"ref-for-typedef-image\u2465"},{"id":"ref-for-typedef-image\u2466"},{"id":"ref-for-typedef-image\u2467"}],"title":"1. \nInserting and replacing content with the content property"},{"refs":[{"id":"ref-for-typedef-image\u2468"},{"id":"ref-for-typedef-image\u2460\u24ea"},{"id":"ref-for-typedef-image\u2460\u2460"},{"id":"ref-for-typedef-image\u2460\u2461"}],"title":"2.2. \n<image>"}],"url":"https://drafts.csswg.org/css-images-3/#typedef-image"},
+"d3936525": {"dfnID":"d3936525","dfnText":"natural dimension","external":true,"refSections":[{"refs":[{"id":"ref-for-natural-dimensions"}],"title":"1. \nInserting and replacing content with the content property"}],"url":"https://drafts.csswg.org/css-images-3/#natural-dimensions"},
+"e1b8b09d": {"dfnID":"e1b8b09d","dfnText":"invalid image","external":true,"refSections":[{"refs":[{"id":"ref-for-invalid-image"},{"id":"ref-for-invalid-image\u2460"},{"id":"ref-for-invalid-image\u2461"}],"title":"1. \nInserting and replacing content with the content property"},{"refs":[{"id":"ref-for-invalid-image\u2462"}],"title":"2.2. \n<image>"}],"url":"https://drafts.csswg.org/css-images-4/#invalid-image"},
+"fd0c9e35": {"dfnID":"fd0c9e35","dfnText":"::after","external":true,"refSections":[{"refs":[{"id":"ref-for-selectordef-after"},{"id":"ref-for-selectordef-after\u2460"}],"title":"1. \nInserting and replacing content with the content property"},{"refs":[{"id":"ref-for-selectordef-after\u2461"}],"title":"2.7.3. \nThe content() function"}],"url":"https://drafts.csswg.org/css-pseudo-4/#selectordef-after"},
+"5869f885": {"dfnID":"5869f885","dfnText":"::before","external":true,"refSections":[{"refs":[{"id":"ref-for-selectordef-before"},{"id":"ref-for-selectordef-before\u2460"}],"title":"1. \nInserting and replacing content with the content property"},{"refs":[{"id":"ref-for-selectordef-before\u2461"}],"title":"2.7.3. \nThe content() function"}],"url":"https://drafts.csswg.org/css-pseudo-4/#selectordef-before"},
+"a1addf6c": {"dfnID":"a1addf6c","dfnText":"::first-letter","external":true,"refSections":[{"refs":[{"id":"ref-for-selectordef-first-letter"}],"title":"2.7.3. \nThe content() function"}],"url":"https://drafts.csswg.org/css-pseudo-4/#selectordef-first-letter"},
+"5875aeb9": {"dfnID":"5875aeb9","dfnText":"::marker","external":true,"refSections":[{"refs":[{"id":"ref-for-selectordef-marker"}],"title":"1. \nInserting and replacing content with the content property"},{"refs":[{"id":"ref-for-selectordef-marker\u2460"}],"title":"2.3. \nElement Content"},{"refs":[{"id":"ref-for-selectordef-marker\u2461"}],"title":"2.7.3. \nThe content() function"}],"url":"https://drafts.csswg.org/css-pseudo-4/#selectordef-marker"},
+"5879b11d": {"dfnID":"5879b11d","dfnText":"content language","external":true,"refSections":[{"refs":[{"id":"ref-for-content-language"}],"title":"2.4.1. \nSpecifying quotes with the quotes property"}],"url":"https://drafts.csswg.org/css-text-4/#content-language"},
+"09e0ad83": {"dfnID":"09e0ad83","dfnText":"white space","external":true,"refSections":[{"refs":[{"id":"ref-for-white-space"},{"id":"ref-for-white-space\u2460"}],"title":"2.1. \nString"}],"url":"https://drafts.csswg.org/css-text-4/#white-space"},
+"68487d22": {"dfnID":"68487d22","dfnText":"#","external":true,"refSections":[{"refs":[{"id":"ref-for-mult-comma"}],"title":"2.7.1. \nThe string-set property"}],"url":"https://drafts.csswg.org/css-values-4/#mult-comma"},
+"bedd9d42": {"dfnID":"bedd9d42","dfnText":"+","external":true,"refSections":[{"refs":[{"id":"ref-for-mult-one-plus"},{"id":"ref-for-mult-one-plus\u2460"}],"title":"1. \nInserting and replacing content with the content property"},{"refs":[{"id":"ref-for-mult-one-plus\u2461"}],"title":"2.4.1. \nSpecifying quotes with the quotes property"},{"refs":[{"id":"ref-for-mult-one-plus\u2462"}],"title":"2.7.1. \nThe string-set property"}],"url":"https://drafts.csswg.org/css-values-4/#mult-one-plus"},
+"9f9120ff": {"dfnID":"9f9120ff","dfnText":",","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-comma"},{"id":"ref-for-comb-comma\u2460"}],"title":"2.6.1. \nThe target-counter() function"},{"refs":[{"id":"ref-for-comb-comma\u2461"},{"id":"ref-for-comb-comma\u2462"},{"id":"ref-for-comb-comma\u2463"}],"title":"2.6.2. \nThe target-counters() function\n"},{"refs":[{"id":"ref-for-comb-comma\u2464"}],"title":"2.6.3. \nThe target-text() function"},{"refs":[{"id":"ref-for-comb-comma\u2465"}],"title":"2.7.2. \nThe string() function"}],"url":"https://drafts.csswg.org/css-values-4/#comb-comma"},
+"e274345c": {"dfnID":"e274345c","dfnText":"<custom-ident>","external":true,"refSections":[{"refs":[{"id":"ref-for-identifier-value"}],"title":"2.6.1. \nThe target-counter() function"},{"refs":[{"id":"ref-for-identifier-value\u2460"}],"title":"2.6.2. \nThe target-counters() function\n"},{"refs":[{"id":"ref-for-identifier-value\u2461"},{"id":"ref-for-identifier-value\u2462"},{"id":"ref-for-identifier-value\u2463"}],"title":"2.7.1. \nThe string-set property"},{"refs":[{"id":"ref-for-identifier-value\u2464"}],"title":"2.7.2. \nThe string() function"}],"url":"https://drafts.csswg.org/css-values-4/#identifier-value"},
+"70c9f859": {"dfnID":"70c9f859","dfnText":"<integer>","external":true,"refSections":[{"refs":[{"id":"ref-for-integer-value"},{"id":"ref-for-integer-value\u2460"}],"title":"4.1. \nbookmark-level\n"}],"url":"https://drafts.csswg.org/css-values-4/#integer-value"},
+"977d3003": {"dfnID":"977d3003","dfnText":"<string>","external":true,"refSections":[{"refs":[{"id":"ref-for-string-value"},{"id":"ref-for-string-value\u2460"},{"id":"ref-for-string-value\u2461"}],"title":"1. \nInserting and replacing content with the content property"},{"refs":[{"id":"ref-for-string-value\u2462"}],"title":"2.1. \nString"},{"refs":[{"id":"ref-for-string-value\u2463"},{"id":"ref-for-string-value\u2464"},{"id":"ref-for-string-value\u2465"},{"id":"ref-for-string-value\u2466"}],"title":"2.4.1. \nSpecifying quotes with the quotes property"},{"refs":[{"id":"ref-for-string-value\u2467"},{"id":"ref-for-string-value\u2468"}],"title":"2.5.1. \nThe leader() function"},{"refs":[{"id":"ref-for-string-value\u2460\u24ea"}],"title":"2.6.1. \nThe target-counter() function"},{"refs":[{"id":"ref-for-string-value\u2460\u2460"},{"id":"ref-for-string-value\u2460\u2461"}],"title":"2.6.2. \nThe target-counters() function\n"},{"refs":[{"id":"ref-for-string-value\u2460\u2462"}],"title":"2.6.3. \nThe target-text() function"},{"refs":[{"id":"ref-for-string-value\u2460\u2463"},{"id":"ref-for-string-value\u2460\u2464"},{"id":"ref-for-string-value\u2460\u2465"}],"title":"2.7.1. \nThe string-set property"}],"url":"https://drafts.csswg.org/css-values-4/#string-value"},
+"fa293cdd": {"dfnID":"fa293cdd","dfnText":"<url>","external":true,"refSections":[{"refs":[{"id":"ref-for-url-value"}],"title":"2.6.1. \nThe target-counter() function"},{"refs":[{"id":"ref-for-url-value\u2460"}],"title":"2.6.2. \nThe target-counters() function\n"},{"refs":[{"id":"ref-for-url-value\u2461"}],"title":"2.6.3. \nThe target-text() function"}],"url":"https://drafts.csswg.org/css-values-4/#url-value"},
+"537cf076": {"dfnID":"537cf076","dfnText":"?","external":true,"refSections":[{"refs":[{"id":"ref-for-mult-opt"}],"title":"1. \nInserting and replacing content with the content property"},{"refs":[{"id":"ref-for-mult-opt\u2460"}],"title":"2.6.1. \nThe target-counter() function"},{"refs":[{"id":"ref-for-mult-opt\u2461"}],"title":"2.6.2. \nThe target-counters() function\n"},{"refs":[{"id":"ref-for-mult-opt\u2462"}],"title":"2.6.3. \nThe target-text() function"},{"refs":[{"id":"ref-for-mult-opt\u2463"}],"title":"2.7.2. \nThe string() function"},{"refs":[{"id":"ref-for-mult-opt\u2464"}],"title":"2.7.3. \nThe content() function"}],"url":"https://drafts.csswg.org/css-values-4/#mult-opt"},
+"358fd6ff": {"dfnID":"358fd6ff","dfnText":"css-wide keywords","external":true,"refSections":[{"refs":[{"id":"ref-for-css-wide-keywords"}],"title":"\nValue Definitions"}],"url":"https://drafts.csswg.org/css-values-4/#css-wide-keywords"},
+"6ec67710": {"dfnID":"6ec67710","dfnText":"|","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-one"},{"id":"ref-for-comb-one\u2460"},{"id":"ref-for-comb-one\u2461"},{"id":"ref-for-comb-one\u2462"},{"id":"ref-for-comb-one\u2463"},{"id":"ref-for-comb-one\u2464"},{"id":"ref-for-comb-one\u2465"},{"id":"ref-for-comb-one\u2466"},{"id":"ref-for-comb-one\u2467"},{"id":"ref-for-comb-one\u2468"}],"title":"1. \nInserting and replacing content with the content property"},{"refs":[{"id":"ref-for-comb-one\u2460\u24ea"},{"id":"ref-for-comb-one\u2460\u2460"}],"title":"2.4.1. \nSpecifying quotes with the quotes property"},{"refs":[{"id":"ref-for-comb-one\u2460\u2461"},{"id":"ref-for-comb-one\u2460\u2462"},{"id":"ref-for-comb-one\u2460\u2463"}],"title":"2.4.2. \nThe *-quote values of the content property"},{"refs":[{"id":"ref-for-comb-one\u2460\u2464"},{"id":"ref-for-comb-one\u2460\u2465"},{"id":"ref-for-comb-one\u2460\u2466"}],"title":"2.5.1. \nThe leader() function"},{"refs":[{"id":"ref-for-comb-one\u2460\u2467"},{"id":"ref-for-comb-one\u2460\u2468"}],"title":"2.6. \nCross references and the target-* functions"},{"refs":[{"id":"ref-for-comb-one\u2461\u24ea"}],"title":"2.6.1. \nThe target-counter() function"},{"refs":[{"id":"ref-for-comb-one\u2461\u2460"}],"title":"2.6.2. \nThe target-counters() function\n"},{"refs":[{"id":"ref-for-comb-one\u2461\u2461"},{"id":"ref-for-comb-one\u2461\u2462"},{"id":"ref-for-comb-one\u2461\u2463"},{"id":"ref-for-comb-one\u2461\u2464"}],"title":"2.6.3. \nThe target-text() function"},{"refs":[{"id":"ref-for-comb-one\u2461\u2465"}],"title":"2.7.1. \nThe string-set property"},{"refs":[{"id":"ref-for-comb-one\u2461\u2466"},{"id":"ref-for-comb-one\u2461\u2467"},{"id":"ref-for-comb-one\u2461\u2468"}],"title":"2.7.2. \nThe string() function"},{"refs":[{"id":"ref-for-comb-one\u2462\u24ea"},{"id":"ref-for-comb-one\u2462\u2460"},{"id":"ref-for-comb-one\u2462\u2461"},{"id":"ref-for-comb-one\u2462\u2462"}],"title":"2.7.3. \nThe content() function"},{"refs":[{"id":"ref-for-comb-one\u2462\u2463"}],"title":"4.1. \nbookmark-level\n"},{"refs":[{"id":"ref-for-comb-one\u2462\u2464"}],"title":"4.3. \nbookmark-state"}],"url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"64fba2c3": {"dfnID":"64fba2c3","dfnText":"<counter>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-counter"},{"id":"ref-for-typedef-counter\u2460"},{"id":"ref-for-typedef-counter\u2461"}],"title":"1. \nInserting and replacing content with the content property"}],"url":"https://drafts.csswg.org/css-lists-3/#typedef-counter"},
+"b8d7db46": {"dfnID":"b8d7db46","dfnText":"counter-increment","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-counter-increment"}],"title":"3. \nAutomatic counters and numbering: the counter-increment and counter-reset properties (moved)"}],"url":"https://drafts.csswg.org/css-lists-3/#propdef-counter-increment"},
+"17d6dd37": {"dfnID":"17d6dd37","dfnText":"counter-reset","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-counter-reset"}],"title":"3. \nAutomatic counters and numbering: the counter-increment and counter-reset properties (moved)"}],"url":"https://drafts.csswg.org/css-lists-3/#propdef-counter-reset"},
+"f0811ff8": {"dfnID":"f0811ff8","dfnText":"img","external":true,"refSections":[{"refs":[{"id":"ref-for-the-img-element"}],"title":"1. \nInserting and replacing content with the content property"}],"url":"https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element"},
+"efe16f32": {"dfnID":"efe16f32","dfnText":":target","external":true,"refSections":[{"refs":[{"id":"ref-for-target-pseudo"}],"title":"4. \nBookmarks"}],"url":"https://drafts.csswg.org/selectors-4/#target-pseudo"},
+"82805a4e": {"dfnID":"82805a4e","dfnText":"originating element","external":true,"refSections":[{"refs":[{"id":"ref-for-originating-element"}],"title":"1. \nInserting and replacing content with the content property"}],"url":"https://drafts.csswg.org/selectors-4/#originating-element"},
+"propdef-content": {"dfnID":"propdef-content","dfnText":"content","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-content"},{"id":"ref-for-propdef-content\u2460"},{"id":"ref-for-propdef-content\u2461"}],"title":"1. \nInserting and replacing content with the content property"},{"refs":[{"id":"ref-for-propdef-content\u2462"}],"title":"1.1. \nAccessibility of Generated Content"},{"refs":[{"id":"ref-for-propdef-content\u2463"}],"title":"1.2. \nAlternative Text for Accessibility"},{"refs":[{"id":"ref-for-propdef-content\u2464"}],"title":"2. \n<content-list> Values and Functions"},{"refs":[{"id":"ref-for-propdef-content\u2465"}],"title":"2.1. \nString"},{"refs":[{"id":"ref-for-propdef-content\u2466"},{"id":"ref-for-propdef-content\u2467"},{"id":"ref-for-propdef-content\u2468"}],"title":"2.3. \nElement Content"},{"refs":[{"id":"ref-for-propdef-content\u2460\u24ea"}],"title":"2.4. \nQuotes"},{"refs":[{"id":"ref-for-propdef-content\u2460\u2460"},{"id":"ref-for-propdef-content\u2460\u2461"}],"title":"2.4.1. \nSpecifying quotes with the quotes property"},{"refs":[{"id":"ref-for-propdef-content\u2460\u2462"}],"title":"2.4.2. \nThe *-quote values of the content property"},{"refs":[{"id":"ref-for-propdef-content\u2460\u2463"}],"title":"2.7. \nNamed strings"},{"refs":[{"id":"ref-for-propdef-content\u2460\u2464"}],"title":"2.7.2. \nThe string() function"}],"url":"#propdef-content"},
+"valdef-content-normal": {"dfnID":"valdef-content-normal","dfnText":"normal","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-content-normal"}],"title":"1. \nInserting and replacing content with the content property"},{"refs":[{"id":"ref-for-valdef-content-normal\u2460"},{"id":"ref-for-valdef-content-normal\u2461"}],"title":"2.3. \nElement Content"}],"url":"#valdef-content-normal"},
+"valdef-content-none": {"dfnID":"valdef-content-none","dfnText":"none","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-content-none"}],"title":"1. \nInserting and replacing content with the content property"},{"refs":[{"id":"ref-for-valdef-content-none\u2460"},{"id":"ref-for-valdef-content-none\u2461"},{"id":"ref-for-valdef-content-none\u2462"}],"title":"2.3. \nElement Content"},{"refs":[{"id":"ref-for-valdef-content-none\u2463"}],"title":"2.4.2. \nThe *-quote values of the content property"}],"url":"#valdef-content-none"},
+"typedef-content-content-replacement": {"dfnID":"typedef-content-content-replacement","dfnText":"<content-replacement>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-content-content-replacement"},{"id":"ref-for-typedef-content-content-replacement\u2460"},{"id":"ref-for-typedef-content-content-replacement\u2461"}],"title":"1. \nInserting and replacing content with the content property"}],"url":"#typedef-content-content-replacement"},
+"typedef-content-content-list": {"dfnID":"typedef-content-content-list","dfnText":"<content-list>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-content-content-list"},{"id":"ref-for-typedef-content-content-list\u2460"},{"id":"ref-for-typedef-content-content-list\u2461"}],"title":"1. \nInserting and replacing content with the content property"},{"refs":[{"id":"ref-for-typedef-content-content-list\u2462"}],"title":"1.2. \nAlternative Text for Accessibility"},{"refs":[{"id":"ref-for-typedef-content-content-list\u2463"},{"id":"ref-for-typedef-content-content-list\u2464"}],"title":"2. \n<content-list> Values and Functions"},{"refs":[{"id":"ref-for-typedef-content-content-list\u2465"},{"id":"ref-for-typedef-content-content-list\u2466"},{"id":"ref-for-typedef-content-content-list\u2467"},{"id":"ref-for-typedef-content-content-list\u2468"}],"title":"4.2. \nbookmark-label"}],"url":"#typedef-content-content-list"},
+"valdef-content-contents": {"dfnID":"valdef-content-contents","dfnText":"contents","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-content-contents"}],"title":"1. \nInserting and replacing content with the content property"},{"refs":[{"id":"ref-for-valdef-content-contents\u2460"},{"id":"ref-for-valdef-content-contents\u2461"},{"id":"ref-for-valdef-content-contents\u2462"}],"title":"2.3. \nElement Content"}],"url":"#valdef-content-contents"},
+"propdef-quotes": {"dfnID":"propdef-quotes","dfnText":"quotes","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-quotes"},{"id":"ref-for-propdef-quotes\u2460"}],"title":"2.4.1. \nSpecifying quotes with the quotes property"},{"refs":[{"id":"ref-for-propdef-quotes\u2461"},{"id":"ref-for-propdef-quotes\u2462"},{"id":"ref-for-propdef-quotes\u2463"}],"title":"2.4.2. \nThe *-quote values of the content property"},{"refs":[{"id":"ref-for-propdef-quotes\u2464"}],"title":"5. Changes since the 2 June 2016 Working Draft"}],"url":"#propdef-quotes"},
+"valdef-quotes-none": {"dfnID":"valdef-quotes-none","dfnText":"none","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-quotes-none"}],"title":"2.4.1. \nSpecifying quotes with the quotes property"}],"url":"#valdef-quotes-none"},
+"valdef-quotes-auto": {"dfnID":"valdef-quotes-auto","dfnText":"auto","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-quotes-auto"}],"title":"2.4.1. \nSpecifying quotes with the quotes property"},{"refs":[{"id":"ref-for-valdef-quotes-auto\u2460"}],"title":"5. Changes since the 2 June 2016 Working Draft"}],"url":"#valdef-quotes-auto"},
+"typedef-quote": {"dfnID":"typedef-quote","dfnText":"<quote>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-quote"}],"title":"1. \nInserting and replacing content with the content property"},{"refs":[{"id":"ref-for-typedef-quote\u2460"}],"title":"2.4.2. \nThe *-quote values of the content property"}],"url":"#typedef-quote"},
+"valdef-content-open-quote": {"dfnID":"valdef-content-open-quote","dfnText":"open-quote","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-content-open-quote"},{"id":"ref-for-valdef-content-open-quote\u2460"}],"title":"2.4.1. \nSpecifying quotes with the quotes property"},{"refs":[{"id":"ref-for-valdef-content-open-quote\u2461"},{"id":"ref-for-valdef-content-open-quote\u2462"},{"id":"ref-for-valdef-content-open-quote\u2463"},{"id":"ref-for-valdef-content-open-quote\u2464"},{"id":"ref-for-valdef-content-open-quote\u2465"}],"title":"2.4.2. \nThe *-quote values of the content property"}],"url":"#valdef-content-open-quote"},
+"valdef-content-close-quote": {"dfnID":"valdef-content-close-quote","dfnText":"close-quote","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-content-close-quote"},{"id":"ref-for-valdef-content-close-quote\u2460"}],"title":"2.4.1. \nSpecifying quotes with the quotes property"},{"refs":[{"id":"ref-for-valdef-content-close-quote\u2461"},{"id":"ref-for-valdef-content-close-quote\u2462"},{"id":"ref-for-valdef-content-close-quote\u2463"},{"id":"ref-for-valdef-content-close-quote\u2464"},{"id":"ref-for-valdef-content-close-quote\u2465"}],"title":"2.4.2. \nThe *-quote values of the content property"}],"url":"#valdef-content-close-quote"},
+"valdef-content-no-open-quote": {"dfnID":"valdef-content-no-open-quote","dfnText":"no-open-quote","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-content-no-open-quote"}],"title":"2.4.1. \nSpecifying quotes with the quotes property"},{"refs":[{"id":"ref-for-valdef-content-no-open-quote\u2460"}],"title":"2.4.2. \nThe *-quote values of the content property"}],"url":"#valdef-content-no-open-quote"},
+"valdef-content-no-close-quote": {"dfnID":"valdef-content-no-close-quote","dfnText":"no-close-quote","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-content-no-close-quote"}],"title":"2.4.1. \nSpecifying quotes with the quotes property"},{"refs":[{"id":"ref-for-valdef-content-no-close-quote\u2460"}],"title":"2.4.2. \nThe *-quote values of the content property"}],"url":"#valdef-content-no-close-quote"},
+"typedef-leader-type": {"dfnID":"typedef-leader-type","dfnText":"<leader-type>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-leader-type"},{"id":"ref-for-typedef-leader-type\u2460"},{"id":"ref-for-typedef-leader-type\u2461"}],"title":"2.5.1. \nThe leader() function"}],"url":"#typedef-leader-type"},
+"typedef-target": {"dfnID":"typedef-target","dfnText":"<target>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-target"}],"title":"1. \nInserting and replacing content with the content property"},{"refs":[{"id":"ref-for-typedef-target\u2460"}],"title":"2.6. \nCross references and the target-* functions"}],"url":"#typedef-target"},
+"funcdef-target-counter": {"dfnID":"funcdef-target-counter","dfnText":"target-counter()","external":false,"refSections":[{"refs":[{"id":"ref-for-funcdef-target-counter"},{"id":"ref-for-funcdef-target-counter\u2460"}],"title":"2.6. \nCross references and the target-* functions"},{"refs":[{"id":"ref-for-funcdef-target-counter\u2461"},{"id":"ref-for-funcdef-target-counter\u2462"}],"title":"2.6.1. \nThe target-counter() function"}],"url":"#funcdef-target-counter"},
+"funcdef-target-counters": {"dfnID":"funcdef-target-counters","dfnText":"target-counters()","external":false,"refSections":[{"refs":[{"id":"ref-for-funcdef-target-counters"},{"id":"ref-for-funcdef-target-counters\u2460"}],"title":"2.6. \nCross references and the target-* functions"},{"refs":[{"id":"ref-for-funcdef-target-counters\u2461"}],"title":"2.6.2. \nThe target-counters() function\n"}],"url":"#funcdef-target-counters"},
+"target-text-function": {"dfnID":"target-text-function","dfnText":"target-text()","external":false,"refSections":[{"refs":[{"id":"ref-for-target-text-function"},{"id":"ref-for-target-text-function\u2460"}],"title":"2.6. \nCross references and the target-* functions"},{"refs":[{"id":"ref-for-target-text-function\u2461"},{"id":"ref-for-target-text-function\u2462"}],"title":"2.6.3. \nThe target-text() function"}],"url":"#target-text-function"},
+"named-string": {"dfnID":"named-string","dfnText":"named strings","external":false,"refSections":[{"refs":[{"id":"ref-for-named-string"}],"title":"2.7.2. \nThe string() function"}],"url":"#named-string"},
+"propdef-string-set": {"dfnID":"propdef-string-set","dfnText":"string-set","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-string-set"}],"title":"2.6.3. \nThe target-text() function"},{"refs":[{"id":"ref-for-propdef-string-set\u2460"}],"title":"2.7. \nNamed strings"},{"refs":[{"id":"ref-for-propdef-string-set\u2461"},{"id":"ref-for-propdef-string-set\u2462"}],"title":"2.7.1. \nThe string-set property"},{"refs":[{"id":"ref-for-propdef-string-set\u2463"}],"title":"4.2. \nbookmark-label"}],"url":"#propdef-string-set"},
+"valdef-string-set-none": {"dfnID":"valdef-string-set-none","dfnText":"none","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-string-set-none"}],"title":"2.7.1. \nThe string-set property"}],"url":"#valdef-string-set-none"},
+"funcdef-string": {"dfnID":"funcdef-string","dfnText":"string()","external":false,"refSections":[{"refs":[{"id":"ref-for-funcdef-string"},{"id":"ref-for-funcdef-string\u2460"}],"title":"2.7.1. \nThe string-set property"},{"refs":[{"id":"ref-for-funcdef-string\u2461"},{"id":"ref-for-funcdef-string\u2462"},{"id":"ref-for-funcdef-string\u2463"}],"title":"2.7.2. \nThe string() function"}],"url":"#funcdef-string"},
+"valdef-string-first": {"dfnID":"valdef-string-first","dfnText":"first","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-string-first"}],"title":"2.7.2. \nThe string() function"}],"url":"#valdef-string-first"},
+"entry-value": {"dfnID":"entry-value","dfnText":"entry value","external":false,"refSections":[{"refs":[{"id":"ref-for-entry-value"},{"id":"ref-for-entry-value\u2460"},{"id":"ref-for-entry-value\u2461"}],"title":"2.7.2. \nThe string() function"}],"url":"#entry-value"},
+"exit-value": {"dfnID":"exit-value","dfnText":"exit value","external":false,"refSections":[{"refs":[{"id":"ref-for-exit-value"},{"id":"ref-for-exit-value\u2460"}],"title":"2.7.2. \nThe string() function"}],"url":"#exit-value"},
+"funcdef-content": {"dfnID":"funcdef-content","dfnText":"content()","external":false,"refSections":[{"refs":[{"id":"ref-for-funcdef-content"}],"title":"1. \nInserting and replacing content with the content property"},{"refs":[{"id":"ref-for-funcdef-content\u2460"},{"id":"ref-for-funcdef-content\u2461"}],"title":"2.7.3. \nThe content() function"}],"url":"#funcdef-content"},
+"valdef-content-text": {"dfnID":"valdef-content-text","dfnText":"text","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-content-text"}],"title":"2.7.3. \nThe content() function"}],"url":"#valdef-content-text"},
+"propdef-bookmark-level": {"dfnID":"propdef-bookmark-level","dfnText":"bookmark-level","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-bookmark-level"},{"id":"ref-for-propdef-bookmark-level\u2460"}],"title":"4. \nBookmarks"},{"refs":[{"id":"ref-for-propdef-bookmark-level\u2461"}],"title":"4.1. \nbookmark-level\n"},{"refs":[{"id":"ref-for-propdef-bookmark-level\u2462"}],"title":"4.3. \nbookmark-state"}],"url":"#propdef-bookmark-level"},
+"valdef-bookmark-level-none": {"dfnID":"valdef-bookmark-level-none","dfnText":"none","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-bookmark-level-none"},{"id":"ref-for-valdef-bookmark-level-none\u2460"}],"title":"4.1. \nbookmark-level\n"}],"url":"#valdef-bookmark-level-none"},
+"propdef-bookmark-label": {"dfnID":"propdef-bookmark-label","dfnText":"bookmark-label","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-bookmark-label"},{"id":"ref-for-propdef-bookmark-label\u2460"}],"title":"4. \nBookmarks"},{"refs":[{"id":"ref-for-propdef-bookmark-label\u2461"}],"title":"4.1. \nbookmark-level\n"}],"url":"#propdef-bookmark-label"},
+"propdef-bookmark-state": {"dfnID":"propdef-bookmark-state","dfnText":"bookmark-state","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-bookmark-state"},{"id":"ref-for-propdef-bookmark-state\u2460"}],"title":"4. \nBookmarks"},{"refs":[{"id":"ref-for-propdef-bookmark-state\u2461"}],"title":"4.1. \nbookmark-level\n"},{"refs":[{"id":"ref-for-propdef-bookmark-state\u2462"}],"title":"4.3. \nbookmark-state"}],"url":"#propdef-bookmark-state"},
+};
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+const typeFormatters = {
+    'dfn': (text) => `[=${text}=]`,
+    'abstract-op': (text) => `[\$${text}\$]`,
+    'value': (text) => `''${text}''`,
+    'http-header': (text) => `[:${text}:]`,
+    'idl': (text) => `{{${text}}}`,
+    'interface': 'idl',
+    'constructor': 'idl',
+    'method': 'idl',
+    'argument': 'idl',
+    'attribute': 'idl',
+    'callback': 'idl',
+    'dictionary': 'idl',
+    'dict-member': 'idl',
+    'enum': 'idl',
+    'enum-value': 'idl',
+    'exception': 'idl',
+    'const': 'idl',
+    'typedef': 'idl',
+    'stringifier': 'idl',
+    'serializer': 'idl',
+    'iterator': 'idl',
+    'maplike': 'idl',
+    'setlike': 'idl',
+    'extended-attribute': 'idl',
+    'event': 'idl',
+    'element': (element) => `<{${element}}>`,
+    'element-state': 'element',
+    'element-attr': 'element',
+    'attr-value': 'element',
+    'scheme': 'dfn',
+    'permission': 'dfn',
+    'grammar': (text) => `${text} (within a <pre class=prod>)`,
+    'type': (text)=> `<<${text}>>`,
+    'property': (text) => `'${text}'`,
+    'descriptor': 'property',
+    'function': 'value',
+    'at-rule': 'value',
+    'selector': 'value',
+};
+const typesUsingFor = new Set(
+    [
+        "descriptor",
+        "value",
+        "element-attr",
+        "attr-value",
+        "element-state",
+        "method",
+        "constructor",
+        "argument",
+        "attribute",
+        "const",
+        "dict-member",
+        "event",
+        "enum-value",
+        "stringifier",
+        "serializer",
+        "iterator",
+        "maplike",
+        "setlike",
+        "state",
+        "mode",
+        "context",
+        "facet",
+    ],
+)
+const typesNotUsingFor = new Set(
+    [
+        "property",
+        "element",
+        "interface",
+        "namespace",
+        "callback",
+        "dictionary",
+        "enum",
+        "exception",
+        "typedef",
+        "http-header",
+        "permission",
+    ],
+)
+function linkFormatterFromType(type) {
+    const fnOrType = typeFormatters[type];
+    if(typeof fnOrType === 'string') {
+        // follow the alias
+        return linkFormatterFromType(fnOrType);
+    }
+    return fnOrType;
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!typesUsingFor.has(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!typesNotUsingFor.has(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
+
+function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+    dfnPanel.forDfn = dfn;
+    if(!dfn) { console.log(dfnPanel); }
+    return dfnPanel;
+}
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        const panel = genDfnPanel({ ...panelData, dfn });
+        append(document.body, panel);
+        insertDfnPopupAction(panel)
+    }
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+})
+
+function hideAllDfnPanels() {
+    // Turn off any currently "on" or "activated" panels.
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
+}
+
+function showDfnPanel(dfnPanel) {
+    hideAllDfnPanels(); // Only display one at this time.
+
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "true");
+
+    dfnPanel.classList.add("on");
+    positionDfnPanel(dfnPanel);
+
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    // Increment tabindex for each anchor and button tags in panel
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.style.position = "absolute"; // unfix it
+    dfnPanel.classList.remove("on");
+    dfnPanel.classList.remove("activated");
+}
+
+function toggleDfnPanel(dfnPanel) {
+    if(dfnPanel.classList.contains("on")) {
+        hideDfnPanel(dfnPanel);
+    } else {
+        showDfnPanel(dfnPanel);
+    }
+}
+
+function insertDfnPopupAction(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        showDfnPanel(dfnPanel);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfnPanel);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel(dfnPanel, dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    })
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
 }
 </script>
 <script>/* Boilerplate: script-link-titles */
+"use strict";
+{
 let linkTitleData = {
- "#typedef-content-content-list": "Expands to: <image> | <string> | close-quote | contents | leader() | no-close-quote | no-open-quote | open-quote",
- "#typedef-quote": "Expands to: close-quote | no-close-quote | no-open-quote | open-quote",
- "https://drafts.csswg.org/css-counter-styles-3/#typedef-counter-style": "Expands to: cjk-ideographic | japanese-formal | japanese-informal | simp-chinese-formal | simp-chinese-informal | trad-chinese-formal | trad-chinese-informal",
- "https://drafts.csswg.org/css-values-4/#url-value": "Expands to: local url flag"
+"#typedef-content-content-list": "Expands to: <image> | <string> | close-quote | contents | leader() | no-close-quote | no-open-quote | open-quote",
+"#typedef-quote": "Expands to: close-quote | no-close-quote | no-open-quote | open-quote",
+"https://drafts.csswg.org/css-values-4/#url-value": "Expands to: local url flag",
+"https://drafts.csswg.org/css-counter-styles-3/#typedef-counter-style": "Expands to: cjk-ideographic | japanese-formal | japanese-informal | simp-chinese-formal | simp-chinese-informal | trad-chinese-formal | trad-chinese-informal",
 };
 
 function setTypeTitles() {
@@ -3325,11 +3323,11 @@ function setTypeTitles() {
 }
 
 document.addEventListener("DOMContentLoaded", setTypeTitles);
+}
 </script>
 <script>/* Boilerplate: script-position-annos */
 "use strict";
 {
-
 function repositionAnnoPanels(){
     const panels = [...document.querySelectorAll("[data-anno-for]")];
     const main = document.querySelector("main");
@@ -3373,278 +3371,273 @@ window.addEventListener("resize", repositionAnnoPanels);
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
+let refsData = {
+"https://drafts.csswg.org/css-values-4/#css-wide-keywords": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"css-wide keywords","type":"dfn","url":"https://drafts.csswg.org/css-values-4/#css-wide-keywords"},
+"#propdef-content": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"local","text":"content","type":"property","url":"#propdef-content"},
+"https://drafts.csswg.org/css-values-4/#comb-one": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"|","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"#typedef-content-content-replacement": {"export":true,"for_":["content"],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"local","text":"<content-replacement>","type":"type","url":"#typedef-content-content-replacement"},
+"#typedef-content-content-list": {"export":true,"for_":["content"],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"local","text":"<content-list>","type":"type","url":"#typedef-content-content-list"},
+"https://drafts.csswg.org/css-values-4/#string-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<string>","type":"type","url":"https://drafts.csswg.org/css-values-4/#string-value"},
+"https://drafts.csswg.org/css-lists-3/#typedef-counter": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-lists","spec":"css-lists-3","status":"current","text":"<counter>","type":"type","url":"https://drafts.csswg.org/css-lists-3/#typedef-counter"},
+"https://drafts.csswg.org/css-values-4/#mult-one-plus": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"+","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#mult-one-plus"},
+"https://drafts.csswg.org/css-values-4/#mult-opt": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"?","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#mult-opt"},
+"#valdef-content-contents": {"export":true,"for_":["<content-list>","content"],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"local","text":"contents","type":"value","url":"#valdef-content-contents"},
+"https://drafts.csswg.org/css-pseudo-4/#selectordef-before": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-pseudo","spec":"css-pseudo-4","status":"current","text":"::before","type":"selector","url":"https://drafts.csswg.org/css-pseudo-4/#selectordef-before"},
+"https://drafts.csswg.org/css-pseudo-4/#selectordef-after": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-pseudo","spec":"css-pseudo-4","status":"current","text":"::after","type":"selector","url":"https://drafts.csswg.org/css-pseudo-4/#selectordef-after"},
+"#valdef-content-none": {"export":true,"for_":["content"],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"local","text":"none","type":"value","url":"#valdef-content-none"},
+"https://drafts.csswg.org/css-pseudo-4/#selectordef-marker": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-pseudo","spec":"css-pseudo-4","status":"current","text":"::marker","type":"selector","url":"https://drafts.csswg.org/css-pseudo-4/#selectordef-marker"},
+"#valdef-content-normal": {"export":true,"for_":["content"],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"local","text":"normal","type":"value","url":"#valdef-content-normal"},
+"https://drafts.csswg.org/css-display-4/#propdef-display": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"display","type":"property","url":"https://drafts.csswg.org/css-display-4/#propdef-display"},
+"https://drafts.csswg.org/selectors-4/#originating-element": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"selectors","spec":"selectors-4","status":"current","text":"originating element","type":"dfn","url":"https://drafts.csswg.org/selectors-4/#originating-element"},
+"https://drafts.csswg.org/css-images-3/#typedef-image": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-images","spec":"css-images-3","status":"current","text":"<image>","type":"type","url":"https://drafts.csswg.org/css-images-3/#typedef-image"},
+"https://drafts.csswg.org/css-images-4/#invalid-image": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-images","spec":"css-images-4","status":"current","text":"invalid image","type":"dfn","url":"https://drafts.csswg.org/css-images-4/#invalid-image"},
+"https://drafts.csswg.org/css-images-3/#natural-dimensions": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-images","spec":"css-images-3","status":"current","text":"natural dimension","type":"dfn","url":"https://drafts.csswg.org/css-images-3/#natural-dimensions"},
+"https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"img","type":"element","url":"https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element"},
+"#typedef-quote": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"local","text":"<quote>","type":"type","url":"#typedef-quote"},
+"#typedef-target": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"local","text":"<target>","type":"type","url":"#typedef-target"},
+"#funcdef-content": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"local","text":"content()","type":"function","url":"#funcdef-content"},
+"https://drafts.csswg.org/css-text-4/#white-space": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-text","spec":"css-text-4","status":"current","text":"white space","type":"dfn","url":"https://drafts.csswg.org/css-text-4/#white-space"},
+"#propdef-quotes": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"local","text":"quotes","type":"property","url":"#propdef-quotes"},
+"#valdef-quotes-none": {"export":true,"for_":["quotes"],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"local","text":"none","type":"value","url":"#valdef-quotes-none"},
+"#valdef-quotes-auto": {"export":true,"for_":["quotes"],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"local","text":"auto","type":"value","url":"#valdef-quotes-auto"},
+"#valdef-content-open-quote": {"export":true,"for_":["<content-list>","<quote>","content"],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"local","text":"open-quote","type":"value","url":"#valdef-content-open-quote"},
+"#valdef-content-close-quote": {"export":true,"for_":["<content-list>","<quote>","content"],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"local","text":"close-quote","type":"value","url":"#valdef-content-close-quote"},
+"#valdef-content-no-open-quote": {"export":true,"for_":["<content-list>","<quote>","content"],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"local","text":"no-open-quote","type":"value","url":"#valdef-content-no-open-quote"},
+"#valdef-content-no-close-quote": {"export":true,"for_":["<content-list>","<quote>","content"],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"local","text":"no-close-quote","type":"value","url":"#valdef-content-no-close-quote"},
+"https://drafts.csswg.org/css-cascade-5/#used-value": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-cascade","spec":"css-cascade-5","status":"current","text":"used value","type":"dfn","url":"https://drafts.csswg.org/css-cascade-5/#used-value"},
+"https://drafts.csswg.org/css-text-4/#content-language": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-text","spec":"css-text-4","status":"current","text":"content language","type":"dfn","url":"https://drafts.csswg.org/css-text-4/#content-language"},
+"#typedef-leader-type": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"local","text":"<leader-type>","type":"type","url":"#typedef-leader-type"},
+"#funcdef-target-counter": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"local","text":"target-counter()","type":"function","url":"#funcdef-target-counter"},
+"#funcdef-target-counters": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"local","text":"target-counters()","type":"function","url":"#funcdef-target-counters"},
+"#target-text-function": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"local","text":"target-text()","type":"function","url":"#target-text-function"},
+"https://drafts.csswg.org/css-values-4/#url-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<url>","type":"type","url":"https://drafts.csswg.org/css-values-4/#url-value"},
+"https://drafts.csswg.org/css-values-4/#comb-comma": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":",","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-comma"},
+"https://drafts.csswg.org/css-values-4/#identifier-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<custom-ident>","type":"type","url":"https://drafts.csswg.org/css-values-4/#identifier-value"},
+"https://drafts.csswg.org/css-counter-styles-3/#typedef-counter-style": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-counter-styles","spec":"css-counter-styles-3","status":"current","text":"<counter-style>","type":"type","url":"https://drafts.csswg.org/css-counter-styles-3/#typedef-counter-style"},
+"#propdef-string-set": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"local","text":"string-set","type":"property","url":"#propdef-string-set"},
+"https://drafts.csswg.org/css-values-4/#mult-comma": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"#","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#mult-comma"},
+"#valdef-string-set-none": {"export":true,"for_":["string-set"],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"local","text":"none","type":"value","url":"#valdef-string-set-none"},
+"#funcdef-string": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"local","text":"string()","type":"function","url":"#funcdef-string"},
+"https://drafts.csswg.org/css-contain-2/#style-containment": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-contain","spec":"css-contain-2","status":"current","text":"style containment","type":"dfn","url":"https://drafts.csswg.org/css-contain-2/#style-containment"},
+"#entry-value": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"local","text":"entry value","type":"dfn","url":"#entry-value"},
+"#named-string": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"local","text":"named string","type":"dfn","url":"#named-string"},
+"#exit-value": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"local","text":"exit value","type":"dfn","url":"#exit-value"},
+"#valdef-string-first": {"export":true,"for_":["string()"],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"local","text":"first","type":"value","url":"#valdef-string-first"},
+"#valdef-content-text": {"export":true,"for_":["content()"],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"local","text":"text","type":"value","url":"#valdef-content-text"},
+"https://drafts.csswg.org/css-pseudo-4/#selectordef-first-letter": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-pseudo","spec":"css-pseudo-4","status":"current","text":"::first-letter","type":"selector","url":"https://drafts.csswg.org/css-pseudo-4/#selectordef-first-letter"},
+"https://drafts.csswg.org/css-lists-3/#propdef-counter-increment": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-lists","spec":"css-lists-3","status":"current","text":"counter-increment","type":"property","url":"https://drafts.csswg.org/css-lists-3/#propdef-counter-increment"},
+"https://drafts.csswg.org/css-lists-3/#propdef-counter-reset": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-lists","spec":"css-lists-3","status":"current","text":"counter-reset","type":"property","url":"https://drafts.csswg.org/css-lists-3/#propdef-counter-reset"},
+"#propdef-bookmark-level": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"local","text":"bookmark-level","type":"property","url":"#propdef-bookmark-level"},
+"#propdef-bookmark-label": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"local","text":"bookmark-label","type":"property","url":"#propdef-bookmark-label"},
+"#propdef-bookmark-state": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"local","text":"bookmark-state","type":"property","url":"#propdef-bookmark-state"},
+"https://drafts.csswg.org/selectors-4/#target-pseudo": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"selectors","spec":"selectors-4","status":"current","text":":target","type":"selector","url":"https://drafts.csswg.org/selectors-4/#target-pseudo"},
+"#valdef-bookmark-level-none": {"export":true,"for_":["bookmark-level"],"level":"3","normative":true,"shortname":"css-content","spec":"css-content-3","status":"local","text":"none","type":"value","url":"#valdef-bookmark-level-none"},
+"https://drafts.csswg.org/css-values-4/#integer-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<integer>","type":"type","url":"https://drafts.csswg.org/css-values-4/#integer-value"},
+};
+
+function genRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "DFN: "),
+                mk.code({ class: "dfn-text" }, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    const forListElements = forList.length === 0 ? '' : mk.li({},
+        mk.b({}, "For: "),
+        mk.ul({},
+            ...forList.map(forItem =>
                 mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
-            mk.b({}, "For: "),
-            mk.ul({},
-                ...forList.map(forItem =>
-                    mk.li({},
-                        mk.span({}, `${forItem}`)
-                    ),
+                    mk.span({}, `${forItem}`)
                 ),
             ),
-        );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+        ),
+    );
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
-    }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    return hintPanel;
+}
+function genAllRefHints() {
+    for(const refData of Object.values(refsData)) {
+        const refUrl = refData.url;
+        const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+        if (links.length == 0) {
+            console.log(`Can't find link href="${refUrl}".`, refData);
+            continue;
+        }
+        for(const link of links) {
+            if(link.classList.contains("dfn-link")) continue;
+            const hint = genRefHint(link, refData);
+            append(document.body, hint);
+            insertLinkPopupAction(hint)
         }
     }
+}
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+function hideAllRefHints() {
+    queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    refHint.style.position = "absolute"; // unfix it
+    refHint.classList.remove("on");
+    const teardown = refHint.teardownEventListeners;
+    if (teardown) {
+        refHint.teardownEventListeners = undefined;
+        teardown();
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+function showRefHint(refHint) {
+    hideAllRefHints(); // Only display one at this time.
+
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "true");
+    refHint.classList.add("on");
+    positionRefHint(refHint);
+    setupRefHintEventListeners(refHint);
+}
+
+function setupRefHintEventListeners(refHint) {
+    if (refHint.teardownEventListeners) return;
+    const link = refHint.forLink;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
 
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
 
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+function insertLinkPopupAction(refHint) {
+    const link = refHint.forLink;
+    // link.setAttribute('role', 'button');
+    link.setAttribute('aria-expanded', 'false')
+    link.classList.add('has-ref-hint');
+    link.addEventListener('mouseover', (event) => {
+        showRefHint(refHint);
     });
+    link.addEventListener('focus', (event) => {
+        showRefHint(refHint);
+    })
+}
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+document.addEventListener("DOMContentLoaded", () => {
+    genAllRefHints();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['https://drafts.csswg.org/css-values-4/#css-wide-keywords'] = {"text": "css-wide keywords", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-content'] = {"text": "content", "type": "property", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#propdef-content", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-content-content-replacement'] = {"text": "<content-replacement>", "type": "type", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#typedef-content-content-replacement", "export": true, "normative": true, "for_": ["content"]};
-window.refsData['#typedef-content-content-list'] = {"text": "<content-list>", "type": "type", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#typedef-content-content-list", "export": true, "normative": true, "for_": ["content"]};
-window.refsData['https://drafts.csswg.org/css-values-4/#string-value'] = {"text": "<string>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#string-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-lists-3/#typedef-counter'] = {"text": "<counter>", "type": "type", "spec": "css-lists-3", "shortname": "css-lists", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-lists-3/#typedef-counter", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#mult-one-plus'] = {"text": "+", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-one-plus", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#mult-opt'] = {"text": "?", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-content-contents'] = {"text": "contents", "type": "value", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#valdef-content-contents", "export": true, "normative": true, "for_": ["<content-list>", "content"]};
-window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-before'] = {"text": "::before", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-before", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-after'] = {"text": "::after", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-after", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-content-none'] = {"text": "none", "type": "value", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#valdef-content-none", "export": true, "normative": true, "for_": ["content"]};
-window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-marker'] = {"text": "::marker", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-marker", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-content-normal'] = {"text": "normal", "type": "value", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#valdef-content-normal", "export": true, "normative": true, "for_": ["content"]};
-window.refsData['https://drafts.csswg.org/css-display-4/#propdef-display'] = {"text": "display", "type": "property", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#propdef-display", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/selectors-4/#originating-element'] = {"text": "originating element", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "current", "url": "https://drafts.csswg.org/selectors-4/#originating-element", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-images-3/#typedef-image'] = {"text": "<image>", "type": "type", "spec": "css-images-3", "shortname": "css-images", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-images-3/#typedef-image", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-images-4/#invalid-image'] = {"text": "invalid image", "type": "dfn", "spec": "css-images-4", "shortname": "css-images", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-images-4/#invalid-image", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-images-3/#natural-dimensions'] = {"text": "natural dimension", "type": "dfn", "spec": "css-images-3", "shortname": "css-images", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-images-3/#natural-dimensions", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element'] = {"text": "img", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-quote'] = {"text": "<quote>", "type": "type", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#typedef-quote", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-target'] = {"text": "<target>", "type": "type", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#typedef-target", "export": true, "normative": true, "for_": []};
-window.refsData['#funcdef-content'] = {"text": "content()", "type": "function", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#funcdef-content", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-text-4/#white-space'] = {"text": "white space", "type": "dfn", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#white-space", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-quotes'] = {"text": "quotes", "type": "property", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#propdef-quotes", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-quotes-none'] = {"text": "none", "type": "value", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#valdef-quotes-none", "export": true, "normative": true, "for_": ["quotes"]};
-window.refsData['#valdef-quotes-auto'] = {"text": "auto", "type": "value", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#valdef-quotes-auto", "export": true, "normative": true, "for_": ["quotes"]};
-window.refsData['#valdef-content-open-quote'] = {"text": "open-quote", "type": "value", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#valdef-content-open-quote", "export": true, "normative": true, "for_": ["<content-list>", "<quote>", "content"]};
-window.refsData['#valdef-content-close-quote'] = {"text": "close-quote", "type": "value", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#valdef-content-close-quote", "export": true, "normative": true, "for_": ["<content-list>", "<quote>", "content"]};
-window.refsData['#valdef-content-no-open-quote'] = {"text": "no-open-quote", "type": "value", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#valdef-content-no-open-quote", "export": true, "normative": true, "for_": ["<content-list>", "<quote>", "content"]};
-window.refsData['#valdef-content-no-close-quote'] = {"text": "no-close-quote", "type": "value", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#valdef-content-no-close-quote", "export": true, "normative": true, "for_": ["<content-list>", "<quote>", "content"]};
-window.refsData['https://drafts.csswg.org/css-cascade-5/#used-value'] = {"text": "used value", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#used-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-text-4/#content-language'] = {"text": "content language", "type": "dfn", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#content-language", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-leader-type'] = {"text": "<leader-type>", "type": "type", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#typedef-leader-type", "export": true, "normative": true, "for_": []};
-window.refsData['#funcdef-target-counter'] = {"text": "target-counter()", "type": "function", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#funcdef-target-counter", "export": true, "normative": true, "for_": []};
-window.refsData['#funcdef-target-counters'] = {"text": "target-counters()", "type": "function", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#funcdef-target-counters", "export": true, "normative": true, "for_": []};
-window.refsData['#target-text-function'] = {"text": "target-text()", "type": "function", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#target-text-function", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#url-value'] = {"text": "<url>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#url-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-comma'] = {"text": ",", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-comma", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#identifier-value'] = {"text": "<custom-ident>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#identifier-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-counter-styles-3/#typedef-counter-style'] = {"text": "<counter-style>", "type": "type", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-counter-styles-3/#typedef-counter-style", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-string-set'] = {"text": "string-set", "type": "property", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#propdef-string-set", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#mult-comma'] = {"text": "#", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-comma", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-string-set-none'] = {"text": "none", "type": "value", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#valdef-string-set-none", "export": true, "normative": true, "for_": ["string-set"]};
-window.refsData['#funcdef-string'] = {"text": "string()", "type": "function", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#funcdef-string", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-contain-2/#style-containment'] = {"text": "style containment", "type": "dfn", "spec": "css-contain-2", "shortname": "css-contain", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-contain-2/#style-containment", "export": true, "normative": true, "for_": []};
-window.refsData['#entry-value'] = {"text": "entry value", "type": "dfn", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#entry-value", "export": true, "normative": true, "for_": []};
-window.refsData['#named-string'] = {"text": "named string", "type": "dfn", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#named-string", "export": true, "normative": true, "for_": []};
-window.refsData['#exit-value'] = {"text": "exit value", "type": "dfn", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#exit-value", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-string-first'] = {"text": "first", "type": "value", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#valdef-string-first", "export": true, "normative": true, "for_": ["string()"]};
-window.refsData['#valdef-content-text'] = {"text": "text", "type": "value", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#valdef-content-text", "export": true, "normative": true, "for_": ["content()"]};
-window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-first-letter'] = {"text": "::first-letter", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-first-letter", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-lists-3/#propdef-counter-increment'] = {"text": "counter-increment", "type": "property", "spec": "css-lists-3", "shortname": "css-lists", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-lists-3/#propdef-counter-increment", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-lists-3/#propdef-counter-reset'] = {"text": "counter-reset", "type": "property", "spec": "css-lists-3", "shortname": "css-lists", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-lists-3/#propdef-counter-reset", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-bookmark-level'] = {"text": "bookmark-level", "type": "property", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#propdef-bookmark-level", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-bookmark-label'] = {"text": "bookmark-label", "type": "property", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#propdef-bookmark-label", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-bookmark-state'] = {"text": "bookmark-state", "type": "property", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#propdef-bookmark-state", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/selectors-4/#target-pseudo'] = {"text": ":target", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "current", "url": "https://drafts.csswg.org/selectors-4/#target-pseudo", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-bookmark-level-none'] = {"text": "none", "type": "value", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#valdef-bookmark-level-none", "export": true, "normative": true, "for_": ["bookmark-level"]};
-window.refsData['https://drafts.csswg.org/css-values-4/#integer-value'] = {"text": "<integer>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#integer-value", "export": true, "normative": true, "for_": []};window.refsData['#propdef-bookmark-label'] = {"text": "bookmark-label", "type": "property", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#propdef-bookmark-label", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-bookmark-level'] = {"text": "bookmark-level", "type": "property", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#propdef-bookmark-level", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-bookmark-state'] = {"text": "bookmark-state", "type": "property", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#propdef-bookmark-state", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-content'] = {"text": "content", "type": "property", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#propdef-content", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-quotes'] = {"text": "quotes", "type": "property", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#propdef-quotes", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-string-set'] = {"text": "string-set", "type": "property", "spec": "css-content-3", "shortname": "css-content", "level": "3", "status": "local", "url": "#propdef-string-set", "export": true, "normative": true, "for_": []};
 </script>

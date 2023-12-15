@@ -96,7 +96,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -470,6 +469,11 @@ figcaption:not(.no-marker)::before {
     }
 }
 </style>
+<style>/* Boilerplate: style-idl-highlighting */
+pre.idl.highlight {
+    background: var(--borderedblock-bg, var(--def-bg));
+}
+</style>
 <style>/* Boilerplate: style-issues */
 a[href].issue-return {
     float: right;
@@ -747,7 +751,6 @@ a[href].issue-return {
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -807,7 +810,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -864,7 +866,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -2152,506 +2153,8 @@ select keyframes and timeline if necessary. <a class="issue-return" href="#issue
     </div>
    </div>
   </details>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['9cd25054'] = {"dfnID": "9cd25054", "url": "https://drafts.csswg.org/css-cascade-5/#computed-value", "dfnText": "computed value", "refSections": [{"refs": [{"id": "ref-for-computed-value"}, {"id": "ref-for-computed-value\u2460"}], "title": "3. Keyframes"}, {"refs": [{"id": "ref-for-computed-value\u2461"}], "title": "5.2. Requirements on pending style changes"}], "external": true};
-window.dfnpanelData['8095a819'] = {"dfnID": "8095a819", "url": "https://drafts.csswg.org/css-easing-2/#typedef-easing-function", "dfnText": "<easing-function>", "refSections": [{"refs": [{"id": "ref-for-typedef-easing-function"}], "title": "3.10. The animation shorthand property"}], "external": true};
-window.dfnpanelData['022ed06a'] = {"dfnID": "022ed06a", "url": "https://drafts.csswg.org/css-easing-2/#valdef-step-easing-function-step-end", "dfnText": "step-end", "refSections": [{"refs": [{"id": "ref-for-valdef-step-easing-function-step-end"}], "title": "3. Keyframes"}], "external": true};
-window.dfnpanelData['7d9dff52'] = {"dfnID": "7d9dff52", "url": "https://drafts.csswg.org/css-easing-2/#easing-function", "dfnText": "timing function", "refSections": [{"refs": [{"id": "ref-for-easing-function"}], "title": "3.2. The animation-timing-function property"}], "external": true};
-window.dfnpanelData['65d2348f'] = {"dfnID": "65d2348f", "url": "https://drafts.fxtf.org/css-masking-1/#valdef-mask-composite-add", "dfnText": "add", "refSections": [{"refs": [{"id": "ref-for-valdef-mask-composite-add"}], "title": "3.8. The animation-composition property"}], "external": true};
-window.dfnpanelData['223bd4c4'] = {"dfnID": "223bd4c4", "url": "https://drafts.csswg.org/css-transforms-2/#propdef-scale", "dfnText": "scale", "refSections": [{"refs": [{"id": "ref-for-propdef-scale"}], "title": "3.8. The animation-composition property"}], "external": true};
-window.dfnpanelData['68487d22'] = {"dfnID": "68487d22", "url": "https://drafts.csswg.org/css-values-4/#mult-comma", "dfnText": "#", "refSections": [{"refs": [{"id": "ref-for-mult-comma"}], "title": "3.8. The animation-composition property"}, {"refs": [{"id": "ref-for-mult-comma\u2460"}], "title": "3.9. The animation-timeline property"}], "external": true};
-window.dfnpanelData['e274345c'] = {"dfnID": "e274345c", "url": "https://drafts.csswg.org/css-values-4/#identifier-value", "dfnText": "<custom-ident>", "refSections": [{"refs": [{"id": "ref-for-identifier-value"}], "title": "3.9. The animation-timeline property"}], "external": true};
-window.dfnpanelData['977d3003'] = {"dfnID": "977d3003", "url": "https://drafts.csswg.org/css-values-4/#string-value", "dfnText": "<string>", "refSections": [{"refs": [{"id": "ref-for-string-value"}], "title": "3.9. The animation-timeline property"}], "external": true};
-window.dfnpanelData['03570f9e'] = {"dfnID": "03570f9e", "url": "https://drafts.csswg.org/css-values-4/#time-value", "dfnText": "<time>", "refSections": [{"refs": [{"id": "ref-for-time-value"}, {"id": "ref-for-time-value\u2460"}], "title": "3.10. The animation shorthand property"}], "external": true};
-window.dfnpanelData['ab06260d'] = {"dfnID": "ab06260d", "url": "https://drafts.csswg.org/css-values-4/#css-identifier", "dfnText": "css identifier", "refSections": [{"refs": [{"id": "ref-for-css-identifier"}], "title": "3.9. The animation-timeline property"}], "external": true};
-window.dfnpanelData['6295808f'] = {"dfnID": "6295808f", "url": "https://drafts.csswg.org/css-writing-modes-4/#logical-to-physical", "dfnText": "equivalent physical property", "refSections": [{"refs": [{"id": "ref-for-logical-to-physical"}], "title": "3. Keyframes"}], "external": true};
-window.dfnpanelData['b06183cf'] = {"dfnID": "b06183cf", "url": "https://drafts.csswg.org/css-animations-1/#typedef-keyframes-name", "dfnText": "<keyframes-name>", "refSections": [{"refs": [{"id": "ref-for-typedef-keyframes-name"}, {"id": "ref-for-typedef-keyframes-name\u2460"}], "title": "3. Keyframes"}, {"refs": [{"id": "ref-for-typedef-keyframes-name\u2461"}], "title": "3.10. The animation shorthand property"}], "external": true};
-window.dfnpanelData['5d951c68'] = {"dfnID": "5d951c68", "url": "https://drafts.csswg.org/css-animations-1/#typedef-single-animation-direction", "dfnText": "<single-animation-direction>", "refSections": [{"refs": [{"id": "ref-for-typedef-single-animation-direction"}], "title": "3.10. The animation shorthand property"}], "external": true};
-window.dfnpanelData['97cad118'] = {"dfnID": "97cad118", "url": "https://drafts.csswg.org/css-animations-1/#typedef-single-animation-fill-mode", "dfnText": "<single-animation-fill-mode>", "refSections": [{"refs": [{"id": "ref-for-typedef-single-animation-fill-mode"}], "title": "3.10. The animation shorthand property"}], "external": true};
-window.dfnpanelData['ef3a10d3'] = {"dfnID": "ef3a10d3", "url": "https://drafts.csswg.org/css-animations-1/#typedef-single-animation-iteration-count", "dfnText": "<single-animation-iteration-count>", "refSections": [{"refs": [{"id": "ref-for-typedef-single-animation-iteration-count"}], "title": "3.10. The animation shorthand property"}], "external": true};
-window.dfnpanelData['ca1357e3'] = {"dfnID": "ca1357e3", "url": "https://drafts.csswg.org/css-animations-1/#typedef-single-animation-play-state", "dfnText": "<single-animation-play-state>", "refSections": [{"refs": [{"id": "ref-for-typedef-single-animation-play-state"}], "title": "3.10. The animation shorthand property"}], "external": true};
-window.dfnpanelData['fa19c68e'] = {"dfnID": "fa19c68e", "url": "https://drafts.csswg.org/css-animations-1/#at-ruledef-keyframes", "dfnText": "@keyframes", "refSections": [{"refs": [{"id": "ref-for-at-ruledef-keyframes"}, {"id": "ref-for-at-ruledef-keyframes\u2460"}, {"id": "ref-for-at-ruledef-keyframes\u2461"}, {"id": "ref-for-at-ruledef-keyframes\u2462"}], "title": "2. Animations"}, {"refs": [{"id": "ref-for-at-ruledef-keyframes\u2463"}, {"id": "ref-for-at-ruledef-keyframes\u2464"}, {"id": "ref-for-at-ruledef-keyframes\u2465"}], "title": "3. Keyframes"}], "external": true};
-window.dfnpanelData['4fea8699'] = {"dfnID": "4fea8699", "url": "https://drafts.csswg.org/css-animations-1/#animationevent", "dfnText": "AnimationEvent", "refSections": [{"refs": [{"id": "ref-for-animationevent"}], "title": "4.1. Event dispatch"}], "external": true};
-window.dfnpanelData['eda608e1'] = {"dfnID": "eda608e1", "url": "https://drafts.csswg.org/css-animations-1/#propdef-animation", "dfnText": "animation", "refSections": [{"refs": [{"id": "ref-for-propdef-animation"}, {"id": "ref-for-propdef-animation\u2460"}], "title": "3.10. The animation shorthand property"}, {"refs": [{"id": "ref-for-propdef-animation\u2461"}, {"id": "ref-for-propdef-animation\u2462"}], "title": "5.2. Requirements on pending style changes"}], "external": true};
-window.dfnpanelData['78be83bb'] = {"dfnID": "78be83bb", "url": "https://drafts.csswg.org/css-animations-1/#propdef-animation-delay", "dfnText": "animation-delay", "refSections": [{"refs": [{"id": "ref-for-propdef-animation-delay"}], "title": "2. Animations"}, {"refs": [{"id": "ref-for-propdef-animation-delay\u2460"}, {"id": "ref-for-propdef-animation-delay\u2461"}], "title": "3.6. The animation-delay property"}], "external": true};
-window.dfnpanelData['be0387bc'] = {"dfnID": "be0387bc", "url": "https://drafts.csswg.org/css-animations-1/#propdef-animation-direction", "dfnText": "animation-direction", "refSections": [{"refs": [{"id": "ref-for-propdef-animation-direction"}, {"id": "ref-for-propdef-animation-direction\u2460"}], "title": "3.4. The animation-direction property"}], "external": true};
-window.dfnpanelData['5e8da52b'] = {"dfnID": "5e8da52b", "url": "https://drafts.csswg.org/css-animations-1/#propdef-animation-duration", "dfnText": "animation-duration", "refSections": [{"refs": [{"id": "ref-for-propdef-animation-duration"}], "title": "2. Animations"}, {"refs": [{"id": "ref-for-propdef-animation-duration\u2460"}, {"id": "ref-for-propdef-animation-duration\u2461"}], "title": "3.1. The animation-duration property"}, {"refs": [{"id": "ref-for-propdef-animation-duration\u2462"}], "title": "3.9. The animation-timeline property"}], "external": true};
-window.dfnpanelData['baa76d7b'] = {"dfnID": "baa76d7b", "url": "https://drafts.csswg.org/css-animations-1/#propdef-animation-fill-mode", "dfnText": "animation-fill-mode", "refSections": [{"refs": [{"id": "ref-for-propdef-animation-fill-mode"}, {"id": "ref-for-propdef-animation-fill-mode\u2460"}], "title": "3.7. The animation-fill-mode property"}], "external": true};
-window.dfnpanelData['7ddf964e'] = {"dfnID": "7ddf964e", "url": "https://drafts.csswg.org/css-animations-1/#propdef-animation-iteration-count", "dfnText": "animation-iteration-count", "refSections": [{"refs": [{"id": "ref-for-propdef-animation-iteration-count"}, {"id": "ref-for-propdef-animation-iteration-count\u2460"}], "title": "3.3. The animation-iteration-count property"}], "external": true};
-window.dfnpanelData['d984b6fe'] = {"dfnID": "d984b6fe", "url": "https://drafts.csswg.org/css-animations-1/#propdef-animation-name", "dfnText": "animation-name", "refSections": [{"refs": [{"id": "ref-for-propdef-animation-name"}], "title": "2. Animations"}, {"refs": [{"id": "ref-for-propdef-animation-name\u2460"}, {"id": "ref-for-propdef-animation-name\u2461"}, {"id": "ref-for-propdef-animation-name\u2462"}], "title": "2.1. Owning element"}, {"refs": [{"id": "ref-for-propdef-animation-name\u2463"}], "title": "2.2. Animation composite order"}, {"refs": [{"id": "ref-for-propdef-animation-name\u2464"}], "title": "3. Keyframes"}, {"refs": [{"id": "ref-for-propdef-animation-name\u2465"}, {"id": "ref-for-propdef-animation-name\u2466"}, {"id": "ref-for-propdef-animation-name\u2467"}], "title": "3.9. The animation-timeline property"}, {"refs": [{"id": "ref-for-propdef-animation-name\u2468"}], "title": "5.1. The CSSAnimation interface"}], "external": true};
-window.dfnpanelData['9b3bb1df'] = {"dfnID": "9b3bb1df", "url": "https://drafts.csswg.org/css-animations-1/#propdef-animation-play-state", "dfnText": "animation-play-state", "refSections": [{"refs": [{"id": "ref-for-propdef-animation-play-state"}, {"id": "ref-for-propdef-animation-play-state\u2460"}, {"id": "ref-for-propdef-animation-play-state\u2461"}, {"id": "ref-for-propdef-animation-play-state\u2462"}], "title": "2. Animations"}, {"refs": [{"id": "ref-for-propdef-animation-play-state\u2463"}, {"id": "ref-for-propdef-animation-play-state\u2464"}, {"id": "ref-for-propdef-animation-play-state\u2465"}, {"id": "ref-for-propdef-animation-play-state\u2466"}], "title": "3.5. The animation-play-state property"}], "external": true};
-window.dfnpanelData['c16b1855'] = {"dfnID": "c16b1855", "url": "https://drafts.csswg.org/css-animations-1/#propdef-animation-timing-function", "dfnText": "animation-timing-function", "refSections": [{"refs": [{"id": "ref-for-propdef-animation-timing-function"}], "title": "2. Animations"}, {"refs": [{"id": "ref-for-propdef-animation-timing-function\u2460"}, {"id": "ref-for-propdef-animation-timing-function\u2461"}], "title": "3. Keyframes"}, {"refs": [{"id": "ref-for-propdef-animation-timing-function\u2462"}, {"id": "ref-for-propdef-animation-timing-function\u2463"}], "title": "3.2. The animation-timing-function property"}], "external": true};
-window.dfnpanelData['44d712bb'] = {"dfnID": "44d712bb", "url": "https://drafts.csswg.org/css-animations-1/#eventdef-globaleventhandlers-animationcancel", "dfnText": "animationcancel", "refSections": [{"refs": [{"id": "ref-for-eventdef-globaleventhandlers-animationcancel"}], "title": "4.1. Event dispatch"}], "external": true};
-window.dfnpanelData['71162c61'] = {"dfnID": "71162c61", "url": "https://drafts.csswg.org/css-animations-1/#eventdef-globaleventhandlers-animationend", "dfnText": "animationend", "refSections": [{"refs": [{"id": "ref-for-eventdef-globaleventhandlers-animationend"}, {"id": "ref-for-eventdef-globaleventhandlers-animationend\u2460"}, {"id": "ref-for-eventdef-globaleventhandlers-animationend\u2461"}, {"id": "ref-for-eventdef-globaleventhandlers-animationend\u2462"}], "title": "4.1. Event dispatch"}], "external": true};
-window.dfnpanelData['94b809f0'] = {"dfnID": "94b809f0", "url": "https://drafts.csswg.org/css-animations-1/#eventdef-globaleventhandlers-animationiteration", "dfnText": "animationiteration", "refSections": [{"refs": [{"id": "ref-for-eventdef-globaleventhandlers-animationiteration"}, {"id": "ref-for-eventdef-globaleventhandlers-animationiteration\u2460"}], "title": "4.1. Event dispatch"}], "external": true};
-window.dfnpanelData['2d1d585c'] = {"dfnID": "2d1d585c", "url": "https://drafts.csswg.org/css-animations-1/#eventdef-globaleventhandlers-animationstart", "dfnText": "animationstart", "refSections": [{"refs": [{"id": "ref-for-eventdef-globaleventhandlers-animationstart"}, {"id": "ref-for-eventdef-globaleventhandlers-animationstart\u2460"}, {"id": "ref-for-eventdef-globaleventhandlers-animationstart\u2461"}, {"id": "ref-for-eventdef-globaleventhandlers-animationstart\u2462"}], "title": "4.1. Event dispatch"}], "external": true};
-window.dfnpanelData['b2813b66'] = {"dfnID": "b2813b66", "url": "https://drafts.csswg.org/css-animations-1/#dom-animationevent-elapsedtime", "dfnText": "elapsedTime", "refSections": [{"refs": [{"id": "ref-for-dom-animationevent-elapsedtime"}, {"id": "ref-for-dom-animationevent-elapsedtime\u2460"}], "title": "4.1. Event dispatch"}], "external": true};
-window.dfnpanelData['409ef463'] = {"dfnID": "409ef463", "url": "https://drafts.csswg.org/css-animations-1/#valdef-animation-play-state-paused", "dfnText": "paused", "refSections": [{"refs": [{"id": "ref-for-valdef-animation-play-state-paused"}], "title": "3.5. The animation-play-state property"}], "external": true};
-window.dfnpanelData['bf7fb7bc'] = {"dfnID": "bf7fb7bc", "url": "https://drafts.csswg.org/css-animations-1/#valdef-animation-play-state-running", "dfnText": "running", "refSections": [{"refs": [{"id": "ref-for-valdef-animation-play-state-running"}], "title": "3.5. The animation-play-state property"}], "external": true};
-window.dfnpanelData['5fced98b'] = {"dfnID": "5fced98b", "url": "https://drafts.csswg.org/cssom-1/#cssomstring", "dfnText": "CSSOMString", "refSections": [{"refs": [{"id": "ref-for-cssomstring"}, {"id": "ref-for-cssomstring\u2460"}], "title": "5.1. The CSSAnimation interface"}], "external": true};
-window.dfnpanelData['4fe61159'] = {"dfnID": "4fe61159", "url": "https://drafts.csswg.org/cssom-1/#resolved-value", "dfnText": "resolved value", "refSections": [{"refs": [{"id": "ref-for-resolved-value"}], "title": "3. Keyframes"}], "external": true};
-window.dfnpanelData['25538777'] = {"dfnID": "25538777", "url": "https://dom.spec.whatwg.org/#concept-tree-order", "dfnText": "tree order", "refSections": [{"refs": [{"id": "ref-for-concept-tree-order"}], "title": "2.2. Animation composite order"}], "external": true};
-window.dfnpanelData['b516749f'] = {"dfnID": "b516749f", "url": "https://drafts.csswg.org/web-animations-1/#animation", "dfnText": "Animation", "refSections": [{"refs": [{"id": "ref-for-animation"}], "title": "2.2. Animation composite order"}, {"refs": [{"id": "ref-for-animation\u2460"}], "title": "3.9. The animation-timeline property"}, {"refs": [{"id": "ref-for-animation\u2461"}], "title": "5.1. The CSSAnimation interface"}], "external": true};
-window.dfnpanelData['dd130a0f'] = {"dfnID": "dd130a0f", "url": "https://drafts.csswg.org/web-animations-1/#animationeffect", "dfnText": "AnimationEffect", "refSections": [{"refs": [{"id": "ref-for-animationeffect"}], "title": "2. Animations"}], "external": true};
-window.dfnpanelData['4636c5b3'] = {"dfnID": "4636c5b3", "url": "https://drafts.csswg.org/web-animations-1/#documenttimeline", "dfnText": "DocumentTimeline", "refSections": [{"refs": [{"id": "ref-for-documenttimeline"}], "title": "3.9. The animation-timeline property"}], "external": true};
-window.dfnpanelData['000c54c5'] = {"dfnID": "000c54c5", "url": "https://drafts.csswg.org/web-animations-1/#keyframeeffect", "dfnText": "KeyframeEffect", "refSections": [{"refs": [{"id": "ref-for-keyframeeffect"}, {"id": "ref-for-keyframeeffect\u2460"}, {"id": "ref-for-keyframeeffect\u2461"}, {"id": "ref-for-keyframeeffect\u2462"}], "title": "2. Animations"}], "external": true};
-window.dfnpanelData['4ea27cff'] = {"dfnID": "4ea27cff", "url": "https://drafts.csswg.org/web-animations-1/#active-duration", "dfnText": "active duration", "refSections": [{"refs": [{"id": "ref-for-active-duration"}, {"id": "ref-for-active-duration\u2460"}, {"id": "ref-for-active-duration\u2461"}], "title": "4.1. Event dispatch"}], "external": true};
-window.dfnpanelData['9f9fa49d'] = {"dfnID": "9f9fa49d", "url": "https://drafts.csswg.org/web-animations-1/#active-phase", "dfnText": "active phase", "refSections": [{"refs": [{"id": "ref-for-active-phase"}, {"id": "ref-for-active-phase\u2460"}, {"id": "ref-for-active-phase\u2461"}, {"id": "ref-for-active-phase\u2462"}, {"id": "ref-for-active-phase\u2463"}, {"id": "ref-for-active-phase\u2464"}], "title": "4.1. Event dispatch"}], "external": true};
-window.dfnpanelData['b9ed110e'] = {"dfnID": "b9ed110e", "url": "https://drafts.csswg.org/web-animations-1/#active-time", "dfnText": "active time", "refSections": [{"refs": [{"id": "ref-for-active-time"}], "title": "4.1. Event dispatch"}], "external": true};
-window.dfnpanelData['96812fae'] = {"dfnID": "96812fae", "url": "https://drafts.csswg.org/web-animations-1/#after-phase", "dfnText": "after phase", "refSections": [{"refs": [{"id": "ref-for-after-phase"}, {"id": "ref-for-after-phase\u2460"}, {"id": "ref-for-after-phase\u2461"}, {"id": "ref-for-after-phase\u2462"}, {"id": "ref-for-after-phase\u2463"}, {"id": "ref-for-after-phase\u2464"}], "title": "4.1. Event dispatch"}], "external": true};
-window.dfnpanelData['2a319ac5'] = {"dfnID": "2a319ac5", "url": "https://drafts.csswg.org/web-animations-1/#animation", "dfnText": "animation", "refSections": [{"refs": [{"id": "ref-for-animation"}], "title": "2.2. Animation composite order"}, {"refs": [{"id": "ref-for-animation\u2460"}], "title": "3.9. The animation-timeline property"}, {"refs": [{"id": "ref-for-animation\u2461"}], "title": "5.1. The CSSAnimation interface"}], "external": true};
-window.dfnpanelData['b822113e'] = {"dfnID": "b822113e", "url": "https://drafts.csswg.org/web-animations-1/#animation-class", "dfnText": "animation class", "refSections": [{"refs": [{"id": "ref-for-animation-class"}, {"id": "ref-for-animation-class\u2460"}], "title": "2.2. Animation composite order"}], "external": true};
-window.dfnpanelData['bdd4e1fc'] = {"dfnID": "bdd4e1fc", "url": "https://drafts.csswg.org/web-animations-1/#animation-effect", "dfnText": "animation effect", "refSections": [{"refs": [{"id": "ref-for-animation-effect"}], "title": "3.1. The animation-duration property"}, {"refs": [{"id": "ref-for-animation-effect\u2460"}], "title": "3.3. The animation-iteration-count property"}, {"refs": [{"id": "ref-for-animation-effect\u2461"}], "title": "3.4. The animation-direction property"}, {"refs": [{"id": "ref-for-animation-effect\u2462"}], "title": "3.6. The animation-delay property"}, {"refs": [{"id": "ref-for-animation-effect\u2463"}], "title": "3.7. The animation-fill-mode property"}, {"refs": [{"id": "ref-for-animation-effect\u2464"}], "title": "4.1. Event dispatch"}], "external": true};
-window.dfnpanelData['ef66e85c'] = {"dfnID": "ef66e85c", "url": "https://drafts.csswg.org/web-animations-1/#before-phase", "dfnText": "before phase", "refSections": [{"refs": [{"id": "ref-for-before-phase"}, {"id": "ref-for-before-phase\u2460"}, {"id": "ref-for-before-phase\u2461"}, {"id": "ref-for-before-phase\u2462"}, {"id": "ref-for-before-phase\u2463"}, {"id": "ref-for-before-phase\u2464"}, {"id": "ref-for-before-phase\u2465"}], "title": "4.1. Event dispatch"}], "external": true};
-window.dfnpanelData['9054eaa4'] = {"dfnID": "9054eaa4", "url": "https://drafts.csswg.org/web-animations-1/#composite-operation", "dfnText": "composite operation", "refSections": [{"refs": [{"id": "ref-for-composite-operation"}, {"id": "ref-for-composite-operation\u2460"}], "title": "3.8. The animation-composition property"}], "external": true};
-window.dfnpanelData['8f8e9b1e'] = {"dfnID": "8f8e9b1e", "url": "https://drafts.csswg.org/web-animations-1/#current-iteration", "dfnText": "current iteration", "refSections": [{"refs": [{"id": "ref-for-current-iteration"}, {"id": "ref-for-current-iteration\u2460"}, {"id": "ref-for-current-iteration\u2461"}, {"id": "ref-for-current-iteration\u2462"}, {"id": "ref-for-current-iteration\u2463"}, {"id": "ref-for-current-iteration\u2464"}], "title": "4.1. Event dispatch"}], "external": true};
-window.dfnpanelData['6fa169fd'] = {"dfnID": "6fa169fd", "url": "https://drafts.csswg.org/web-animations-1/#current-time", "dfnText": "current time", "refSections": [{"refs": [{"id": "ref-for-current-time"}, {"id": "ref-for-current-time\u2460"}], "title": "4.1. Event dispatch"}], "external": true};
-window.dfnpanelData['26b9f468'] = {"dfnID": "26b9f468", "url": "https://drafts.csswg.org/web-animations-1/#default-document-timeline", "dfnText": "default document timeline", "refSections": [{"refs": [{"id": "ref-for-default-document-timeline"}], "title": "3.9. The animation-timeline property"}], "external": true};
-window.dfnpanelData['1f7bca82'] = {"dfnID": "1f7bca82", "url": "https://drafts.csswg.org/web-animations-1/#dom-animation-effect", "dfnText": "effect", "refSections": [{"refs": [{"id": "ref-for-dom-animation-effect"}], "title": "2. Animations"}], "external": true};
-window.dfnpanelData['a5b996d7'] = {"dfnID": "a5b996d7", "url": "https://drafts.csswg.org/web-animations-1/#fill-mode", "dfnText": "fill mode", "refSections": [{"refs": [{"id": "ref-for-fill-mode"}], "title": "3.7. The animation-fill-mode property"}, {"refs": [{"id": "ref-for-fill-mode\u2460"}], "title": "4.1. Event dispatch"}], "external": true};
-window.dfnpanelData['8c052c1e'] = {"dfnID": "8c052c1e", "url": "https://drafts.csswg.org/web-animations-1/#global-animation-list", "dfnText": "global animation list", "refSections": [{"refs": [{"id": "ref-for-global-animation-list"}, {"id": "ref-for-global-animation-list\u2460"}, {"id": "ref-for-global-animation-list\u2461"}], "title": "2.2. Animation composite order"}], "external": true};
-window.dfnpanelData['a9ee4e92'] = {"dfnID": "a9ee4e92", "url": "https://drafts.csswg.org/web-animations-1/#idle-phase", "dfnText": "idle phase", "refSections": [{"refs": [{"id": "ref-for-idle-phase"}, {"id": "ref-for-idle-phase\u2460"}, {"id": "ref-for-idle-phase\u2461"}, {"id": "ref-for-idle-phase\u2462"}, {"id": "ref-for-idle-phase\u2463"}], "title": "4.1. Event dispatch"}], "external": true};
-window.dfnpanelData['6c215671'] = {"dfnID": "6c215671", "url": "https://drafts.csswg.org/web-animations-1/#idle-play-state", "dfnText": "idle play state", "refSections": [{"refs": [{"id": "ref-for-idle-play-state"}, {"id": "ref-for-idle-play-state\u2460"}, {"id": "ref-for-idle-play-state\u2461"}], "title": "2.2. Animation composite order"}], "external": true};
-window.dfnpanelData['e9264d53'] = {"dfnID": "e9264d53", "url": "https://drafts.csswg.org/web-animations-1/#iteration-count", "dfnText": "iteration count", "refSections": [{"refs": [{"id": "ref-for-iteration-count"}], "title": "3.3. The animation-iteration-count property"}], "external": true};
-window.dfnpanelData['9b8452ef'] = {"dfnID": "9b8452ef", "url": "https://drafts.csswg.org/web-animations-1/#iteration-duration", "dfnText": "iteration duration", "refSections": [{"refs": [{"id": "ref-for-iteration-duration"}], "title": "3.1. The animation-duration property"}, {"refs": [{"id": "ref-for-iteration-duration\u2460"}, {"id": "ref-for-iteration-duration\u2461"}], "title": "4.1. Event dispatch"}], "external": true};
-window.dfnpanelData['4c53a3ed'] = {"dfnID": "4c53a3ed", "url": "https://drafts.csswg.org/web-animations-1/#iteration-start", "dfnText": "iteration start", "refSections": [{"refs": [{"id": "ref-for-iteration-start"}, {"id": "ref-for-iteration-start\u2460"}], "title": "4.1. Event dispatch"}], "external": true};
-window.dfnpanelData['c443f9ba'] = {"dfnID": "c443f9ba", "url": "https://drafts.csswg.org/web-animations-1/#keyframe", "dfnText": "keyframe", "refSections": [{"refs": [{"id": "ref-for-keyframe"}, {"id": "ref-for-keyframe\u2460"}, {"id": "ref-for-keyframe\u2461"}, {"id": "ref-for-keyframe\u2462"}], "title": "3. Keyframes"}, {"refs": [{"id": "ref-for-keyframe\u2463"}], "title": "3.2. The animation-timing-function property"}], "external": true};
-window.dfnpanelData['d3902c40'] = {"dfnID": "d3902c40", "url": "https://drafts.csswg.org/web-animations-1/#pause-an-animation", "dfnText": "pause an animation", "refSections": [{"refs": [{"id": "ref-for-pause-an-animation"}], "title": "3.5. The animation-play-state property"}], "external": true};
-window.dfnpanelData['6aa0dd52'] = {"dfnID": "6aa0dd52", "url": "https://drafts.csswg.org/web-animations-1/#dom-animation-pause", "dfnText": "pause()", "refSections": [{"refs": [{"id": "ref-for-dom-animation-pause"}], "title": "2. Animations"}], "external": true};
-window.dfnpanelData['d9ad9e72'] = {"dfnID": "d9ad9e72", "url": "https://drafts.csswg.org/web-animations-1/#paused-play-state", "dfnText": "paused play state", "refSections": [{"refs": [{"id": "ref-for-paused-play-state"}, {"id": "ref-for-paused-play-state\u2460"}], "title": "2. Animations"}], "external": true};
-window.dfnpanelData['b0540aa4'] = {"dfnID": "b0540aa4", "url": "https://drafts.csswg.org/web-animations-1/#pending-play-state", "dfnText": "pending play state", "refSections": [{"refs": [{"id": "ref-for-pending-play-state"}], "title": "4.1. Event dispatch"}], "external": true};
-window.dfnpanelData['5e4c6440'] = {"dfnID": "5e4c6440", "url": "https://drafts.csswg.org/web-animations-1/#play-an-animation", "dfnText": "play an animation", "refSections": [{"refs": [{"id": "ref-for-play-an-animation"}], "title": "3.5. The animation-play-state property"}], "external": true};
-window.dfnpanelData['50920597'] = {"dfnID": "50920597", "url": "https://drafts.csswg.org/web-animations-1/#play-state", "dfnText": "play state", "refSections": [{"refs": [{"id": "ref-for-play-state"}], "title": "2. Animations"}], "external": true};
-window.dfnpanelData['7ccd2ce2'] = {"dfnID": "7ccd2ce2", "url": "https://drafts.csswg.org/web-animations-1/#dom-animation-play", "dfnText": "play()", "refSections": [{"refs": [{"id": "ref-for-dom-animation-play"}], "title": "2. Animations"}], "external": true};
-window.dfnpanelData['7014f8d1'] = {"dfnID": "7014f8d1", "url": "https://drafts.csswg.org/web-animations-1/#dom-animation-playstate", "dfnText": "playState", "refSections": [{"refs": [{"id": "ref-for-dom-animation-playstate"}], "title": "5.2. Requirements on pending style changes"}], "external": true};
-window.dfnpanelData['83998ca7'] = {"dfnID": "83998ca7", "url": "https://drafts.csswg.org/web-animations-1/#playback-direction", "dfnText": "playback direction", "refSections": [{"refs": [{"id": "ref-for-playback-direction"}], "title": "3.4. The animation-direction property"}], "external": true};
-window.dfnpanelData['433ecf04'] = {"dfnID": "433ecf04", "url": "https://drafts.csswg.org/web-animations-1/#dom-animation-reverse", "dfnText": "reverse()", "refSections": [{"refs": [{"id": "ref-for-dom-animation-reverse"}, {"id": "ref-for-dom-animation-reverse\u2460"}], "title": "2. Animations"}], "external": true};
-window.dfnpanelData['5e871285'] = {"dfnID": "5e871285", "url": "https://drafts.csswg.org/web-animations-1/#sampling", "dfnText": "sampling", "refSections": [{"refs": [{"id": "ref-for-sampling"}], "title": "4.1. Event dispatch"}], "external": true};
-window.dfnpanelData['14b67d5f'] = {"dfnID": "14b67d5f", "url": "https://drafts.csswg.org/web-animations-1/#dom-keyframeeffect-setkeyframes", "dfnText": "setKeyframes(keyframes)", "refSections": [{"refs": [{"id": "ref-for-dom-keyframeeffect-setkeyframes"}], "title": "2. Animations"}], "external": true};
-window.dfnpanelData['acc1b2b4'] = {"dfnID": "acc1b2b4", "url": "https://drafts.csswg.org/web-animations-1/#start-delay", "dfnText": "start delay", "refSections": [{"refs": [{"id": "ref-for-start-delay"}], "title": "3.6. The animation-delay property"}, {"refs": [{"id": "ref-for-start-delay\u2460"}, {"id": "ref-for-start-delay\u2461"}, {"id": "ref-for-start-delay\u2462"}], "title": "4.1. Event dispatch"}], "external": true};
-window.dfnpanelData['1360d6d3'] = {"dfnID": "1360d6d3", "url": "https://drafts.csswg.org/web-animations-1/#target-effect", "dfnText": "target effect", "refSections": [{"refs": [{"id": "ref-for-target-effect"}], "title": "2.1. Owning element"}, {"refs": [{"id": "ref-for-target-effect\u2460"}, {"id": "ref-for-target-effect\u2461"}, {"id": "ref-for-target-effect\u2462"}, {"id": "ref-for-target-effect\u2463"}, {"id": "ref-for-target-effect\u2464"}], "title": "4.1. Event dispatch"}, {"refs": [{"id": "ref-for-target-effect\u2465"}], "title": "5.1. The CSSAnimation interface"}], "external": true};
-window.dfnpanelData['d9a4cd1e'] = {"dfnID": "d9a4cd1e", "url": "https://drafts.csswg.org/web-animations-1/#target-effect-end", "dfnText": "target effect end", "refSections": [{"refs": [{"id": "ref-for-target-effect-end"}], "title": "4.1. Event dispatch"}], "external": true};
-window.dfnpanelData['bf2a682a'] = {"dfnID": "bf2a682a", "url": "https://drafts.csswg.org/web-animations-1/#target-element", "dfnText": "target element", "refSections": [{"refs": [{"id": "ref-for-target-element"}], "title": "2.1. Owning element"}], "external": true};
-window.dfnpanelData['8baec6ed'] = {"dfnID": "8baec6ed", "url": "https://drafts.csswg.org/web-animations-1/#timeline", "dfnText": "timeline", "refSections": [{"refs": [{"id": "ref-for-timeline"}, {"id": "ref-for-timeline\u2460"}, {"id": "ref-for-timeline\u2461"}, {"id": "ref-for-timeline\u2462"}, {"id": "ref-for-timeline\u2463"}], "title": "3.9. The animation-timeline property"}], "external": true};
-window.dfnpanelData['f305d4bb'] = {"dfnID": "f305d4bb", "url": "https://drafts.csswg.org/web-animations-1/#dom-animationeffect-updatetiming-timing-timing", "dfnText": "timing", "refSections": [{"refs": [{"id": "ref-for-dom-animationeffect-updatetiming-timing-timing"}], "title": "2. Animations"}], "external": true};
-window.dfnpanelData['b0425d4a'] = {"dfnID": "b0425d4a", "url": "https://drafts.csswg.org/web-animations-1/#unresolved", "dfnText": "unresolved", "refSections": [{"refs": [{"id": "ref-for-unresolved"}], "title": "4.1. Event dispatch"}], "external": true};
-window.dfnpanelData['506a1554'] = {"dfnID": "506a1554", "url": "https://drafts.csswg.org/web-animations-1/#dom-animationeffect-updatetiming", "dfnText": "updateTiming()", "refSections": [{"refs": [{"id": "ref-for-dom-animationeffect-updatetiming"}], "title": "2. Animations"}], "external": true};
-window.dfnpanelData['2fe418bd'] = {"dfnID": "2fe418bd", "url": "https://drafts.csswg.org/web-animations-2/#dom-animatable-getanimations", "dfnText": "getAnimations()", "refSections": [{"refs": [{"id": "ref-for-dom-animatable-getanimations"}], "title": "5.2. Requirements on pending style changes"}], "external": true};
-window.dfnpanelData['e98bd90f'] = {"dfnID": "e98bd90f", "url": "https://drafts.csswg.org/web-animations-2/#dom-animation-starttime", "dfnText": "startTime", "refSections": [{"refs": [{"id": "ref-for-dom-animation-starttime"}, {"id": "ref-for-dom-animation-starttime\u2460"}], "title": "2. Animations"}], "external": true};
-window.dfnpanelData['889e932f'] = {"dfnID": "889e932f", "url": "https://webidl.spec.whatwg.org/#Exposed", "dfnText": "Exposed", "refSections": [{"refs": [{"id": "ref-for-Exposed"}], "title": "5.1. The CSSAnimation interface"}], "external": true};
-window.dfnpanelData['owning-element'] = {"dfnID": "owning-element", "url": "#owning-element", "dfnText": "owning element", "refSections": [{"refs": [{"id": "ref-for-owning-element"}, {"id": "ref-for-owning-element\u2460"}, {"id": "ref-for-owning-element\u2461"}, {"id": "ref-for-owning-element\u2462"}, {"id": "ref-for-owning-element\u2463"}], "title": "2.1. Owning element"}, {"refs": [{"id": "ref-for-owning-element\u2464"}, {"id": "ref-for-owning-element\u2465"}, {"id": "ref-for-owning-element\u2466"}, {"id": "ref-for-owning-element\u2467"}, {"id": "ref-for-owning-element\u2468"}, {"id": "ref-for-owning-element\u2460\u24ea"}, {"id": "ref-for-owning-element\u2460\u2460"}, {"id": "ref-for-owning-element\u2460\u2461"}, {"id": "ref-for-owning-element\u2460\u2462"}], "title": "2.2. Animation composite order"}], "external": false};
-window.dfnpanelData['propdef-animation-composition'] = {"dfnID": "propdef-animation-composition", "url": "#propdef-animation-composition", "dfnText": "animation-composition", "refSections": [{"refs": [{"id": "ref-for-propdef-animation-composition"}, {"id": "ref-for-propdef-animation-composition\u2460"}, {"id": "ref-for-propdef-animation-composition\u2461"}, {"id": "ref-for-propdef-animation-composition\u2462"}, {"id": "ref-for-propdef-animation-composition\u2463"}, {"id": "ref-for-propdef-animation-composition\u2464"}], "title": "3.8. The animation-composition property"}], "external": false};
-window.dfnpanelData['typedef-single-animation-composition'] = {"dfnID": "typedef-single-animation-composition", "url": "#typedef-single-animation-composition", "dfnText": "<single-animation-composition>", "refSections": [{"refs": [{"id": "ref-for-typedef-single-animation-composition"}], "title": "3.8. The animation-composition property"}], "external": false};
-window.dfnpanelData['propdef-animation-timeline'] = {"dfnID": "propdef-animation-timeline", "url": "#propdef-animation-timeline", "dfnText": "animation-timeline", "refSections": [{"refs": [{"id": "ref-for-propdef-animation-timeline"}, {"id": "ref-for-propdef-animation-timeline\u2460"}, {"id": "ref-for-propdef-animation-timeline\u2461"}, {"id": "ref-for-propdef-animation-timeline\u2462"}, {"id": "ref-for-propdef-animation-timeline\u2463"}], "title": "3.9. The animation-timeline property"}], "external": false};
-window.dfnpanelData['typedef-single-animation-timeline'] = {"dfnID": "typedef-single-animation-timeline", "url": "#typedef-single-animation-timeline", "dfnText": "<single-animation-timeline>", "refSections": [{"refs": [{"id": "ref-for-typedef-single-animation-timeline"}, {"id": "ref-for-typedef-single-animation-timeline\u2460"}], "title": "3.9. The animation-timeline property"}, {"refs": [{"id": "ref-for-typedef-single-animation-timeline\u2461"}], "title": "3.10. The animation shorthand property"}], "external": false};
-window.dfnpanelData['valdef-single-animation-timeline-auto'] = {"dfnID": "valdef-single-animation-timeline-auto", "url": "#valdef-single-animation-timeline-auto", "dfnText": "auto", "refSections": [{"refs": [{"id": "ref-for-valdef-single-animation-timeline-auto"}], "title": "3.9. The animation-timeline property"}], "external": false};
-window.dfnpanelData['valdef-single-animation-timeline-none'] = {"dfnID": "valdef-single-animation-timeline-none", "url": "#valdef-single-animation-timeline-none", "dfnText": "none", "refSections": [{"refs": [{"id": "ref-for-valdef-single-animation-timeline-none"}], "title": "3.9. The animation-timeline property"}], "external": false};
-window.dfnpanelData['typedef-timeline-name'] = {"dfnID": "typedef-timeline-name", "url": "#typedef-timeline-name", "dfnText": "<timeline-name>", "refSections": [{"refs": [{"id": "ref-for-typedef-timeline-name"}, {"id": "ref-for-typedef-timeline-name\u2460"}], "title": "3.9. The animation-timeline property"}], "external": false};
-window.dfnpanelData['interval-start'] = {"dfnID": "interval-start", "url": "#interval-start", "dfnText": "interval start", "refSections": [{"refs": [{"id": "ref-for-interval-start"}, {"id": "ref-for-interval-start\u2460"}, {"id": "ref-for-interval-start\u2461"}, {"id": "ref-for-interval-start\u2462"}], "title": "4.1. Event dispatch"}], "external": false};
-window.dfnpanelData['interval-end'] = {"dfnID": "interval-end", "url": "#interval-end", "dfnText": "interval end", "refSections": [{"refs": [{"id": "ref-for-interval-end"}, {"id": "ref-for-interval-end\u2460"}, {"id": "ref-for-interval-end\u2461"}, {"id": "ref-for-interval-end\u2462"}], "title": "4.1. Event dispatch"}], "external": false};
-window.dfnpanelData['elapsed-time'] = {"dfnID": "elapsed-time", "url": "#elapsed-time", "dfnText": "Elapsed time", "refSections": [{"refs": [{"id": "ref-for-elapsed-time"}, {"id": "ref-for-elapsed-time\u2460"}, {"id": "ref-for-elapsed-time\u2461"}], "title": "4.1. Event dispatch"}], "external": false};
-window.dfnpanelData['cssanimation'] = {"dfnID": "cssanimation", "url": "#cssanimation", "dfnText": "CSSAnimation", "refSections": [{"refs": [{"id": "ref-for-cssanimation"}, {"id": "ref-for-cssanimation\u2460"}, {"id": "ref-for-cssanimation\u2461"}, {"id": "ref-for-cssanimation\u2462"}, {"id": "ref-for-cssanimation\u2463"}, {"id": "ref-for-cssanimation\u2464"}, {"id": "ref-for-cssanimation\u2465"}, {"id": "ref-for-cssanimation\u2466"}, {"id": "ref-for-cssanimation\u2467"}, {"id": "ref-for-cssanimation\u2468"}], "title": "2. Animations"}, {"refs": [{"id": "ref-for-cssanimation\u2460\u24ea"}, {"id": "ref-for-cssanimation\u2460\u2460"}], "title": "5.2. Requirements on pending style changes"}], "external": false};
-window.dfnpanelData['dom-cssanimation-animationname'] = {"dfnID": "dom-cssanimation-animationname", "url": "#dom-cssanimation-animationname", "dfnText": "animationName", "refSections": [{"refs": [{"id": "ref-for-dom-cssanimation-animationname"}], "title": "5.1. The CSSAnimation interface"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -2845,13 +2348,513 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"9cd25054": {"dfnID":"9cd25054","dfnText":"computed value","external":true,"refSections":[{"refs":[{"id":"ref-for-computed-value"},{"id":"ref-for-computed-value\u2460"}],"title":"3. Keyframes"},{"refs":[{"id":"ref-for-computed-value\u2461"}],"title":"5.2. Requirements on pending style changes"}],"url":"https://drafts.csswg.org/css-cascade-5/#computed-value"},
+"8095a819": {"dfnID":"8095a819","dfnText":"<easing-function>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-easing-function"}],"title":"3.10. The animation shorthand property"}],"url":"https://drafts.csswg.org/css-easing-2/#typedef-easing-function"},
+"022ed06a": {"dfnID":"022ed06a","dfnText":"step-end","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-step-easing-function-step-end"}],"title":"3. Keyframes"}],"url":"https://drafts.csswg.org/css-easing-2/#valdef-step-easing-function-step-end"},
+"7d9dff52": {"dfnID":"7d9dff52","dfnText":"timing function","external":true,"refSections":[{"refs":[{"id":"ref-for-easing-function"}],"title":"3.2. The animation-timing-function property"}],"url":"https://drafts.csswg.org/css-easing-2/#easing-function"},
+"65d2348f": {"dfnID":"65d2348f","dfnText":"add","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-mask-composite-add"}],"title":"3.8. The animation-composition property"}],"url":"https://drafts.fxtf.org/css-masking-1/#valdef-mask-composite-add"},
+"223bd4c4": {"dfnID":"223bd4c4","dfnText":"scale","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-scale"}],"title":"3.8. The animation-composition property"}],"url":"https://drafts.csswg.org/css-transforms-2/#propdef-scale"},
+"68487d22": {"dfnID":"68487d22","dfnText":"#","external":true,"refSections":[{"refs":[{"id":"ref-for-mult-comma"}],"title":"3.8. The animation-composition property"},{"refs":[{"id":"ref-for-mult-comma\u2460"}],"title":"3.9. The animation-timeline property"}],"url":"https://drafts.csswg.org/css-values-4/#mult-comma"},
+"e274345c": {"dfnID":"e274345c","dfnText":"<custom-ident>","external":true,"refSections":[{"refs":[{"id":"ref-for-identifier-value"}],"title":"3.9. The animation-timeline property"}],"url":"https://drafts.csswg.org/css-values-4/#identifier-value"},
+"977d3003": {"dfnID":"977d3003","dfnText":"<string>","external":true,"refSections":[{"refs":[{"id":"ref-for-string-value"}],"title":"3.9. The animation-timeline property"}],"url":"https://drafts.csswg.org/css-values-4/#string-value"},
+"03570f9e": {"dfnID":"03570f9e","dfnText":"<time>","external":true,"refSections":[{"refs":[{"id":"ref-for-time-value"},{"id":"ref-for-time-value\u2460"}],"title":"3.10. The animation shorthand property"}],"url":"https://drafts.csswg.org/css-values-4/#time-value"},
+"ab06260d": {"dfnID":"ab06260d","dfnText":"css identifier","external":true,"refSections":[{"refs":[{"id":"ref-for-css-identifier"}],"title":"3.9. The animation-timeline property"}],"url":"https://drafts.csswg.org/css-values-4/#css-identifier"},
+"6295808f": {"dfnID":"6295808f","dfnText":"equivalent physical property","external":true,"refSections":[{"refs":[{"id":"ref-for-logical-to-physical"}],"title":"3. Keyframes"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#logical-to-physical"},
+"b06183cf": {"dfnID":"b06183cf","dfnText":"<keyframes-name>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-keyframes-name"},{"id":"ref-for-typedef-keyframes-name\u2460"}],"title":"3. Keyframes"},{"refs":[{"id":"ref-for-typedef-keyframes-name\u2461"}],"title":"3.10. The animation shorthand property"}],"url":"https://drafts.csswg.org/css-animations-1/#typedef-keyframes-name"},
+"5d951c68": {"dfnID":"5d951c68","dfnText":"<single-animation-direction>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-single-animation-direction"}],"title":"3.10. The animation shorthand property"}],"url":"https://drafts.csswg.org/css-animations-1/#typedef-single-animation-direction"},
+"97cad118": {"dfnID":"97cad118","dfnText":"<single-animation-fill-mode>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-single-animation-fill-mode"}],"title":"3.10. The animation shorthand property"}],"url":"https://drafts.csswg.org/css-animations-1/#typedef-single-animation-fill-mode"},
+"ef3a10d3": {"dfnID":"ef3a10d3","dfnText":"<single-animation-iteration-count>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-single-animation-iteration-count"}],"title":"3.10. The animation shorthand property"}],"url":"https://drafts.csswg.org/css-animations-1/#typedef-single-animation-iteration-count"},
+"ca1357e3": {"dfnID":"ca1357e3","dfnText":"<single-animation-play-state>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-single-animation-play-state"}],"title":"3.10. The animation shorthand property"}],"url":"https://drafts.csswg.org/css-animations-1/#typedef-single-animation-play-state"},
+"fa19c68e": {"dfnID":"fa19c68e","dfnText":"@keyframes","external":true,"refSections":[{"refs":[{"id":"ref-for-at-ruledef-keyframes"},{"id":"ref-for-at-ruledef-keyframes\u2460"},{"id":"ref-for-at-ruledef-keyframes\u2461"},{"id":"ref-for-at-ruledef-keyframes\u2462"}],"title":"2. Animations"},{"refs":[{"id":"ref-for-at-ruledef-keyframes\u2463"},{"id":"ref-for-at-ruledef-keyframes\u2464"},{"id":"ref-for-at-ruledef-keyframes\u2465"}],"title":"3. Keyframes"}],"url":"https://drafts.csswg.org/css-animations-1/#at-ruledef-keyframes"},
+"4fea8699": {"dfnID":"4fea8699","dfnText":"AnimationEvent","external":true,"refSections":[{"refs":[{"id":"ref-for-animationevent"}],"title":"4.1. Event dispatch"}],"url":"https://drafts.csswg.org/css-animations-1/#animationevent"},
+"eda608e1": {"dfnID":"eda608e1","dfnText":"animation","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-animation"},{"id":"ref-for-propdef-animation\u2460"}],"title":"3.10. The animation shorthand property"},{"refs":[{"id":"ref-for-propdef-animation\u2461"},{"id":"ref-for-propdef-animation\u2462"}],"title":"5.2. Requirements on pending style changes"}],"url":"https://drafts.csswg.org/css-animations-1/#propdef-animation"},
+"78be83bb": {"dfnID":"78be83bb","dfnText":"animation-delay","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-animation-delay"}],"title":"2. Animations"},{"refs":[{"id":"ref-for-propdef-animation-delay\u2460"},{"id":"ref-for-propdef-animation-delay\u2461"}],"title":"3.6. The animation-delay property"}],"url":"https://drafts.csswg.org/css-animations-1/#propdef-animation-delay"},
+"be0387bc": {"dfnID":"be0387bc","dfnText":"animation-direction","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-animation-direction"},{"id":"ref-for-propdef-animation-direction\u2460"}],"title":"3.4. The animation-direction property"}],"url":"https://drafts.csswg.org/css-animations-1/#propdef-animation-direction"},
+"5e8da52b": {"dfnID":"5e8da52b","dfnText":"animation-duration","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-animation-duration"}],"title":"2. Animations"},{"refs":[{"id":"ref-for-propdef-animation-duration\u2460"},{"id":"ref-for-propdef-animation-duration\u2461"}],"title":"3.1. The animation-duration property"},{"refs":[{"id":"ref-for-propdef-animation-duration\u2462"}],"title":"3.9. The animation-timeline property"}],"url":"https://drafts.csswg.org/css-animations-1/#propdef-animation-duration"},
+"baa76d7b": {"dfnID":"baa76d7b","dfnText":"animation-fill-mode","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-animation-fill-mode"},{"id":"ref-for-propdef-animation-fill-mode\u2460"}],"title":"3.7. The animation-fill-mode property"}],"url":"https://drafts.csswg.org/css-animations-1/#propdef-animation-fill-mode"},
+"7ddf964e": {"dfnID":"7ddf964e","dfnText":"animation-iteration-count","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-animation-iteration-count"},{"id":"ref-for-propdef-animation-iteration-count\u2460"}],"title":"3.3. The animation-iteration-count property"}],"url":"https://drafts.csswg.org/css-animations-1/#propdef-animation-iteration-count"},
+"d984b6fe": {"dfnID":"d984b6fe","dfnText":"animation-name","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-animation-name"}],"title":"2. Animations"},{"refs":[{"id":"ref-for-propdef-animation-name\u2460"},{"id":"ref-for-propdef-animation-name\u2461"},{"id":"ref-for-propdef-animation-name\u2462"}],"title":"2.1. Owning element"},{"refs":[{"id":"ref-for-propdef-animation-name\u2463"}],"title":"2.2. Animation composite order"},{"refs":[{"id":"ref-for-propdef-animation-name\u2464"}],"title":"3. Keyframes"},{"refs":[{"id":"ref-for-propdef-animation-name\u2465"},{"id":"ref-for-propdef-animation-name\u2466"},{"id":"ref-for-propdef-animation-name\u2467"}],"title":"3.9. The animation-timeline property"},{"refs":[{"id":"ref-for-propdef-animation-name\u2468"}],"title":"5.1. The CSSAnimation interface"}],"url":"https://drafts.csswg.org/css-animations-1/#propdef-animation-name"},
+"9b3bb1df": {"dfnID":"9b3bb1df","dfnText":"animation-play-state","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-animation-play-state"},{"id":"ref-for-propdef-animation-play-state\u2460"},{"id":"ref-for-propdef-animation-play-state\u2461"},{"id":"ref-for-propdef-animation-play-state\u2462"}],"title":"2. Animations"},{"refs":[{"id":"ref-for-propdef-animation-play-state\u2463"},{"id":"ref-for-propdef-animation-play-state\u2464"},{"id":"ref-for-propdef-animation-play-state\u2465"},{"id":"ref-for-propdef-animation-play-state\u2466"}],"title":"3.5. The animation-play-state property"}],"url":"https://drafts.csswg.org/css-animations-1/#propdef-animation-play-state"},
+"c16b1855": {"dfnID":"c16b1855","dfnText":"animation-timing-function","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-animation-timing-function"}],"title":"2. Animations"},{"refs":[{"id":"ref-for-propdef-animation-timing-function\u2460"},{"id":"ref-for-propdef-animation-timing-function\u2461"}],"title":"3. Keyframes"},{"refs":[{"id":"ref-for-propdef-animation-timing-function\u2462"},{"id":"ref-for-propdef-animation-timing-function\u2463"}],"title":"3.2. The animation-timing-function property"}],"url":"https://drafts.csswg.org/css-animations-1/#propdef-animation-timing-function"},
+"44d712bb": {"dfnID":"44d712bb","dfnText":"animationcancel","external":true,"refSections":[{"refs":[{"id":"ref-for-eventdef-globaleventhandlers-animationcancel"}],"title":"4.1. Event dispatch"}],"url":"https://drafts.csswg.org/css-animations-1/#eventdef-globaleventhandlers-animationcancel"},
+"71162c61": {"dfnID":"71162c61","dfnText":"animationend","external":true,"refSections":[{"refs":[{"id":"ref-for-eventdef-globaleventhandlers-animationend"},{"id":"ref-for-eventdef-globaleventhandlers-animationend\u2460"},{"id":"ref-for-eventdef-globaleventhandlers-animationend\u2461"},{"id":"ref-for-eventdef-globaleventhandlers-animationend\u2462"}],"title":"4.1. Event dispatch"}],"url":"https://drafts.csswg.org/css-animations-1/#eventdef-globaleventhandlers-animationend"},
+"94b809f0": {"dfnID":"94b809f0","dfnText":"animationiteration","external":true,"refSections":[{"refs":[{"id":"ref-for-eventdef-globaleventhandlers-animationiteration"},{"id":"ref-for-eventdef-globaleventhandlers-animationiteration\u2460"}],"title":"4.1. Event dispatch"}],"url":"https://drafts.csswg.org/css-animations-1/#eventdef-globaleventhandlers-animationiteration"},
+"2d1d585c": {"dfnID":"2d1d585c","dfnText":"animationstart","external":true,"refSections":[{"refs":[{"id":"ref-for-eventdef-globaleventhandlers-animationstart"},{"id":"ref-for-eventdef-globaleventhandlers-animationstart\u2460"},{"id":"ref-for-eventdef-globaleventhandlers-animationstart\u2461"},{"id":"ref-for-eventdef-globaleventhandlers-animationstart\u2462"}],"title":"4.1. Event dispatch"}],"url":"https://drafts.csswg.org/css-animations-1/#eventdef-globaleventhandlers-animationstart"},
+"b2813b66": {"dfnID":"b2813b66","dfnText":"elapsedTime","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-animationevent-elapsedtime"},{"id":"ref-for-dom-animationevent-elapsedtime\u2460"}],"title":"4.1. Event dispatch"}],"url":"https://drafts.csswg.org/css-animations-1/#dom-animationevent-elapsedtime"},
+"409ef463": {"dfnID":"409ef463","dfnText":"paused","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-animation-play-state-paused"}],"title":"3.5. The animation-play-state property"}],"url":"https://drafts.csswg.org/css-animations-1/#valdef-animation-play-state-paused"},
+"bf7fb7bc": {"dfnID":"bf7fb7bc","dfnText":"running","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-animation-play-state-running"}],"title":"3.5. The animation-play-state property"}],"url":"https://drafts.csswg.org/css-animations-1/#valdef-animation-play-state-running"},
+"5fced98b": {"dfnID":"5fced98b","dfnText":"CSSOMString","external":true,"refSections":[{"refs":[{"id":"ref-for-cssomstring"},{"id":"ref-for-cssomstring\u2460"}],"title":"5.1. The CSSAnimation interface"}],"url":"https://drafts.csswg.org/cssom-1/#cssomstring"},
+"4fe61159": {"dfnID":"4fe61159","dfnText":"resolved value","external":true,"refSections":[{"refs":[{"id":"ref-for-resolved-value"}],"title":"3. Keyframes"}],"url":"https://drafts.csswg.org/cssom-1/#resolved-value"},
+"25538777": {"dfnID":"25538777","dfnText":"tree order","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-tree-order"}],"title":"2.2. Animation composite order"}],"url":"https://dom.spec.whatwg.org/#concept-tree-order"},
+"b516749f": {"dfnID":"b516749f","dfnText":"Animation","external":true,"refSections":[{"refs":[{"id":"ref-for-animation"}],"title":"2.2. Animation composite order"},{"refs":[{"id":"ref-for-animation\u2460"}],"title":"3.9. The animation-timeline property"},{"refs":[{"id":"ref-for-animation\u2461"}],"title":"5.1. The CSSAnimation interface"}],"url":"https://drafts.csswg.org/web-animations-1/#animation"},
+"dd130a0f": {"dfnID":"dd130a0f","dfnText":"AnimationEffect","external":true,"refSections":[{"refs":[{"id":"ref-for-animationeffect"}],"title":"2. Animations"}],"url":"https://drafts.csswg.org/web-animations-1/#animationeffect"},
+"4636c5b3": {"dfnID":"4636c5b3","dfnText":"DocumentTimeline","external":true,"refSections":[{"refs":[{"id":"ref-for-documenttimeline"}],"title":"3.9. The animation-timeline property"}],"url":"https://drafts.csswg.org/web-animations-1/#documenttimeline"},
+"000c54c5": {"dfnID":"000c54c5","dfnText":"KeyframeEffect","external":true,"refSections":[{"refs":[{"id":"ref-for-keyframeeffect"},{"id":"ref-for-keyframeeffect\u2460"},{"id":"ref-for-keyframeeffect\u2461"},{"id":"ref-for-keyframeeffect\u2462"}],"title":"2. Animations"}],"url":"https://drafts.csswg.org/web-animations-1/#keyframeeffect"},
+"4ea27cff": {"dfnID":"4ea27cff","dfnText":"active duration","external":true,"refSections":[{"refs":[{"id":"ref-for-active-duration"},{"id":"ref-for-active-duration\u2460"},{"id":"ref-for-active-duration\u2461"}],"title":"4.1. Event dispatch"}],"url":"https://drafts.csswg.org/web-animations-1/#active-duration"},
+"9f9fa49d": {"dfnID":"9f9fa49d","dfnText":"active phase","external":true,"refSections":[{"refs":[{"id":"ref-for-active-phase"},{"id":"ref-for-active-phase\u2460"},{"id":"ref-for-active-phase\u2461"},{"id":"ref-for-active-phase\u2462"},{"id":"ref-for-active-phase\u2463"},{"id":"ref-for-active-phase\u2464"}],"title":"4.1. Event dispatch"}],"url":"https://drafts.csswg.org/web-animations-1/#active-phase"},
+"b9ed110e": {"dfnID":"b9ed110e","dfnText":"active time","external":true,"refSections":[{"refs":[{"id":"ref-for-active-time"}],"title":"4.1. Event dispatch"}],"url":"https://drafts.csswg.org/web-animations-1/#active-time"},
+"96812fae": {"dfnID":"96812fae","dfnText":"after phase","external":true,"refSections":[{"refs":[{"id":"ref-for-after-phase"},{"id":"ref-for-after-phase\u2460"},{"id":"ref-for-after-phase\u2461"},{"id":"ref-for-after-phase\u2462"},{"id":"ref-for-after-phase\u2463"},{"id":"ref-for-after-phase\u2464"}],"title":"4.1. Event dispatch"}],"url":"https://drafts.csswg.org/web-animations-1/#after-phase"},
+"2a319ac5": {"dfnID":"2a319ac5","dfnText":"animation","external":true,"refSections":[{"refs":[{"id":"ref-for-animation"}],"title":"2.2. Animation composite order"},{"refs":[{"id":"ref-for-animation\u2460"}],"title":"3.9. The animation-timeline property"},{"refs":[{"id":"ref-for-animation\u2461"}],"title":"5.1. The CSSAnimation interface"}],"url":"https://drafts.csswg.org/web-animations-1/#animation"},
+"b822113e": {"dfnID":"b822113e","dfnText":"animation class","external":true,"refSections":[{"refs":[{"id":"ref-for-animation-class"},{"id":"ref-for-animation-class\u2460"}],"title":"2.2. Animation composite order"}],"url":"https://drafts.csswg.org/web-animations-1/#animation-class"},
+"bdd4e1fc": {"dfnID":"bdd4e1fc","dfnText":"animation effect","external":true,"refSections":[{"refs":[{"id":"ref-for-animation-effect"}],"title":"3.1. The animation-duration property"},{"refs":[{"id":"ref-for-animation-effect\u2460"}],"title":"3.3. The animation-iteration-count property"},{"refs":[{"id":"ref-for-animation-effect\u2461"}],"title":"3.4. The animation-direction property"},{"refs":[{"id":"ref-for-animation-effect\u2462"}],"title":"3.6. The animation-delay property"},{"refs":[{"id":"ref-for-animation-effect\u2463"}],"title":"3.7. The animation-fill-mode property"},{"refs":[{"id":"ref-for-animation-effect\u2464"}],"title":"4.1. Event dispatch"}],"url":"https://drafts.csswg.org/web-animations-1/#animation-effect"},
+"ef66e85c": {"dfnID":"ef66e85c","dfnText":"before phase","external":true,"refSections":[{"refs":[{"id":"ref-for-before-phase"},{"id":"ref-for-before-phase\u2460"},{"id":"ref-for-before-phase\u2461"},{"id":"ref-for-before-phase\u2462"},{"id":"ref-for-before-phase\u2463"},{"id":"ref-for-before-phase\u2464"},{"id":"ref-for-before-phase\u2465"}],"title":"4.1. Event dispatch"}],"url":"https://drafts.csswg.org/web-animations-1/#before-phase"},
+"9054eaa4": {"dfnID":"9054eaa4","dfnText":"composite operation","external":true,"refSections":[{"refs":[{"id":"ref-for-composite-operation"},{"id":"ref-for-composite-operation\u2460"}],"title":"3.8. The animation-composition property"}],"url":"https://drafts.csswg.org/web-animations-1/#composite-operation"},
+"8f8e9b1e": {"dfnID":"8f8e9b1e","dfnText":"current iteration","external":true,"refSections":[{"refs":[{"id":"ref-for-current-iteration"},{"id":"ref-for-current-iteration\u2460"},{"id":"ref-for-current-iteration\u2461"},{"id":"ref-for-current-iteration\u2462"},{"id":"ref-for-current-iteration\u2463"},{"id":"ref-for-current-iteration\u2464"}],"title":"4.1. Event dispatch"}],"url":"https://drafts.csswg.org/web-animations-1/#current-iteration"},
+"6fa169fd": {"dfnID":"6fa169fd","dfnText":"current time","external":true,"refSections":[{"refs":[{"id":"ref-for-current-time"},{"id":"ref-for-current-time\u2460"}],"title":"4.1. Event dispatch"}],"url":"https://drafts.csswg.org/web-animations-1/#current-time"},
+"26b9f468": {"dfnID":"26b9f468","dfnText":"default document timeline","external":true,"refSections":[{"refs":[{"id":"ref-for-default-document-timeline"}],"title":"3.9. The animation-timeline property"}],"url":"https://drafts.csswg.org/web-animations-1/#default-document-timeline"},
+"1f7bca82": {"dfnID":"1f7bca82","dfnText":"effect","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-animation-effect"}],"title":"2. Animations"}],"url":"https://drafts.csswg.org/web-animations-1/#dom-animation-effect"},
+"a5b996d7": {"dfnID":"a5b996d7","dfnText":"fill mode","external":true,"refSections":[{"refs":[{"id":"ref-for-fill-mode"}],"title":"3.7. The animation-fill-mode property"},{"refs":[{"id":"ref-for-fill-mode\u2460"}],"title":"4.1. Event dispatch"}],"url":"https://drafts.csswg.org/web-animations-1/#fill-mode"},
+"8c052c1e": {"dfnID":"8c052c1e","dfnText":"global animation list","external":true,"refSections":[{"refs":[{"id":"ref-for-global-animation-list"},{"id":"ref-for-global-animation-list\u2460"},{"id":"ref-for-global-animation-list\u2461"}],"title":"2.2. Animation composite order"}],"url":"https://drafts.csswg.org/web-animations-1/#global-animation-list"},
+"a9ee4e92": {"dfnID":"a9ee4e92","dfnText":"idle phase","external":true,"refSections":[{"refs":[{"id":"ref-for-idle-phase"},{"id":"ref-for-idle-phase\u2460"},{"id":"ref-for-idle-phase\u2461"},{"id":"ref-for-idle-phase\u2462"},{"id":"ref-for-idle-phase\u2463"}],"title":"4.1. Event dispatch"}],"url":"https://drafts.csswg.org/web-animations-1/#idle-phase"},
+"6c215671": {"dfnID":"6c215671","dfnText":"idle play state","external":true,"refSections":[{"refs":[{"id":"ref-for-idle-play-state"},{"id":"ref-for-idle-play-state\u2460"},{"id":"ref-for-idle-play-state\u2461"}],"title":"2.2. Animation composite order"}],"url":"https://drafts.csswg.org/web-animations-1/#idle-play-state"},
+"e9264d53": {"dfnID":"e9264d53","dfnText":"iteration count","external":true,"refSections":[{"refs":[{"id":"ref-for-iteration-count"}],"title":"3.3. The animation-iteration-count property"}],"url":"https://drafts.csswg.org/web-animations-1/#iteration-count"},
+"9b8452ef": {"dfnID":"9b8452ef","dfnText":"iteration duration","external":true,"refSections":[{"refs":[{"id":"ref-for-iteration-duration"}],"title":"3.1. The animation-duration property"},{"refs":[{"id":"ref-for-iteration-duration\u2460"},{"id":"ref-for-iteration-duration\u2461"}],"title":"4.1. Event dispatch"}],"url":"https://drafts.csswg.org/web-animations-1/#iteration-duration"},
+"4c53a3ed": {"dfnID":"4c53a3ed","dfnText":"iteration start","external":true,"refSections":[{"refs":[{"id":"ref-for-iteration-start"},{"id":"ref-for-iteration-start\u2460"}],"title":"4.1. Event dispatch"}],"url":"https://drafts.csswg.org/web-animations-1/#iteration-start"},
+"c443f9ba": {"dfnID":"c443f9ba","dfnText":"keyframe","external":true,"refSections":[{"refs":[{"id":"ref-for-keyframe"},{"id":"ref-for-keyframe\u2460"},{"id":"ref-for-keyframe\u2461"},{"id":"ref-for-keyframe\u2462"}],"title":"3. Keyframes"},{"refs":[{"id":"ref-for-keyframe\u2463"}],"title":"3.2. The animation-timing-function property"}],"url":"https://drafts.csswg.org/web-animations-1/#keyframe"},
+"d3902c40": {"dfnID":"d3902c40","dfnText":"pause an animation","external":true,"refSections":[{"refs":[{"id":"ref-for-pause-an-animation"}],"title":"3.5. The animation-play-state property"}],"url":"https://drafts.csswg.org/web-animations-1/#pause-an-animation"},
+"6aa0dd52": {"dfnID":"6aa0dd52","dfnText":"pause()","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-animation-pause"}],"title":"2. Animations"}],"url":"https://drafts.csswg.org/web-animations-1/#dom-animation-pause"},
+"d9ad9e72": {"dfnID":"d9ad9e72","dfnText":"paused play state","external":true,"refSections":[{"refs":[{"id":"ref-for-paused-play-state"},{"id":"ref-for-paused-play-state\u2460"}],"title":"2. Animations"}],"url":"https://drafts.csswg.org/web-animations-1/#paused-play-state"},
+"b0540aa4": {"dfnID":"b0540aa4","dfnText":"pending play state","external":true,"refSections":[{"refs":[{"id":"ref-for-pending-play-state"}],"title":"4.1. Event dispatch"}],"url":"https://drafts.csswg.org/web-animations-1/#pending-play-state"},
+"5e4c6440": {"dfnID":"5e4c6440","dfnText":"play an animation","external":true,"refSections":[{"refs":[{"id":"ref-for-play-an-animation"}],"title":"3.5. The animation-play-state property"}],"url":"https://drafts.csswg.org/web-animations-1/#play-an-animation"},
+"50920597": {"dfnID":"50920597","dfnText":"play state","external":true,"refSections":[{"refs":[{"id":"ref-for-play-state"}],"title":"2. Animations"}],"url":"https://drafts.csswg.org/web-animations-1/#play-state"},
+"7ccd2ce2": {"dfnID":"7ccd2ce2","dfnText":"play()","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-animation-play"}],"title":"2. Animations"}],"url":"https://drafts.csswg.org/web-animations-1/#dom-animation-play"},
+"7014f8d1": {"dfnID":"7014f8d1","dfnText":"playState","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-animation-playstate"}],"title":"5.2. Requirements on pending style changes"}],"url":"https://drafts.csswg.org/web-animations-1/#dom-animation-playstate"},
+"83998ca7": {"dfnID":"83998ca7","dfnText":"playback direction","external":true,"refSections":[{"refs":[{"id":"ref-for-playback-direction"}],"title":"3.4. The animation-direction property"}],"url":"https://drafts.csswg.org/web-animations-1/#playback-direction"},
+"433ecf04": {"dfnID":"433ecf04","dfnText":"reverse()","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-animation-reverse"},{"id":"ref-for-dom-animation-reverse\u2460"}],"title":"2. Animations"}],"url":"https://drafts.csswg.org/web-animations-1/#dom-animation-reverse"},
+"5e871285": {"dfnID":"5e871285","dfnText":"sampling","external":true,"refSections":[{"refs":[{"id":"ref-for-sampling"}],"title":"4.1. Event dispatch"}],"url":"https://drafts.csswg.org/web-animations-1/#sampling"},
+"14b67d5f": {"dfnID":"14b67d5f","dfnText":"setKeyframes(keyframes)","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-keyframeeffect-setkeyframes"}],"title":"2. Animations"}],"url":"https://drafts.csswg.org/web-animations-1/#dom-keyframeeffect-setkeyframes"},
+"acc1b2b4": {"dfnID":"acc1b2b4","dfnText":"start delay","external":true,"refSections":[{"refs":[{"id":"ref-for-start-delay"}],"title":"3.6. The animation-delay property"},{"refs":[{"id":"ref-for-start-delay\u2460"},{"id":"ref-for-start-delay\u2461"},{"id":"ref-for-start-delay\u2462"}],"title":"4.1. Event dispatch"}],"url":"https://drafts.csswg.org/web-animations-1/#start-delay"},
+"1360d6d3": {"dfnID":"1360d6d3","dfnText":"target effect","external":true,"refSections":[{"refs":[{"id":"ref-for-target-effect"}],"title":"2.1. Owning element"},{"refs":[{"id":"ref-for-target-effect\u2460"},{"id":"ref-for-target-effect\u2461"},{"id":"ref-for-target-effect\u2462"},{"id":"ref-for-target-effect\u2463"},{"id":"ref-for-target-effect\u2464"}],"title":"4.1. Event dispatch"},{"refs":[{"id":"ref-for-target-effect\u2465"}],"title":"5.1. The CSSAnimation interface"}],"url":"https://drafts.csswg.org/web-animations-1/#target-effect"},
+"d9a4cd1e": {"dfnID":"d9a4cd1e","dfnText":"target effect end","external":true,"refSections":[{"refs":[{"id":"ref-for-target-effect-end"}],"title":"4.1. Event dispatch"}],"url":"https://drafts.csswg.org/web-animations-1/#target-effect-end"},
+"bf2a682a": {"dfnID":"bf2a682a","dfnText":"target element","external":true,"refSections":[{"refs":[{"id":"ref-for-target-element"}],"title":"2.1. Owning element"}],"url":"https://drafts.csswg.org/web-animations-1/#target-element"},
+"8baec6ed": {"dfnID":"8baec6ed","dfnText":"timeline","external":true,"refSections":[{"refs":[{"id":"ref-for-timeline"},{"id":"ref-for-timeline\u2460"},{"id":"ref-for-timeline\u2461"},{"id":"ref-for-timeline\u2462"},{"id":"ref-for-timeline\u2463"}],"title":"3.9. The animation-timeline property"}],"url":"https://drafts.csswg.org/web-animations-1/#timeline"},
+"f305d4bb": {"dfnID":"f305d4bb","dfnText":"timing","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-animationeffect-updatetiming-timing-timing"}],"title":"2. Animations"}],"url":"https://drafts.csswg.org/web-animations-1/#dom-animationeffect-updatetiming-timing-timing"},
+"b0425d4a": {"dfnID":"b0425d4a","dfnText":"unresolved","external":true,"refSections":[{"refs":[{"id":"ref-for-unresolved"}],"title":"4.1. Event dispatch"}],"url":"https://drafts.csswg.org/web-animations-1/#unresolved"},
+"506a1554": {"dfnID":"506a1554","dfnText":"updateTiming()","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-animationeffect-updatetiming"}],"title":"2. Animations"}],"url":"https://drafts.csswg.org/web-animations-1/#dom-animationeffect-updatetiming"},
+"2fe418bd": {"dfnID":"2fe418bd","dfnText":"getAnimations()","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-animatable-getanimations"}],"title":"5.2. Requirements on pending style changes"}],"url":"https://drafts.csswg.org/web-animations-2/#dom-animatable-getanimations"},
+"e98bd90f": {"dfnID":"e98bd90f","dfnText":"startTime","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-animation-starttime"},{"id":"ref-for-dom-animation-starttime\u2460"}],"title":"2. Animations"}],"url":"https://drafts.csswg.org/web-animations-2/#dom-animation-starttime"},
+"889e932f": {"dfnID":"889e932f","dfnText":"Exposed","external":true,"refSections":[{"refs":[{"id":"ref-for-Exposed"}],"title":"5.1. The CSSAnimation interface"}],"url":"https://webidl.spec.whatwg.org/#Exposed"},
+"owning-element": {"dfnID":"owning-element","dfnText":"owning element","external":false,"refSections":[{"refs":[{"id":"ref-for-owning-element"},{"id":"ref-for-owning-element\u2460"},{"id":"ref-for-owning-element\u2461"},{"id":"ref-for-owning-element\u2462"},{"id":"ref-for-owning-element\u2463"}],"title":"2.1. Owning element"},{"refs":[{"id":"ref-for-owning-element\u2464"},{"id":"ref-for-owning-element\u2465"},{"id":"ref-for-owning-element\u2466"},{"id":"ref-for-owning-element\u2467"},{"id":"ref-for-owning-element\u2468"},{"id":"ref-for-owning-element\u2460\u24ea"},{"id":"ref-for-owning-element\u2460\u2460"},{"id":"ref-for-owning-element\u2460\u2461"},{"id":"ref-for-owning-element\u2460\u2462"}],"title":"2.2. Animation composite order"}],"url":"#owning-element"},
+"propdef-animation-composition": {"dfnID":"propdef-animation-composition","dfnText":"animation-composition","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-animation-composition"},{"id":"ref-for-propdef-animation-composition\u2460"},{"id":"ref-for-propdef-animation-composition\u2461"},{"id":"ref-for-propdef-animation-composition\u2462"},{"id":"ref-for-propdef-animation-composition\u2463"},{"id":"ref-for-propdef-animation-composition\u2464"}],"title":"3.8. The animation-composition property"}],"url":"#propdef-animation-composition"},
+"typedef-single-animation-composition": {"dfnID":"typedef-single-animation-composition","dfnText":"<single-animation-composition>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-single-animation-composition"}],"title":"3.8. The animation-composition property"}],"url":"#typedef-single-animation-composition"},
+"propdef-animation-timeline": {"dfnID":"propdef-animation-timeline","dfnText":"animation-timeline","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-animation-timeline"},{"id":"ref-for-propdef-animation-timeline\u2460"},{"id":"ref-for-propdef-animation-timeline\u2461"},{"id":"ref-for-propdef-animation-timeline\u2462"},{"id":"ref-for-propdef-animation-timeline\u2463"}],"title":"3.9. The animation-timeline property"}],"url":"#propdef-animation-timeline"},
+"typedef-single-animation-timeline": {"dfnID":"typedef-single-animation-timeline","dfnText":"<single-animation-timeline>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-single-animation-timeline"},{"id":"ref-for-typedef-single-animation-timeline\u2460"}],"title":"3.9. The animation-timeline property"},{"refs":[{"id":"ref-for-typedef-single-animation-timeline\u2461"}],"title":"3.10. The animation shorthand property"}],"url":"#typedef-single-animation-timeline"},
+"valdef-single-animation-timeline-auto": {"dfnID":"valdef-single-animation-timeline-auto","dfnText":"auto","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-single-animation-timeline-auto"}],"title":"3.9. The animation-timeline property"}],"url":"#valdef-single-animation-timeline-auto"},
+"valdef-single-animation-timeline-none": {"dfnID":"valdef-single-animation-timeline-none","dfnText":"none","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-single-animation-timeline-none"}],"title":"3.9. The animation-timeline property"}],"url":"#valdef-single-animation-timeline-none"},
+"typedef-timeline-name": {"dfnID":"typedef-timeline-name","dfnText":"<timeline-name>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-timeline-name"},{"id":"ref-for-typedef-timeline-name\u2460"}],"title":"3.9. The animation-timeline property"}],"url":"#typedef-timeline-name"},
+"interval-start": {"dfnID":"interval-start","dfnText":"interval start","external":false,"refSections":[{"refs":[{"id":"ref-for-interval-start"},{"id":"ref-for-interval-start\u2460"},{"id":"ref-for-interval-start\u2461"},{"id":"ref-for-interval-start\u2462"}],"title":"4.1. Event dispatch"}],"url":"#interval-start"},
+"interval-end": {"dfnID":"interval-end","dfnText":"interval end","external":false,"refSections":[{"refs":[{"id":"ref-for-interval-end"},{"id":"ref-for-interval-end\u2460"},{"id":"ref-for-interval-end\u2461"},{"id":"ref-for-interval-end\u2462"}],"title":"4.1. Event dispatch"}],"url":"#interval-end"},
+"elapsed-time": {"dfnID":"elapsed-time","dfnText":"Elapsed time","external":false,"refSections":[{"refs":[{"id":"ref-for-elapsed-time"},{"id":"ref-for-elapsed-time\u2460"},{"id":"ref-for-elapsed-time\u2461"}],"title":"4.1. Event dispatch"}],"url":"#elapsed-time"},
+"cssanimation": {"dfnID":"cssanimation","dfnText":"CSSAnimation","external":false,"refSections":[{"refs":[{"id":"ref-for-cssanimation"},{"id":"ref-for-cssanimation\u2460"},{"id":"ref-for-cssanimation\u2461"},{"id":"ref-for-cssanimation\u2462"},{"id":"ref-for-cssanimation\u2463"},{"id":"ref-for-cssanimation\u2464"},{"id":"ref-for-cssanimation\u2465"},{"id":"ref-for-cssanimation\u2466"},{"id":"ref-for-cssanimation\u2467"},{"id":"ref-for-cssanimation\u2468"}],"title":"2. Animations"},{"refs":[{"id":"ref-for-cssanimation\u2460\u24ea"},{"id":"ref-for-cssanimation\u2460\u2460"}],"title":"5.2. Requirements on pending style changes"}],"url":"#cssanimation"},
+"dom-cssanimation-animationname": {"dfnID":"dom-cssanimation-animationname","dfnText":"animationName","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-cssanimation-animationname"}],"title":"5.1. The CSSAnimation interface"}],"url":"#dom-cssanimation-animationname"},
+};
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+const typeFormatters = {
+    'dfn': (text) => `[=${text}=]`,
+    'abstract-op': (text) => `[\$${text}\$]`,
+    'value': (text) => `''${text}''`,
+    'http-header': (text) => `[:${text}:]`,
+    'idl': (text) => `{{${text}}}`,
+    'interface': 'idl',
+    'constructor': 'idl',
+    'method': 'idl',
+    'argument': 'idl',
+    'attribute': 'idl',
+    'callback': 'idl',
+    'dictionary': 'idl',
+    'dict-member': 'idl',
+    'enum': 'idl',
+    'enum-value': 'idl',
+    'exception': 'idl',
+    'const': 'idl',
+    'typedef': 'idl',
+    'stringifier': 'idl',
+    'serializer': 'idl',
+    'iterator': 'idl',
+    'maplike': 'idl',
+    'setlike': 'idl',
+    'extended-attribute': 'idl',
+    'event': 'idl',
+    'element': (element) => `<{${element}}>`,
+    'element-state': 'element',
+    'element-attr': 'element',
+    'attr-value': 'element',
+    'scheme': 'dfn',
+    'permission': 'dfn',
+    'grammar': (text) => `${text} (within a <pre class=prod>)`,
+    'type': (text)=> `<<${text}>>`,
+    'property': (text) => `'${text}'`,
+    'descriptor': 'property',
+    'function': 'value',
+    'at-rule': 'value',
+    'selector': 'value',
+};
+const typesUsingFor = new Set(
+    [
+        "descriptor",
+        "value",
+        "element-attr",
+        "attr-value",
+        "element-state",
+        "method",
+        "constructor",
+        "argument",
+        "attribute",
+        "const",
+        "dict-member",
+        "event",
+        "enum-value",
+        "stringifier",
+        "serializer",
+        "iterator",
+        "maplike",
+        "setlike",
+        "state",
+        "mode",
+        "context",
+        "facet",
+    ],
+)
+const typesNotUsingFor = new Set(
+    [
+        "property",
+        "element",
+        "interface",
+        "namespace",
+        "callback",
+        "dictionary",
+        "enum",
+        "exception",
+        "typedef",
+        "http-header",
+        "permission",
+    ],
+)
+function linkFormatterFromType(type) {
+    const fnOrType = typeFormatters[type];
+    if(typeof fnOrType === 'string') {
+        // follow the alias
+        return linkFormatterFromType(fnOrType);
+    }
+    return fnOrType;
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!typesUsingFor.has(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!typesNotUsingFor.has(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
+
+function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+    dfnPanel.forDfn = dfn;
+    if(!dfn) { console.log(dfnPanel); }
+    return dfnPanel;
+}
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        const panel = genDfnPanel({ ...panelData, dfn });
+        append(document.body, panel);
+        insertDfnPopupAction(panel)
+    }
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+})
+
+function hideAllDfnPanels() {
+    // Turn off any currently "on" or "activated" panels.
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
+}
+
+function showDfnPanel(dfnPanel) {
+    hideAllDfnPanels(); // Only display one at this time.
+
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "true");
+
+    dfnPanel.classList.add("on");
+    positionDfnPanel(dfnPanel);
+
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    // Increment tabindex for each anchor and button tags in panel
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.style.position = "absolute"; // unfix it
+    dfnPanel.classList.remove("on");
+    dfnPanel.classList.remove("activated");
+}
+
+function toggleDfnPanel(dfnPanel) {
+    if(dfnPanel.classList.contains("on")) {
+        hideDfnPanel(dfnPanel);
+    } else {
+        showDfnPanel(dfnPanel);
+    }
+}
+
+function insertDfnPopupAction(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        showDfnPanel(dfnPanel);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfnPanel);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel(dfnPanel, dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    })
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
 }
 </script>
 <script>/* Boilerplate: script-link-titles */
+"use strict";
+{
 let linkTitleData = {
- "#typedef-single-animation-timeline": "Expands to: auto | none",
- "https://drafts.csswg.org/css-easing-2/#typedef-easing-function": "Expands to: linear",
- "https://drafts.csswg.org/css-values-4/#time-value": "Expands to: ms | s"
+"#typedef-single-animation-timeline": "Expands to: auto | none",
+"https://drafts.csswg.org/css-values-4/#time-value": "Expands to: ms | s",
+"https://drafts.csswg.org/css-easing-2/#typedef-easing-function": "Expands to: linear",
 };
 
 function setTypeTitles() {
@@ -2863,11 +2866,11 @@ function setTypeTitles() {
 }
 
 document.addEventListener("DOMContentLoaded", setTypeTitles);
+}
 </script>
 <script>/* Boilerplate: script-position-annos */
 "use strict";
 {
-
 function repositionAnnoPanels(){
     const panels = [...document.querySelectorAll("[data-anno-for]")];
     const main = document.querySelector("main");
@@ -2911,311 +2914,310 @@ window.addEventListener("resize", repositionAnnoPanels);
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
+let refsData = {
+"#cssanimation": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-animations-2","spec":"css-animations-2-2","status":"local","text":"CSSAnimation","type":"interface","url":"#cssanimation"},
+"https://drafts.csswg.org/web-animations-1/#dom-keyframeeffect-setkeyframes": {"export":true,"for_":["KeyframeEffect"],"level":"1","normative":true,"shortname":"web-animations","spec":"web-animations-1","status":"current","text":"setKeyframes(keyframes)","type":"method","url":"https://drafts.csswg.org/web-animations-1/#dom-keyframeeffect-setkeyframes"},
+"https://drafts.csswg.org/web-animations-1/#keyframeeffect": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"web-animations","spec":"web-animations-1","status":"current","text":"KeyframeEffect","type":"interface","url":"https://drafts.csswg.org/web-animations-1/#keyframeeffect"},
+"https://drafts.csswg.org/css-animations-1/#at-ruledef-keyframes": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-animations","spec":"css-animations-1","status":"current","text":"@keyframes","type":"at-rule","url":"https://drafts.csswg.org/css-animations-1/#at-ruledef-keyframes"},
+"https://drafts.csswg.org/css-animations-1/#propdef-animation-timing-function": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-animations","spec":"css-animations-1","status":"current","text":"animation-timing-function","type":"property","url":"https://drafts.csswg.org/css-animations-1/#propdef-animation-timing-function"},
+"https://drafts.csswg.org/web-animations-1/#dom-animationeffect-updatetiming": {"export":true,"for_":["AnimationEffect"],"level":"1","normative":true,"shortname":"web-animations","spec":"web-animations-1","status":"current","text":"updateTiming()","type":"method","url":"https://drafts.csswg.org/web-animations-1/#dom-animationeffect-updatetiming"},
+"https://drafts.csswg.org/web-animations-1/#dom-animationeffect-updatetiming-timing-timing": {"export":true,"for_":["AnimationEffect/updateTiming(timing)"],"level":"1","normative":true,"shortname":"web-animations","spec":"web-animations-1","status":"current","text":"timing","type":"argument","url":"https://drafts.csswg.org/web-animations-1/#dom-animationeffect-updatetiming-timing-timing"},
+"https://drafts.csswg.org/css-animations-1/#propdef-animation-duration": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-animations","spec":"css-animations-1","status":"current","text":"animation-duration","type":"property","url":"https://drafts.csswg.org/css-animations-1/#propdef-animation-duration"},
+"https://drafts.csswg.org/css-animations-1/#propdef-animation-delay": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-animations","spec":"css-animations-1","status":"current","text":"animation-delay","type":"property","url":"https://drafts.csswg.org/css-animations-1/#propdef-animation-delay"},
+"https://drafts.csswg.org/web-animations-1/#dom-animation-play": {"export":true,"for_":["Animation"],"level":"1","normative":true,"shortname":"web-animations","spec":"web-animations-1","status":"current","text":"play()","type":"method","url":"https://drafts.csswg.org/web-animations-1/#dom-animation-play"},
+"https://drafts.csswg.org/web-animations-1/#dom-animation-pause": {"export":true,"for_":["Animation"],"level":"1","normative":true,"shortname":"web-animations","spec":"web-animations-1","status":"current","text":"pause()","type":"method","url":"https://drafts.csswg.org/web-animations-1/#dom-animation-pause"},
+"https://drafts.csswg.org/css-animations-1/#propdef-animation-play-state": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-animations","spec":"css-animations-1","status":"current","text":"animation-play-state","type":"property","url":"https://drafts.csswg.org/css-animations-1/#propdef-animation-play-state"},
+"https://drafts.csswg.org/web-animations-1/#dom-animation-reverse": {"export":true,"for_":["Animation"],"level":"1","normative":true,"shortname":"web-animations","spec":"web-animations-1","status":"current","text":"reverse()","type":"method","url":"https://drafts.csswg.org/web-animations-1/#dom-animation-reverse"},
+"https://drafts.csswg.org/web-animations-2/#dom-animation-starttime": {"export":true,"for_":["Animation"],"level":"2","normative":true,"shortname":"web-animations","spec":"web-animations-2","status":"current","text":"startTime","type":"attribute","url":"https://drafts.csswg.org/web-animations-2/#dom-animation-starttime"},
+"https://drafts.csswg.org/web-animations-1/#play-state": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"play state","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#play-state"},
+"https://drafts.csswg.org/web-animations-1/#paused-play-state": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"paused play state","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#paused-play-state"},
+"https://drafts.csswg.org/web-animations-1/#dom-animation-effect": {"export":true,"for_":["Animation"],"level":"1","normative":true,"shortname":"web-animations","spec":"web-animations-1","status":"current","text":"effect","type":"attribute","url":"https://drafts.csswg.org/web-animations-1/#dom-animation-effect"},
+"https://drafts.csswg.org/web-animations-1/#animationeffect": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"web-animations","spec":"web-animations-1","status":"current","text":"AnimationEffect","type":"interface","url":"https://drafts.csswg.org/web-animations-1/#animationeffect"},
+"https://drafts.csswg.org/css-animations-1/#propdef-animation-name": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-animations","spec":"css-animations-1","status":"current","text":"animation-name","type":"property","url":"https://drafts.csswg.org/css-animations-1/#propdef-animation-name"},
+"#owning-element": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-animations-2","spec":"css-animations-2-2","status":"local","text":"owning element","type":"dfn","url":"#owning-element"},
+"https://drafts.csswg.org/web-animations-1/#target-element": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"target element","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#target-element"},
+"https://drafts.csswg.org/web-animations-1/#target-effect": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"target effect","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#target-effect"},
+"https://drafts.csswg.org/web-animations-1/#animation": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"animation","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#animation"},
+"https://drafts.csswg.org/web-animations-1/#animation-class": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"animation class","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#animation-class"},
+"https://dom.spec.whatwg.org/#concept-tree-order": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"tree order","type":"dfn","url":"https://dom.spec.whatwg.org/#concept-tree-order"},
+"https://drafts.csswg.org/web-animations-1/#global-animation-list": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"global animation list","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#global-animation-list"},
+"https://drafts.csswg.org/web-animations-1/#idle-play-state": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"idle play state","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#idle-play-state"},
+"https://drafts.csswg.org/web-animations-1/#keyframe": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"keyframe","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#keyframe"},
+"https://drafts.csswg.org/cssom-1/#resolved-value": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"resolved value","type":"dfn","url":"https://drafts.csswg.org/cssom-1/#resolved-value"},
+"https://drafts.csswg.org/css-animations-1/#typedef-keyframes-name": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-animations","spec":"css-animations-1","status":"current","text":"<keyframes-name>","type":"type","url":"https://drafts.csswg.org/css-animations-1/#typedef-keyframes-name"},
+"https://drafts.csswg.org/css-easing-2/#valdef-step-easing-function-step-end": {"export":true,"for_":["<step-easing-function>"],"level":"2","normative":true,"shortname":"css-easing","spec":"css-easing-2","status":"current","text":"step-end","type":"value","url":"https://drafts.csswg.org/css-easing-2/#valdef-step-easing-function-step-end"},
+"https://drafts.csswg.org/css-writing-modes-4/#logical-to-physical": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"anchor-block","text":"equivalent physical property","type":"dfn","url":"https://drafts.csswg.org/css-writing-modes-4/#logical-to-physical"},
+"https://drafts.csswg.org/css-cascade-5/#computed-value": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-cascade","spec":"css-cascade-5","status":"current","text":"computed value","type":"dfn","url":"https://drafts.csswg.org/css-cascade-5/#computed-value"},
+"https://drafts.csswg.org/web-animations-1/#iteration-duration": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"iteration duration","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#iteration-duration"},
+"https://drafts.csswg.org/web-animations-1/#animation-effect": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"animation effect","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#animation-effect"},
+"https://drafts.csswg.org/css-easing-2/#easing-function": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-easing","spec":"css-easing-2","status":"current","text":"timing function","type":"dfn","url":"https://drafts.csswg.org/css-easing-2/#easing-function"},
+"https://drafts.csswg.org/css-animations-1/#propdef-animation-iteration-count": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-animations","spec":"css-animations-1","status":"current","text":"animation-iteration-count","type":"property","url":"https://drafts.csswg.org/css-animations-1/#propdef-animation-iteration-count"},
+"https://drafts.csswg.org/web-animations-1/#iteration-count": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"iteration count","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#iteration-count"},
+"https://drafts.csswg.org/css-animations-1/#propdef-animation-direction": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-animations","spec":"css-animations-1","status":"current","text":"animation-direction","type":"property","url":"https://drafts.csswg.org/css-animations-1/#propdef-animation-direction"},
+"https://drafts.csswg.org/web-animations-1/#playback-direction": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"playback direction","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#playback-direction"},
+"https://drafts.csswg.org/css-animations-1/#valdef-animation-play-state-running": {"export":true,"for_":["animation-play-state"],"level":"1","normative":true,"shortname":"css-animations","spec":"css-animations-1","status":"current","text":"running","type":"value","url":"https://drafts.csswg.org/css-animations-1/#valdef-animation-play-state-running"},
+"https://drafts.csswg.org/web-animations-1/#play-an-animation": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"play an animation","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#play-an-animation"},
+"https://drafts.csswg.org/css-animations-1/#valdef-animation-play-state-paused": {"export":true,"for_":["animation-play-state"],"level":"1","normative":true,"shortname":"css-animations","spec":"css-animations-1","status":"current","text":"paused","type":"value","url":"https://drafts.csswg.org/css-animations-1/#valdef-animation-play-state-paused"},
+"https://drafts.csswg.org/web-animations-1/#pause-an-animation": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"pause an animation","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#pause-an-animation"},
+"https://drafts.csswg.org/web-animations-1/#start-delay": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"start delay","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#start-delay"},
+"https://drafts.csswg.org/css-animations-1/#propdef-animation-fill-mode": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-animations","spec":"css-animations-1","status":"current","text":"animation-fill-mode","type":"property","url":"https://drafts.csswg.org/css-animations-1/#propdef-animation-fill-mode"},
+"https://drafts.csswg.org/web-animations-1/#fill-mode": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"fill mode","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#fill-mode"},
+"#propdef-animation-composition": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-animations-2","spec":"css-animations-2-2","status":"local","text":"animation-composition","type":"property","url":"#propdef-animation-composition"},
+"https://drafts.csswg.org/web-animations-1/#composite-operation": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"composite operation","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#composite-operation"},
+"#typedef-single-animation-composition": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-animations-2","spec":"css-animations-2-2","status":"local","text":"<single-animation-composition>","type":"type","url":"#typedef-single-animation-composition"},
+"https://drafts.csswg.org/css-values-4/#mult-comma": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"#","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#mult-comma"},
+"https://drafts.csswg.org/css-transforms-2/#propdef-scale": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-transforms","spec":"css-transforms-2","status":"current","text":"scale","type":"property","url":"https://drafts.csswg.org/css-transforms-2/#propdef-scale"},
+"https://drafts.fxtf.org/css-masking-1/#valdef-mask-composite-add": {"export":true,"for_":["mask-composite"],"level":"1","normative":true,"shortname":"css-masking","spec":"css-masking-1","status":"current","text":"add","type":"value","url":"https://drafts.fxtf.org/css-masking-1/#valdef-mask-composite-add"},
+"#propdef-animation-timeline": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-animations-2","spec":"css-animations-2-2","status":"local","text":"animation-timeline","type":"property","url":"#propdef-animation-timeline"},
+"https://drafts.csswg.org/web-animations-1/#timeline": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"timeline","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#timeline"},
+"#typedef-single-animation-timeline": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-animations-2","spec":"css-animations-2-2","status":"local","text":"<single-animation-timeline>","type":"type","url":"#typedef-single-animation-timeline"},
+"https://drafts.csswg.org/css-values-4/#css-identifier": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"anchor-block","text":"css identifier","type":"dfn","url":"https://drafts.csswg.org/css-values-4/#css-identifier"},
+"#valdef-single-animation-timeline-none": {"export":true,"for_":["single-animation-timeline"],"level":"2","normative":true,"shortname":"css-animations-2","spec":"css-animations-2-2","status":"local","text":"none","type":"value","url":"#valdef-single-animation-timeline-none"},
+"#valdef-single-animation-timeline-auto": {"export":true,"for_":["single-animation-timeline"],"level":"2","normative":true,"shortname":"css-animations-2","spec":"css-animations-2-2","status":"local","text":"auto","type":"value","url":"#valdef-single-animation-timeline-auto"},
+"#typedef-timeline-name": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-animations-2","spec":"css-animations-2-2","status":"local","text":"<timeline-name>","type":"type","url":"#typedef-timeline-name"},
+"https://drafts.csswg.org/web-animations-1/#documenttimeline": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"web-animations","spec":"web-animations-1","status":"current","text":"DocumentTimeline","type":"interface","url":"https://drafts.csswg.org/web-animations-1/#documenttimeline"},
+"https://drafts.csswg.org/web-animations-1/#default-document-timeline": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"default document timeline","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#default-document-timeline"},
+"https://drafts.csswg.org/css-values-4/#identifier-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<custom-ident>","type":"type","url":"https://drafts.csswg.org/css-values-4/#identifier-value"},
+"https://drafts.csswg.org/css-values-4/#string-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<string>","type":"type","url":"https://drafts.csswg.org/css-values-4/#string-value"},
+"https://drafts.csswg.org/css-animations-1/#propdef-animation": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-animations","spec":"css-animations-1","status":"current","text":"animation","type":"property","url":"https://drafts.csswg.org/css-animations-1/#propdef-animation"},
+"https://drafts.csswg.org/css-values-4/#time-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<time>","type":"type","url":"https://drafts.csswg.org/css-values-4/#time-value"},
+"https://drafts.csswg.org/css-easing-2/#typedef-easing-function": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-easing","spec":"css-easing-2","status":"current","text":"<easing-function>","type":"type","url":"https://drafts.csswg.org/css-easing-2/#typedef-easing-function"},
+"https://drafts.csswg.org/css-animations-1/#typedef-single-animation-iteration-count": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-animations","spec":"css-animations-1","status":"current","text":"<single-animation-iteration-count>","type":"type","url":"https://drafts.csswg.org/css-animations-1/#typedef-single-animation-iteration-count"},
+"https://drafts.csswg.org/css-animations-1/#typedef-single-animation-direction": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-animations","spec":"css-animations-1","status":"current","text":"<single-animation-direction>","type":"type","url":"https://drafts.csswg.org/css-animations-1/#typedef-single-animation-direction"},
+"https://drafts.csswg.org/css-animations-1/#typedef-single-animation-fill-mode": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-animations","spec":"css-animations-1","status":"current","text":"<single-animation-fill-mode>","type":"type","url":"https://drafts.csswg.org/css-animations-1/#typedef-single-animation-fill-mode"},
+"https://drafts.csswg.org/css-animations-1/#typedef-single-animation-play-state": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-animations","spec":"css-animations-1","status":"current","text":"<single-animation-play-state>","type":"type","url":"https://drafts.csswg.org/css-animations-1/#typedef-single-animation-play-state"},
+"https://drafts.csswg.org/web-animations-1/#before-phase": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"before phase","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#before-phase"},
+"https://drafts.csswg.org/web-animations-1/#idle-phase": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"idle phase","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#idle-phase"},
+"https://drafts.csswg.org/web-animations-1/#current-time": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"current time","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#current-time"},
+"https://drafts.csswg.org/web-animations-1/#unresolved": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"unresolved","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#unresolved"},
+"https://drafts.csswg.org/web-animations-1/#after-phase": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"after phase","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#after-phase"},
+"https://drafts.csswg.org/web-animations-1/#active-duration": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"active duration","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#active-duration"},
+"https://drafts.csswg.org/web-animations-1/#current-iteration": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"current iteration","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#current-iteration"},
+"https://drafts.csswg.org/web-animations-1/#iteration-start": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"iteration start","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#iteration-start"},
+"https://drafts.csswg.org/css-animations-1/#dom-animationevent-elapsedtime": {"export":true,"for_":["AnimationEvent"],"level":"1","normative":true,"shortname":"css-animations","spec":"css-animations-1","status":"current","text":"elapsedTime","type":"attribute","url":"https://drafts.csswg.org/css-animations-1/#dom-animationevent-elapsedtime"},
+"https://drafts.csswg.org/web-animations-1/#target-effect-end": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"target effect end","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#target-effect-end"},
+"https://drafts.csswg.org/web-animations-1/#sampling": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"sampling","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#sampling"},
+"https://drafts.csswg.org/web-animations-1/#pending-play-state": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"pending play state","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#pending-play-state"},
+"https://drafts.csswg.org/web-animations-1/#active-phase": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"active phase","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#active-phase"},
+"https://drafts.csswg.org/css-animations-1/#eventdef-globaleventhandlers-animationstart": {"export":true,"for_":["GlobalEventHandlers"],"level":"1","normative":true,"shortname":"css-animations","spec":"css-animations-1","status":"current","text":"animationstart","type":"event","url":"https://drafts.csswg.org/css-animations-1/#eventdef-globaleventhandlers-animationstart"},
+"#interval-start": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-animations-2","spec":"css-animations-2-2","status":"local","text":"interval start","type":"dfn","url":"#interval-start"},
+"https://drafts.csswg.org/css-animations-1/#eventdef-globaleventhandlers-animationend": {"export":true,"for_":["GlobalEventHandlers"],"level":"1","normative":true,"shortname":"css-animations","spec":"css-animations-1","status":"current","text":"animationend","type":"event","url":"https://drafts.csswg.org/css-animations-1/#eventdef-globaleventhandlers-animationend"},
+"#interval-end": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-animations-2","spec":"css-animations-2-2","status":"local","text":"interval end","type":"dfn","url":"#interval-end"},
+"https://drafts.csswg.org/css-animations-1/#eventdef-globaleventhandlers-animationiteration": {"export":true,"for_":["GlobalEventHandlers"],"level":"1","normative":true,"shortname":"css-animations","spec":"css-animations-1","status":"current","text":"animationiteration","type":"event","url":"https://drafts.csswg.org/css-animations-1/#eventdef-globaleventhandlers-animationiteration"},
+"https://drafts.csswg.org/css-animations-1/#eventdef-globaleventhandlers-animationcancel": {"export":true,"for_":["GlobalEventHandlers"],"level":"1","normative":true,"shortname":"css-animations","spec":"css-animations-1","status":"current","text":"animationcancel","type":"event","url":"https://drafts.csswg.org/css-animations-1/#eventdef-globaleventhandlers-animationcancel"},
+"https://drafts.csswg.org/web-animations-1/#active-time": {"export":true,"for_":[],"level":"","normative":true,"shortname":"web-animations","spec":"web-animations","status":"anchor-block","text":"active time","type":"dfn","url":"https://drafts.csswg.org/web-animations-1/#active-time"},
+"#elapsed-time": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-animations-2","spec":"css-animations-2-2","status":"local","text":"elapsed time","type":"dfn","url":"#elapsed-time"},
+"https://drafts.csswg.org/css-animations-1/#animationevent": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-animations","spec":"css-animations-1","status":"current","text":"AnimationEvent","type":"interface","url":"https://drafts.csswg.org/css-animations-1/#animationevent"},
+"https://webidl.spec.whatwg.org/#Exposed": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"Exposed","type":"extended-attribute","url":"https://webidl.spec.whatwg.org/#Exposed"},
+"https://drafts.csswg.org/cssom-1/#cssomstring": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"CSSOMString","type":"interface","url":"https://drafts.csswg.org/cssom-1/#cssomstring"},
+"#dom-cssanimation-animationname": {"export":true,"for_":["CSSAnimation"],"level":"2","normative":true,"shortname":"css-animations-2","spec":"css-animations-2-2","status":"local","text":"animationName","type":"attribute","url":"#dom-cssanimation-animationname"},
+"https://drafts.csswg.org/web-animations-2/#dom-animatable-getanimations": {"export":true,"for_":["Animatable"],"level":"2","normative":true,"shortname":"web-animations","spec":"web-animations-2","status":"current","text":"getAnimations()","type":"method","url":"https://drafts.csswg.org/web-animations-2/#dom-animatable-getanimations"},
+"https://drafts.csswg.org/web-animations-1/#dom-animation-playstate": {"export":true,"for_":["Animation"],"level":"1","normative":true,"shortname":"web-animations","spec":"web-animations-1","status":"current","text":"playState","type":"attribute","url":"https://drafts.csswg.org/web-animations-1/#dom-animation-playstate"},
+};
+
+function genRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "DFN: "),
+                mk.code({ class: "dfn-text" }, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    const forListElements = forList.length === 0 ? '' : mk.li({},
+        mk.b({}, "For: "),
+        mk.ul({},
+            ...forList.map(forItem =>
                 mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
-            mk.b({}, "For: "),
-            mk.ul({},
-                ...forList.map(forItem =>
-                    mk.li({},
-                        mk.span({}, `${forItem}`)
-                    ),
+                    mk.span({}, `${forItem}`)
                 ),
             ),
-        );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+        ),
+    );
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
-    }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    return hintPanel;
+}
+function genAllRefHints() {
+    for(const refData of Object.values(refsData)) {
+        const refUrl = refData.url;
+        const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+        if (links.length == 0) {
+            console.log(`Can't find link href="${refUrl}".`, refData);
+            continue;
+        }
+        for(const link of links) {
+            if(link.classList.contains("dfn-link")) continue;
+            const hint = genRefHint(link, refData);
+            append(document.body, hint);
+            insertLinkPopupAction(hint)
         }
     }
+}
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+function hideAllRefHints() {
+    queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    refHint.style.position = "absolute"; // unfix it
+    refHint.classList.remove("on");
+    const teardown = refHint.teardownEventListeners;
+    if (teardown) {
+        refHint.teardownEventListeners = undefined;
+        teardown();
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+function showRefHint(refHint) {
+    hideAllRefHints(); // Only display one at this time.
+
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "true");
+    refHint.classList.add("on");
+    positionRefHint(refHint);
+    setupRefHintEventListeners(refHint);
+}
+
+function setupRefHintEventListeners(refHint) {
+    if (refHint.teardownEventListeners) return;
+    const link = refHint.forLink;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
 
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
 
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+function insertLinkPopupAction(refHint) {
+    const link = refHint.forLink;
+    // link.setAttribute('role', 'button');
+    link.setAttribute('aria-expanded', 'false')
+    link.classList.add('has-ref-hint');
+    link.addEventListener('mouseover', (event) => {
+        showRefHint(refHint);
     });
+    link.addEventListener('focus', (event) => {
+        showRefHint(refHint);
+    })
+}
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+document.addEventListener("DOMContentLoaded", () => {
+    genAllRefHints();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['#cssanimation'] = {"text": "CSSAnimation", "type": "interface", "spec": "css-animations-2-2", "shortname": "css-animations-2", "level": "2", "status": "local", "url": "#cssanimation", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#dom-keyframeeffect-setkeyframes'] = {"text": "setKeyframes(keyframes)", "type": "method", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#dom-keyframeeffect-setkeyframes", "export": true, "normative": true, "for_": ["KeyframeEffect"]};
-window.refsData['https://drafts.csswg.org/web-animations-1/#keyframeeffect'] = {"text": "KeyframeEffect", "type": "interface", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#keyframeeffect", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-animations-1/#at-ruledef-keyframes'] = {"text": "@keyframes", "type": "at-rule", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-animations-1/#at-ruledef-keyframes", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-animations-1/#propdef-animation-timing-function'] = {"text": "animation-timing-function", "type": "property", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-animations-1/#propdef-animation-timing-function", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#dom-animationeffect-updatetiming'] = {"text": "updateTiming()", "type": "method", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#dom-animationeffect-updatetiming", "export": true, "normative": true, "for_": ["AnimationEffect"]};
-window.refsData['https://drafts.csswg.org/web-animations-1/#dom-animationeffect-updatetiming-timing-timing'] = {"text": "timing", "type": "argument", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#dom-animationeffect-updatetiming-timing-timing", "export": true, "normative": true, "for_": ["AnimationEffect/updateTiming(timing)"]};
-window.refsData['https://drafts.csswg.org/css-animations-1/#propdef-animation-duration'] = {"text": "animation-duration", "type": "property", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-animations-1/#propdef-animation-duration", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-animations-1/#propdef-animation-delay'] = {"text": "animation-delay", "type": "property", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-animations-1/#propdef-animation-delay", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#dom-animation-play'] = {"text": "play()", "type": "method", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#dom-animation-play", "export": true, "normative": true, "for_": ["Animation"]};
-window.refsData['https://drafts.csswg.org/web-animations-1/#dom-animation-pause'] = {"text": "pause()", "type": "method", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#dom-animation-pause", "export": true, "normative": true, "for_": ["Animation"]};
-window.refsData['https://drafts.csswg.org/css-animations-1/#propdef-animation-play-state'] = {"text": "animation-play-state", "type": "property", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-animations-1/#propdef-animation-play-state", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#dom-animation-reverse'] = {"text": "reverse()", "type": "method", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#dom-animation-reverse", "export": true, "normative": true, "for_": ["Animation"]};
-window.refsData['https://drafts.csswg.org/web-animations-2/#dom-animation-starttime'] = {"text": "startTime", "type": "attribute", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "current", "url": "https://drafts.csswg.org/web-animations-2/#dom-animation-starttime", "export": true, "normative": true, "for_": ["Animation"]};
-window.refsData['https://drafts.csswg.org/web-animations-1/#play-state'] = {"text": "play state", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#play-state", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#paused-play-state'] = {"text": "paused play state", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#paused-play-state", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#dom-animation-effect'] = {"text": "effect", "type": "attribute", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#dom-animation-effect", "export": true, "normative": true, "for_": ["Animation"]};
-window.refsData['https://drafts.csswg.org/web-animations-1/#animationeffect'] = {"text": "AnimationEffect", "type": "interface", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#animationeffect", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-animations-1/#propdef-animation-name'] = {"text": "animation-name", "type": "property", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-animations-1/#propdef-animation-name", "export": true, "normative": true, "for_": []};
-window.refsData['#owning-element'] = {"text": "owning element", "type": "dfn", "spec": "css-animations-2-2", "shortname": "css-animations-2", "level": "2", "status": "local", "url": "#owning-element", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#target-element'] = {"text": "target element", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#target-element", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#target-effect'] = {"text": "target effect", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#target-effect", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#animation'] = {"text": "animation", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#animation", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#animation-class'] = {"text": "animation class", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#animation-class", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#concept-tree-order'] = {"text": "tree order", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-tree-order", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#global-animation-list'] = {"text": "global animation list", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#global-animation-list", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#idle-play-state'] = {"text": "idle play state", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#idle-play-state", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#keyframe'] = {"text": "keyframe", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#keyframe", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/cssom-1/#resolved-value'] = {"text": "resolved value", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#resolved-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-animations-1/#typedef-keyframes-name'] = {"text": "<keyframes-name>", "type": "type", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-animations-1/#typedef-keyframes-name", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-easing-2/#valdef-step-easing-function-step-end'] = {"text": "step-end", "type": "value", "spec": "css-easing-2", "shortname": "css-easing", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-easing-2/#valdef-step-easing-function-step-end", "export": true, "normative": true, "for_": ["<step-easing-function>"]};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#logical-to-physical'] = {"text": "equivalent physical property", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "anchor-block", "url": "https://drafts.csswg.org/css-writing-modes-4/#logical-to-physical", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-cascade-5/#computed-value'] = {"text": "computed value", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#computed-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#iteration-duration'] = {"text": "iteration duration", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#iteration-duration", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#animation-effect'] = {"text": "animation effect", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#animation-effect", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-easing-2/#easing-function'] = {"text": "timing function", "type": "dfn", "spec": "css-easing-2", "shortname": "css-easing", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-easing-2/#easing-function", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-animations-1/#propdef-animation-iteration-count'] = {"text": "animation-iteration-count", "type": "property", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-animations-1/#propdef-animation-iteration-count", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#iteration-count'] = {"text": "iteration count", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#iteration-count", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-animations-1/#propdef-animation-direction'] = {"text": "animation-direction", "type": "property", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-animations-1/#propdef-animation-direction", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#playback-direction'] = {"text": "playback direction", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#playback-direction", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-animations-1/#valdef-animation-play-state-running'] = {"text": "running", "type": "value", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-animations-1/#valdef-animation-play-state-running", "export": true, "normative": true, "for_": ["animation-play-state"]};
-window.refsData['https://drafts.csswg.org/web-animations-1/#play-an-animation'] = {"text": "play an animation", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#play-an-animation", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-animations-1/#valdef-animation-play-state-paused'] = {"text": "paused", "type": "value", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-animations-1/#valdef-animation-play-state-paused", "export": true, "normative": true, "for_": ["animation-play-state"]};
-window.refsData['https://drafts.csswg.org/web-animations-1/#pause-an-animation'] = {"text": "pause an animation", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#pause-an-animation", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#start-delay'] = {"text": "start delay", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#start-delay", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-animations-1/#propdef-animation-fill-mode'] = {"text": "animation-fill-mode", "type": "property", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-animations-1/#propdef-animation-fill-mode", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#fill-mode'] = {"text": "fill mode", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#fill-mode", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-animation-composition'] = {"text": "animation-composition", "type": "property", "spec": "css-animations-2-2", "shortname": "css-animations-2", "level": "2", "status": "local", "url": "#propdef-animation-composition", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#composite-operation'] = {"text": "composite operation", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#composite-operation", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-single-animation-composition'] = {"text": "<single-animation-composition>", "type": "type", "spec": "css-animations-2-2", "shortname": "css-animations-2", "level": "2", "status": "local", "url": "#typedef-single-animation-composition", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#mult-comma'] = {"text": "#", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-comma", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-transforms-2/#propdef-scale'] = {"text": "scale", "type": "property", "spec": "css-transforms-2", "shortname": "css-transforms", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-transforms-2/#propdef-scale", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.fxtf.org/css-masking-1/#valdef-mask-composite-add'] = {"text": "add", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/css-masking-1/#valdef-mask-composite-add", "export": true, "normative": true, "for_": ["mask-composite"]};
-window.refsData['#propdef-animation-timeline'] = {"text": "animation-timeline", "type": "property", "spec": "css-animations-2-2", "shortname": "css-animations-2", "level": "2", "status": "local", "url": "#propdef-animation-timeline", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#timeline'] = {"text": "timeline", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#timeline", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-single-animation-timeline'] = {"text": "<single-animation-timeline>", "type": "type", "spec": "css-animations-2-2", "shortname": "css-animations-2", "level": "2", "status": "local", "url": "#typedef-single-animation-timeline", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#css-identifier'] = {"text": "css identifier", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "anchor-block", "url": "https://drafts.csswg.org/css-values-4/#css-identifier", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-single-animation-timeline-none'] = {"text": "none", "type": "value", "spec": "css-animations-2-2", "shortname": "css-animations-2", "level": "2", "status": "local", "url": "#valdef-single-animation-timeline-none", "export": true, "normative": true, "for_": ["single-animation-timeline"]};
-window.refsData['#valdef-single-animation-timeline-auto'] = {"text": "auto", "type": "value", "spec": "css-animations-2-2", "shortname": "css-animations-2", "level": "2", "status": "local", "url": "#valdef-single-animation-timeline-auto", "export": true, "normative": true, "for_": ["single-animation-timeline"]};
-window.refsData['#typedef-timeline-name'] = {"text": "<timeline-name>", "type": "type", "spec": "css-animations-2-2", "shortname": "css-animations-2", "level": "2", "status": "local", "url": "#typedef-timeline-name", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#documenttimeline'] = {"text": "DocumentTimeline", "type": "interface", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#documenttimeline", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#default-document-timeline'] = {"text": "default document timeline", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#default-document-timeline", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#identifier-value'] = {"text": "<custom-ident>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#identifier-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#string-value'] = {"text": "<string>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#string-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-animations-1/#propdef-animation'] = {"text": "animation", "type": "property", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-animations-1/#propdef-animation", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#time-value'] = {"text": "<time>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#time-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-easing-2/#typedef-easing-function'] = {"text": "<easing-function>", "type": "type", "spec": "css-easing-2", "shortname": "css-easing", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-easing-2/#typedef-easing-function", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-animations-1/#typedef-single-animation-iteration-count'] = {"text": "<single-animation-iteration-count>", "type": "type", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-animations-1/#typedef-single-animation-iteration-count", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-animations-1/#typedef-single-animation-direction'] = {"text": "<single-animation-direction>", "type": "type", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-animations-1/#typedef-single-animation-direction", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-animations-1/#typedef-single-animation-fill-mode'] = {"text": "<single-animation-fill-mode>", "type": "type", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-animations-1/#typedef-single-animation-fill-mode", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-animations-1/#typedef-single-animation-play-state'] = {"text": "<single-animation-play-state>", "type": "type", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-animations-1/#typedef-single-animation-play-state", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#before-phase'] = {"text": "before phase", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#before-phase", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#idle-phase'] = {"text": "idle phase", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#idle-phase", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#current-time'] = {"text": "current time", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#current-time", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#unresolved'] = {"text": "unresolved", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#unresolved", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#after-phase'] = {"text": "after phase", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#after-phase", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#active-duration'] = {"text": "active duration", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#active-duration", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#current-iteration'] = {"text": "current iteration", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#current-iteration", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#iteration-start'] = {"text": "iteration start", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#iteration-start", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-animations-1/#dom-animationevent-elapsedtime'] = {"text": "elapsedTime", "type": "attribute", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-animations-1/#dom-animationevent-elapsedtime", "export": true, "normative": true, "for_": ["AnimationEvent"]};
-window.refsData['https://drafts.csswg.org/web-animations-1/#target-effect-end'] = {"text": "target effect end", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#target-effect-end", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#sampling'] = {"text": "sampling", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#sampling", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#pending-play-state'] = {"text": "pending play state", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#pending-play-state", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/web-animations-1/#active-phase'] = {"text": "active phase", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#active-phase", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-animations-1/#eventdef-globaleventhandlers-animationstart'] = {"text": "animationstart", "type": "event", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-animations-1/#eventdef-globaleventhandlers-animationstart", "export": true, "normative": true, "for_": ["GlobalEventHandlers"]};
-window.refsData['#interval-start'] = {"text": "interval start", "type": "dfn", "spec": "css-animations-2-2", "shortname": "css-animations-2", "level": "2", "status": "local", "url": "#interval-start", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-animations-1/#eventdef-globaleventhandlers-animationend'] = {"text": "animationend", "type": "event", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-animations-1/#eventdef-globaleventhandlers-animationend", "export": true, "normative": true, "for_": ["GlobalEventHandlers"]};
-window.refsData['#interval-end'] = {"text": "interval end", "type": "dfn", "spec": "css-animations-2-2", "shortname": "css-animations-2", "level": "2", "status": "local", "url": "#interval-end", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-animations-1/#eventdef-globaleventhandlers-animationiteration'] = {"text": "animationiteration", "type": "event", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-animations-1/#eventdef-globaleventhandlers-animationiteration", "export": true, "normative": true, "for_": ["GlobalEventHandlers"]};
-window.refsData['https://drafts.csswg.org/css-animations-1/#eventdef-globaleventhandlers-animationcancel'] = {"text": "animationcancel", "type": "event", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-animations-1/#eventdef-globaleventhandlers-animationcancel", "export": true, "normative": true, "for_": ["GlobalEventHandlers"]};
-window.refsData['https://drafts.csswg.org/web-animations-1/#active-time'] = {"text": "active time", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/web-animations-1/#active-time", "export": true, "normative": true, "for_": []};
-window.refsData['#elapsed-time'] = {"text": "elapsed time", "type": "dfn", "spec": "css-animations-2-2", "shortname": "css-animations-2", "level": "2", "status": "local", "url": "#elapsed-time", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-animations-1/#animationevent'] = {"text": "AnimationEvent", "type": "interface", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-animations-1/#animationevent", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/cssom-1/#cssomstring'] = {"text": "CSSOMString", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#cssomstring", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-cssanimation-animationname'] = {"text": "animationName", "type": "attribute", "spec": "css-animations-2-2", "shortname": "css-animations-2", "level": "2", "status": "local", "url": "#dom-cssanimation-animationname", "export": true, "normative": true, "for_": ["CSSAnimation"]};
-window.refsData['https://drafts.csswg.org/web-animations-2/#dom-animatable-getanimations'] = {"text": "getAnimations()", "type": "method", "spec": "web-animations-2", "shortname": "web-animations", "level": "2", "status": "current", "url": "https://drafts.csswg.org/web-animations-2/#dom-animatable-getanimations", "export": true, "normative": true, "for_": ["Animatable"]};
-window.refsData['https://drafts.csswg.org/web-animations-1/#dom-animation-playstate'] = {"text": "playState", "type": "attribute", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#dom-animation-playstate", "export": true, "normative": true, "for_": ["Animation"]};window.refsData['#propdef-animation-composition'] = {"text": "animation-composition", "type": "property", "spec": "css-animations-2-2", "shortname": "css-animations-2", "level": "2", "status": "local", "url": "#propdef-animation-composition", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-animation-timeline'] = {"text": "animation-timeline", "type": "property", "spec": "css-animations-2-2", "shortname": "css-animations-2", "level": "2", "status": "local", "url": "#propdef-animation-timeline", "export": true, "normative": true, "for_": []};
 </script>

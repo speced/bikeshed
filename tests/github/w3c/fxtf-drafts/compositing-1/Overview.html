@@ -89,7 +89,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -740,7 +739,6 @@ a[href].issue-return {
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -2326,438 +2324,8 @@ Draft of 2013-06-25</a>:</p>
     </div>
    </div>
   </details>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['91bfbe18'] = {"dfnID": "91bfbe18", "url": "https://drafts.csswg.org/css-color-4/#propdef-opacity", "dfnText": "opacity", "refSections": [{"refs": [{"id": "ref-for-propdef-opacity"}], "title": "3.4.1. The mix-blend-mode property"}], "external": true};
-window.dfnpanelData['68487d22'] = {"dfnID": "68487d22", "url": "https://drafts.csswg.org/css-values-4/#mult-comma", "dfnText": "#", "refSections": [{"refs": [{"id": "ref-for-mult-comma"}], "title": "3.4.3. The background-blend-mode property"}], "external": true};
-window.dfnpanelData['6ec67710'] = {"dfnID": "6ec67710", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "dfnText": "|", "refSections": [{"refs": [{"id": "ref-for-comb-one"}, {"id": "ref-for-comb-one\u2460"}, {"id": "ref-for-comb-one\u2461"}, {"id": "ref-for-comb-one\u2462"}, {"id": "ref-for-comb-one\u2463"}, {"id": "ref-for-comb-one\u2464"}, {"id": "ref-for-comb-one\u2465"}, {"id": "ref-for-comb-one\u2466"}, {"id": "ref-for-comb-one\u2467"}, {"id": "ref-for-comb-one\u2468"}, {"id": "ref-for-comb-one\u2460\u24ea"}, {"id": "ref-for-comb-one\u2460\u2460"}, {"id": "ref-for-comb-one\u2460\u2461"}, {"id": "ref-for-comb-one\u2460\u2462"}, {"id": "ref-for-comb-one\u2460\u2463"}], "title": "3.4.1. The mix-blend-mode property"}, {"refs": [{"id": "ref-for-comb-one\u2460\u2464"}], "title": "3.4.2. The isolation property"}, {"refs": [{"id": "ref-for-comb-one\u2460\u2465"}, {"id": "ref-for-comb-one\u2460\u2466"}, {"id": "ref-for-comb-one\u2460\u2467"}, {"id": "ref-for-comb-one\u2460\u2468"}, {"id": "ref-for-comb-one\u2461\u24ea"}, {"id": "ref-for-comb-one\u2461\u2460"}, {"id": "ref-for-comb-one\u2461\u2461"}, {"id": "ref-for-comb-one\u2461\u2462"}, {"id": "ref-for-comb-one\u2461\u2463"}, {"id": "ref-for-comb-one\u2461\u2464"}, {"id": "ref-for-comb-one\u2461\u2465"}], "title": "4. Specifying Compositing and Blending in Canvas 2D"}], "external": true};
-window.dfnpanelData['f5eca8c9'] = {"dfnID": "f5eca8c9", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background", "dfnText": "background", "refSections": [{"refs": [{"id": "ref-for-propdef-background"}], "title": "3.4.3. The background-blend-mode property"}], "external": true};
-window.dfnpanelData['f831c141'] = {"dfnID": "f831c141", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background-image", "dfnText": "background-image", "refSections": [{"refs": [{"id": "ref-for-propdef-background-image"}], "title": "3.4.3. The background-blend-mode property"}], "external": true};
-window.dfnpanelData['2f0492ac'] = {"dfnID": "2f0492ac", "url": "https://html.spec.whatwg.org/multipage/sections.html#the-body-element", "dfnText": "body", "refSections": [{"refs": [{"id": "ref-for-the-body-element"}], "title": "3.4.3. The background-blend-mode property"}], "external": true};
-window.dfnpanelData['33db4476'] = {"dfnID": "33db4476", "url": "https://html.spec.whatwg.org/multipage/canvas.html#dom-context-2d-globalcompositeoperation", "dfnText": "globalCompositeOperation", "refSections": [{"refs": [{"id": "ref-for-dom-context-2d-globalcompositeoperation"}], "title": "Unnumbered Section"}, {"refs": [{"id": "ref-for-dom-context-2d-globalcompositeoperation\u2460"}], "title": "2.1. Module interactions"}, {"refs": [{"id": "ref-for-dom-context-2d-globalcompositeoperation\u2461"}], "title": "4. Specifying Compositing and Blending in Canvas 2D"}], "external": true};
-window.dfnpanelData['f0811ff8'] = {"dfnID": "f0811ff8", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element", "dfnText": "img", "refSections": [{"refs": [{"id": "ref-for-the-img-element"}, {"id": "ref-for-the-img-element\u2460"}], "title": "3.4.2. The isolation property"}], "external": true};
-window.dfnpanelData['propdef-mix-blend-mode'] = {"dfnID": "propdef-mix-blend-mode", "url": "#propdef-mix-blend-mode", "dfnText": "mix-blend-mode", "refSections": [{"refs": [{"id": "ref-for-propdef-mix-blend-mode"}], "title": "3.4.1. The mix-blend-mode property"}], "external": false};
-window.dfnpanelData['ltblendmodegt'] = {"dfnID": "ltblendmodegt", "url": "#ltblendmodegt", "dfnText": "<blend-mode>", "refSections": [{"refs": [{"id": "ref-for-ltblendmodegt"}, {"id": "ref-for-ltblendmodegt\u2460"}], "title": "3.4.1. The mix-blend-mode property"}, {"refs": [{"id": "ref-for-ltblendmodegt\u2461"}], "title": "3.4.3. The background-blend-mode property"}, {"refs": [{"id": "ref-for-ltblendmodegt\u2462"}], "title": "4. Specifying Compositing and Blending in Canvas 2D"}], "external": false};
-window.dfnpanelData['propdef-isolation'] = {"dfnID": "propdef-isolation", "url": "#propdef-isolation", "dfnText": "isolation", "refSections": [{"refs": [{"id": "ref-for-propdef-isolation"}, {"id": "ref-for-propdef-isolation\u2460"}], "title": "3.4.2. The isolation property"}], "external": false};
-window.dfnpanelData['isolated-propid'] = {"dfnID": "isolated-propid", "url": "#isolated-propid", "dfnText": "<isolation-mode>", "refSections": [{"refs": [{"id": "ref-for-isolated-propid"}, {"id": "ref-for-isolated-propid\u2460"}], "title": "3.4.2. The isolation property"}], "external": false};
-window.dfnpanelData['propdef-background-blend-mode'] = {"dfnID": "propdef-background-blend-mode", "url": "#propdef-background-blend-mode", "dfnText": "background-blend-mode", "refSections": [{"refs": [{"id": "ref-for-propdef-background-blend-mode"}], "title": "2.1. Module interactions"}, {"refs": [{"id": "ref-for-propdef-background-blend-mode\u2460"}, {"id": "ref-for-propdef-background-blend-mode\u2461"}, {"id": "ref-for-propdef-background-blend-mode\u2462"}, {"id": "ref-for-propdef-background-blend-mode\u2463"}], "title": "3.4.3. The background-blend-mode property"}], "external": false};
-window.dfnpanelData['compositemode'] = {"dfnID": "compositemode", "url": "#compositemode", "dfnText": "<composite-mode>", "refSections": [{"refs": [{"id": "ref-for-compositemode"}, {"id": "ref-for-compositemode\u2460"}], "title": "4. Specifying Compositing and Blending in Canvas 2D"}, {"refs": [{"id": "ref-for-compositemode\u2461"}], "title": "12. Changes"}], "external": false};
-window.dfnpanelData['backdrop'] = {"dfnID": "backdrop", "url": "#backdrop", "dfnText": "backdrop", "refSections": [{"refs": [{"id": "ref-for-backdrop\u2460"}, {"id": "ref-for-backdrop\u2461"}], "title": "5. Introduction to compositing"}, {"refs": [{"id": "ref-for-backdrop\u2462"}, {"id": "ref-for-backdrop\u2463"}, {"id": "ref-for-backdrop\u2464"}], "title": "5.1. Simple alpha compositing"}, {"refs": [{"id": "ref-for-backdrop\u2465"}, {"id": "ref-for-backdrop\u2466"}], "title": "5.1.1. Examples of simple alpha compositing"}, {"refs": [{"id": "ref-for-backdrop\u2467"}, {"id": "ref-for-backdrop\u2468"}, {"id": "ref-for-backdrop\u2460\u24ea"}, {"id": "ref-for-backdrop\u2460\u2460"}, {"id": "ref-for-backdrop\u2460\u2461"}], "title": "10. Blending"}, {"refs": [{"id": "ref-for-backdrop\u2460\u2462"}], "title": "10.1. Separable blend modes"}, {"refs": [{"id": "ref-for-backdrop\u2460\u2463"}], "title": "10.1.3. screen blend mode"}, {"refs": [{"id": "ref-for-backdrop\u2460\u2464"}, {"id": "ref-for-backdrop\u2460\u2465"}, {"id": "ref-for-backdrop\u2460\u2466"}, {"id": "ref-for-backdrop\u2460\u2467"}], "title": "10.1.4. overlay blend mode"}, {"refs": [{"id": "ref-for-backdrop\u2460\u2468"}, {"id": "ref-for-backdrop\u2461\u24ea"}], "title": "10.1.5. darken blend mode"}, {"refs": [{"id": "ref-for-backdrop\u2461\u2460"}, {"id": "ref-for-backdrop\u2461\u2461"}], "title": "10.1.6. lighten blend mode"}, {"refs": [{"id": "ref-for-backdrop\u2461\u2462"}], "title": "10.1.7. color-dodge blend mode"}, {"refs": [{"id": "ref-for-backdrop\u2461\u2463"}], "title": "10.1.8. color-burn blend mode"}, {"refs": [{"id": "ref-for-backdrop\u2461\u2464"}], "title": "10.1.9. hard-light blend mode"}, {"refs": [{"id": "ref-for-backdrop\u2461\u2465"}], "title": "10.1.10. soft-light blend mode"}, {"refs": [{"id": "ref-for-backdrop\u2461\u2466"}], "title": "10.1.11. difference blend mode"}, {"refs": [{"id": "ref-for-backdrop\u2461\u2467"}], "title": "10.1.12. exclusion blend mode"}, {"refs": [{"id": "ref-for-backdrop\u2461\u2468"}, {"id": "ref-for-backdrop\u2462\u24ea"}], "title": "10.2. Non-separable blend modes"}, {"refs": [{"id": "ref-for-backdrop\u2462\u2460"}], "title": "10.2.1. hue blend mode"}, {"refs": [{"id": "ref-for-backdrop\u2462\u2461"}, {"id": "ref-for-backdrop\u2462\u2462"}], "title": "10.2.2. saturation blend mode"}, {"refs": [{"id": "ref-for-backdrop\u2462\u2463"}, {"id": "ref-for-backdrop\u2462\u2464"}], "title": "10.2.3. color blend mode"}, {"refs": [{"id": "ref-for-backdrop\u2462\u2465"}], "title": "10.2.4. luminosity blend mode"}], "external": false};
-window.dfnpanelData['valdef-blend-mode-normal'] = {"dfnID": "valdef-blend-mode-normal", "url": "#valdef-blend-mode-normal", "dfnText": "normal", "refSections": [{"refs": [{"id": "ref-for-valdef-blend-mode-normal"}, {"id": "ref-for-valdef-blend-mode-normal\u2460"}], "title": "3.4.1. The mix-blend-mode property"}, {"refs": [{"id": "ref-for-valdef-blend-mode-normal\u2461"}], "title": "8.1. Group invariance"}], "external": false};
-window.dfnpanelData['valdef-blend-mode-multiply'] = {"dfnID": "valdef-blend-mode-multiply", "url": "#valdef-blend-mode-multiply", "dfnText": "multiply", "refSections": [{"refs": [{"id": "ref-for-valdef-blend-mode-multiply"}], "title": "3.4.1. The mix-blend-mode property"}, {"refs": [{"id": "ref-for-valdef-blend-mode-multiply\u2460"}], "title": "10.1.9. hard-light blend mode"}], "external": false};
-window.dfnpanelData['valdef-blend-mode-screen'] = {"dfnID": "valdef-blend-mode-screen", "url": "#valdef-blend-mode-screen", "dfnText": "screen", "refSections": [{"refs": [{"id": "ref-for-valdef-blend-mode-screen"}], "title": "3.4.1. The mix-blend-mode property"}, {"refs": [{"id": "ref-for-valdef-blend-mode-screen\u2460"}], "title": "10.1.9. hard-light blend mode"}], "external": false};
-window.dfnpanelData['valdef-blend-mode-overlay'] = {"dfnID": "valdef-blend-mode-overlay", "url": "#valdef-blend-mode-overlay", "dfnText": "overlay", "refSections": [{"refs": [{"id": "ref-for-valdef-blend-mode-overlay"}, {"id": "ref-for-valdef-blend-mode-overlay\u2460"}], "title": "3.4.1. The mix-blend-mode property"}], "external": false};
-window.dfnpanelData['valdef-blend-mode-darken'] = {"dfnID": "valdef-blend-mode-darken", "url": "#valdef-blend-mode-darken", "dfnText": "darken", "refSections": [{"refs": [{"id": "ref-for-valdef-blend-mode-darken"}], "title": "3.4.1. The mix-blend-mode property"}], "external": false};
-window.dfnpanelData['valdef-blend-mode-lighten'] = {"dfnID": "valdef-blend-mode-lighten", "url": "#valdef-blend-mode-lighten", "dfnText": "lighten", "refSections": [{"refs": [{"id": "ref-for-valdef-blend-mode-lighten"}], "title": "3.4.1. The mix-blend-mode property"}], "external": false};
-window.dfnpanelData['valdef-blend-mode-color-dodge'] = {"dfnID": "valdef-blend-mode-color-dodge", "url": "#valdef-blend-mode-color-dodge", "dfnText": "color-dodge", "refSections": [{"refs": [{"id": "ref-for-valdef-blend-mode-color-dodge"}], "title": "3.4.1. The mix-blend-mode property"}], "external": false};
-window.dfnpanelData['valdef-blend-mode-color-burn'] = {"dfnID": "valdef-blend-mode-color-burn", "url": "#valdef-blend-mode-color-burn", "dfnText": "color-burn", "refSections": [{"refs": [{"id": "ref-for-valdef-blend-mode-color-burn"}], "title": "3.4.1. The mix-blend-mode property"}], "external": false};
-window.dfnpanelData['valdef-blend-mode-hard-light'] = {"dfnID": "valdef-blend-mode-hard-light", "url": "#valdef-blend-mode-hard-light", "dfnText": "hard-light", "refSections": [{"refs": [{"id": "ref-for-valdef-blend-mode-hard-light"}], "title": "3.4.1. The mix-blend-mode property"}, {"refs": [{"id": "ref-for-valdef-blend-mode-hard-light\u2460"}, {"id": "ref-for-valdef-blend-mode-hard-light\u2461"}], "title": "10.1.4. overlay blend mode"}], "external": false};
-window.dfnpanelData['valdef-blend-mode-soft-light'] = {"dfnID": "valdef-blend-mode-soft-light", "url": "#valdef-blend-mode-soft-light", "dfnText": "soft-light", "refSections": [{"refs": [{"id": "ref-for-valdef-blend-mode-soft-light"}], "title": "3.4.1. The mix-blend-mode property"}], "external": false};
-window.dfnpanelData['valdef-blend-mode-difference'] = {"dfnID": "valdef-blend-mode-difference", "url": "#valdef-blend-mode-difference", "dfnText": "difference", "refSections": [{"refs": [{"id": "ref-for-valdef-blend-mode-difference"}], "title": "3.4.1. The mix-blend-mode property"}], "external": false};
-window.dfnpanelData['valdef-blend-mode-exclusion'] = {"dfnID": "valdef-blend-mode-exclusion", "url": "#valdef-blend-mode-exclusion", "dfnText": "exclusion", "refSections": [{"refs": [{"id": "ref-for-valdef-blend-mode-exclusion"}], "title": "3.4.1. The mix-blend-mode property"}], "external": false};
-window.dfnpanelData['valdef-blend-mode-hue'] = {"dfnID": "valdef-blend-mode-hue", "url": "#valdef-blend-mode-hue", "dfnText": "hue", "refSections": [{"refs": [{"id": "ref-for-valdef-blend-mode-hue"}], "title": "3.4.1. The mix-blend-mode property"}], "external": false};
-window.dfnpanelData['valdef-blend-mode-saturation'] = {"dfnID": "valdef-blend-mode-saturation", "url": "#valdef-blend-mode-saturation", "dfnText": "saturation", "refSections": [{"refs": [{"id": "ref-for-valdef-blend-mode-saturation"}], "title": "3.4.1. The mix-blend-mode property"}], "external": false};
-window.dfnpanelData['valdef-blend-mode-color'] = {"dfnID": "valdef-blend-mode-color", "url": "#valdef-blend-mode-color", "dfnText": "color", "refSections": [{"refs": [{"id": "ref-for-valdef-blend-mode-color"}], "title": "3.4.1. The mix-blend-mode property"}], "external": false};
-window.dfnpanelData['valdef-blend-mode-luminosity'] = {"dfnID": "valdef-blend-mode-luminosity", "url": "#valdef-blend-mode-luminosity", "dfnText": "luminosity", "refSections": [{"refs": [{"id": "ref-for-valdef-blend-mode-luminosity"}], "title": "3.4.1. The mix-blend-mode property"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -2951,11 +2519,443 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"91bfbe18": {"dfnID":"91bfbe18","dfnText":"opacity","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-opacity"}],"title":"3.4.1. The mix-blend-mode property"}],"url":"https://drafts.csswg.org/css-color-4/#propdef-opacity"},
+"68487d22": {"dfnID":"68487d22","dfnText":"#","external":true,"refSections":[{"refs":[{"id":"ref-for-mult-comma"}],"title":"3.4.3. The background-blend-mode property"}],"url":"https://drafts.csswg.org/css-values-4/#mult-comma"},
+"6ec67710": {"dfnID":"6ec67710","dfnText":"|","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-one"},{"id":"ref-for-comb-one\u2460"},{"id":"ref-for-comb-one\u2461"},{"id":"ref-for-comb-one\u2462"},{"id":"ref-for-comb-one\u2463"},{"id":"ref-for-comb-one\u2464"},{"id":"ref-for-comb-one\u2465"},{"id":"ref-for-comb-one\u2466"},{"id":"ref-for-comb-one\u2467"},{"id":"ref-for-comb-one\u2468"},{"id":"ref-for-comb-one\u2460\u24ea"},{"id":"ref-for-comb-one\u2460\u2460"},{"id":"ref-for-comb-one\u2460\u2461"},{"id":"ref-for-comb-one\u2460\u2462"},{"id":"ref-for-comb-one\u2460\u2463"}],"title":"3.4.1. The mix-blend-mode property"},{"refs":[{"id":"ref-for-comb-one\u2460\u2464"}],"title":"3.4.2. The isolation property"},{"refs":[{"id":"ref-for-comb-one\u2460\u2465"},{"id":"ref-for-comb-one\u2460\u2466"},{"id":"ref-for-comb-one\u2460\u2467"},{"id":"ref-for-comb-one\u2460\u2468"},{"id":"ref-for-comb-one\u2461\u24ea"},{"id":"ref-for-comb-one\u2461\u2460"},{"id":"ref-for-comb-one\u2461\u2461"},{"id":"ref-for-comb-one\u2461\u2462"},{"id":"ref-for-comb-one\u2461\u2463"},{"id":"ref-for-comb-one\u2461\u2464"},{"id":"ref-for-comb-one\u2461\u2465"}],"title":"4. Specifying Compositing and Blending in Canvas 2D"}],"url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"f5eca8c9": {"dfnID":"f5eca8c9","dfnText":"background","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-background"}],"title":"3.4.3. The background-blend-mode property"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-background"},
+"f831c141": {"dfnID":"f831c141","dfnText":"background-image","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-background-image"}],"title":"3.4.3. The background-blend-mode property"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-background-image"},
+"2f0492ac": {"dfnID":"2f0492ac","dfnText":"body","external":true,"refSections":[{"refs":[{"id":"ref-for-the-body-element"}],"title":"3.4.3. The background-blend-mode property"}],"url":"https://html.spec.whatwg.org/multipage/sections.html#the-body-element"},
+"33db4476": {"dfnID":"33db4476","dfnText":"globalCompositeOperation","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-context-2d-globalcompositeoperation"}],"title":"Unnumbered Section"},{"refs":[{"id":"ref-for-dom-context-2d-globalcompositeoperation\u2460"}],"title":"2.1. Module interactions"},{"refs":[{"id":"ref-for-dom-context-2d-globalcompositeoperation\u2461"}],"title":"4. Specifying Compositing and Blending in Canvas 2D"}],"url":"https://html.spec.whatwg.org/multipage/canvas.html#dom-context-2d-globalcompositeoperation"},
+"f0811ff8": {"dfnID":"f0811ff8","dfnText":"img","external":true,"refSections":[{"refs":[{"id":"ref-for-the-img-element"},{"id":"ref-for-the-img-element\u2460"}],"title":"3.4.2. The isolation property"}],"url":"https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element"},
+"propdef-mix-blend-mode": {"dfnID":"propdef-mix-blend-mode","dfnText":"mix-blend-mode","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-mix-blend-mode"}],"title":"3.4.1. The mix-blend-mode property"}],"url":"#propdef-mix-blend-mode"},
+"ltblendmodegt": {"dfnID":"ltblendmodegt","dfnText":"<blend-mode>","external":false,"refSections":[{"refs":[{"id":"ref-for-ltblendmodegt"},{"id":"ref-for-ltblendmodegt\u2460"}],"title":"3.4.1. The mix-blend-mode property"},{"refs":[{"id":"ref-for-ltblendmodegt\u2461"}],"title":"3.4.3. The background-blend-mode property"},{"refs":[{"id":"ref-for-ltblendmodegt\u2462"}],"title":"4. Specifying Compositing and Blending in Canvas 2D"}],"url":"#ltblendmodegt"},
+"propdef-isolation": {"dfnID":"propdef-isolation","dfnText":"isolation","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-isolation"},{"id":"ref-for-propdef-isolation\u2460"}],"title":"3.4.2. The isolation property"}],"url":"#propdef-isolation"},
+"isolated-propid": {"dfnID":"isolated-propid","dfnText":"<isolation-mode>","external":false,"refSections":[{"refs":[{"id":"ref-for-isolated-propid"},{"id":"ref-for-isolated-propid\u2460"}],"title":"3.4.2. The isolation property"}],"url":"#isolated-propid"},
+"propdef-background-blend-mode": {"dfnID":"propdef-background-blend-mode","dfnText":"background-blend-mode","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-background-blend-mode"}],"title":"2.1. Module interactions"},{"refs":[{"id":"ref-for-propdef-background-blend-mode\u2460"},{"id":"ref-for-propdef-background-blend-mode\u2461"},{"id":"ref-for-propdef-background-blend-mode\u2462"},{"id":"ref-for-propdef-background-blend-mode\u2463"}],"title":"3.4.3. The background-blend-mode property"}],"url":"#propdef-background-blend-mode"},
+"compositemode": {"dfnID":"compositemode","dfnText":"<composite-mode>","external":false,"refSections":[{"refs":[{"id":"ref-for-compositemode"},{"id":"ref-for-compositemode\u2460"}],"title":"4. Specifying Compositing and Blending in Canvas 2D"},{"refs":[{"id":"ref-for-compositemode\u2461"}],"title":"12. Changes"}],"url":"#compositemode"},
+"backdrop": {"dfnID":"backdrop","dfnText":"backdrop","external":false,"refSections":[{"refs":[{"id":"ref-for-backdrop\u2460"},{"id":"ref-for-backdrop\u2461"}],"title":"5. Introduction to compositing"},{"refs":[{"id":"ref-for-backdrop\u2462"},{"id":"ref-for-backdrop\u2463"},{"id":"ref-for-backdrop\u2464"}],"title":"5.1. Simple alpha compositing"},{"refs":[{"id":"ref-for-backdrop\u2465"},{"id":"ref-for-backdrop\u2466"}],"title":"5.1.1. Examples of simple alpha compositing"},{"refs":[{"id":"ref-for-backdrop\u2467"},{"id":"ref-for-backdrop\u2468"},{"id":"ref-for-backdrop\u2460\u24ea"},{"id":"ref-for-backdrop\u2460\u2460"},{"id":"ref-for-backdrop\u2460\u2461"}],"title":"10. Blending"},{"refs":[{"id":"ref-for-backdrop\u2460\u2462"}],"title":"10.1. Separable blend modes"},{"refs":[{"id":"ref-for-backdrop\u2460\u2463"}],"title":"10.1.3. screen blend mode"},{"refs":[{"id":"ref-for-backdrop\u2460\u2464"},{"id":"ref-for-backdrop\u2460\u2465"},{"id":"ref-for-backdrop\u2460\u2466"},{"id":"ref-for-backdrop\u2460\u2467"}],"title":"10.1.4. overlay blend mode"},{"refs":[{"id":"ref-for-backdrop\u2460\u2468"},{"id":"ref-for-backdrop\u2461\u24ea"}],"title":"10.1.5. darken blend mode"},{"refs":[{"id":"ref-for-backdrop\u2461\u2460"},{"id":"ref-for-backdrop\u2461\u2461"}],"title":"10.1.6. lighten blend mode"},{"refs":[{"id":"ref-for-backdrop\u2461\u2462"}],"title":"10.1.7. color-dodge blend mode"},{"refs":[{"id":"ref-for-backdrop\u2461\u2463"}],"title":"10.1.8. color-burn blend mode"},{"refs":[{"id":"ref-for-backdrop\u2461\u2464"}],"title":"10.1.9. hard-light blend mode"},{"refs":[{"id":"ref-for-backdrop\u2461\u2465"}],"title":"10.1.10. soft-light blend mode"},{"refs":[{"id":"ref-for-backdrop\u2461\u2466"}],"title":"10.1.11. difference blend mode"},{"refs":[{"id":"ref-for-backdrop\u2461\u2467"}],"title":"10.1.12. exclusion blend mode"},{"refs":[{"id":"ref-for-backdrop\u2461\u2468"},{"id":"ref-for-backdrop\u2462\u24ea"}],"title":"10.2. Non-separable blend modes"},{"refs":[{"id":"ref-for-backdrop\u2462\u2460"}],"title":"10.2.1. hue blend mode"},{"refs":[{"id":"ref-for-backdrop\u2462\u2461"},{"id":"ref-for-backdrop\u2462\u2462"}],"title":"10.2.2. saturation blend mode"},{"refs":[{"id":"ref-for-backdrop\u2462\u2463"},{"id":"ref-for-backdrop\u2462\u2464"}],"title":"10.2.3. color blend mode"},{"refs":[{"id":"ref-for-backdrop\u2462\u2465"}],"title":"10.2.4. luminosity blend mode"}],"url":"#backdrop"},
+"valdef-blend-mode-normal": {"dfnID":"valdef-blend-mode-normal","dfnText":"normal","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-blend-mode-normal"},{"id":"ref-for-valdef-blend-mode-normal\u2460"}],"title":"3.4.1. The mix-blend-mode property"},{"refs":[{"id":"ref-for-valdef-blend-mode-normal\u2461"}],"title":"8.1. Group invariance"}],"url":"#valdef-blend-mode-normal"},
+"valdef-blend-mode-multiply": {"dfnID":"valdef-blend-mode-multiply","dfnText":"multiply","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-blend-mode-multiply"}],"title":"3.4.1. The mix-blend-mode property"},{"refs":[{"id":"ref-for-valdef-blend-mode-multiply\u2460"}],"title":"10.1.9. hard-light blend mode"}],"url":"#valdef-blend-mode-multiply"},
+"valdef-blend-mode-screen": {"dfnID":"valdef-blend-mode-screen","dfnText":"screen","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-blend-mode-screen"}],"title":"3.4.1. The mix-blend-mode property"},{"refs":[{"id":"ref-for-valdef-blend-mode-screen\u2460"}],"title":"10.1.9. hard-light blend mode"}],"url":"#valdef-blend-mode-screen"},
+"valdef-blend-mode-overlay": {"dfnID":"valdef-blend-mode-overlay","dfnText":"overlay","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-blend-mode-overlay"},{"id":"ref-for-valdef-blend-mode-overlay\u2460"}],"title":"3.4.1. The mix-blend-mode property"}],"url":"#valdef-blend-mode-overlay"},
+"valdef-blend-mode-darken": {"dfnID":"valdef-blend-mode-darken","dfnText":"darken","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-blend-mode-darken"}],"title":"3.4.1. The mix-blend-mode property"}],"url":"#valdef-blend-mode-darken"},
+"valdef-blend-mode-lighten": {"dfnID":"valdef-blend-mode-lighten","dfnText":"lighten","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-blend-mode-lighten"}],"title":"3.4.1. The mix-blend-mode property"}],"url":"#valdef-blend-mode-lighten"},
+"valdef-blend-mode-color-dodge": {"dfnID":"valdef-blend-mode-color-dodge","dfnText":"color-dodge","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-blend-mode-color-dodge"}],"title":"3.4.1. The mix-blend-mode property"}],"url":"#valdef-blend-mode-color-dodge"},
+"valdef-blend-mode-color-burn": {"dfnID":"valdef-blend-mode-color-burn","dfnText":"color-burn","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-blend-mode-color-burn"}],"title":"3.4.1. The mix-blend-mode property"}],"url":"#valdef-blend-mode-color-burn"},
+"valdef-blend-mode-hard-light": {"dfnID":"valdef-blend-mode-hard-light","dfnText":"hard-light","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-blend-mode-hard-light"}],"title":"3.4.1. The mix-blend-mode property"},{"refs":[{"id":"ref-for-valdef-blend-mode-hard-light\u2460"},{"id":"ref-for-valdef-blend-mode-hard-light\u2461"}],"title":"10.1.4. overlay blend mode"}],"url":"#valdef-blend-mode-hard-light"},
+"valdef-blend-mode-soft-light": {"dfnID":"valdef-blend-mode-soft-light","dfnText":"soft-light","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-blend-mode-soft-light"}],"title":"3.4.1. The mix-blend-mode property"}],"url":"#valdef-blend-mode-soft-light"},
+"valdef-blend-mode-difference": {"dfnID":"valdef-blend-mode-difference","dfnText":"difference","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-blend-mode-difference"}],"title":"3.4.1. The mix-blend-mode property"}],"url":"#valdef-blend-mode-difference"},
+"valdef-blend-mode-exclusion": {"dfnID":"valdef-blend-mode-exclusion","dfnText":"exclusion","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-blend-mode-exclusion"}],"title":"3.4.1. The mix-blend-mode property"}],"url":"#valdef-blend-mode-exclusion"},
+"valdef-blend-mode-hue": {"dfnID":"valdef-blend-mode-hue","dfnText":"hue","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-blend-mode-hue"}],"title":"3.4.1. The mix-blend-mode property"}],"url":"#valdef-blend-mode-hue"},
+"valdef-blend-mode-saturation": {"dfnID":"valdef-blend-mode-saturation","dfnText":"saturation","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-blend-mode-saturation"}],"title":"3.4.1. The mix-blend-mode property"}],"url":"#valdef-blend-mode-saturation"},
+"valdef-blend-mode-color": {"dfnID":"valdef-blend-mode-color","dfnText":"color","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-blend-mode-color"}],"title":"3.4.1. The mix-blend-mode property"}],"url":"#valdef-blend-mode-color"},
+"valdef-blend-mode-luminosity": {"dfnID":"valdef-blend-mode-luminosity","dfnText":"luminosity","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-blend-mode-luminosity"}],"title":"3.4.1. The mix-blend-mode property"}],"url":"#valdef-blend-mode-luminosity"},
+};
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+const typeFormatters = {
+    'dfn': (text) => `[=${text}=]`,
+    'abstract-op': (text) => `[\$${text}\$]`,
+    'value': (text) => `''${text}''`,
+    'http-header': (text) => `[:${text}:]`,
+    'idl': (text) => `{{${text}}}`,
+    'interface': 'idl',
+    'constructor': 'idl',
+    'method': 'idl',
+    'argument': 'idl',
+    'attribute': 'idl',
+    'callback': 'idl',
+    'dictionary': 'idl',
+    'dict-member': 'idl',
+    'enum': 'idl',
+    'enum-value': 'idl',
+    'exception': 'idl',
+    'const': 'idl',
+    'typedef': 'idl',
+    'stringifier': 'idl',
+    'serializer': 'idl',
+    'iterator': 'idl',
+    'maplike': 'idl',
+    'setlike': 'idl',
+    'extended-attribute': 'idl',
+    'event': 'idl',
+    'element': (element) => `<{${element}}>`,
+    'element-state': 'element',
+    'element-attr': 'element',
+    'attr-value': 'element',
+    'scheme': 'dfn',
+    'permission': 'dfn',
+    'grammar': (text) => `${text} (within a <pre class=prod>)`,
+    'type': (text)=> `<<${text}>>`,
+    'property': (text) => `'${text}'`,
+    'descriptor': 'property',
+    'function': 'value',
+    'at-rule': 'value',
+    'selector': 'value',
+};
+const typesUsingFor = new Set(
+    [
+        "descriptor",
+        "value",
+        "element-attr",
+        "attr-value",
+        "element-state",
+        "method",
+        "constructor",
+        "argument",
+        "attribute",
+        "const",
+        "dict-member",
+        "event",
+        "enum-value",
+        "stringifier",
+        "serializer",
+        "iterator",
+        "maplike",
+        "setlike",
+        "state",
+        "mode",
+        "context",
+        "facet",
+    ],
+)
+const typesNotUsingFor = new Set(
+    [
+        "property",
+        "element",
+        "interface",
+        "namespace",
+        "callback",
+        "dictionary",
+        "enum",
+        "exception",
+        "typedef",
+        "http-header",
+        "permission",
+    ],
+)
+function linkFormatterFromType(type) {
+    const fnOrType = typeFormatters[type];
+    if(typeof fnOrType === 'string') {
+        // follow the alias
+        return linkFormatterFromType(fnOrType);
+    }
+    return fnOrType;
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!typesUsingFor.has(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!typesNotUsingFor.has(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
+
+function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+    dfnPanel.forDfn = dfn;
+    if(!dfn) { console.log(dfnPanel); }
+    return dfnPanel;
+}
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        const panel = genDfnPanel({ ...panelData, dfn });
+        append(document.body, panel);
+        insertDfnPopupAction(panel)
+    }
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+})
+
+function hideAllDfnPanels() {
+    // Turn off any currently "on" or "activated" panels.
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
+}
+
+function showDfnPanel(dfnPanel) {
+    hideAllDfnPanels(); // Only display one at this time.
+
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "true");
+
+    dfnPanel.classList.add("on");
+    positionDfnPanel(dfnPanel);
+
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    // Increment tabindex for each anchor and button tags in panel
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.style.position = "absolute"; // unfix it
+    dfnPanel.classList.remove("on");
+    dfnPanel.classList.remove("activated");
+}
+
+function toggleDfnPanel(dfnPanel) {
+    if(dfnPanel.classList.contains("on")) {
+        hideDfnPanel(dfnPanel);
+    } else {
+        showDfnPanel(dfnPanel);
+    }
+}
+
+function insertDfnPopupAction(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        showDfnPanel(dfnPanel);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfnPanel);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel(dfnPanel, dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    })
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
 }
 </script>
 <script>/* Boilerplate: script-link-titles */
+"use strict";
+{
 let linkTitleData = {
- "#ltblendmodegt": "Expands to: color | color-burn | color-dodge | darken | difference | exclusion | hard-light | hue | lighten | luminosity | multiply | normal | overlay | saturation | screen | soft-light"
+"#ltblendmodegt": "Expands to: color | color-burn | color-dodge | darken | difference | exclusion | hard-light | hue | lighten | luminosity | multiply | normal | overlay | saturation | screen | soft-light",
 };
 
 function setTypeTitles() {
@@ -2967,11 +2967,11 @@ function setTypeTitles() {
 }
 
 document.addEventListener("DOMContentLoaded", setTypeTitles);
+}
 </script>
 <script>/* Boilerplate: script-position-annos */
 "use strict";
 {
-
 function repositionAnnoPanels(){
     const panels = [...document.querySelectorAll("[data-anno-for]")];
     const main = document.querySelector("main");
@@ -3015,245 +3015,243 @@ window.addEventListener("resize", repositionAnnoPanels);
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
+let refsData = {
+"#backdrop": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"compositing","spec":"compositing-1","status":"local","text":"backdrop","type":"dfn","url":"#backdrop"},
+"https://html.spec.whatwg.org/multipage/canvas.html#dom-context-2d-globalcompositeoperation": {"export":true,"for_":["CanvasCompositing"],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"globalCompositeOperation","type":"attribute","url":"https://html.spec.whatwg.org/multipage/canvas.html#dom-context-2d-globalcompositeoperation"},
+"#propdef-background-blend-mode": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"compositing","spec":"compositing-1","status":"local","text":"background-blend-mode","type":"property","url":"#propdef-background-blend-mode"},
+"#propdef-mix-blend-mode": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"compositing","spec":"compositing-1","status":"local","text":"mix-blend-mode","type":"property","url":"#propdef-mix-blend-mode"},
+"#ltblendmodegt": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"compositing","spec":"compositing-1","status":"local","text":"<blend-mode>","type":"type","url":"#ltblendmodegt"},
+"#valdef-blend-mode-normal": {"export":true,"for_":["<blend-mode>"],"level":"1","normative":true,"shortname":"compositing","spec":"compositing-1","status":"local","text":"normal","type":"value","url":"#valdef-blend-mode-normal"},
+"https://drafts.csswg.org/css-values-4/#comb-one": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"|","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"#valdef-blend-mode-multiply": {"export":true,"for_":["<blend-mode>"],"level":"1","normative":true,"shortname":"compositing","spec":"compositing-1","status":"local","text":"multiply","type":"value","url":"#valdef-blend-mode-multiply"},
+"#valdef-blend-mode-screen": {"export":true,"for_":["<blend-mode>"],"level":"1","normative":true,"shortname":"compositing","spec":"compositing-1","status":"local","text":"screen","type":"value","url":"#valdef-blend-mode-screen"},
+"#valdef-blend-mode-overlay": {"export":true,"for_":["<blend-mode>"],"level":"1","normative":true,"shortname":"compositing","spec":"compositing-1","status":"local","text":"overlay","type":"value","url":"#valdef-blend-mode-overlay"},
+"#valdef-blend-mode-darken": {"export":true,"for_":["<blend-mode>"],"level":"1","normative":true,"shortname":"compositing","spec":"compositing-1","status":"local","text":"darken","type":"value","url":"#valdef-blend-mode-darken"},
+"#valdef-blend-mode-lighten": {"export":true,"for_":["<blend-mode>"],"level":"1","normative":true,"shortname":"compositing","spec":"compositing-1","status":"local","text":"lighten","type":"value","url":"#valdef-blend-mode-lighten"},
+"#valdef-blend-mode-color-dodge": {"export":true,"for_":["<blend-mode>"],"level":"1","normative":true,"shortname":"compositing","spec":"compositing-1","status":"local","text":"color-dodge","type":"value","url":"#valdef-blend-mode-color-dodge"},
+"#valdef-blend-mode-color-burn": {"export":true,"for_":["<blend-mode>"],"level":"1","normative":true,"shortname":"compositing","spec":"compositing-1","status":"local","text":"color-burn","type":"value","url":"#valdef-blend-mode-color-burn"},
+"#valdef-blend-mode-hard-light": {"export":true,"for_":["<blend-mode>"],"level":"1","normative":true,"shortname":"compositing","spec":"compositing-1","status":"local","text":"hard-light","type":"value","url":"#valdef-blend-mode-hard-light"},
+"#valdef-blend-mode-soft-light": {"export":true,"for_":["<blend-mode>"],"level":"1","normative":true,"shortname":"compositing","spec":"compositing-1","status":"local","text":"soft-light","type":"value","url":"#valdef-blend-mode-soft-light"},
+"#valdef-blend-mode-difference": {"export":true,"for_":["<blend-mode>"],"level":"1","normative":true,"shortname":"compositing","spec":"compositing-1","status":"local","text":"difference","type":"value","url":"#valdef-blend-mode-difference"},
+"#valdef-blend-mode-exclusion": {"export":true,"for_":["<blend-mode>"],"level":"1","normative":true,"shortname":"compositing","spec":"compositing-1","status":"local","text":"exclusion","type":"value","url":"#valdef-blend-mode-exclusion"},
+"#valdef-blend-mode-hue": {"export":true,"for_":["<blend-mode>"],"level":"1","normative":true,"shortname":"compositing","spec":"compositing-1","status":"local","text":"hue","type":"value","url":"#valdef-blend-mode-hue"},
+"#valdef-blend-mode-saturation": {"export":true,"for_":["<blend-mode>"],"level":"1","normative":true,"shortname":"compositing","spec":"compositing-1","status":"local","text":"saturation","type":"value","url":"#valdef-blend-mode-saturation"},
+"#valdef-blend-mode-color": {"export":true,"for_":["<blend-mode>"],"level":"1","normative":true,"shortname":"compositing","spec":"compositing-1","status":"local","text":"color","type":"value","url":"#valdef-blend-mode-color"},
+"#valdef-blend-mode-luminosity": {"export":true,"for_":["<blend-mode>"],"level":"1","normative":true,"shortname":"compositing","spec":"compositing-1","status":"local","text":"luminosity","type":"value","url":"#valdef-blend-mode-luminosity"},
+"https://drafts.csswg.org/css-color-4/#propdef-opacity": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-color","spec":"css-color-4","status":"current","text":"opacity","type":"property","url":"https://drafts.csswg.org/css-color-4/#propdef-opacity"},
+"#propdef-isolation": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"compositing","spec":"compositing-1","status":"local","text":"isolation","type":"property","url":"#propdef-isolation"},
+"#isolated-propid": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"compositing","spec":"compositing-1","status":"local","text":"<isolation-mode>","type":"type","url":"#isolated-propid"},
+"https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"img","type":"element","url":"https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element"},
+"https://drafts.csswg.org/css-values-4/#mult-comma": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"#","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#mult-comma"},
+"https://drafts.csswg.org/css-backgrounds-3/#propdef-background-image": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"current","text":"background-image","type":"property","url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-background-image"},
+"https://drafts.csswg.org/css-backgrounds-3/#propdef-background": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"current","text":"background","type":"property","url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-background"},
+"https://html.spec.whatwg.org/multipage/sections.html#the-body-element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"body","type":"element","url":"https://html.spec.whatwg.org/multipage/sections.html#the-body-element"},
+"#compositemode": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"compositing","spec":"compositing-1","status":"local","text":"<composite-mode>","type":"type","url":"#compositemode"},
+};
+
+function genRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "DFN: "),
+                mk.code({ class: "dfn-text" }, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    const forListElements = forList.length === 0 ? '' : mk.li({},
+        mk.b({}, "For: "),
+        mk.ul({},
+            ...forList.map(forItem =>
                 mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
-            mk.b({}, "For: "),
-            mk.ul({},
-                ...forList.map(forItem =>
-                    mk.li({},
-                        mk.span({}, `${forItem}`)
-                    ),
+                    mk.span({}, `${forItem}`)
                 ),
             ),
-        );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+        ),
+    );
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
-    }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    return hintPanel;
+}
+function genAllRefHints() {
+    for(const refData of Object.values(refsData)) {
+        const refUrl = refData.url;
+        const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+        if (links.length == 0) {
+            console.log(`Can't find link href="${refUrl}".`, refData);
+            continue;
+        }
+        for(const link of links) {
+            if(link.classList.contains("dfn-link")) continue;
+            const hint = genRefHint(link, refData);
+            append(document.body, hint);
+            insertLinkPopupAction(hint)
         }
     }
+}
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+function hideAllRefHints() {
+    queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    refHint.style.position = "absolute"; // unfix it
+    refHint.classList.remove("on");
+    const teardown = refHint.teardownEventListeners;
+    if (teardown) {
+        refHint.teardownEventListeners = undefined;
+        teardown();
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+function showRefHint(refHint) {
+    hideAllRefHints(); // Only display one at this time.
+
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "true");
+    refHint.classList.add("on");
+    positionRefHint(refHint);
+    setupRefHintEventListeners(refHint);
+}
+
+function setupRefHintEventListeners(refHint) {
+    if (refHint.teardownEventListeners) return;
+    const link = refHint.forLink;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
 
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
 
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+function insertLinkPopupAction(refHint) {
+    const link = refHint.forLink;
+    // link.setAttribute('role', 'button');
+    link.setAttribute('aria-expanded', 'false')
+    link.classList.add('has-ref-hint');
+    link.addEventListener('mouseover', (event) => {
+        showRefHint(refHint);
     });
+    link.addEventListener('focus', (event) => {
+        showRefHint(refHint);
+    })
+}
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+document.addEventListener("DOMContentLoaded", () => {
+    genAllRefHints();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['#backdrop'] = {"text": "backdrop", "type": "dfn", "spec": "compositing-1", "shortname": "compositing", "level": "1", "status": "local", "url": "#backdrop", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/canvas.html#dom-context-2d-globalcompositeoperation'] = {"text": "globalCompositeOperation", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/canvas.html#dom-context-2d-globalcompositeoperation", "export": true, "normative": true, "for_": ["CanvasCompositing"]};
-window.refsData['#propdef-background-blend-mode'] = {"text": "background-blend-mode", "type": "property", "spec": "compositing-1", "shortname": "compositing", "level": "1", "status": "local", "url": "#propdef-background-blend-mode", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-mix-blend-mode'] = {"text": "mix-blend-mode", "type": "property", "spec": "compositing-1", "shortname": "compositing", "level": "1", "status": "local", "url": "#propdef-mix-blend-mode", "export": true, "normative": true, "for_": []};
-window.refsData['#ltblendmodegt'] = {"text": "<blend-mode>", "type": "type", "spec": "compositing-1", "shortname": "compositing", "level": "1", "status": "local", "url": "#ltblendmodegt", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-blend-mode-normal'] = {"text": "normal", "type": "value", "spec": "compositing-1", "shortname": "compositing", "level": "1", "status": "local", "url": "#valdef-blend-mode-normal", "export": true, "normative": true, "for_": ["<blend-mode>"]};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-blend-mode-multiply'] = {"text": "multiply", "type": "value", "spec": "compositing-1", "shortname": "compositing", "level": "1", "status": "local", "url": "#valdef-blend-mode-multiply", "export": true, "normative": true, "for_": ["<blend-mode>"]};
-window.refsData['#valdef-blend-mode-screen'] = {"text": "screen", "type": "value", "spec": "compositing-1", "shortname": "compositing", "level": "1", "status": "local", "url": "#valdef-blend-mode-screen", "export": true, "normative": true, "for_": ["<blend-mode>"]};
-window.refsData['#valdef-blend-mode-overlay'] = {"text": "overlay", "type": "value", "spec": "compositing-1", "shortname": "compositing", "level": "1", "status": "local", "url": "#valdef-blend-mode-overlay", "export": true, "normative": true, "for_": ["<blend-mode>"]};
-window.refsData['#valdef-blend-mode-darken'] = {"text": "darken", "type": "value", "spec": "compositing-1", "shortname": "compositing", "level": "1", "status": "local", "url": "#valdef-blend-mode-darken", "export": true, "normative": true, "for_": ["<blend-mode>"]};
-window.refsData['#valdef-blend-mode-lighten'] = {"text": "lighten", "type": "value", "spec": "compositing-1", "shortname": "compositing", "level": "1", "status": "local", "url": "#valdef-blend-mode-lighten", "export": true, "normative": true, "for_": ["<blend-mode>"]};
-window.refsData['#valdef-blend-mode-color-dodge'] = {"text": "color-dodge", "type": "value", "spec": "compositing-1", "shortname": "compositing", "level": "1", "status": "local", "url": "#valdef-blend-mode-color-dodge", "export": true, "normative": true, "for_": ["<blend-mode>"]};
-window.refsData['#valdef-blend-mode-color-burn'] = {"text": "color-burn", "type": "value", "spec": "compositing-1", "shortname": "compositing", "level": "1", "status": "local", "url": "#valdef-blend-mode-color-burn", "export": true, "normative": true, "for_": ["<blend-mode>"]};
-window.refsData['#valdef-blend-mode-hard-light'] = {"text": "hard-light", "type": "value", "spec": "compositing-1", "shortname": "compositing", "level": "1", "status": "local", "url": "#valdef-blend-mode-hard-light", "export": true, "normative": true, "for_": ["<blend-mode>"]};
-window.refsData['#valdef-blend-mode-soft-light'] = {"text": "soft-light", "type": "value", "spec": "compositing-1", "shortname": "compositing", "level": "1", "status": "local", "url": "#valdef-blend-mode-soft-light", "export": true, "normative": true, "for_": ["<blend-mode>"]};
-window.refsData['#valdef-blend-mode-difference'] = {"text": "difference", "type": "value", "spec": "compositing-1", "shortname": "compositing", "level": "1", "status": "local", "url": "#valdef-blend-mode-difference", "export": true, "normative": true, "for_": ["<blend-mode>"]};
-window.refsData['#valdef-blend-mode-exclusion'] = {"text": "exclusion", "type": "value", "spec": "compositing-1", "shortname": "compositing", "level": "1", "status": "local", "url": "#valdef-blend-mode-exclusion", "export": true, "normative": true, "for_": ["<blend-mode>"]};
-window.refsData['#valdef-blend-mode-hue'] = {"text": "hue", "type": "value", "spec": "compositing-1", "shortname": "compositing", "level": "1", "status": "local", "url": "#valdef-blend-mode-hue", "export": true, "normative": true, "for_": ["<blend-mode>"]};
-window.refsData['#valdef-blend-mode-saturation'] = {"text": "saturation", "type": "value", "spec": "compositing-1", "shortname": "compositing", "level": "1", "status": "local", "url": "#valdef-blend-mode-saturation", "export": true, "normative": true, "for_": ["<blend-mode>"]};
-window.refsData['#valdef-blend-mode-color'] = {"text": "color", "type": "value", "spec": "compositing-1", "shortname": "compositing", "level": "1", "status": "local", "url": "#valdef-blend-mode-color", "export": true, "normative": true, "for_": ["<blend-mode>"]};
-window.refsData['#valdef-blend-mode-luminosity'] = {"text": "luminosity", "type": "value", "spec": "compositing-1", "shortname": "compositing", "level": "1", "status": "local", "url": "#valdef-blend-mode-luminosity", "export": true, "normative": true, "for_": ["<blend-mode>"]};
-window.refsData['https://drafts.csswg.org/css-color-4/#propdef-opacity'] = {"text": "opacity", "type": "property", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-color-4/#propdef-opacity", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-isolation'] = {"text": "isolation", "type": "property", "spec": "compositing-1", "shortname": "compositing", "level": "1", "status": "local", "url": "#propdef-isolation", "export": true, "normative": true, "for_": []};
-window.refsData['#isolated-propid'] = {"text": "<isolation-mode>", "type": "type", "spec": "compositing-1", "shortname": "compositing", "level": "1", "status": "local", "url": "#isolated-propid", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element'] = {"text": "img", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#mult-comma'] = {"text": "#", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-comma", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-background-image'] = {"text": "background-image", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background-image", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-background'] = {"text": "background", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/sections.html#the-body-element'] = {"text": "body", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/sections.html#the-body-element", "export": true, "normative": true, "for_": []};
-window.refsData['#compositemode'] = {"text": "<composite-mode>", "type": "type", "spec": "compositing-1", "shortname": "compositing", "level": "1", "status": "local", "url": "#compositemode", "export": true, "normative": true, "for_": []};window.refsData['#propdef-background-blend-mode'] = {"text": "background-blend-mode", "type": "property", "spec": "compositing-1", "shortname": "compositing", "level": "1", "status": "local", "url": "#propdef-background-blend-mode", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-isolation'] = {"text": "isolation", "type": "property", "spec": "compositing-1", "shortname": "compositing", "level": "1", "status": "local", "url": "#propdef-isolation", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-mix-blend-mode'] = {"text": "mix-blend-mode", "type": "property", "spec": "compositing-1", "shortname": "compositing", "level": "1", "status": "local", "url": "#propdef-mix-blend-mode", "export": true, "normative": true, "for_": []};
 </script>

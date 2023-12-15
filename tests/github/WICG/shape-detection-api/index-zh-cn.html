@@ -93,7 +93,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -467,6 +466,11 @@ figcaption:not(.no-marker)::before {
     }
 }
 </style>
+<style>/* Boilerplate: style-idl-highlighting */
+pre.idl.highlight {
+    background: var(--borderedblock-bg, var(--def-bg));
+}
+</style>
 <style>/* Boilerplate: style-issues */
 a[href].issue-return {
     float: right;
@@ -744,7 +748,6 @@ a[href].issue-return {
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -804,7 +807,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -861,7 +863,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -1413,442 +1414,8 @@ textDetector<c- p>.</c->detect<c- p>(</c->theImage<c- p>)</c->
     </div>
    </div>
   </details>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['899cfb35'] = {"dfnID": "899cfb35", "url": "https://w3c.github.io/mediacapture-image/#Point2D", "dfnText": "Point2D", "refSections": [{"refs": [{"id": "ref-for-Point2D"}, {"id": "ref-for-Point2D\u2460"}, {"id": "ref-for-Point2D\u2461"}], "title": "2.3. \u6761\u5f62\u7801\u8bc6\u522bAPI"}], "external": true};
-window.dfnpanelData['27dba777'] = {"dfnID": "27dba777", "url": "https://drafts.fxtf.org/geometry-1/#domrect", "dfnText": "DOMRect", "refSections": [{"refs": [{"id": "ref-for-domrect"}, {"id": "ref-for-domrect\u2460"}], "title": "2.4. \u6587\u672c\u8bc6\u522bAPI"}], "external": true};
-window.dfnpanelData['fdd2dd4e'] = {"dfnID": "fdd2dd4e", "url": "https://drafts.fxtf.org/geometry-1/#domrectreadonly", "dfnText": "DOMRectReadOnly", "refSections": [{"refs": [{"id": "ref-for-domrectreadonly"}, {"id": "ref-for-domrectreadonly\u2460"}], "title": "2.2. \u4eba\u8138\u8bc6\u522bAPI"}, {"refs": [{"id": "ref-for-domrectreadonly\u2461"}, {"id": "ref-for-domrectreadonly\u2462"}], "title": "2.3. \u6761\u5f62\u7801\u8bc6\u522bAPI"}], "external": true};
-window.dfnpanelData['5b13c537'] = {"dfnID": "5b13c537", "url": "https://html.spec.whatwg.org/multipage/canvas.html#htmlcanvaselement", "dfnText": "HTMLCanvasElement", "refSections": [{"refs": [{"id": "ref-for-htmlcanvaselement"}, {"id": "ref-for-htmlcanvaselement\u2460"}], "title": "2.1. \u7528\u4e8e\u8bc6\u522b\u7684\u56fe\u50cf\u6e90"}], "external": true};
-window.dfnpanelData['c5891539'] = {"dfnID": "c5891539", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#htmlimageelement", "dfnText": "HTMLImageElement", "refSections": [{"refs": [{"id": "ref-for-htmlimageelement"}, {"id": "ref-for-htmlimageelement\u2460"}, {"id": "ref-for-htmlimageelement\u2461"}, {"id": "ref-for-htmlimageelement\u2462"}], "title": "2.1. \u7528\u4e8e\u8bc6\u522b\u7684\u56fe\u50cf\u6e90"}], "external": true};
-window.dfnpanelData['f57f330b'] = {"dfnID": "f57f330b", "url": "https://html.spec.whatwg.org/multipage/media.html#htmlvideoelement", "dfnText": "HTMLVideoElement", "refSections": [{"refs": [{"id": "ref-for-htmlvideoelement"}, {"id": "ref-for-htmlvideoelement\u2460"}], "title": "2.1. \u7528\u4e8e\u8bc6\u522b\u7684\u56fe\u50cf\u6e90"}], "external": true};
-window.dfnpanelData['aeb8d5fd'] = {"dfnID": "aeb8d5fd", "url": "https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html#imagebitmapsource", "dfnText": "ImageBitmapSource", "refSections": [{"refs": [{"id": "ref-for-imagebitmapsource"}, {"id": "ref-for-imagebitmapsource\u2460"}, {"id": "ref-for-imagebitmapsource\u2461"}, {"id": "ref-for-imagebitmapsource\u2462"}, {"id": "ref-for-imagebitmapsource\u2463"}, {"id": "ref-for-imagebitmapsource\u2464"}, {"id": "ref-for-imagebitmapsource\u2465"}, {"id": "ref-for-imagebitmapsource\u2466"}, {"id": "ref-for-imagebitmapsource\u2467"}, {"id": "ref-for-imagebitmapsource\u2468"}, {"id": "ref-for-imagebitmapsource\u2460\u24ea"}, {"id": "ref-for-imagebitmapsource\u2460\u2460"}], "title": "2.1. \u7528\u4e8e\u8bc6\u522b\u7684\u56fe\u50cf\u6e90"}, {"refs": [{"id": "ref-for-imagebitmapsource\u2460\u2461"}, {"id": "ref-for-imagebitmapsource\u2460\u2462"}, {"id": "ref-for-imagebitmapsource\u2460\u2463"}], "title": "2.2. \u4eba\u8138\u8bc6\u522bAPI"}, {"refs": [{"id": "ref-for-imagebitmapsource\u2460\u2464"}, {"id": "ref-for-imagebitmapsource\u2460\u2465"}, {"id": "ref-for-imagebitmapsource\u2460\u2466"}], "title": "2.3. \u6761\u5f62\u7801\u8bc6\u522bAPI"}, {"refs": [{"id": "ref-for-imagebitmapsource\u2460\u2467"}, {"id": "ref-for-imagebitmapsource\u2460\u2468"}, {"id": "ref-for-imagebitmapsource\u2461\u24ea"}], "title": "2.4. \u6587\u672c\u8bc6\u522bAPI"}], "external": true};
-window.dfnpanelData['dca2de17'] = {"dfnID": "dca2de17", "url": "https://webidl.spec.whatwg.org/#idl-DOMException", "dfnText": "DOMException", "refSections": [{"refs": [{"id": "ref-for-idl-DOMException"}, {"id": "ref-for-idl-DOMException\u2460"}, {"id": "ref-for-idl-DOMException\u2461"}, {"id": "ref-for-idl-DOMException\u2462"}, {"id": "ref-for-idl-DOMException\u2463"}], "title": "2.1. \u7528\u4e8e\u8bc6\u522b\u7684\u56fe\u50cf\u6e90"}], "external": true};
-window.dfnpanelData['bcda9d2a'] = {"dfnID": "bcda9d2a", "url": "https://heycam.github.io/webidl/#idl-DOMString", "dfnText": "DOMString", "refSections": [{"refs": [{"id": "ref-for-idl-DOMString"}, {"id": "ref-for-idl-DOMString\u2460"}, {"id": "ref-for-idl-DOMString\u2461"}], "title": "2.3. \u6761\u5f62\u7801\u8bc6\u522bAPI"}, {"refs": [{"id": "ref-for-idl-DOMString\u2462"}, {"id": "ref-for-idl-DOMString\u2463"}], "title": "2.4. \u6587\u672c\u8bc6\u522bAPI"}], "external": true};
-window.dfnpanelData['889e932f'] = {"dfnID": "889e932f", "url": "https://webidl.spec.whatwg.org/#Exposed", "dfnText": "Exposed", "refSections": [{"refs": [{"id": "ref-for-Exposed"}], "title": "2.2. \u4eba\u8138\u8bc6\u522bAPI"}, {"refs": [{"id": "ref-for-Exposed\u2460"}], "title": "2.3. \u6761\u5f62\u7801\u8bc6\u522bAPI"}, {"refs": [{"id": "ref-for-Exposed\u2461"}], "title": "2.4. \u6587\u672c\u8bc6\u522bAPI"}], "external": true};
-window.dfnpanelData['dcf5fafa'] = {"dfnID": "dcf5fafa", "url": "https://webidl.spec.whatwg.org/#idl-frozen-array", "dfnText": "FrozenArray", "refSections": [{"refs": [{"id": "ref-for-idl-frozen-array"}], "title": "2.3. \u6761\u5f62\u7801\u8bc6\u522bAPI"}], "external": true};
-window.dfnpanelData['797018a7'] = {"dfnID": "797018a7", "url": "https://webidl.spec.whatwg.org/#invalidstateerror", "dfnText": "InvalidStateError", "refSections": [{"refs": [{"id": "ref-for-invalidstateerror"}, {"id": "ref-for-invalidstateerror\u2460"}, {"id": "ref-for-invalidstateerror\u2461"}], "title": "2.1. \u7528\u4e8e\u8bc6\u522b\u7684\u56fe\u50cf\u6e90"}], "external": true};
-window.dfnpanelData['bdbd19d1'] = {"dfnID": "bdbd19d1", "url": "https://webidl.spec.whatwg.org/#idl-promise", "dfnText": "Promise", "refSections": [{"refs": [{"id": "ref-for-idl-promise"}], "title": "2.2. \u4eba\u8138\u8bc6\u522bAPI"}, {"refs": [{"id": "ref-for-idl-promise\u2460"}], "title": "2.3. \u6761\u5f62\u7801\u8bc6\u522bAPI"}, {"refs": [{"id": "ref-for-idl-promise\u2461"}], "title": "2.4. \u6587\u672c\u8bc6\u522bAPI"}], "external": true};
-window.dfnpanelData['a5c91173'] = {"dfnID": "a5c91173", "url": "https://webidl.spec.whatwg.org/#SameObject", "dfnText": "SameObject", "refSections": [{"refs": [{"id": "ref-for-SameObject"}], "title": "2.2. \u4eba\u8138\u8bc6\u522bAPI"}, {"refs": [{"id": "ref-for-SameObject\u2460"}, {"id": "ref-for-SameObject\u2461"}, {"id": "ref-for-SameObject\u2462"}], "title": "2.3. \u6761\u5f62\u7801\u8bc6\u522bAPI"}, {"refs": [{"id": "ref-for-SameObject\u2463"}, {"id": "ref-for-SameObject\u2464"}], "title": "2.4. \u6587\u672c\u8bc6\u522bAPI"}], "external": true};
-window.dfnpanelData['c3e881ef'] = {"dfnID": "c3e881ef", "url": "https://webidl.spec.whatwg.org/#securityerror", "dfnText": "SecurityError", "refSections": [{"refs": [{"id": "ref-for-securityerror"}, {"id": "ref-for-securityerror\u2460"}], "title": "2.1. \u7528\u4e8e\u8bc6\u522b\u7684\u56fe\u50cf\u6e90"}], "external": true};
-window.dfnpanelData['5372cca8'] = {"dfnID": "5372cca8", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "dfnText": "boolean", "refSections": [{"refs": [{"id": "ref-for-idl-boolean"}, {"id": "ref-for-idl-boolean\u2460"}], "title": "2.2. \u4eba\u8138\u8bc6\u522bAPI"}], "external": true};
-window.dfnpanelData['9cce47fd'] = {"dfnID": "9cce47fd", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "dfnText": "sequence", "refSections": [{"refs": [{"id": "ref-for-idl-sequence"}], "title": "2.2. \u4eba\u8138\u8bc6\u522bAPI"}, {"refs": [{"id": "ref-for-idl-sequence\u2460"}, {"id": "ref-for-idl-sequence\u2461"}], "title": "2.3. \u6761\u5f62\u7801\u8bc6\u522bAPI"}, {"refs": [{"id": "ref-for-idl-sequence\u2462"}], "title": "2.4. \u6587\u672c\u8bc6\u522bAPI"}], "external": true};
-window.dfnpanelData['450958f7'] = {"dfnID": "450958f7", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-short", "dfnText": "unsigned short", "refSections": [{"refs": [{"id": "ref-for-idl-unsigned-short"}, {"id": "ref-for-idl-unsigned-short\u2460"}], "title": "2.2. \u4eba\u8138\u8bc6\u522bAPI"}], "external": true};
-window.dfnpanelData['dictdef-facedetectoroptions'] = {"dfnID": "dictdef-facedetectoroptions", "url": "#dictdef-facedetectoroptions", "dfnText": "FaceDetectorOptions", "refSections": [{"refs": [{"id": "ref-for-dictdef-facedetectoroptions"}, {"id": "ref-for-dictdef-facedetectoroptions\u2460"}], "title": "2.2. \u4eba\u8138\u8bc6\u522bAPI"}], "external": false};
-window.dfnpanelData['dom-facedetectoroptions-maxdetectedfaces'] = {"dfnID": "dom-facedetectoroptions-maxdetectedfaces", "url": "#dom-facedetectoroptions-maxdetectedfaces", "dfnText": "maxDetectedFaces", "refSections": [{"refs": [{"id": "ref-for-dom-facedetectoroptions-maxdetectedfaces"}], "title": "2.2. \u4eba\u8138\u8bc6\u522bAPI"}], "external": false};
-window.dfnpanelData['dom-facedetectoroptions-fastmode'] = {"dfnID": "dom-facedetectoroptions-fastmode", "url": "#dom-facedetectoroptions-fastmode", "dfnText": "fastMode", "refSections": [{"refs": [{"id": "ref-for-dom-facedetectoroptions-fastmode"}], "title": "2.2. \u4eba\u8138\u8bc6\u522bAPI"}], "external": false};
-window.dfnpanelData['facedetector'] = {"dfnID": "facedetector", "url": "#facedetector", "dfnText": "FaceDetector", "refSections": [{"refs": [{"id": "ref-for-facedetector"}, {"id": "ref-for-facedetector\u2460"}], "title": "2.2. \u4eba\u8138\u8bc6\u522bAPI"}], "external": false};
-window.dfnpanelData['dom-facedetector-detect'] = {"dfnID": "dom-facedetector-detect", "url": "#dom-facedetector-detect", "dfnText": "detect", "refSections": [{"refs": [{"id": "ref-for-dom-facedetector-detect"}], "title": "2.2. \u4eba\u8138\u8bc6\u522bAPI"}], "external": false};
-window.dfnpanelData['detectedface'] = {"dfnID": "detectedface", "url": "#detectedface", "dfnText": "DetectedFace", "refSections": [{"refs": [{"id": "ref-for-detectedface"}, {"id": "ref-for-detectedface\u2460"}, {"id": "ref-for-detectedface\u2461"}, {"id": "ref-for-detectedface\u2462"}], "title": "2.2. \u4eba\u8138\u8bc6\u522bAPI"}], "external": false};
-window.dfnpanelData['dom-detectedface-boundingbox'] = {"dfnID": "dom-detectedface-boundingbox", "url": "#dom-detectedface-boundingbox", "dfnText": "boundingBox", "refSections": [{"refs": [{"id": "ref-for-dom-detectedface-boundingbox"}, {"id": "ref-for-dom-detectedface-boundingbox\u2460"}], "title": "2.2. \u4eba\u8138\u8bc6\u522bAPI"}], "external": false};
-window.dfnpanelData['barcodedetector'] = {"dfnID": "barcodedetector", "url": "#barcodedetector", "dfnText": "BarcodeDetector", "refSections": [{"refs": [{"id": "ref-for-barcodedetector"}], "title": "2.3. \u6761\u5f62\u7801\u8bc6\u522bAPI"}], "external": false};
-window.dfnpanelData['dom-barcodedetector-detect'] = {"dfnID": "dom-barcodedetector-detect", "url": "#dom-barcodedetector-detect", "dfnText": "detect(ImageBitmapSource image)", "refSections": [{"refs": [{"id": "ref-for-dom-barcodedetector-detect"}, {"id": "ref-for-dom-barcodedetector-detect\u2460"}], "title": "2.3. \u6761\u5f62\u7801\u8bc6\u522bAPI"}], "external": false};
-window.dfnpanelData['detectedbarcode'] = {"dfnID": "detectedbarcode", "url": "#detectedbarcode", "dfnText": "DetectedBarcode", "refSections": [{"refs": [{"id": "ref-for-detectedbarcode"}, {"id": "ref-for-detectedbarcode\u2460"}], "title": "2.3. \u6761\u5f62\u7801\u8bc6\u522bAPI"}], "external": false};
-window.dfnpanelData['dom-detectedbarcode-boundingbox'] = {"dfnID": "dom-detectedbarcode-boundingbox", "url": "#dom-detectedbarcode-boundingbox", "dfnText": "boundingBox", "refSections": [{"refs": [{"id": "ref-for-dom-detectedbarcode-boundingbox"}, {"id": "ref-for-dom-detectedbarcode-boundingbox\u2460"}], "title": "2.3. \u6761\u5f62\u7801\u8bc6\u522bAPI"}], "external": false};
-window.dfnpanelData['dom-detectedbarcode-rawvalue'] = {"dfnID": "dom-detectedbarcode-rawvalue", "url": "#dom-detectedbarcode-rawvalue", "dfnText": "rawValue", "refSections": [{"refs": [{"id": "ref-for-dom-detectedbarcode-rawvalue"}, {"id": "ref-for-dom-detectedbarcode-rawvalue\u2460"}], "title": "2.3. \u6761\u5f62\u7801\u8bc6\u522bAPI"}], "external": false};
-window.dfnpanelData['dom-detectedbarcode-cornerpoints'] = {"dfnID": "dom-detectedbarcode-cornerpoints", "url": "#dom-detectedbarcode-cornerpoints", "dfnText": "cornerPoints", "refSections": [{"refs": [{"id": "ref-for-dom-detectedbarcode-cornerpoints"}], "title": "2.3. \u6761\u5f62\u7801\u8bc6\u522bAPI"}], "external": false};
-window.dfnpanelData['dom-textdetector-detect'] = {"dfnID": "dom-textdetector-detect", "url": "#dom-textdetector-detect", "dfnText": "detect(ImageBitmapSource image)", "refSections": [{"refs": [{"id": "ref-for-dom-textdetector-detect"}, {"id": "ref-for-dom-textdetector-detect\u2460"}], "title": "2.4. \u6587\u672c\u8bc6\u522bAPI"}], "external": false};
-window.dfnpanelData['detectedtext'] = {"dfnID": "detectedtext", "url": "#detectedtext", "dfnText": "DetectedText", "refSections": [{"refs": [{"id": "ref-for-detectedtext"}, {"id": "ref-for-detectedtext\u2460"}], "title": "2.4. \u6587\u672c\u8bc6\u522bAPI"}], "external": false};
-window.dfnpanelData['dom-detectedtext-boundingbox'] = {"dfnID": "dom-detectedtext-boundingbox", "url": "#dom-detectedtext-boundingbox", "dfnText": "boundingBox", "refSections": [{"refs": [{"id": "ref-for-dom-detectedtext-boundingbox"}, {"id": "ref-for-dom-detectedtext-boundingbox\u2460"}], "title": "2.4. \u6587\u672c\u8bc6\u522bAPI"}], "external": false};
-window.dfnpanelData['dom-detectedtext-rawvalue'] = {"dfnID": "dom-detectedtext-rawvalue", "url": "#dom-detectedtext-rawvalue", "dfnText": "rawValue", "refSections": [{"refs": [{"id": "ref-for-dom-detectedtext-rawvalue"}, {"id": "ref-for-dom-detectedtext-rawvalue\u2460"}], "title": "2.4. \u6587\u672c\u8bc6\u522bAPI"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -2042,12 +1609,445 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"899cfb35": {"dfnID":"899cfb35","dfnText":"Point2D","external":true,"refSections":[{"refs":[{"id":"ref-for-Point2D"},{"id":"ref-for-Point2D\u2460"},{"id":"ref-for-Point2D\u2461"}],"title":"2.3. \u6761\u5f62\u7801\u8bc6\u522bAPI"}],"url":"https://w3c.github.io/mediacapture-image/#Point2D"},
+"27dba777": {"dfnID":"27dba777","dfnText":"DOMRect","external":true,"refSections":[{"refs":[{"id":"ref-for-domrect"},{"id":"ref-for-domrect\u2460"}],"title":"2.4. \u6587\u672c\u8bc6\u522bAPI"}],"url":"https://drafts.fxtf.org/geometry-1/#domrect"},
+"fdd2dd4e": {"dfnID":"fdd2dd4e","dfnText":"DOMRectReadOnly","external":true,"refSections":[{"refs":[{"id":"ref-for-domrectreadonly"},{"id":"ref-for-domrectreadonly\u2460"}],"title":"2.2. \u4eba\u8138\u8bc6\u522bAPI"},{"refs":[{"id":"ref-for-domrectreadonly\u2461"},{"id":"ref-for-domrectreadonly\u2462"}],"title":"2.3. \u6761\u5f62\u7801\u8bc6\u522bAPI"}],"url":"https://drafts.fxtf.org/geometry-1/#domrectreadonly"},
+"5b13c537": {"dfnID":"5b13c537","dfnText":"HTMLCanvasElement","external":true,"refSections":[{"refs":[{"id":"ref-for-htmlcanvaselement"},{"id":"ref-for-htmlcanvaselement\u2460"}],"title":"2.1. \u7528\u4e8e\u8bc6\u522b\u7684\u56fe\u50cf\u6e90"}],"url":"https://html.spec.whatwg.org/multipage/canvas.html#htmlcanvaselement"},
+"c5891539": {"dfnID":"c5891539","dfnText":"HTMLImageElement","external":true,"refSections":[{"refs":[{"id":"ref-for-htmlimageelement"},{"id":"ref-for-htmlimageelement\u2460"},{"id":"ref-for-htmlimageelement\u2461"},{"id":"ref-for-htmlimageelement\u2462"}],"title":"2.1. \u7528\u4e8e\u8bc6\u522b\u7684\u56fe\u50cf\u6e90"}],"url":"https://html.spec.whatwg.org/multipage/embedded-content.html#htmlimageelement"},
+"f57f330b": {"dfnID":"f57f330b","dfnText":"HTMLVideoElement","external":true,"refSections":[{"refs":[{"id":"ref-for-htmlvideoelement"},{"id":"ref-for-htmlvideoelement\u2460"}],"title":"2.1. \u7528\u4e8e\u8bc6\u522b\u7684\u56fe\u50cf\u6e90"}],"url":"https://html.spec.whatwg.org/multipage/media.html#htmlvideoelement"},
+"aeb8d5fd": {"dfnID":"aeb8d5fd","dfnText":"ImageBitmapSource","external":true,"refSections":[{"refs":[{"id":"ref-for-imagebitmapsource"},{"id":"ref-for-imagebitmapsource\u2460"},{"id":"ref-for-imagebitmapsource\u2461"},{"id":"ref-for-imagebitmapsource\u2462"},{"id":"ref-for-imagebitmapsource\u2463"},{"id":"ref-for-imagebitmapsource\u2464"},{"id":"ref-for-imagebitmapsource\u2465"},{"id":"ref-for-imagebitmapsource\u2466"},{"id":"ref-for-imagebitmapsource\u2467"},{"id":"ref-for-imagebitmapsource\u2468"},{"id":"ref-for-imagebitmapsource\u2460\u24ea"},{"id":"ref-for-imagebitmapsource\u2460\u2460"}],"title":"2.1. \u7528\u4e8e\u8bc6\u522b\u7684\u56fe\u50cf\u6e90"},{"refs":[{"id":"ref-for-imagebitmapsource\u2460\u2461"},{"id":"ref-for-imagebitmapsource\u2460\u2462"},{"id":"ref-for-imagebitmapsource\u2460\u2463"}],"title":"2.2. \u4eba\u8138\u8bc6\u522bAPI"},{"refs":[{"id":"ref-for-imagebitmapsource\u2460\u2464"},{"id":"ref-for-imagebitmapsource\u2460\u2465"},{"id":"ref-for-imagebitmapsource\u2460\u2466"}],"title":"2.3. \u6761\u5f62\u7801\u8bc6\u522bAPI"},{"refs":[{"id":"ref-for-imagebitmapsource\u2460\u2467"},{"id":"ref-for-imagebitmapsource\u2460\u2468"},{"id":"ref-for-imagebitmapsource\u2461\u24ea"}],"title":"2.4. \u6587\u672c\u8bc6\u522bAPI"}],"url":"https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html#imagebitmapsource"},
+"dca2de17": {"dfnID":"dca2de17","dfnText":"DOMException","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-DOMException"},{"id":"ref-for-idl-DOMException\u2460"},{"id":"ref-for-idl-DOMException\u2461"},{"id":"ref-for-idl-DOMException\u2462"},{"id":"ref-for-idl-DOMException\u2463"}],"title":"2.1. \u7528\u4e8e\u8bc6\u522b\u7684\u56fe\u50cf\u6e90"}],"url":"https://webidl.spec.whatwg.org/#idl-DOMException"},
+"bcda9d2a": {"dfnID":"bcda9d2a","dfnText":"DOMString","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-DOMString"},{"id":"ref-for-idl-DOMString\u2460"},{"id":"ref-for-idl-DOMString\u2461"}],"title":"2.3. \u6761\u5f62\u7801\u8bc6\u522bAPI"},{"refs":[{"id":"ref-for-idl-DOMString\u2462"},{"id":"ref-for-idl-DOMString\u2463"}],"title":"2.4. \u6587\u672c\u8bc6\u522bAPI"}],"url":"https://heycam.github.io/webidl/#idl-DOMString"},
+"889e932f": {"dfnID":"889e932f","dfnText":"Exposed","external":true,"refSections":[{"refs":[{"id":"ref-for-Exposed"}],"title":"2.2. \u4eba\u8138\u8bc6\u522bAPI"},{"refs":[{"id":"ref-for-Exposed\u2460"}],"title":"2.3. \u6761\u5f62\u7801\u8bc6\u522bAPI"},{"refs":[{"id":"ref-for-Exposed\u2461"}],"title":"2.4. \u6587\u672c\u8bc6\u522bAPI"}],"url":"https://webidl.spec.whatwg.org/#Exposed"},
+"dcf5fafa": {"dfnID":"dcf5fafa","dfnText":"FrozenArray","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-frozen-array"}],"title":"2.3. \u6761\u5f62\u7801\u8bc6\u522bAPI"}],"url":"https://webidl.spec.whatwg.org/#idl-frozen-array"},
+"797018a7": {"dfnID":"797018a7","dfnText":"InvalidStateError","external":true,"refSections":[{"refs":[{"id":"ref-for-invalidstateerror"},{"id":"ref-for-invalidstateerror\u2460"},{"id":"ref-for-invalidstateerror\u2461"}],"title":"2.1. \u7528\u4e8e\u8bc6\u522b\u7684\u56fe\u50cf\u6e90"}],"url":"https://webidl.spec.whatwg.org/#invalidstateerror"},
+"bdbd19d1": {"dfnID":"bdbd19d1","dfnText":"Promise","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-promise"}],"title":"2.2. \u4eba\u8138\u8bc6\u522bAPI"},{"refs":[{"id":"ref-for-idl-promise\u2460"}],"title":"2.3. \u6761\u5f62\u7801\u8bc6\u522bAPI"},{"refs":[{"id":"ref-for-idl-promise\u2461"}],"title":"2.4. \u6587\u672c\u8bc6\u522bAPI"}],"url":"https://webidl.spec.whatwg.org/#idl-promise"},
+"a5c91173": {"dfnID":"a5c91173","dfnText":"SameObject","external":true,"refSections":[{"refs":[{"id":"ref-for-SameObject"}],"title":"2.2. \u4eba\u8138\u8bc6\u522bAPI"},{"refs":[{"id":"ref-for-SameObject\u2460"},{"id":"ref-for-SameObject\u2461"},{"id":"ref-for-SameObject\u2462"}],"title":"2.3. \u6761\u5f62\u7801\u8bc6\u522bAPI"},{"refs":[{"id":"ref-for-SameObject\u2463"},{"id":"ref-for-SameObject\u2464"}],"title":"2.4. \u6587\u672c\u8bc6\u522bAPI"}],"url":"https://webidl.spec.whatwg.org/#SameObject"},
+"c3e881ef": {"dfnID":"c3e881ef","dfnText":"SecurityError","external":true,"refSections":[{"refs":[{"id":"ref-for-securityerror"},{"id":"ref-for-securityerror\u2460"}],"title":"2.1. \u7528\u4e8e\u8bc6\u522b\u7684\u56fe\u50cf\u6e90"}],"url":"https://webidl.spec.whatwg.org/#securityerror"},
+"5372cca8": {"dfnID":"5372cca8","dfnText":"boolean","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-boolean"},{"id":"ref-for-idl-boolean\u2460"}],"title":"2.2. \u4eba\u8138\u8bc6\u522bAPI"}],"url":"https://webidl.spec.whatwg.org/#idl-boolean"},
+"9cce47fd": {"dfnID":"9cce47fd","dfnText":"sequence","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-sequence"}],"title":"2.2. \u4eba\u8138\u8bc6\u522bAPI"},{"refs":[{"id":"ref-for-idl-sequence\u2460"},{"id":"ref-for-idl-sequence\u2461"}],"title":"2.3. \u6761\u5f62\u7801\u8bc6\u522bAPI"},{"refs":[{"id":"ref-for-idl-sequence\u2462"}],"title":"2.4. \u6587\u672c\u8bc6\u522bAPI"}],"url":"https://webidl.spec.whatwg.org/#idl-sequence"},
+"450958f7": {"dfnID":"450958f7","dfnText":"unsigned short","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-unsigned-short"},{"id":"ref-for-idl-unsigned-short\u2460"}],"title":"2.2. \u4eba\u8138\u8bc6\u522bAPI"}],"url":"https://webidl.spec.whatwg.org/#idl-unsigned-short"},
+"dictdef-facedetectoroptions": {"dfnID":"dictdef-facedetectoroptions","dfnText":"FaceDetectorOptions","external":false,"refSections":[{"refs":[{"id":"ref-for-dictdef-facedetectoroptions"},{"id":"ref-for-dictdef-facedetectoroptions\u2460"}],"title":"2.2. \u4eba\u8138\u8bc6\u522bAPI"}],"url":"#dictdef-facedetectoroptions"},
+"dom-facedetectoroptions-maxdetectedfaces": {"dfnID":"dom-facedetectoroptions-maxdetectedfaces","dfnText":"maxDetectedFaces","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-facedetectoroptions-maxdetectedfaces"}],"title":"2.2. \u4eba\u8138\u8bc6\u522bAPI"}],"url":"#dom-facedetectoroptions-maxdetectedfaces"},
+"dom-facedetectoroptions-fastmode": {"dfnID":"dom-facedetectoroptions-fastmode","dfnText":"fastMode","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-facedetectoroptions-fastmode"}],"title":"2.2. \u4eba\u8138\u8bc6\u522bAPI"}],"url":"#dom-facedetectoroptions-fastmode"},
+"facedetector": {"dfnID":"facedetector","dfnText":"FaceDetector","external":false,"refSections":[{"refs":[{"id":"ref-for-facedetector"},{"id":"ref-for-facedetector\u2460"}],"title":"2.2. \u4eba\u8138\u8bc6\u522bAPI"}],"url":"#facedetector"},
+"dom-facedetector-detect": {"dfnID":"dom-facedetector-detect","dfnText":"detect","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-facedetector-detect"}],"title":"2.2. \u4eba\u8138\u8bc6\u522bAPI"}],"url":"#dom-facedetector-detect"},
+"detectedface": {"dfnID":"detectedface","dfnText":"DetectedFace","external":false,"refSections":[{"refs":[{"id":"ref-for-detectedface"},{"id":"ref-for-detectedface\u2460"},{"id":"ref-for-detectedface\u2461"},{"id":"ref-for-detectedface\u2462"}],"title":"2.2. \u4eba\u8138\u8bc6\u522bAPI"}],"url":"#detectedface"},
+"dom-detectedface-boundingbox": {"dfnID":"dom-detectedface-boundingbox","dfnText":"boundingBox","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-detectedface-boundingbox"},{"id":"ref-for-dom-detectedface-boundingbox\u2460"}],"title":"2.2. \u4eba\u8138\u8bc6\u522bAPI"}],"url":"#dom-detectedface-boundingbox"},
+"barcodedetector": {"dfnID":"barcodedetector","dfnText":"BarcodeDetector","external":false,"refSections":[{"refs":[{"id":"ref-for-barcodedetector"}],"title":"2.3. \u6761\u5f62\u7801\u8bc6\u522bAPI"}],"url":"#barcodedetector"},
+"dom-barcodedetector-detect": {"dfnID":"dom-barcodedetector-detect","dfnText":"detect(ImageBitmapSource image)","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-barcodedetector-detect"},{"id":"ref-for-dom-barcodedetector-detect\u2460"}],"title":"2.3. \u6761\u5f62\u7801\u8bc6\u522bAPI"}],"url":"#dom-barcodedetector-detect"},
+"detectedbarcode": {"dfnID":"detectedbarcode","dfnText":"DetectedBarcode","external":false,"refSections":[{"refs":[{"id":"ref-for-detectedbarcode"},{"id":"ref-for-detectedbarcode\u2460"}],"title":"2.3. \u6761\u5f62\u7801\u8bc6\u522bAPI"}],"url":"#detectedbarcode"},
+"dom-detectedbarcode-boundingbox": {"dfnID":"dom-detectedbarcode-boundingbox","dfnText":"boundingBox","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-detectedbarcode-boundingbox"},{"id":"ref-for-dom-detectedbarcode-boundingbox\u2460"}],"title":"2.3. \u6761\u5f62\u7801\u8bc6\u522bAPI"}],"url":"#dom-detectedbarcode-boundingbox"},
+"dom-detectedbarcode-rawvalue": {"dfnID":"dom-detectedbarcode-rawvalue","dfnText":"rawValue","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-detectedbarcode-rawvalue"},{"id":"ref-for-dom-detectedbarcode-rawvalue\u2460"}],"title":"2.3. \u6761\u5f62\u7801\u8bc6\u522bAPI"}],"url":"#dom-detectedbarcode-rawvalue"},
+"dom-detectedbarcode-cornerpoints": {"dfnID":"dom-detectedbarcode-cornerpoints","dfnText":"cornerPoints","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-detectedbarcode-cornerpoints"}],"title":"2.3. \u6761\u5f62\u7801\u8bc6\u522bAPI"}],"url":"#dom-detectedbarcode-cornerpoints"},
+"dom-textdetector-detect": {"dfnID":"dom-textdetector-detect","dfnText":"detect(ImageBitmapSource image)","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-textdetector-detect"},{"id":"ref-for-dom-textdetector-detect\u2460"}],"title":"2.4. \u6587\u672c\u8bc6\u522bAPI"}],"url":"#dom-textdetector-detect"},
+"detectedtext": {"dfnID":"detectedtext","dfnText":"DetectedText","external":false,"refSections":[{"refs":[{"id":"ref-for-detectedtext"},{"id":"ref-for-detectedtext\u2460"}],"title":"2.4. \u6587\u672c\u8bc6\u522bAPI"}],"url":"#detectedtext"},
+"dom-detectedtext-boundingbox": {"dfnID":"dom-detectedtext-boundingbox","dfnText":"boundingBox","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-detectedtext-boundingbox"},{"id":"ref-for-dom-detectedtext-boundingbox\u2460"}],"title":"2.4. \u6587\u672c\u8bc6\u522bAPI"}],"url":"#dom-detectedtext-boundingbox"},
+"dom-detectedtext-rawvalue": {"dfnID":"dom-detectedtext-rawvalue","dfnText":"rawValue","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-detectedtext-rawvalue"},{"id":"ref-for-dom-detectedtext-rawvalue\u2460"}],"title":"2.4. \u6587\u672c\u8bc6\u522bAPI"}],"url":"#dom-detectedtext-rawvalue"},
+};
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+const typeFormatters = {
+    'dfn': (text) => `[=${text}=]`,
+    'abstract-op': (text) => `[\$${text}\$]`,
+    'value': (text) => `''${text}''`,
+    'http-header': (text) => `[:${text}:]`,
+    'idl': (text) => `{{${text}}}`,
+    'interface': 'idl',
+    'constructor': 'idl',
+    'method': 'idl',
+    'argument': 'idl',
+    'attribute': 'idl',
+    'callback': 'idl',
+    'dictionary': 'idl',
+    'dict-member': 'idl',
+    'enum': 'idl',
+    'enum-value': 'idl',
+    'exception': 'idl',
+    'const': 'idl',
+    'typedef': 'idl',
+    'stringifier': 'idl',
+    'serializer': 'idl',
+    'iterator': 'idl',
+    'maplike': 'idl',
+    'setlike': 'idl',
+    'extended-attribute': 'idl',
+    'event': 'idl',
+    'element': (element) => `<{${element}}>`,
+    'element-state': 'element',
+    'element-attr': 'element',
+    'attr-value': 'element',
+    'scheme': 'dfn',
+    'permission': 'dfn',
+    'grammar': (text) => `${text} (within a <pre class=prod>)`,
+    'type': (text)=> `<<${text}>>`,
+    'property': (text) => `'${text}'`,
+    'descriptor': 'property',
+    'function': 'value',
+    'at-rule': 'value',
+    'selector': 'value',
+};
+const typesUsingFor = new Set(
+    [
+        "descriptor",
+        "value",
+        "element-attr",
+        "attr-value",
+        "element-state",
+        "method",
+        "constructor",
+        "argument",
+        "attribute",
+        "const",
+        "dict-member",
+        "event",
+        "enum-value",
+        "stringifier",
+        "serializer",
+        "iterator",
+        "maplike",
+        "setlike",
+        "state",
+        "mode",
+        "context",
+        "facet",
+    ],
+)
+const typesNotUsingFor = new Set(
+    [
+        "property",
+        "element",
+        "interface",
+        "namespace",
+        "callback",
+        "dictionary",
+        "enum",
+        "exception",
+        "typedef",
+        "http-header",
+        "permission",
+    ],
+)
+function linkFormatterFromType(type) {
+    const fnOrType = typeFormatters[type];
+    if(typeof fnOrType === 'string') {
+        // follow the alias
+        return linkFormatterFromType(fnOrType);
+    }
+    return fnOrType;
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!typesUsingFor.has(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!typesNotUsingFor.has(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
+
+function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+    dfnPanel.forDfn = dfn;
+    if(!dfn) { console.log(dfnPanel); }
+    return dfnPanel;
+}
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        const panel = genDfnPanel({ ...panelData, dfn });
+        append(document.body, panel);
+        insertDfnPopupAction(panel)
+    }
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+})
+
+function hideAllDfnPanels() {
+    // Turn off any currently "on" or "activated" panels.
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
+}
+
+function showDfnPanel(dfnPanel) {
+    hideAllDfnPanels(); // Only display one at this time.
+
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "true");
+
+    dfnPanel.classList.add("on");
+    positionDfnPanel(dfnPanel);
+
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    // Increment tabindex for each anchor and button tags in panel
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.style.position = "absolute"; // unfix it
+    dfnPanel.classList.remove("on");
+    dfnPanel.classList.remove("activated");
+}
+
+function toggleDfnPanel(dfnPanel) {
+    if(dfnPanel.classList.contains("on")) {
+        hideDfnPanel(dfnPanel);
+    } else {
+        showDfnPanel(dfnPanel);
+    }
+}
+
+function insertDfnPopupAction(dfnPanel) {
+    const dfn = dfnPanel.forDfn;
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        showDfnPanel(dfnPanel);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfnPanel);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel(dfnPanel, dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    })
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
 }
 </script>
 <script>/* Boilerplate: script-position-annos */
 "use strict";
 {
-
 function repositionAnnoPanels(){
     const panels = [...document.querySelectorAll("[data-anno-for]")];
     const main = document.querySelector("main");
@@ -2091,247 +2091,247 @@ window.addEventListener("resize", repositionAnnoPanels);
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
+let refsData = {
+"https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html#imagebitmapsource": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"ImageBitmapSource","type":"typedef","url":"https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html#imagebitmapsource"},
+"https://html.spec.whatwg.org/multipage/embedded-content.html#htmlimageelement": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"HTMLImageElement","type":"interface","url":"https://html.spec.whatwg.org/multipage/embedded-content.html#htmlimageelement"},
+"https://html.spec.whatwg.org/multipage/media.html#htmlvideoelement": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"HTMLVideoElement","type":"interface","url":"https://html.spec.whatwg.org/multipage/media.html#htmlvideoelement"},
+"https://html.spec.whatwg.org/multipage/canvas.html#htmlcanvaselement": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"HTMLCanvasElement","type":"interface","url":"https://html.spec.whatwg.org/multipage/canvas.html#htmlcanvaselement"},
+"https://webidl.spec.whatwg.org/#securityerror": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"SecurityError","type":"exception","url":"https://webidl.spec.whatwg.org/#securityerror"},
+"https://webidl.spec.whatwg.org/#idl-DOMException": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"DOMException","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-DOMException"},
+"https://webidl.spec.whatwg.org/#invalidstateerror": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"InvalidStateError","type":"exception","url":"https://webidl.spec.whatwg.org/#invalidstateerror"},
+"#facedetector": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"shape-detection-api","spec":"shape-detection-api-1","status":"local","text":"FaceDetector","type":"interface","url":"#facedetector"},
+"#dictdef-facedetectoroptions": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"shape-detection-api","spec":"shape-detection-api-1","status":"local","text":"FaceDetectorOptions","type":"dictionary","url":"#dictdef-facedetectoroptions"},
+"#dom-facedetector-detect": {"export":true,"for_":["FaceDetector"],"level":"1","normative":true,"shortname":"shape-detection-api","spec":"shape-detection-api-1","status":"local","text":"detect()","type":"method","url":"#dom-facedetector-detect"},
+"#detectedface": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"shape-detection-api","spec":"shape-detection-api-1","status":"local","text":"DetectedFace","type":"interface","url":"#detectedface"},
+"#dom-detectedface-boundingbox": {"export":true,"for_":["DetectedFace"],"level":"1","normative":true,"shortname":"shape-detection-api","spec":"shape-detection-api-1","status":"local","text":"boundingBox","type":"attribute","url":"#dom-detectedface-boundingbox"},
+"https://webidl.spec.whatwg.org/#idl-unsigned-short": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"unsigned short","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-unsigned-short"},
+"#dom-facedetectoroptions-maxdetectedfaces": {"export":true,"for_":["FaceDetectorOptions"],"level":"1","normative":true,"shortname":"shape-detection-api","spec":"shape-detection-api-1","status":"local","text":"maxDetectedFaces","type":"dict-member","url":"#dom-facedetectoroptions-maxdetectedfaces"},
+"https://webidl.spec.whatwg.org/#idl-boolean": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"boolean","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-boolean"},
+"#dom-facedetectoroptions-fastmode": {"export":true,"for_":["FaceDetectorOptions"],"level":"1","normative":true,"shortname":"shape-detection-api","spec":"shape-detection-api-1","status":"local","text":"fastMode","type":"dict-member","url":"#dom-facedetectoroptions-fastmode"},
+"https://webidl.spec.whatwg.org/#Exposed": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"Exposed","type":"extended-attribute","url":"https://webidl.spec.whatwg.org/#Exposed"},
+"https://webidl.spec.whatwg.org/#idl-promise": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"Promise","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-promise"},
+"https://webidl.spec.whatwg.org/#idl-sequence": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"sequence","type":"dfn","url":"https://webidl.spec.whatwg.org/#idl-sequence"},
+"https://webidl.spec.whatwg.org/#SameObject": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"SameObject","type":"extended-attribute","url":"https://webidl.spec.whatwg.org/#SameObject"},
+"https://drafts.fxtf.org/geometry-1/#domrectreadonly": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"geometry","spec":"geometry-1","status":"current","text":"DOMRectReadOnly","type":"interface","url":"https://drafts.fxtf.org/geometry-1/#domrectreadonly"},
+"#barcodedetector": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"shape-detection-api","spec":"shape-detection-api-1","status":"local","text":"BarcodeDetector","type":"interface","url":"#barcodedetector"},
+"#dom-barcodedetector-detect": {"export":true,"for_":["BarcodeDetector"],"level":"1","normative":true,"shortname":"shape-detection-api","spec":"shape-detection-api-1","status":"local","text":"detect(image)","type":"method","url":"#dom-barcodedetector-detect"},
+"#detectedbarcode": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"shape-detection-api","spec":"shape-detection-api-1","status":"local","text":"DetectedBarcode","type":"interface","url":"#detectedbarcode"},
+"#dom-detectedbarcode-boundingbox": {"export":true,"for_":["DetectedBarcode"],"level":"1","normative":true,"shortname":"shape-detection-api","spec":"shape-detection-api-1","status":"local","text":"boundingBox","type":"attribute","url":"#dom-detectedbarcode-boundingbox"},
+"https://w3c.github.io/mediacapture-image/#Point2D": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"shape-detection-api","spec":"","status":"anchor-block","text":"Point2D","type":"interface","url":"https://w3c.github.io/mediacapture-image/#Point2D"},
+"https://heycam.github.io/webidl/#idl-DOMString": {"export":true,"for_":[],"level":"","normative":true,"shortname":"webidl","spec":"webidl","status":"anchor-block","text":"DOMString","type":"interface","url":"https://heycam.github.io/webidl/#idl-DOMString"},
+"#dom-detectedbarcode-rawvalue": {"export":true,"for_":["DetectedBarcode"],"level":"1","normative":true,"shortname":"shape-detection-api","spec":"shape-detection-api-1","status":"local","text":"rawValue","type":"attribute","url":"#dom-detectedbarcode-rawvalue"},
+"https://webidl.spec.whatwg.org/#idl-frozen-array": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"FrozenArray","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-frozen-array"},
+"#dom-detectedbarcode-cornerpoints": {"export":true,"for_":["DetectedBarcode"],"level":"1","normative":true,"shortname":"shape-detection-api","spec":"shape-detection-api-1","status":"local","text":"cornerPoints","type":"attribute","url":"#dom-detectedbarcode-cornerpoints"},
+"#dom-textdetector-detect": {"export":true,"for_":["TextDetector"],"level":"1","normative":true,"shortname":"shape-detection-api","spec":"shape-detection-api-1","status":"local","text":"detect(image)","type":"method","url":"#dom-textdetector-detect"},
+"#detectedtext": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"shape-detection-api","spec":"shape-detection-api-1","status":"local","text":"DetectedText","type":"interface","url":"#detectedtext"},
+"#dom-detectedtext-rawvalue": {"export":true,"for_":["DetectedText"],"level":"1","normative":true,"shortname":"shape-detection-api","spec":"shape-detection-api-1","status":"local","text":"rawValue","type":"attribute","url":"#dom-detectedtext-rawvalue"},
+"#dom-detectedtext-boundingbox": {"export":true,"for_":["DetectedText"],"level":"1","normative":true,"shortname":"shape-detection-api","spec":"shape-detection-api-1","status":"local","text":"boundingBox","type":"attribute","url":"#dom-detectedtext-boundingbox"},
+"https://drafts.fxtf.org/geometry-1/#domrect": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"geometry","spec":"geometry-1","status":"current","text":"DOMRect","type":"interface","url":"https://drafts.fxtf.org/geometry-1/#domrect"},
+};
+
+function genRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "DFN: "),
+                mk.code({ class: "dfn-text" }, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    const forListElements = forList.length === 0 ? '' : mk.li({},
+        mk.b({}, "For: "),
+        mk.ul({},
+            ...forList.map(forItem =>
                 mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
-            mk.b({}, "For: "),
-            mk.ul({},
-                ...forList.map(forItem =>
-                    mk.li({},
-                        mk.span({}, `${forItem}`)
-                    ),
+                    mk.span({}, `${forItem}`)
                 ),
             ),
-        );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+        ),
+    );
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
-    }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    return hintPanel;
+}
+function genAllRefHints() {
+    for(const refData of Object.values(refsData)) {
+        const refUrl = refData.url;
+        const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+        if (links.length == 0) {
+            console.log(`Can't find link href="${refUrl}".`, refData);
+            continue;
+        }
+        for(const link of links) {
+            if(link.classList.contains("dfn-link")) continue;
+            const hint = genRefHint(link, refData);
+            append(document.body, hint);
+            insertLinkPopupAction(hint)
         }
     }
+}
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+function hideAllRefHints() {
+    queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    refHint.style.position = "absolute"; // unfix it
+    refHint.classList.remove("on");
+    const teardown = refHint.teardownEventListeners;
+    if (teardown) {
+        refHint.teardownEventListeners = undefined;
+        teardown();
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+function showRefHint(refHint) {
+    hideAllRefHints(); // Only display one at this time.
+
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "true");
+    refHint.classList.add("on");
+    positionRefHint(refHint);
+    setupRefHintEventListeners(refHint);
+}
+
+function setupRefHintEventListeners(refHint) {
+    if (refHint.teardownEventListeners) return;
+    const link = refHint.forLink;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
 
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
 
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+function insertLinkPopupAction(refHint) {
+    const link = refHint.forLink;
+    // link.setAttribute('role', 'button');
+    link.setAttribute('aria-expanded', 'false')
+    link.classList.add('has-ref-hint');
+    link.addEventListener('mouseover', (event) => {
+        showRefHint(refHint);
     });
+    link.addEventListener('focus', (event) => {
+        showRefHint(refHint);
+    })
+}
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+document.addEventListener("DOMContentLoaded", () => {
+    genAllRefHints();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html#imagebitmapsource'] = {"text": "ImageBitmapSource", "type": "typedef", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html#imagebitmapsource", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#htmlimageelement'] = {"text": "HTMLImageElement", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#htmlimageelement", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/media.html#htmlvideoelement'] = {"text": "HTMLVideoElement", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#htmlvideoelement", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/canvas.html#htmlcanvaselement'] = {"text": "HTMLCanvasElement", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/canvas.html#htmlcanvaselement", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#securityerror'] = {"text": "SecurityError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#securityerror", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-DOMException'] = {"text": "DOMException", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMException", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#invalidstateerror'] = {"text": "InvalidStateError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invalidstateerror", "export": true, "normative": true, "for_": []};
-window.refsData['#facedetector'] = {"text": "FaceDetector", "type": "interface", "spec": "shape-detection-api-1", "shortname": "shape-detection-api", "level": "1", "status": "local", "url": "#facedetector", "export": true, "normative": true, "for_": []};
-window.refsData['#dictdef-facedetectoroptions'] = {"text": "FaceDetectorOptions", "type": "dictionary", "spec": "shape-detection-api-1", "shortname": "shape-detection-api", "level": "1", "status": "local", "url": "#dictdef-facedetectoroptions", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-facedetector-detect'] = {"text": "detect()", "type": "method", "spec": "shape-detection-api-1", "shortname": "shape-detection-api", "level": "1", "status": "local", "url": "#dom-facedetector-detect", "export": true, "normative": true, "for_": ["FaceDetector"]};
-window.refsData['#detectedface'] = {"text": "DetectedFace", "type": "interface", "spec": "shape-detection-api-1", "shortname": "shape-detection-api", "level": "1", "status": "local", "url": "#detectedface", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-detectedface-boundingbox'] = {"text": "boundingBox", "type": "attribute", "spec": "shape-detection-api-1", "shortname": "shape-detection-api", "level": "1", "status": "local", "url": "#dom-detectedface-boundingbox", "export": true, "normative": true, "for_": ["DetectedFace"]};
-window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-short'] = {"text": "unsigned short", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-short", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-facedetectoroptions-maxdetectedfaces'] = {"text": "maxDetectedFaces", "type": "dict-member", "spec": "shape-detection-api-1", "shortname": "shape-detection-api", "level": "1", "status": "local", "url": "#dom-facedetectoroptions-maxdetectedfaces", "export": true, "normative": true, "for_": ["FaceDetectorOptions"]};
-window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-facedetectoroptions-fastmode'] = {"text": "fastMode", "type": "dict-member", "spec": "shape-detection-api-1", "shortname": "shape-detection-api", "level": "1", "status": "local", "url": "#dom-facedetectoroptions-fastmode", "export": true, "normative": true, "for_": ["FaceDetectorOptions"]};
-window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-promise'] = {"text": "Promise", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-promise", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#SameObject'] = {"text": "SameObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SameObject", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.fxtf.org/geometry-1/#domrectreadonly'] = {"text": "DOMRectReadOnly", "type": "interface", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/geometry-1/#domrectreadonly", "export": true, "normative": true, "for_": []};
-window.refsData['#barcodedetector'] = {"text": "BarcodeDetector", "type": "interface", "spec": "shape-detection-api-1", "shortname": "shape-detection-api", "level": "1", "status": "local", "url": "#barcodedetector", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-barcodedetector-detect'] = {"text": "detect(image)", "type": "method", "spec": "shape-detection-api-1", "shortname": "shape-detection-api", "level": "1", "status": "local", "url": "#dom-barcodedetector-detect", "export": true, "normative": true, "for_": ["BarcodeDetector"]};
-window.refsData['#detectedbarcode'] = {"text": "DetectedBarcode", "type": "interface", "spec": "shape-detection-api-1", "shortname": "shape-detection-api", "level": "1", "status": "local", "url": "#detectedbarcode", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-detectedbarcode-boundingbox'] = {"text": "boundingBox", "type": "attribute", "spec": "shape-detection-api-1", "shortname": "shape-detection-api", "level": "1", "status": "local", "url": "#dom-detectedbarcode-boundingbox", "export": true, "normative": true, "for_": ["DetectedBarcode"]};
-window.refsData['https://w3c.github.io/mediacapture-image/#Point2D'] = {"text": "Point2D", "type": "interface", "spec": "", "shortname": "shape-detection-api", "level": "1", "status": "anchor-block", "url": "https://w3c.github.io/mediacapture-image/#Point2D", "export": true, "normative": true, "for_": []};
-window.refsData['https://heycam.github.io/webidl/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "", "status": "anchor-block", "url": "https://heycam.github.io/webidl/#idl-DOMString", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-detectedbarcode-rawvalue'] = {"text": "rawValue", "type": "attribute", "spec": "shape-detection-api-1", "shortname": "shape-detection-api", "level": "1", "status": "local", "url": "#dom-detectedbarcode-rawvalue", "export": true, "normative": true, "for_": ["DetectedBarcode"]};
-window.refsData['https://webidl.spec.whatwg.org/#idl-frozen-array'] = {"text": "FrozenArray", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-frozen-array", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-detectedbarcode-cornerpoints'] = {"text": "cornerPoints", "type": "attribute", "spec": "shape-detection-api-1", "shortname": "shape-detection-api", "level": "1", "status": "local", "url": "#dom-detectedbarcode-cornerpoints", "export": true, "normative": true, "for_": ["DetectedBarcode"]};
-window.refsData['#dom-textdetector-detect'] = {"text": "detect(image)", "type": "method", "spec": "shape-detection-api-1", "shortname": "shape-detection-api", "level": "1", "status": "local", "url": "#dom-textdetector-detect", "export": true, "normative": true, "for_": ["TextDetector"]};
-window.refsData['#detectedtext'] = {"text": "DetectedText", "type": "interface", "spec": "shape-detection-api-1", "shortname": "shape-detection-api", "level": "1", "status": "local", "url": "#detectedtext", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-detectedtext-rawvalue'] = {"text": "rawValue", "type": "attribute", "spec": "shape-detection-api-1", "shortname": "shape-detection-api", "level": "1", "status": "local", "url": "#dom-detectedtext-rawvalue", "export": true, "normative": true, "for_": ["DetectedText"]};
-window.refsData['#dom-detectedtext-boundingbox'] = {"text": "boundingBox", "type": "attribute", "spec": "shape-detection-api-1", "shortname": "shape-detection-api", "level": "1", "status": "local", "url": "#dom-detectedtext-boundingbox", "export": true, "normative": true, "for_": ["DetectedText"]};
-window.refsData['https://drafts.fxtf.org/geometry-1/#domrect'] = {"text": "DOMRect", "type": "interface", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/geometry-1/#domrect", "export": true, "normative": true, "for_": []};
 </script>
