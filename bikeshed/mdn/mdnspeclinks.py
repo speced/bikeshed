@@ -48,7 +48,7 @@ def addMdnPanels(doc: t.SpecT) -> list[t.ElementT]:
 
     panels = panelsFromData(doc, data)
     if panels:
-        doc.extraStyles.setFile("mdn-anno", "mdn/mdn.css")
+        doc.extraJC.addMdn()
 
     return panels
 

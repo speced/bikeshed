@@ -193,8 +193,7 @@ def checkVarHygiene(doc: t.SpecT) -> None:
 def addVarClickHighlighting(doc: t.SpecT) -> None:
     if doc.md.slimBuildArtifact:
         return
-    doc.extraStyles.setFile("var-click-highlighting", "var-click-highlighting.css")
-    doc.extraScripts.setFile("var-click-highlighting", "var-click-highlighting.js")
+    doc.extraJC.addVarClickHighlighting()
 
 
 def fixIntraDocumentReferences(doc: t.SpecT) -> None:
@@ -677,8 +676,7 @@ def verifyUsageOfAllLocalBiblios(doc: t.SpecT) -> None:
 
 
 def processAutolinks(doc: t.SpecT) -> None:
-    scriptLines = []
-    refsAdded = {}
+    refsJSON = doc.extraJC.addRefHints()
 
     # An <a> without an href is an autolink.
     # <i> is a legacy syntax for term autolinks. If it links up, we change it into an <a>.
@@ -766,10 +764,8 @@ def processAutolinks(doc: t.SpecT) -> None:
                 el.text = replacementText
             decorateAutolink(doc, el, linkType=linkType, linkText=linkText, ref=ref)
 
-            if ref.url not in refsAdded:
-                refsAdded[ref.url] = True
-                refJson = ref.__json__()
-                scriptLines.append(f"window.refsData['{ref.url}'] = {json.dumps(refJson)};")
+            if ref.url not in refsJSON:
+                refsJSON[ref.url] = ref.__json__()
         else:
             if linkType == "maybe":
                 el.tag = "css"
@@ -777,14 +773,6 @@ def processAutolinks(doc: t.SpecT) -> None:
                     del el.attrib["data-link-type"]
                 if el.get("data-lt"):
                     del el.attrib["data-lt"]
-
-    if len(scriptLines) > 0:
-        jsonBlock = doc.extraScripts.setDefault("ref-hints-json", "window.refsData = {};\n")
-        jsonBlock.text += "\n".join(scriptLines)
-
-        doc.extraScripts.setFile("ref-hints", "refs/refhints.js")
-        doc.extraStyles.setFile("ref-hints", "refs/refhints.css")
-        h.addDOMHelperScript(doc)
 
     h.dedupIDs(doc)
 
@@ -834,8 +822,8 @@ def decorateAutolink(doc: t.SpecT, el: t.ElementT, linkType: str, linkText: str,
                 assert titleText is not None
                 doc.typeExpansions[linkText] = titleText
         if titleText:
-            script = doc.extraScripts.setFile("link-titles", "link-titles.js")
-            script.getData("linkTitleData", {})[ref.url] = titleText
+            titleData = doc.extraJC.addLinkTitles()
+            titleData[ref.url] = titleText
 
 
 def removeMultipleLinks(doc: t.SpecT) -> None:

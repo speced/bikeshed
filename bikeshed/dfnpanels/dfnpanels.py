@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from collections import OrderedDict
 
 from .. import h, t
@@ -10,7 +9,6 @@ from ..translate import _
 
 def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
     # Constructs "dfn panels" which show all the local references to a term
-    atLeastOnePanel = False
     # Gather all the <a href>s together
     allRefs: OrderedDict[str, list[t.ElementT]] = OrderedDict()
     for a in h.findAll("a", doc):
@@ -20,7 +18,7 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
         if not href.startswith("#"):
             continue
         allRefs.setdefault(href[1:], []).append(a)
-    scriptLines = []
+    panelsJSON = doc.extraJC.addDfnPanels()
     for dfn in dfns:
         id = dfn.get("id")
         dfnText = h.textContent(dfn)
@@ -39,7 +37,6 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
                 h.appendChild(dfn, h.E.a({"href": "#" + h.escapeUrlFrag(id), "class": "self-link"}))
             continue
         h.addClass(doc, dfn, "dfn-paneled")
-        atLeastOnePanel = True
         sectionsJson = []
         for text, els in refsFromSection.items():
             refsJson = []
@@ -55,21 +52,13 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
                     "title": text,
                 },
             )
-        panelJson = {
+        panelsJSON[id] = {
             "dfnID": id,
             "url": "#" + h.escapeUrlFrag(id),
             "dfnText": dfnText,
             "refSections": sectionsJson,
             "external": False,
         }
-        scriptLines.append(f"window.dfnpanelData['{id}'] = {json.dumps(panelJson)};")
-    if len(scriptLines) > 0:
-        jsonBlock = doc.extraScripts.setDefault("dfn-panel-json", "window.dfnpanelData = {};\n")
-        jsonBlock.text += "\n".join(scriptLines)
-    if atLeastOnePanel:
-        doc.extraScripts.setFile("dfn-panel", "dfnpanels/dfnpanels.js")
-        doc.extraStyles.setFile("dfn-panel", "dfnpanels/dfnpanels.css")
-        h.addDOMHelperScript(doc)
 
 
 def addExternalDfnPanel(termEl: t.ElementT, ref: t.RefWrapper, doc: t.SpecT) -> None:
@@ -88,6 +77,8 @@ def addExternalDfnPanel(termEl: t.ElementT, ref: t.RefWrapper, doc: t.SpecT) -> 
 
     if ref.url not in doc.cachedLinksFromHref:
         return
+
+    panelsJSON = doc.extraJC.addDfnPanels()
 
     # Group the relevant links according to the section they're in.
     refsFromSection: OrderedDict[str, list[t.ElementT]] = OrderedDict()
@@ -122,19 +113,10 @@ def addExternalDfnPanel(termEl: t.ElementT, ref: t.RefWrapper, doc: t.SpecT) -> 
                 "title": text,
             },
         )
-    panelJson = {
+    panelsJSON[termID] = {
         "dfnID": termID,
         "url": ref.url,
         "dfnText": termText,
         "refSections": sectionsJson,
         "external": True,
     }
-
-    jsonBlock = doc.extraScripts.setDefault("dfn-panel-json", "window.dfnpanelData = {};\n")
-    jsonBlock.text += f"window.dfnpanelData['{termID}'] = {json.dumps(panelJson)};\n"
-
-
-def addExternalDfnPanelStyles(doc: t.SpecT) -> None:
-    doc.extraScripts.setFile("dfn-panel", "dfnpanels/dfnpanels.js")
-    doc.extraStyles.setFile("dfn-panel", "dfnpanels/dfnpanels.css")
-    h.addDOMHelperScript(doc)

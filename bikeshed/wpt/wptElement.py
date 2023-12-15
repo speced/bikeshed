@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .. import config, h, t
+from .. import h, t
 from .. import messages as m
 from ..translate import _
 
@@ -94,12 +94,13 @@ def processWptElements(doc: t.SpecT) -> None:
                 ),
             )
 
-    if doc.md.wptDisplay != "none" and atLeastOneElement:
-        # Empty <wpt> blocks still need styles
-        doc.extraStyles.setFile("wpt", "wpt/wpt.css")
+    if doc.md.wptDisplay != "none":
+        if atLeastOneElement:
+            # Empty <wpt> blocks still need styles
+            doc.extraJC.addWptCSS()
         if atLeastOneVisibleTest:
             # But I only need script if there's actually some tests.
-            doc.extraScripts.set("wpt", getWptScript(pathPrefix))
+            doc.extraJC.addWpt(pathPrefix)
 
 
 def createHTML(
@@ -339,16 +340,3 @@ def commonPathPrefix(paths: t.Iterable[str]) -> str | None:
     if len(commonPrefix) >= 1:
         return "/" + "/".join(commonPrefix) + "/"
     return None
-
-
-def getWptScript(path: str | None) -> str:
-    if path is None:
-        path = "/"
-    if not path.startswith("/"):
-        path = "/" + path
-    if not path.endswith("/"):
-        path = path + "/"
-    script = f'let wptPath = "{path}";\n'
-    with open(config.scriptPath("wpt", "wptScript.js"), "r", encoding="utf-8") as fh:
-        script += fh.read()
-    return script

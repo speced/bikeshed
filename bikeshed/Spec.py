@@ -109,14 +109,13 @@ class Spec:
 
         self.languages: dict[str, language.Language] = fetchLanguages(self.dataFile)
 
-        self.extraStyles = stylescript.StyleManager()
-        self.extraStyles.setFile("colors", "Spec-colors.css")
-        self.extraStyles.setFile("md-lists", "Spec-mdlists.css")
-        self.extraStyles.setFile("autolinks", "Spec-autolinks.css")
-        self.extraStyles.setFile("selflinks", "Spec-selflinks.css")
-        self.extraStyles.setFile("counters", "Spec-counters.css")
-        self.extraStyles.setFile("issues", "Spec-issues.css")
-        self.extraScripts = stylescript.ScriptManager()
+        self.extraJC = stylescript.JCManager()
+        self.extraJC.addColors()
+        self.extraJC.addMdLists()
+        self.extraJC.addAutolinks()
+        self.extraJC.addSelflinks()
+        self.extraJC.addCounters()
+        self.extraJC.addIssues()
 
         try:
             self.inputContent = self.inputSource.read()
@@ -309,10 +308,8 @@ class Spec:
         u.processAutolinks(self)
         boilerplate.removeUnwantedBoilerplate(self)
         # Add MDN panels after all IDs/anchors have been added
-        mdnPanels = mdn.addMdnPanels(self)
-        ciuPanels = caniuse.addCanIUsePanels(self)
-        if mdnPanels or ciuPanels:
-            self.extraScripts.setFile("position-annos", "Spec-position-annos.js")
+        mdn.addMdnPanels(self)
+        caniuse.addCanIUsePanels(self)
         highlight.addSyntaxHighlighting(self)
         boilerplate.addBikeshedBoilerplate(self)
         fingerprinting.addTrackingVector(self)
@@ -562,7 +559,7 @@ def addDomintroStyles(doc: Spec) -> None:
     if h.find(".domintro", doc) is None:
         return
 
-    doc.extraStyles.setFile("domintro", "Spec-domintro.css")
+    doc.extraJC.addDomintro()
 
 
 def checkForMixedIndents(lines: t.Sequence[l.Line], info: metadata.IndentInfo) -> None:

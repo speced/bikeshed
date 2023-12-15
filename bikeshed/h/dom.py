@@ -989,11 +989,6 @@ def circledDigits(num: int) -> str:
     return result
 
 
-def addDOMHelperScript(doc: t.SpecT) -> None:
-    if not doc.extraScripts.has("dom-helper"):
-        doc.extraScripts.setFile("dom-helper", "h/dom.js")
-
-
 def createElement(tag: str, attrs: t.Mapping[str, str | None] | None = None, *children: t.NodesT | None) -> t.ElementT:
     if attrs is None:
         attrs = {}

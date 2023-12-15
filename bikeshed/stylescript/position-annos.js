@@ -1,6 +1,3 @@
-"use strict";
-{
-
 function repositionAnnoPanels(){
     const panels = [...document.querySelectorAll("[data-anno-for]")];
     const main = document.querySelector("main");
@@ -39,4 +36,3 @@ function cmpTops(a,b) {
 
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
-}

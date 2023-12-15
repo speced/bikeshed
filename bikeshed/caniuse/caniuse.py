@@ -55,7 +55,7 @@ def addCanIUsePanels(doc: t.SpecT) -> list[t.ElementT]:
         panels.append(panel)
 
     if panels:
-        doc.extraStyles.setFile("caniuse-panel", "caniuse/caniuse.css")
+        doc.extraJC.addCiu()
 
     return panels
 

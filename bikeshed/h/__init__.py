@@ -2,7 +2,6 @@ from .dom import (
     DuplicatedLinkText,
     E,
     addClass,
-    addDOMHelperScript,
     addOldIDs,
     appendChild,
     appendContents,
