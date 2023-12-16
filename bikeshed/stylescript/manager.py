@@ -190,7 +190,7 @@ class Script(JCResource):
         text = f'/* Boilerplate: script-{self.name} */\n"use strict";\n{{\n'
         if self.data:
             text += f"let {self.data[0]} = {{\n"
-            for key, val in self.data[1].items():
+            for key, val in sorted(self.data[1].items()):
                 text += f'"{key}": {json.dumps(val, sort_keys=True, separators=(",",":"))},\n'
             text += "};\n\n"
         with self.path.open("r", encoding="utf-8") as fh:
