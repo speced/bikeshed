@@ -3487,180 +3487,36 @@ let dfnPanelData = {
 "valdef-all-unset": {"dfnID":"valdef-all-unset","dfnText":"unset","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-all-unset"},{"id":"ref-for-valdef-all-unset\u2460"}],"title":"7.3.3. \nErasing All Declarations: the unset keyword"},{"refs":[{"id":"ref-for-valdef-all-unset\u2461"}],"title":"7.3.4. \nRolling Back Cascade Origins: the revert keyword"},{"refs":[{"id":"ref-for-valdef-all-unset\u2462"}],"title":"8.3. \nAdditions Since Level 2"}],"url":"#valdef-all-unset"},
 };
 
-// Functions, divided by link type, that wrap an autolink's
-// contents with the appropriate outer syntax.
-// Alternately, a string naming another type they format
-// the same as.
-const typeFormatters = {
-    'dfn': (text) => `[=${text}=]`,
-    'abstract-op': (text) => `[\$${text}\$]`,
-    'value': (text) => `''${text}''`,
-    'http-header': (text) => `[:${text}:]`,
-    'idl': (text) => `{{${text}}}`,
-    'interface': 'idl',
-    'constructor': 'idl',
-    'method': 'idl',
-    'argument': 'idl',
-    'attribute': 'idl',
-    'callback': 'idl',
-    'dictionary': 'idl',
-    'dict-member': 'idl',
-    'enum': 'idl',
-    'enum-value': 'idl',
-    'exception': 'idl',
-    'const': 'idl',
-    'typedef': 'idl',
-    'stringifier': 'idl',
-    'serializer': 'idl',
-    'iterator': 'idl',
-    'maplike': 'idl',
-    'setlike': 'idl',
-    'extended-attribute': 'idl',
-    'event': 'idl',
-    'element': (element) => `<{${element}}>`,
-    'element-state': 'element',
-    'element-attr': 'element',
-    'attr-value': 'element',
-    'scheme': 'dfn',
-    'permission': 'dfn',
-    'grammar': (text) => `${text} (within a <pre class=prod>)`,
-    'type': (text)=> `<<${text}>>`,
-    'property': (text) => `'${text}'`,
-    'descriptor': 'property',
-    'function': 'value',
-    'at-rule': 'value',
-    'selector': 'value',
-};
-const typesUsingFor = new Set(
-    [
-        "descriptor",
-        "value",
-        "element-attr",
-        "attr-value",
-        "element-state",
-        "method",
-        "constructor",
-        "argument",
-        "attribute",
-        "const",
-        "dict-member",
-        "event",
-        "enum-value",
-        "stringifier",
-        "serializer",
-        "iterator",
-        "maplike",
-        "setlike",
-        "state",
-        "mode",
-        "context",
-        "facet",
-    ],
-)
-const typesNotUsingFor = new Set(
-    [
-        "property",
-        "element",
-        "interface",
-        "namespace",
-        "callback",
-        "dictionary",
-        "enum",
-        "exception",
-        "typedef",
-        "http-header",
-        "permission",
-    ],
-)
-function linkFormatterFromType(type) {
-    const fnOrType = typeFormatters[type];
-    if(typeof fnOrType === 'string') {
-        // follow the alias
-        return linkFormatterFromType(fnOrType);
-    }
-    return fnOrType;
-};
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
 
-function genLinkingSyntaxes(dfn) {
-    if(dfn.tagName != "DFN") return;
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+});
 
-    const type = dfn.getAttribute('data-dfn-type');
-    if(!type) {
-        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-        return [];
-    }
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
 
-    // Return a function that wraps link text based on the type
-    const linkFormatter = linkFormatterFromType(type);
-    if(!linkFormatter) {
-        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-        return [];
-    }
-
-    let ltAlts;
-    if(dfn.hasAttribute('data-lt')) {
-        ltAlts = dfn.getAttribute('data-lt')
-            .split("|")
-            .map(x=>x.trim());
-    } else {
-        ltAlts = [dfn.textContent.trim()];
-    }
-    if(type == "type") {
-        // lt of "<foo>", but "foo" is the interior;
-        // <<foo/bar>> is how you write it with a for,
-        // not <foo/<bar>> or whatever.
-        for(var i = 0; i < ltAlts.length; i++) {
-            const lt = ltAlts[i];
-            const match = /<(.*)>/.exec(lt);
-            if(match) { ltAlts[i] = match[1]; }
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
         }
+        dfn.panelData = panelData;
+        insertDfnPopupAction(dfn);
     }
-
-    let forAlts;
-    if(dfn.hasAttribute('data-dfn-for')) {
-        forAlts = dfn.getAttribute('data-dfn-for')
-            .split(",")
-            .map(x=>x.trim());
-    } else {
-        forAlts = [''];
-    }
-
-    let linkingSyntaxes = [];
-    if(!typesUsingFor.has(type)) {
-        for(const lt of ltAlts) {
-            linkingSyntaxes.push(linkFormatter(lt));
-        }
-    }
-    if(!typesNotUsingFor.has(type)) {
-        for(const f of forAlts) {
-            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-        }
-    }
-    return [
-        mk.b({}, 'Possible linking syntaxes:'),
-        mk.ul({},
-            ...linkingSyntaxes.map(link => {
-                const copyLink = async () =>
-                    await navigator.clipboard.writeText(link);
-                return mk.li({},
-                    mk.div({ class: 'link-item' },
-                        mk.button({
-                            class: 'copy-icon', title: 'Copy',
-                            type: 'button',
-                            _onclick: copyLink,
-                            tabindex: 0,
-                        }, mk.span({ class: 'icon' }) ),
-                        mk.span({}, link)
-                    )
-                );
-            })
-        )
-    ];
 }
 
-function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
+function genDfnPanel(dfn, { dfnID, url, dfnText, refSections, external }) {
     const dfnPanel = mk.aside({
-        class: "dfn-panel",
+        class: "dfn-panel on",
         id: `infopanel-for-${dfnID}`,
         "data-for": dfnID,
         "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
@@ -3685,59 +3541,57 @@ function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
         ),
         genLinkingSyntaxes(dfn),
     );
-    dfnPanel.forDfn = dfn;
-    if(!dfn) { console.log(dfnPanel); }
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel({dfnPanel});
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.dfn = dfn;
+    dfn.dfnPanel = dfnPanel;
     return dfnPanel;
 }
 
-function genAllDfnPanels() {
-    for(const panelData of Object.values(dfnPanelData)) {
-        const dfnID = panelData.dfnID;
-        const dfn = document.getElementById(dfnID);
-        if(!dfn) {
-            console.log(`Can't find dfn#${dfnID}.`, panelData);
-            continue;
-        }
-        const panel = genDfnPanel({ ...panelData, dfn });
-        append(document.body, panel);
-        insertDfnPopupAction(panel)
-    }
-}
 
-document.addEventListener("DOMContentLoaded", ()=>{
-    genAllDfnPanels();
-
-    document.body.addEventListener("click", (e) => {
-        // If not handled already, just hide all dfn panels.
-        hideAllDfnPanels();
-    });
-})
 
 function hideAllDfnPanels() {
-    // Turn off any currently "on" or "activated" panels.
-    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
+    // Delete the currently-active dfn panel.
+    queryAll(".dfn-panel").forEach(dfnPanel=>hideDfnPanel({dfnPanel}));
 }
 
-function showDfnPanel(dfnPanel) {
-    hideAllDfnPanels(); // Only display one at this time.
+function showDfnPanel(dfn) {
+    hideAllDfnPanels(); // Only display one at a time.
 
-    const dfn = dfnPanel.forDfn;
     dfn.setAttribute("aria-expanded", "true");
 
-    dfnPanel.classList.add("on");
-    positionDfnPanel(dfnPanel);
+    const dfnPanel = genDfnPanel(dfn, dfn.panelData);
 
+    // Give the dfn a unique tabindex, and then
+    // give all the tabbable panel bits successive indexes.
     let tabIndex = 100;
     dfn.tabIndex = tabIndex++;
-    // Increment tabindex for each anchor and button tags in panel
     const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
     for (const el of tabbable) {
         el.tabIndex = tabIndex++;
     }
+
+    append(document.body, dfnPanel);
+    positionDfnPanel(dfnPanel);
 }
 
 function positionDfnPanel(dfnPanel) {
-    const dfn = dfnPanel.forDfn;
+    const dfn = dfnPanel.dfn;
     const dfnPos = getRootLevelAbsolutePosition(dfn);
     dfnPanel.style.top = dfnPos.bottom + "px";
     dfnPanel.style.left = dfnPos.left + "px";
@@ -3749,7 +3603,8 @@ function positionDfnPanel(dfnPanel) {
         const overflowAmount = panelPos.right - maxRight;
         const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
         dfnPanel.style.left = newLeft + "px";
-    }}
+    }
+}
 
 function pinDfnPanel(dfnPanel) {
     // Switch it to "activated" state, which pins it.
@@ -3759,59 +3614,42 @@ function pinDfnPanel(dfnPanel) {
     dfnPanel.style.top = null;
 }
 
-function hideDfnPanel(dfnPanel) {
-    const dfn = dfnPanel.forDfn;
+function hideDfnPanel({dfn, dfnPanel}) {
+    if(!dfnPanel) dfnPanel = dfn.dfnPanel;
+    if(!dfn) dfn = dfnPanel.dfn;
+    dfn.dfnPanel = undefined;
+    dfnPanel.dfn = undefined;
     dfn.setAttribute("aria-expanded", "false");
     dfn.tabIndex = undefined;
-    dfnPanel.style.position = "absolute"; // unfix it
-    dfnPanel.classList.remove("on");
-    dfnPanel.classList.remove("activated");
+    dfnPanel.remove()
 }
 
-function toggleDfnPanel(dfnPanel) {
-    if(dfnPanel.classList.contains("on")) {
-        hideDfnPanel(dfnPanel);
+function toggleDfnPanel(dfn) {
+    if(dfn.dfnPanel) {
+        hideDfnPanel(dfn);
     } else {
-        showDfnPanel(dfnPanel);
+        showDfnPanel(dfn);
     }
 }
 
-function insertDfnPopupAction(dfnPanel) {
-    const dfn = dfnPanel.forDfn;
+function insertDfnPopupAction(dfn) {
     dfn.setAttribute('role', 'button');
     dfn.setAttribute('aria-expanded', 'false')
     dfn.tabIndex = 0;
     dfn.classList.add('has-dfn-panel');
     dfn.addEventListener('click', (event) => {
-        showDfnPanel(dfnPanel);
+        toggleDfnPanel(dfn);
         event.stopPropagation();
     });
     dfn.addEventListener('keypress', (event) => {
         const kc = event.keyCode;
         // 32->Space, 13->Enter
         if(kc == 32 || kc == 13) {
-            toggleDfnPanel(dfnPanel);
+            toggleDfnPanel(dfn);
             event.stopPropagation();
             event.preventDefault();
         }
     });
-
-    dfnPanel.addEventListener('click', (event) => {
-        if (event.target.nodeName == 'A') {
-            scrollToTargetAndHighlight(event);
-            pinDfnPanel(dfnPanel);
-        }
-        event.stopPropagation();
-        refocusOnTarget(event);
-    });
-
-    dfnPanel.addEventListener('keydown', (event) => {
-        if(event.keyCode == 27) { // Escape key
-            hideDfnPanel(dfnPanel, dfn);
-            event.stopPropagation();
-            event.preventDefault();
-        }
-    })
 }
 
 function refocusOnTarget(event) {
@@ -3875,10 +3713,184 @@ function scrollToTargetAndHighlight(event) {
     }
 }
 
-window.addEventListener("resize", () => {
-    // Pin any visible dfn panel
-    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-});
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+function needsFor(type) {
+    switch(type) {
+        case "descriptor":
+        case "value":
+        case "element-attr":
+        case "attr-value":
+        case "element-state":
+        case "method":
+        case "constructor":
+        case "argument":
+        case "attribute":
+        case "const":
+        case "dict-member":
+        case "event":
+        case "enum-value":
+        case "stringifier":
+        case "serializer":
+        case "iterator":
+        case "maplike":
+        case "setlike":
+        case "state":
+        case "mode":
+        case "context":
+        case "facet": return true;
+
+        default: return false;
+    }
+}
+function refusesFor(type) {
+    switch(type) {
+        case "property":
+        case "element":
+        case "interface":
+        case "namespace":
+        case "callback":
+        case "dictionary":
+        case "enum":
+        case "exception":
+        case "typedef":
+        case "http-header":
+        case "permission": return true;
+
+        default: return false;
+    }
+}
+function linkFormatterFromType(type) {
+    switch(type) {
+        case 'scheme':
+        case 'permission':
+        case 'dfn': return (text) => `[=${text}=]`;
+
+        case 'abstract-op': return (text) => `[\$${text}\$]`;
+
+        case 'function':
+        case 'at-rule':
+        case 'selector':
+        case 'value': return (text) => `''${text}''`;
+
+        case 'http-header': return (text) => `[:${text}:]`;
+
+        case 'interface':
+        case 'constructor':
+        case 'method':
+        case 'argument':
+        case 'attribute':
+        case 'callback':
+        case 'dictionary':
+        case 'dict-member':
+        case 'enum':
+        case 'enum-value':
+        case 'exception':
+        case 'const':
+        case 'typedef':
+        case 'stringifier':
+        case 'serializer':
+        case 'iterator':
+        case 'maplike':
+        case 'setlike':
+        case 'extended-attribute':
+        case 'event':
+        case 'idl': return (text) => `{{${text}}}`;
+
+        case 'element-state':
+        case 'element-attr':
+        case 'attr-value':
+        case 'element': return (element) => `<{${element}}>`;
+
+        case 'grammar': return (text) => `${text} (within a <pre class=prod>)`;
+
+        case 'type': return (text)=> `<<${text}>>`;
+
+        case 'descriptor':
+        case 'property': return (text) => `'${text}'`;
+
+        default: return;
+    };
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!needsFor(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!refusesFor(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
 }
 </script>
 <script>/* Boilerplate: script-link-titles */
@@ -3905,26 +3917,7 @@ document.addEventListener("DOMContentLoaded", setTypeTitles);
 {
 function repositionAnnoPanels(){
     const panels = [...document.querySelectorAll("[data-anno-for]")];
-    const main = document.querySelector("main");
-    let mainRect;
-    if(main) mainRect = main.getBoundingClientRect();
-    for(const panel of panels) {
-        const dfn = document.getElementById(panel.getAttribute("data-anno-for"));
-        if(!dfn) {
-            console.log("Can't find the annotation panel target:", panel);
-            continue;
-        }
-        const rect = dfn.getBoundingClientRect();
-        const top = window.scrollY + rect.top
-        panel.style.top = top + "px";
-        panel.top = top;
-        panel.height = rect.height;
-        panel.classList.remove("unpositioned");
-        const panelRect = panel.getBoundingClientRect()
-        if(main) {
-            panel.classList.toggle("overlapping-main", panelRect.left < mainRect.right)
-        }
-    }
+    hydratePanels(panels);
     let vSoFar = 0;
     for(const panel of panels.sort(cmpTops)) {
         if(panel.top < vSoFar) {
@@ -3932,6 +3925,39 @@ function repositionAnnoPanels(){
             panel.style.top = vSoFar + "px";
         }
         vSoFar = panel.top + panel.height + 15;
+    }
+}
+function hydratePanels(panels) {
+    const main = document.querySelector("main");
+    let mainRect;
+    if(main) mainRect = main.getBoundingClientRect();
+    // First display them all, if they're not already visible.
+    for(const panel of panels) {
+        panel.classList.remove("unpositioned");
+    }
+    // Measure them all
+    for(const panel of panels) {
+        const dfn = document.getElementById(panel.getAttribute("data-anno-for"));
+        if(!dfn) {
+            console.log("Can't find the annotation panel target:", panel);
+            continue;
+        }
+        panel.dfn = dfn;
+        panel.top = window.scrollY + dfn.getBoundingClientRect().top;
+        let panelRect = panel.getBoundingClientRect();
+        panel.height = panelRect.height;
+        if(main) {
+            panel.overlappingMain = panelRect.left < mainRect.right;
+        } else {
+            panel.overlappingMain = false;
+        }
+    }
+    // And finally position them
+    for(const panel of panels) {
+        const dfn = panel.dfn;
+        if(!dfn) continue;
+        panel.style.top = panel.top + "px";
+        panel.classList.toggle("overlapping-main", panel.overlappingMain);
     }
 }
 
