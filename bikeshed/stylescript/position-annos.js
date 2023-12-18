@@ -14,7 +14,7 @@ function hydratePanels(panels) {
     const main = document.querySelector("main");
     let mainRect;
     if(main) mainRect = main.getBoundingClientRect();
-    // First display them all
+    // First display them all, if they're not already visible.
     for(const panel of panels) {
         panel.classList.remove("unpositioned");
     }
@@ -26,22 +26,21 @@ function hydratePanels(panels) {
             continue;
         }
         panel.dfn = dfn;
-        panel.dfnRect = dfn.getBoundingClientRect();
-        panel.panelRect = panel.getBoundingClientRect();
+        panel.top = window.scrollY + dfn.getBoundingClientRect().top;
+        let panelRect = panel.getBoundingClientRect();
+        panel.height = panelRect.height;
+        if(main) {
+            panel.overlappingMain = panelRect.left < mainRect.right;
+        } else {
+            panel.overlappingMain = false;
+        }
     }
     // And finally position them
     for(const panel of panels) {
         const dfn = panel.dfn;
         if(!dfn) continue;
-        const dfnRect = panel.dfnRect;
-        const panelRect = panel.panelRect;
-        const top = window.scrollY + dfnRect.top
-        panel.style.top = top + "px";
-        panel.top = top;
-        panel.height = dfnRect.height;
-        if(main) {
-            panel.classList.toggle("overlapping-main", panelRect.left < mainRect.right)
-        }
+        panel.style.top = panel.top + "px";
+        panel.classList.toggle("overlapping-main", panel.overlappingMain);
     }
 }
 
