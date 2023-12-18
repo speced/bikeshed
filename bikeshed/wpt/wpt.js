@@ -1,7 +1,5 @@
-"use strict";
-
 document.addEventListener("DOMContentLoaded", async ()=>{
-    if(wptPath == "/") return;
+    if(wptData.path == "/") return;
 
     const runsUrl = "https://wpt.fyi/api/runs?label=master&label=stable&max-count=1&product=chrome&product=firefox&product=safari&product=edge";
     const runs = await (await fetch(runsUrl)).json();
@@ -13,7 +11,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         },
         body: JSON.stringify({
             "run_ids": runs.map(x=>x.id),
-            "query": {"path": wptPath},
+            "query": {"path": wptData.path},
         })
     })).json();
 
@@ -33,11 +31,11 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         const numTests = passData[0][1];
         if(numTests > 1) {
             nameEl.insertAdjacentElement("beforeend",
-                el("small", {}, ` (${numTests} tests)`));
+                mk.small({}, ` (${numTests} tests)`));
         }
         if(passData == undefined) return;
-        const resultsEl = el("span",{"class":"wpt-results"},
-            ...passData.map((p,i) => el("span",
+        const resultsEl = mk.span({"class":"wpt-results"},
+            ...passData.map((p,i) => mk.span(
             {
                 "title": `${browsers[i].name} ${p[0]}/${p[1]}`,
                 "class": "wpt-result",
@@ -59,8 +57,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     });
     const overview = document.querySelector(".wpt-overview");
     if(overview) {
-        overview.appendChild(el('ul',{}, ...browsers.map(formatWptResult)));
-        document.head.appendChild(el('style', {},
+        overview.appendChild(mk.ul({}, ...browsers.map(formatWptResult)));
+        document.head.appendChild(mk.style({},
             `.wpt-overview ul { display: flex; flex-flow: row wrap; gap: .2em; justify-content: start; list-style: none; padding: 0; margin: 0;}
              .wpt-overview li { padding: .25em 1em; color: black; text-align: center; }
              .wpt-overview img { height: 1.5em; height: max(1.5em, 32px); background: transparent; }
@@ -74,19 +72,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
              .wpt-overview .passes-all { background: #81c784; }`));
     }
 });
-function el(name, attrs, ...content) {
-    const x = document.createElement(name);
-    for(const [k,v] of Object.entries(attrs)) {
-        x.setAttribute(k, v);
-    }
-    for(let child of content) {
-        if(typeof child == "string") child = document.createTextNode(child);
-        try {
-        x.appendChild(child);
-        } catch(e) { console.log({x, child}); }
-    }
-    return x;
-}
+
 function formatWptResult({name, version, passes, total}) {
     const passRate = passes/total;
     let passClass = "";
@@ -102,14 +88,14 @@ function formatWptResult({name, version, passes, total}) {
     const shortVersion = /^\d+/.exec(version);
     const icon = []
 
-    if(name == "Chrome") icon.push(el('img', {alt:"", src:"https://wpt.fyi/static/chrome_64x64.png"}));
-    if(name == "Edge") icon.push(el('img', {alt:"", src:"https://wpt.fyi/static/edge_64x64.png"}));
-    if(name == "Safari") icon.push(el('img', {alt:"", src:"https://wpt.fyi/static/safari_64x64.png"}));
-    if(name == "Firefox") icon.push(el('img', {alt:"", src:"https://wpt.fyi/static/firefox_64x64.png"}));
+    if(name == "Chrome") icon.push(mk.img({alt:"", src:"https://wpt.fyi/static/chrome_64x64.png"}));
+    if(name == "Edge") icon.push(mk.img({alt:"", src:"https://wpt.fyi/static/edge_64x64.png"}));
+    if(name == "Safari") icon.push(mk.img({alt:"", src:"https://wpt.fyi/static/safari_64x64.png"}));
+    if(name == "Firefox") icon.push(mk.img({alt:"", src:"https://wpt.fyi/static/firefox_64x64.png"}));
 
-    return el('li', {"class":passClass},
-        el('nobr', {'class':'browser'}, ...icon, ` ${name} ${shortVersion}`),
-        el('br', {}),
-        el('nobr', {'class':'pass-rate'}, `${passes}/${total}`)
+    return mk.li({"class":passClass},
+        mk.nobr({'class':'browser'}, ...icon, ` ${name} ${shortVersion}`),
+        mk.br(),
+        mk.nobr({'class':'pass-rate'}, `${passes}/${total}`)
     );
 }

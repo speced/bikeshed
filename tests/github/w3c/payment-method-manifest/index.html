@@ -76,7 +76,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -482,7 +481,7 @@ a[href].issue-return {
 }
 
 .ref-hint {
-    display: none;
+    display: inline-block;
     position: absolute;
     z-index: 35;
     width: 20em;
@@ -498,16 +497,11 @@ a[href].issue-return {
     white-space: normal; /* in case it's moved into a pre */
 }
 
-.ref-hint.on {
-    display: inline-block;
-}
-
 .ref-hint * { margin: 0; padding: 0; text-indent: 0; }
 
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -567,7 +561,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -624,7 +617,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -1396,488 +1388,8 @@ Rouslan Solomakhin for their contributions to making this specification awesome!
    <dt id="biblio-payment-handler">[PAYMENT-HANDLER]
    <dd>Adrian Hope-Bailie; et al. <a href="https://w3c.github.io/payment-handler/"><cite>Payment Handler API</cite></a>. URL: <a href="https://w3c.github.io/payment-handler/">https://w3c.github.io/payment-handler/</a>
   </dl>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['4aff89a3'] = {"dfnID": "4aff89a3", "url": "https://www.w3.org/TR/appmanifest/#dfn-processed-manifest", "dfnText": "processed web app manifest", "refSections": [{"refs": [{"id": "ref-for-dfn-processed-manifest"}, {"id": "ref-for-dfn-processed-manifest\u2460"}, {"id": "ref-for-dfn-processed-manifest\u2461"}], "title": "3.2. Ingesting payment method manifests"}], "external": true};
-window.dfnpanelData['4d540443'] = {"dfnID": "4d540443", "url": "https://www.w3.org/TR/appmanifest/#dfn-obtaining-the-manifest", "dfnText": "steps for obtaining a web app manifest", "refSections": [{"refs": [{"id": "ref-for-dfn-obtaining-the-manifest"}], "title": "3.5. Fetching web app manifests"}], "external": true};
-window.dfnpanelData['5b59a696'] = {"dfnID": "5b59a696", "url": "https://www.w3.org/TR/appmanifest/#dfn-processing-a-manifest", "dfnText": "steps for processing a web app manifest", "refSections": [{"refs": [{"id": "ref-for-dfn-processing-a-manifest"}, {"id": "ref-for-dfn-processing-a-manifest\u2460"}], "title": "3.2. Ingesting payment method manifests"}], "external": true};
-window.dfnpanelData['2d6020a8'] = {"dfnID": "2d6020a8", "url": "https://www.w3.org/TR/appmanifest/#dfn-manifest-url", "dfnText": "url", "refSections": [{"refs": [{"id": "ref-for-dfn-manifest-url"}], "title": "1.1. Use cases"}], "external": true};
-window.dfnpanelData['6723bdad'] = {"dfnID": "6723bdad", "url": "https://www.w3.org/TR/appmanifest/#dfn-manifest", "dfnText": "web app manifest", "refSections": [{"refs": [{"id": "ref-for-dfn-manifest"}], "title": "1.1. Use cases"}, {"refs": [{"id": "ref-for-dfn-manifest\u2460"}], "title": "1.3. Example manifest file"}, {"refs": [{"id": "ref-for-dfn-manifest\u2461"}], "title": "3.5. Fetching web app manifests"}], "external": true};
-window.dfnpanelData['bffb633e'] = {"dfnID": "bffb633e", "url": "https://encoding.spec.whatwg.org/#utf-8", "dfnText": "utf-8", "refSections": [{"refs": [{"id": "ref-for-utf-8"}], "title": "2. Manifest format"}], "external": true};
-window.dfnpanelData['b0fcb8d7'] = {"dfnID": "b0fcb8d7", "url": "https://encoding.spec.whatwg.org/#utf-8-decode", "dfnText": "utf-8 decode", "refSections": [{"refs": [{"id": "ref-for-utf-8-decode"}], "title": "3.4. Validating and parsing payment method manifests"}, {"refs": [{"id": "ref-for-utf-8-decode\u2460"}], "title": "3.5. Fetching web app manifests"}], "external": true};
-window.dfnpanelData['81a76425'] = {"dfnID": "81a76425", "url": "https://fetch.spec.whatwg.org/#concept-response-body", "dfnText": "body", "refSections": [{"refs": [{"id": "ref-for-concept-response-body"}, {"id": "ref-for-concept-response-body\u2460"}, {"id": "ref-for-concept-response-body\u2461"}], "title": "3.3. Fetching payment method manifests"}, {"refs": [{"id": "ref-for-concept-response-body\u2462"}], "title": "3.5. Fetching web app manifests"}], "external": true};
-window.dfnpanelData['857d5516'] = {"dfnID": "857d5516", "url": "https://fetch.spec.whatwg.org/#concept-request-client", "dfnText": "client", "refSections": [{"refs": [{"id": "ref-for-concept-request-client"}, {"id": "ref-for-concept-request-client\u2460"}], "title": "3.3. Fetching payment method manifests"}, {"refs": [{"id": "ref-for-concept-request-client\u2461"}], "title": "3.5. Fetching web app manifests"}], "external": true};
-window.dfnpanelData['902380f7'] = {"dfnID": "902380f7", "url": "https://fetch.spec.whatwg.org/#concept-request-credentials-mode", "dfnText": "credentials mode", "refSections": [{"refs": [{"id": "ref-for-concept-request-credentials-mode"}, {"id": "ref-for-concept-request-credentials-mode\u2460"}], "title": "3.3. Fetching payment method manifests"}, {"refs": [{"id": "ref-for-concept-request-credentials-mode\u2461"}], "title": "3.5. Fetching web app manifests"}], "external": true};
-window.dfnpanelData['61025082'] = {"dfnID": "61025082", "url": "https://fetch.spec.whatwg.org/#extract-header-list-values", "dfnText": "extract header list values", "refSections": [{"refs": [{"id": "ref-for-extract-header-list-values"}], "title": "3.3. Fetching payment method manifests"}], "external": true};
-window.dfnpanelData['a33db89a'] = {"dfnID": "a33db89a", "url": "https://fetch.spec.whatwg.org/#concept-fetch", "dfnText": "fetch", "refSections": [{"refs": [{"id": "ref-for-concept-fetch"}, {"id": "ref-for-concept-fetch\u2460"}, {"id": "ref-for-concept-fetch\u2461"}], "title": "3.3. Fetching payment method manifests"}, {"refs": [{"id": "ref-for-concept-fetch\u2462"}], "title": "3.5. Fetching web app manifests"}], "external": true};
-window.dfnpanelData['f7b00a8b'] = {"dfnID": "f7b00a8b", "url": "https://fetch.spec.whatwg.org/#concept-response-header-list", "dfnText": "header list", "refSections": [{"refs": [{"id": "ref-for-concept-response-header-list"}], "title": "3.3. Fetching payment method manifests"}], "external": true};
-window.dfnpanelData['50b05fad'] = {"dfnID": "50b05fad", "url": "https://fetch.spec.whatwg.org/#concept-request-method", "dfnText": "method", "refSections": [{"refs": [{"id": "ref-for-concept-request-method"}], "title": "3.3. Fetching payment method manifests"}], "external": true};
-window.dfnpanelData['cb98f71f'] = {"dfnID": "cb98f71f", "url": "https://fetch.spec.whatwg.org/#concept-request-mode", "dfnText": "mode", "refSections": [{"refs": [{"id": "ref-for-concept-request-mode"}, {"id": "ref-for-concept-request-mode\u2460"}], "title": "3.3. Fetching payment method manifests"}, {"refs": [{"id": "ref-for-concept-request-mode\u2461"}], "title": "3.5. Fetching web app manifests"}], "external": true};
-window.dfnpanelData['eb1b1af3'] = {"dfnID": "eb1b1af3", "url": "https://fetch.spec.whatwg.org/#concept-network-error", "dfnText": "network error", "refSections": [{"refs": [{"id": "ref-for-concept-network-error"}, {"id": "ref-for-concept-network-error\u2460"}], "title": "3.3. Fetching payment method manifests"}, {"refs": [{"id": "ref-for-concept-network-error\u2461"}], "title": "3.5. Fetching web app manifests"}], "external": true};
-window.dfnpanelData['a27468c5'] = {"dfnID": "a27468c5", "url": "https://fetch.spec.whatwg.org/#ok-status", "dfnText": "ok status", "refSections": [{"refs": [{"id": "ref-for-ok-status"}, {"id": "ref-for-ok-status\u2460"}], "title": "3.3. Fetching payment method manifests"}, {"refs": [{"id": "ref-for-ok-status\u2461"}], "title": "3.5. Fetching web app manifests"}], "external": true};
-window.dfnpanelData['64b62ea0'] = {"dfnID": "64b62ea0", "url": "https://fetch.spec.whatwg.org/#concept-request-redirect-mode", "dfnText": "redirect mode", "refSections": [{"refs": [{"id": "ref-for-concept-request-redirect-mode"}, {"id": "ref-for-concept-request-redirect-mode\u2460"}], "title": "3.3. Fetching payment method manifests"}, {"refs": [{"id": "ref-for-concept-request-redirect-mode\u2461"}], "title": "3.5. Fetching web app manifests"}], "external": true};
-window.dfnpanelData['358f1dbd'] = {"dfnID": "358f1dbd", "url": "https://fetch.spec.whatwg.org/#concept-request-referrer", "dfnText": "referrer", "refSections": [{"refs": [{"id": "ref-for-concept-request-referrer"}], "title": "3.3. Fetching payment method manifests"}, {"refs": [{"id": "ref-for-concept-request-referrer\u2460"}], "title": "3.5. Fetching web app manifests"}, {"refs": [{"id": "ref-for-concept-request-referrer\u2461"}], "title": "4.1. Revealing user activity to payment providers"}], "external": true};
-window.dfnpanelData['07582c28'] = {"dfnID": "07582c28", "url": "https://fetch.spec.whatwg.org/#concept-request-referrer-policy", "dfnText": "referrer policy", "refSections": [{"refs": [{"id": "ref-for-concept-request-referrer-policy"}], "title": "3.3. Fetching payment method manifests"}, {"refs": [{"id": "ref-for-concept-request-referrer-policy\u2460"}], "title": "4.1. Revealing user activity to payment providers"}], "external": true};
-window.dfnpanelData['55213b5b'] = {"dfnID": "55213b5b", "url": "https://fetch.spec.whatwg.org/#concept-request", "dfnText": "request", "refSections": [{"refs": [{"id": "ref-for-concept-request"}, {"id": "ref-for-concept-request\u2460"}], "title": "3.3. Fetching payment method manifests"}, {"refs": [{"id": "ref-for-concept-request\u2461"}], "title": "3.5. Fetching web app manifests"}], "external": true};
-window.dfnpanelData['ee7bba09'] = {"dfnID": "ee7bba09", "url": "https://fetch.spec.whatwg.org/#concept-response", "dfnText": "response", "refSections": [{"refs": [{"id": "ref-for-concept-response"}, {"id": "ref-for-concept-response\u2460"}, {"id": "ref-for-concept-response\u2461"}], "title": "3.3. Fetching payment method manifests"}, {"refs": [{"id": "ref-for-concept-response\u2462"}], "title": "3.5. Fetching web app manifests"}], "external": true};
-window.dfnpanelData['a1d47575'] = {"dfnID": "a1d47575", "url": "https://fetch.spec.whatwg.org/#concept-response-status", "dfnText": "status", "refSections": [{"refs": [{"id": "ref-for-concept-response-status"}, {"id": "ref-for-concept-response-status\u2460"}], "title": "3.3. Fetching payment method manifests"}, {"refs": [{"id": "ref-for-concept-response-status\u2461"}], "title": "3.5. Fetching web app manifests"}], "external": true};
-window.dfnpanelData['dc1cd39b'] = {"dfnID": "dc1cd39b", "url": "https://fetch.spec.whatwg.org/#concept-request-url", "dfnText": "url (for request)", "refSections": [{"refs": [{"id": "ref-for-concept-request-url"}, {"id": "ref-for-concept-request-url\u2460"}], "title": "3.3. Fetching payment method manifests"}, {"refs": [{"id": "ref-for-concept-request-url\u2461"}], "title": "3.5. Fetching web app manifests"}], "external": true};
-window.dfnpanelData['3268a8eb'] = {"dfnID": "3268a8eb", "url": "https://fetch.spec.whatwg.org/#concept-response-url", "dfnText": "url (for response)", "refSections": [{"refs": [{"id": "ref-for-concept-response-url"}, {"id": "ref-for-concept-response-url\u2460"}, {"id": "ref-for-concept-response-url\u2461"}, {"id": "ref-for-concept-response-url\u2462"}], "title": "3.3. Fetching payment method manifests"}], "external": true};
-window.dfnpanelData['12b8dfc0'] = {"dfnID": "12b8dfc0", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#current-settings-object", "dfnText": "current settings object", "refSections": [{"refs": [{"id": "ref-for-current-settings-object"}], "title": "3.1. Modifications to Payment Request API"}], "external": true};
-window.dfnpanelData['3e12e042'] = {"dfnID": "3e12e042", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object", "dfnText": "environment settings object", "refSections": [{"refs": [{"id": "ref-for-environment-settings-object"}], "title": "3.2. Ingesting payment method manifests"}, {"refs": [{"id": "ref-for-environment-settings-object\u2460"}], "title": "3.3. Fetching payment method manifests"}, {"refs": [{"id": "ref-for-environment-settings-object\u2461"}], "title": "3.5. Fetching web app manifests"}], "external": true};
-window.dfnpanelData['086e3aff'] = {"dfnID": "086e3aff", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-origin", "dfnText": "origin", "refSections": [{"refs": [{"id": "ref-for-concept-origin"}], "title": "1.1. Use cases"}, {"refs": [{"id": "ref-for-concept-origin\u2460"}], "title": "1.3. Example manifest file"}, {"refs": [{"id": "ref-for-concept-origin\u2461"}], "title": "2. Manifest format"}, {"refs": [{"id": "ref-for-concept-origin\u2462"}], "title": "3.4. Validating and parsing payment method manifests"}, {"refs": [{"id": "ref-for-concept-origin\u2463"}], "title": "4.1. Revealing user activity to payment providers"}], "external": true};
-window.dfnpanelData['dae0bfde'] = {"dfnID": "dae0bfde", "url": "https://html.spec.whatwg.org/multipage/browsers.html#ascii-serialisation-of-an-origin", "dfnText": "serialization of an origin", "refSections": [{"refs": [{"id": "ref-for-ascii-serialisation-of-an-origin"}], "title": "2. Manifest format"}], "external": true};
-window.dfnpanelData['53275e46'] = {"dfnID": "53275e46", "url": "https://infra.spec.whatwg.org/#list-append", "dfnText": "append (for list)", "refSections": [{"refs": [{"id": "ref-for-list-append"}], "title": "3.3. Fetching payment method manifests"}], "external": true};
-window.dfnpanelData['a3b18719'] = {"dfnID": "a3b18719", "url": "https://infra.spec.whatwg.org/#set-append", "dfnText": "append (for set)", "refSections": [{"refs": [{"id": "ref-for-set-append"}, {"id": "ref-for-set-append\u2460"}], "title": "3.4. Validating and parsing payment method manifests"}], "external": true};
-window.dfnpanelData['7f9469b5'] = {"dfnID": "7f9469b5", "url": "https://infra.spec.whatwg.org/#ascii-case-insensitive", "dfnText": "ascii case-insensitive", "refSections": [{"refs": [{"id": "ref-for-ascii-case-insensitive"}, {"id": "ref-for-ascii-case-insensitive\u2460"}], "title": "3.3. Fetching payment method manifests"}], "external": true};
-window.dfnpanelData['7b0d918d'] = {"dfnID": "7b0d918d", "url": "https://infra.spec.whatwg.org/#iteration-break", "dfnText": "break", "refSections": [{"refs": [{"id": "ref-for-iteration-break"}], "title": "3.3. Fetching payment method manifests"}], "external": true};
-window.dfnpanelData['3de9e659'] = {"dfnID": "3de9e659", "url": "https://infra.spec.whatwg.org/#byte-sequence", "dfnText": "byte sequence", "refSections": [{"refs": [{"id": "ref-for-byte-sequence"}, {"id": "ref-for-byte-sequence\u2460"}, {"id": "ref-for-byte-sequence\u2461"}], "title": "3.3. Fetching payment method manifests"}, {"refs": [{"id": "ref-for-byte-sequence\u2462"}], "title": "3.4. Validating and parsing payment method manifests"}, {"refs": [{"id": "ref-for-byte-sequence\u2463"}], "title": "3.5. Fetching web app manifests"}], "external": true};
-window.dfnpanelData['f937b7b6'] = {"dfnID": "f937b7b6", "url": "https://infra.spec.whatwg.org/#iteration-continue", "dfnText": "continue", "refSections": [{"refs": [{"id": "ref-for-iteration-continue"}, {"id": "ref-for-iteration-continue\u2460"}], "title": "3.2. Ingesting payment method manifests"}, {"refs": [{"id": "ref-for-iteration-continue\u2461"}, {"id": "ref-for-iteration-continue\u2462"}, {"id": "ref-for-iteration-continue\u2463"}, {"id": "ref-for-iteration-continue\u2464"}, {"id": "ref-for-iteration-continue\u2465"}, {"id": "ref-for-iteration-continue\u2466"}, {"id": "ref-for-iteration-continue\u2467"}, {"id": "ref-for-iteration-continue\u2468"}, {"id": "ref-for-iteration-continue\u2460\u24ea"}, {"id": "ref-for-iteration-continue\u2460\u2460"}, {"id": "ref-for-iteration-continue\u2460\u2461"}], "title": "3.3. Fetching payment method manifests"}], "external": true};
-window.dfnpanelData['1243a891'] = {"dfnID": "1243a891", "url": "https://infra.spec.whatwg.org/#map-exists", "dfnText": "exist", "refSections": [{"refs": [{"id": "ref-for-map-exists"}, {"id": "ref-for-map-exists\u2460"}], "title": "3.4. Validating and parsing payment method manifests"}], "external": true};
-window.dfnpanelData['16d07e10'] = {"dfnID": "16d07e10", "url": "https://infra.spec.whatwg.org/#list-iterate", "dfnText": "for each", "refSections": [{"refs": [{"id": "ref-for-list-iterate"}, {"id": "ref-for-list-iterate\u2460"}], "title": "3.2. Ingesting payment method manifests"}, {"refs": [{"id": "ref-for-list-iterate\u2461"}, {"id": "ref-for-list-iterate\u2462"}, {"id": "ref-for-list-iterate\u2463"}], "title": "3.3. Fetching payment method manifests"}, {"refs": [{"id": "ref-for-list-iterate\u2464"}, {"id": "ref-for-list-iterate\u2465"}], "title": "3.4. Validating and parsing payment method manifests"}], "external": true};
-window.dfnpanelData['c88f3887'] = {"dfnID": "c88f3887", "url": "https://infra.spec.whatwg.org/#struct-item", "dfnText": "item", "refSections": [{"refs": [{"id": "ref-for-struct-item"}], "title": "3.1. Modifications to Payment Request API"}], "external": true};
-window.dfnpanelData['b38d7ca1'] = {"dfnID": "b38d7ca1", "url": "https://infra.spec.whatwg.org/#string", "dfnText": "javascript string", "refSections": [{"refs": [{"id": "ref-for-string"}], "title": "3.3. Fetching payment method manifests"}], "external": true};
-window.dfnpanelData['649608b9'] = {"dfnID": "649608b9", "url": "https://infra.spec.whatwg.org/#list", "dfnText": "list", "refSections": [{"refs": [{"id": "ref-for-list"}, {"id": "ref-for-list\u2460"}], "title": "3.3. Fetching payment method manifests"}, {"refs": [{"id": "ref-for-list\u2461"}, {"id": "ref-for-list\u2462"}], "title": "3.4. Validating and parsing payment method manifests"}], "external": true};
-window.dfnpanelData['3fca5a9e'] = {"dfnID": "3fca5a9e", "url": "https://infra.spec.whatwg.org/#ordered-map", "dfnText": "map", "refSections": [{"refs": [{"id": "ref-for-ordered-map"}, {"id": "ref-for-ordered-map\u2460"}], "title": "3.3. Fetching payment method manifests"}, {"refs": [{"id": "ref-for-ordered-map\u2461"}], "title": "3.4. Validating and parsing payment method manifests"}], "external": true};
-window.dfnpanelData['84b454ff'] = {"dfnID": "84b454ff", "url": "https://infra.spec.whatwg.org/#ordered-map", "dfnText": "ordered map", "refSections": [{"refs": [{"id": "ref-for-ordered-map"}, {"id": "ref-for-ordered-map\u2460"}], "title": "3.3. Fetching payment method manifests"}, {"refs": [{"id": "ref-for-ordered-map\u2461"}], "title": "3.4. Validating and parsing payment method manifests"}], "external": true};
-window.dfnpanelData['692595fe'] = {"dfnID": "692595fe", "url": "https://infra.spec.whatwg.org/#ordered-set", "dfnText": "ordered set", "refSections": [{"refs": [{"id": "ref-for-ordered-set"}, {"id": "ref-for-ordered-set\u2460"}, {"id": "ref-for-ordered-set\u2461"}, {"id": "ref-for-ordered-set\u2462"}], "title": "3.4. Validating and parsing payment method manifests"}], "external": true};
-window.dfnpanelData['8e8decb4'] = {"dfnID": "8e8decb4", "url": "https://infra.spec.whatwg.org/#parse-a-json-string-to-an-infra-value", "dfnText": "parse json into infra values", "refSections": [{"refs": [{"id": "ref-for-parse-a-json-string-to-an-infra-value"}], "title": "3.4. Validating and parsing payment method manifests"}], "external": true};
-window.dfnpanelData['762869d3'] = {"dfnID": "762869d3", "url": "https://infra.spec.whatwg.org/#scalar-value-string", "dfnText": "scalar value string", "refSections": [{"refs": [{"id": "ref-for-scalar-value-string"}], "title": "3.5. Fetching web app manifests"}], "external": true};
-window.dfnpanelData['0e6b2056'] = {"dfnID": "0e6b2056", "url": "https://infra.spec.whatwg.org/#map-set", "dfnText": "set", "refSections": [{"refs": [{"id": "ref-for-map-set"}, {"id": "ref-for-map-set\u2460"}], "title": "3.3. Fetching payment method manifests"}], "external": true};
-window.dfnpanelData['0204d188'] = {"dfnID": "0204d188", "url": "https://infra.spec.whatwg.org/#list-size", "dfnText": "size", "refSections": [{"refs": [{"id": "ref-for-list-size"}, {"id": "ref-for-list-size\u2460"}, {"id": "ref-for-list-size\u2461"}], "title": "3.4. Validating and parsing payment method manifests"}], "external": true};
-window.dfnpanelData['984221ca'] = {"dfnID": "984221ca", "url": "https://infra.spec.whatwg.org/#struct", "dfnText": "struct", "refSections": [{"refs": [{"id": "ref-for-struct"}], "title": "3.4. Validating and parsing payment method manifests"}], "external": true};
-window.dfnpanelData['0e8de730'] = {"dfnID": "0e8de730", "url": "https://infra.spec.whatwg.org/#tuple", "dfnText": "tuple", "refSections": [{"refs": [{"id": "ref-for-tuple"}], "title": "3.3. Fetching payment method manifests"}], "external": true};
-window.dfnpanelData['1394891f'] = {"dfnID": "1394891f", "url": "https://w3c.github.io/payment-method-id/#dfn-payment-method-identifiers", "dfnText": "payment method identifier", "refSections": [{"refs": [{"id": "ref-for-dfn-payment-method-identifiers"}], "title": "1.1. Use cases"}, {"refs": [{"id": "ref-for-dfn-payment-method-identifiers\u2460"}, {"id": "ref-for-dfn-payment-method-identifiers\u2461"}, {"id": "ref-for-dfn-payment-method-identifiers\u2462"}, {"id": "ref-for-dfn-payment-method-identifiers\u2463"}], "title": "1.2. Accessing the manifest"}, {"refs": [{"id": "ref-for-dfn-payment-method-identifiers\u2464"}], "title": "3.2. Ingesting payment method manifests"}, {"refs": [{"id": "ref-for-dfn-payment-method-identifiers\u2465"}, {"id": "ref-for-dfn-payment-method-identifiers\u2466"}, {"id": "ref-for-dfn-payment-method-identifiers\u2467"}], "title": "3.3. Fetching payment method manifests"}], "external": true};
-window.dfnpanelData['a8389e54'] = {"dfnID": "a8389e54", "url": "https://w3c.github.io/payment-method-id/#dfn-standardized-payment-method-identifiers", "dfnText": "standardized payment method identifier", "refSections": [{"refs": [{"id": "ref-for-dfn-standardized-payment-method-identifiers"}], "title": "3.3. Fetching payment method manifests"}], "external": true};
-window.dfnpanelData['120fe263'] = {"dfnID": "120fe263", "url": "https://w3c.github.io/payment-method-id/#dfn-url-based-payment-method-identifiers", "dfnText": "url-based payment method identifier", "refSections": [{"refs": [{"id": "ref-for-dfn-url-based-payment-method-identifiers"}], "title": "1.1. Use cases"}, {"refs": [{"id": "ref-for-dfn-url-based-payment-method-identifiers\u2460"}], "title": "3.3. Fetching payment method manifests"}, {"refs": [{"id": "ref-for-dfn-url-based-payment-method-identifiers\u2461"}], "title": "4.1. Revealing user activity to payment providers"}], "external": true};
-window.dfnpanelData['70b9716d'] = {"dfnID": "70b9716d", "url": "https://w3c.github.io/payment-method-id/#dfn-validate-a-url-based-payment-method-identifier", "dfnText": "validate a url-based payment method identifier", "refSections": [{"refs": [{"id": "ref-for-dfn-validate-a-url-based-payment-method-identifier"}], "title": "3.3. Fetching payment method manifests"}], "external": true};
-window.dfnpanelData['f679a0bc'] = {"dfnID": "f679a0bc", "url": "https://w3c.github.io/payment-request/#dom-paymentrequest", "dfnText": "PaymentRequest", "refSections": [{"refs": [{"id": "ref-for-dom-paymentrequest"}, {"id": "ref-for-dom-paymentrequest\u2460"}], "title": "3.1. Modifications to Payment Request API"}, {"refs": [{"id": "ref-for-dom-paymentrequest\u2461"}], "title": "4.1. Revealing user activity to payment providers"}], "external": true};
-window.dfnpanelData['e0f06068'] = {"dfnID": "e0f06068", "url": "https://w3c.github.io/payment-request/#dfn-paymentrequest-paymentrequest", "dfnText": "PaymentRequest(methodData, details, options)", "refSections": [{"refs": [{"id": "ref-for-dfn-paymentrequest-paymentrequest"}], "title": "3.1. Modifications to Payment Request API"}], "external": true};
-window.dfnpanelData['621925c8'] = {"dfnID": "621925c8", "url": "https://w3c.github.io/payment-request/#dfn-serializedmethoddata", "dfnText": "[[serializedmethoddata]]", "refSections": [{"refs": [{"id": "ref-for-dfn-serializedmethoddata"}], "title": "3.1. Modifications to Payment Request API"}], "external": true};
-window.dfnpanelData['57def0af'] = {"dfnID": "57def0af", "url": "https://w3c.github.io/payment-request/#dfn-payment-apps", "dfnText": "payment app", "refSections": [{"refs": [{"id": "ref-for-dfn-payment-apps"}, {"id": "ref-for-dfn-payment-apps\u2460"}, {"id": "ref-for-dfn-payment-apps\u2461"}], "title": "1.1. Use cases"}, {"refs": [{"id": "ref-for-dfn-payment-apps\u2462"}, {"id": "ref-for-dfn-payment-apps\u2463"}, {"id": "ref-for-dfn-payment-apps\u2464"}], "title": "1.3. Example manifest file"}, {"refs": [{"id": "ref-for-dfn-payment-apps\u2465"}], "title": "3.1. Modifications to Payment Request API"}, {"refs": [{"id": "ref-for-dfn-payment-apps\u2466"}, {"id": "ref-for-dfn-payment-apps\u2467"}, {"id": "ref-for-dfn-payment-apps\u2468"}], "title": "3.2. Ingesting payment method manifests"}, {"refs": [{"id": "ref-for-dfn-payment-apps\u2460\u24ea"}], "title": "3.5. Fetching web app manifests"}, {"refs": [{"id": "ref-for-dfn-payment-apps\u2460\u2460"}], "title": "4.1. Revealing user activity to payment providers"}], "external": true};
-window.dfnpanelData['75f46ef4'] = {"dfnID": "75f46ef4", "url": "https://w3c.github.io/payment-request/#dfn-payment-method", "dfnText": "payment method", "refSections": [{"refs": [{"id": "ref-for-dfn-payment-method"}], "title": "Unnumbered Section"}, {"refs": [{"id": "ref-for-dfn-payment-method\u2460"}, {"id": "ref-for-dfn-payment-method\u2461"}, {"id": "ref-for-dfn-payment-method\u2462"}, {"id": "ref-for-dfn-payment-method\u2463"}, {"id": "ref-for-dfn-payment-method\u2464"}, {"id": "ref-for-dfn-payment-method\u2465"}], "title": "1.1. Use cases"}, {"refs": [{"id": "ref-for-dfn-payment-method\u2466"}], "title": "1.2. Accessing the manifest"}, {"refs": [{"id": "ref-for-dfn-payment-method\u2467"}, {"id": "ref-for-dfn-payment-method\u2468"}, {"id": "ref-for-dfn-payment-method\u2460\u24ea"}], "title": "1.3. Example manifest file"}, {"refs": [{"id": "ref-for-dfn-payment-method\u2460\u2460"}, {"id": "ref-for-dfn-payment-method\u2460\u2461"}], "title": "3.2. Ingesting payment method manifests"}, {"refs": [{"id": "ref-for-dfn-payment-method\u2460\u2462"}], "title": "4.1. Revealing user activity to payment providers"}, {"refs": [{"id": "ref-for-dfn-payment-method\u2460\u2463"}], "title": "5.1. The payment-method-manifest link relation"}], "external": true};
-window.dfnpanelData['ef28f15d'] = {"dfnID": "ef28f15d", "url": "https://streams.spec.whatwg.org/#readablestream-get-a-reader", "dfnText": "get a reader", "refSections": [{"refs": [{"id": "ref-for-readablestream-get-a-reader"}, {"id": "ref-for-readablestream-get-a-reader\u2460"}], "title": "3.3. Fetching payment method manifests"}, {"refs": [{"id": "ref-for-readablestream-get-a-reader\u2461"}], "title": "3.5. Fetching web app manifests"}], "external": true};
-window.dfnpanelData['22ece843'] = {"dfnID": "22ece843", "url": "https://url.spec.whatwg.org/#absolute-url-string", "dfnText": "absolute-url string", "refSections": [{"refs": [{"id": "ref-for-absolute-url-string"}], "title": "1.1. Use cases"}, {"refs": [{"id": "ref-for-absolute-url-string\u2460"}], "title": "2. Manifest format"}], "external": true};
-window.dfnpanelData['9ed8b710'] = {"dfnID": "9ed8b710", "url": "https://url.spec.whatwg.org/#concept-basic-url-parser", "dfnText": "basic url parser", "refSections": [{"refs": [{"id": "ref-for-concept-basic-url-parser"}, {"id": "ref-for-concept-basic-url-parser\u2460"}], "title": "3.3. Fetching payment method manifests"}, {"refs": [{"id": "ref-for-concept-basic-url-parser\u2461"}, {"id": "ref-for-concept-basic-url-parser\u2462"}], "title": "3.4. Validating and parsing payment method manifests"}], "external": true};
-window.dfnpanelData['ed948033'] = {"dfnID": "ed948033", "url": "https://url.spec.whatwg.org/#concept-url-fragment", "dfnText": "fragment", "refSections": [{"refs": [{"id": "ref-for-concept-url-fragment"}], "title": "3.4. Validating and parsing payment method manifests"}], "external": true};
-window.dfnpanelData['959ad97b'] = {"dfnID": "959ad97b", "url": "https://url.spec.whatwg.org/#concept-url-origin", "dfnText": "origin", "refSections": [{"refs": [{"id": "ref-for-concept-url-origin"}], "title": "2. Manifest format"}, {"refs": [{"id": "ref-for-concept-url-origin\u2460"}], "title": "3.4. Validating and parsing payment method manifests"}], "external": true};
-window.dfnpanelData['a1288f2a'] = {"dfnID": "a1288f2a", "url": "https://url.spec.whatwg.org/#concept-url-password", "dfnText": "password", "refSections": [{"refs": [{"id": "ref-for-concept-url-password"}], "title": "3.4. Validating and parsing payment method manifests"}], "external": true};
-window.dfnpanelData['c0868016'] = {"dfnID": "c0868016", "url": "https://url.spec.whatwg.org/#concept-url-path", "dfnText": "path", "refSections": [{"refs": [{"id": "ref-for-concept-url-path"}], "title": "3.4. Validating and parsing payment method manifests"}], "external": true};
-window.dfnpanelData['3ab2ec8b'] = {"dfnID": "3ab2ec8b", "url": "https://url.spec.whatwg.org/#concept-url-query", "dfnText": "query", "refSections": [{"refs": [{"id": "ref-for-concept-url-query"}], "title": "3.4. Validating and parsing payment method manifests"}], "external": true};
-window.dfnpanelData['3a711be7'] = {"dfnID": "3a711be7", "url": "https://url.spec.whatwg.org/#concept-url-scheme", "dfnText": "scheme", "refSections": [{"refs": [{"id": "ref-for-concept-url-scheme"}], "title": "2. Manifest format"}, {"refs": [{"id": "ref-for-concept-url-scheme\u2460"}], "title": "3.3. Fetching payment method manifests"}, {"refs": [{"id": "ref-for-concept-url-scheme\u2461"}, {"id": "ref-for-concept-url-scheme\u2462"}], "title": "3.4. Validating and parsing payment method manifests"}, {"refs": [{"id": "ref-for-concept-url-scheme\u2463"}], "title": "4.2. Considerations for development environments"}], "external": true};
-window.dfnpanelData['dcffbccd'] = {"dfnID": "dcffbccd", "url": "https://url.spec.whatwg.org/#concept-url", "dfnText": "url", "refSections": [{"refs": [{"id": "ref-for-concept-url"}, {"id": "ref-for-concept-url\u2460"}], "title": "2. Manifest format"}, {"refs": [{"id": "ref-for-concept-url\u2461"}, {"id": "ref-for-concept-url\u2462"}, {"id": "ref-for-concept-url\u2463"}], "title": "3.3. Fetching payment method manifests"}, {"refs": [{"id": "ref-for-concept-url\u2464"}, {"id": "ref-for-concept-url\u2465"}], "title": "3.4. Validating and parsing payment method manifests"}, {"refs": [{"id": "ref-for-concept-url\u2466"}], "title": "3.5. Fetching web app manifests"}], "external": true};
-window.dfnpanelData['218c9455'] = {"dfnID": "218c9455", "url": "https://url.spec.whatwg.org/#concept-url-username", "dfnText": "username", "refSections": [{"refs": [{"id": "ref-for-concept-url-username"}], "title": "3.4. Validating and parsing payment method manifests"}], "external": true};
-window.dfnpanelData['05af0c3f'] = {"dfnID": "05af0c3f", "url": "https://url.spec.whatwg.org/#valid-url-string", "dfnText": "valid url string", "refSections": [{"refs": [{"id": "ref-for-valid-url-string"}], "title": "2. Manifest format"}], "external": true};
-window.dfnpanelData['24bd7d25'] = {"dfnID": "24bd7d25", "url": "https://webidl.spec.whatwg.org/#upon-fulfillment", "dfnText": "upon fulfillment", "refSections": [{"refs": [{"id": "ref-for-upon-fulfillment"}, {"id": "ref-for-upon-fulfillment\u2460"}], "title": "3.3. Fetching payment method manifests"}, {"refs": [{"id": "ref-for-upon-fulfillment\u2461"}], "title": "3.5. Fetching web app manifests"}], "external": true};
-window.dfnpanelData['f14ed351'] = {"dfnID": "f14ed351", "url": "https://webidl.spec.whatwg.org/#upon-rejection", "dfnText": "upon rejection", "refSections": [{"refs": [{"id": "ref-for-upon-rejection"}], "title": "3.5. Fetching web app manifests"}], "external": true};
-window.dfnpanelData['payment-method-manifest'] = {"dfnID": "payment-method-manifest", "url": "#payment-method-manifest", "dfnText": "payment method manifest", "refSections": [{"refs": [{"id": "ref-for-payment-method-manifest"}], "title": "1.1. Use cases"}, {"refs": [{"id": "ref-for-payment-method-manifest\u2460"}, {"id": "ref-for-payment-method-manifest\u2461"}], "title": "1.2. Accessing the manifest"}, {"refs": [{"id": "ref-for-payment-method-manifest\u2462"}], "title": "1.3. Example manifest file"}, {"refs": [{"id": "ref-for-payment-method-manifest\u2463"}, {"id": "ref-for-payment-method-manifest\u2464"}, {"id": "ref-for-payment-method-manifest\u2465"}, {"id": "ref-for-payment-method-manifest\u2466"}], "title": "2. Manifest format"}], "external": false};
-window.dfnpanelData['valid-payment-method-manifest'] = {"dfnID": "valid-payment-method-manifest", "url": "#valid-payment-method-manifest", "dfnText": "valid payment method manifest", "refSections": [{"refs": [{"id": "ref-for-valid-payment-method-manifest"}, {"id": "ref-for-valid-payment-method-manifest\u2460"}, {"id": "ref-for-valid-payment-method-manifest\u2461"}], "title": "2. Manifest format"}, {"refs": [{"id": "ref-for-valid-payment-method-manifest\u2462"}], "title": "3.4. Validating and parsing payment method manifests"}], "external": false};
-window.dfnpanelData['ingest-payment-method-manifests'] = {"dfnID": "ingest-payment-method-manifests", "url": "#ingest-payment-method-manifests", "dfnText": "ingest payment method manifests", "refSections": [{"refs": [{"id": "ref-for-ingest-payment-method-manifests"}], "title": "3.1. Modifications to Payment Request API"}, {"refs": [{"id": "ref-for-ingest-payment-method-manifests\u2460"}], "title": "4.1. Revealing user activity to payment providers"}], "external": false};
-window.dfnpanelData['fetch-payment-method-manifests'] = {"dfnID": "fetch-payment-method-manifests", "url": "#fetch-payment-method-manifests", "dfnText": "fetch payment method manifests", "refSections": [{"refs": [{"id": "ref-for-fetch-payment-method-manifests"}], "title": "3.2. Ingesting payment method manifests"}, {"refs": [{"id": "ref-for-fetch-payment-method-manifests\u2460"}], "title": "4.1. Revealing user activity to payment providers"}, {"refs": [{"id": "ref-for-fetch-payment-method-manifests\u2461"}], "title": "4.2. Considerations for development environments"}], "external": false};
-window.dfnpanelData['parsed-payment-method-manifest'] = {"dfnID": "parsed-payment-method-manifest", "url": "#parsed-payment-method-manifest", "dfnText": "parsed payment method manifest", "refSections": [{"refs": [{"id": "ref-for-parsed-payment-method-manifest"}, {"id": "ref-for-parsed-payment-method-manifest\u2460"}], "title": "3.4. Validating and parsing payment method manifests"}], "external": false};
-window.dfnpanelData['parsed-payment-method-manifest-default-applications'] = {"dfnID": "parsed-payment-method-manifest-default-applications", "url": "#parsed-payment-method-manifest-default-applications", "dfnText": "default applications", "refSections": [{"refs": [{"id": "ref-for-parsed-payment-method-manifest-default-applications"}], "title": "3.2. Ingesting payment method manifests"}, {"refs": [{"id": "ref-for-parsed-payment-method-manifest-default-applications\u2460"}], "title": "3.4. Validating and parsing payment method manifests"}], "external": false};
-window.dfnpanelData['parsed-payment-method-manifest-supported-origins'] = {"dfnID": "parsed-payment-method-manifest-supported-origins", "url": "#parsed-payment-method-manifest-supported-origins", "dfnText": "supported origins", "refSections": [{"refs": [{"id": "ref-for-parsed-payment-method-manifest-supported-origins"}], "title": "3.2. Ingesting payment method manifests"}, {"refs": [{"id": "ref-for-parsed-payment-method-manifest-supported-origins\u2460"}], "title": "3.4. Validating and parsing payment method manifests"}], "external": false};
-window.dfnpanelData['validate-and-parse-the-payment-method-manifest'] = {"dfnID": "validate-and-parse-the-payment-method-manifest", "url": "#validate-and-parse-the-payment-method-manifest", "dfnText": "validate and parse", "refSections": [{"refs": [{"id": "ref-for-validate-and-parse-the-payment-method-manifest"}], "title": "3.2. Ingesting payment method manifests"}, {"refs": [{"id": "ref-for-validate-and-parse-the-payment-method-manifest\u2460"}], "title": "4.2. Considerations for development environments"}], "external": false};
-window.dfnpanelData['fetch-the-web-app-manifest-for-a-default-payment-app'] = {"dfnID": "fetch-the-web-app-manifest-for-a-default-payment-app", "url": "#fetch-the-web-app-manifest-for-a-default-payment-app", "dfnText": "fetch the web app manifest for a default payment app", "refSections": [{"refs": [{"id": "ref-for-fetch-the-web-app-manifest-for-a-default-payment-app"}], "title": "3.2. Ingesting payment method manifests"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -2071,297 +1583,778 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"0204d188": {"dfnID":"0204d188","dfnText":"size","external":true,"refSections":[{"refs":[{"id":"ref-for-list-size"},{"id":"ref-for-list-size\u2460"},{"id":"ref-for-list-size\u2461"}],"title":"3.4. Validating and parsing payment method manifests"}],"url":"https://infra.spec.whatwg.org/#list-size"},
+"05af0c3f": {"dfnID":"05af0c3f","dfnText":"valid url string","external":true,"refSections":[{"refs":[{"id":"ref-for-valid-url-string"}],"title":"2. Manifest format"}],"url":"https://url.spec.whatwg.org/#valid-url-string"},
+"07582c28": {"dfnID":"07582c28","dfnText":"referrer policy","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-request-referrer-policy"}],"title":"3.3. Fetching payment method manifests"},{"refs":[{"id":"ref-for-concept-request-referrer-policy\u2460"}],"title":"4.1. Revealing user activity to payment providers"}],"url":"https://fetch.spec.whatwg.org/#concept-request-referrer-policy"},
+"086e3aff": {"dfnID":"086e3aff","dfnText":"origin","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-origin"}],"title":"1.1. Use cases"},{"refs":[{"id":"ref-for-concept-origin\u2460"}],"title":"1.3. Example manifest file"},{"refs":[{"id":"ref-for-concept-origin\u2461"}],"title":"2. Manifest format"},{"refs":[{"id":"ref-for-concept-origin\u2462"}],"title":"3.4. Validating and parsing payment method manifests"},{"refs":[{"id":"ref-for-concept-origin\u2463"}],"title":"4.1. Revealing user activity to payment providers"}],"url":"https://html.spec.whatwg.org/multipage/browsers.html#concept-origin"},
+"0e6b2056": {"dfnID":"0e6b2056","dfnText":"set","external":true,"refSections":[{"refs":[{"id":"ref-for-map-set"},{"id":"ref-for-map-set\u2460"}],"title":"3.3. Fetching payment method manifests"}],"url":"https://infra.spec.whatwg.org/#map-set"},
+"0e8de730": {"dfnID":"0e8de730","dfnText":"tuple","external":true,"refSections":[{"refs":[{"id":"ref-for-tuple"}],"title":"3.3. Fetching payment method manifests"}],"url":"https://infra.spec.whatwg.org/#tuple"},
+"120fe263": {"dfnID":"120fe263","dfnText":"url-based payment method identifier","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-url-based-payment-method-identifiers"}],"title":"1.1. Use cases"},{"refs":[{"id":"ref-for-dfn-url-based-payment-method-identifiers\u2460"}],"title":"3.3. Fetching payment method manifests"},{"refs":[{"id":"ref-for-dfn-url-based-payment-method-identifiers\u2461"}],"title":"4.1. Revealing user activity to payment providers"}],"url":"https://w3c.github.io/payment-method-id/#dfn-url-based-payment-method-identifiers"},
+"1243a891": {"dfnID":"1243a891","dfnText":"exist","external":true,"refSections":[{"refs":[{"id":"ref-for-map-exists"},{"id":"ref-for-map-exists\u2460"}],"title":"3.4. Validating and parsing payment method manifests"}],"url":"https://infra.spec.whatwg.org/#map-exists"},
+"12b8dfc0": {"dfnID":"12b8dfc0","dfnText":"current settings object","external":true,"refSections":[{"refs":[{"id":"ref-for-current-settings-object"}],"title":"3.1. Modifications to Payment Request API"}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#current-settings-object"},
+"1394891f": {"dfnID":"1394891f","dfnText":"payment method identifier","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-payment-method-identifiers"}],"title":"1.1. Use cases"},{"refs":[{"id":"ref-for-dfn-payment-method-identifiers\u2460"},{"id":"ref-for-dfn-payment-method-identifiers\u2461"},{"id":"ref-for-dfn-payment-method-identifiers\u2462"},{"id":"ref-for-dfn-payment-method-identifiers\u2463"}],"title":"1.2. Accessing the manifest"},{"refs":[{"id":"ref-for-dfn-payment-method-identifiers\u2464"}],"title":"3.2. Ingesting payment method manifests"},{"refs":[{"id":"ref-for-dfn-payment-method-identifiers\u2465"},{"id":"ref-for-dfn-payment-method-identifiers\u2466"},{"id":"ref-for-dfn-payment-method-identifiers\u2467"}],"title":"3.3. Fetching payment method manifests"}],"url":"https://w3c.github.io/payment-method-id/#dfn-payment-method-identifiers"},
+"16d07e10": {"dfnID":"16d07e10","dfnText":"for each","external":true,"refSections":[{"refs":[{"id":"ref-for-list-iterate"},{"id":"ref-for-list-iterate\u2460"}],"title":"3.2. Ingesting payment method manifests"},{"refs":[{"id":"ref-for-list-iterate\u2461"},{"id":"ref-for-list-iterate\u2462"},{"id":"ref-for-list-iterate\u2463"}],"title":"3.3. Fetching payment method manifests"},{"refs":[{"id":"ref-for-list-iterate\u2464"},{"id":"ref-for-list-iterate\u2465"}],"title":"3.4. Validating and parsing payment method manifests"}],"url":"https://infra.spec.whatwg.org/#list-iterate"},
+"218c9455": {"dfnID":"218c9455","dfnText":"username","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-url-username"}],"title":"3.4. Validating and parsing payment method manifests"}],"url":"https://url.spec.whatwg.org/#concept-url-username"},
+"22ece843": {"dfnID":"22ece843","dfnText":"absolute-url string","external":true,"refSections":[{"refs":[{"id":"ref-for-absolute-url-string"}],"title":"1.1. Use cases"},{"refs":[{"id":"ref-for-absolute-url-string\u2460"}],"title":"2. Manifest format"}],"url":"https://url.spec.whatwg.org/#absolute-url-string"},
+"24bd7d25": {"dfnID":"24bd7d25","dfnText":"upon fulfillment","external":true,"refSections":[{"refs":[{"id":"ref-for-upon-fulfillment"},{"id":"ref-for-upon-fulfillment\u2460"}],"title":"3.3. Fetching payment method manifests"},{"refs":[{"id":"ref-for-upon-fulfillment\u2461"}],"title":"3.5. Fetching web app manifests"}],"url":"https://webidl.spec.whatwg.org/#upon-fulfillment"},
+"2d6020a8": {"dfnID":"2d6020a8","dfnText":"url","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-manifest-url"}],"title":"1.1. Use cases"}],"url":"https://www.w3.org/TR/appmanifest/#dfn-manifest-url"},
+"3268a8eb": {"dfnID":"3268a8eb","dfnText":"url (for response)","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-response-url"},{"id":"ref-for-concept-response-url\u2460"},{"id":"ref-for-concept-response-url\u2461"},{"id":"ref-for-concept-response-url\u2462"}],"title":"3.3. Fetching payment method manifests"}],"url":"https://fetch.spec.whatwg.org/#concept-response-url"},
+"358f1dbd": {"dfnID":"358f1dbd","dfnText":"referrer","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-request-referrer"}],"title":"3.3. Fetching payment method manifests"},{"refs":[{"id":"ref-for-concept-request-referrer\u2460"}],"title":"3.5. Fetching web app manifests"},{"refs":[{"id":"ref-for-concept-request-referrer\u2461"}],"title":"4.1. Revealing user activity to payment providers"}],"url":"https://fetch.spec.whatwg.org/#concept-request-referrer"},
+"3a711be7": {"dfnID":"3a711be7","dfnText":"scheme","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-url-scheme"}],"title":"2. Manifest format"},{"refs":[{"id":"ref-for-concept-url-scheme\u2460"}],"title":"3.3. Fetching payment method manifests"},{"refs":[{"id":"ref-for-concept-url-scheme\u2461"},{"id":"ref-for-concept-url-scheme\u2462"}],"title":"3.4. Validating and parsing payment method manifests"},{"refs":[{"id":"ref-for-concept-url-scheme\u2463"}],"title":"4.2. Considerations for development environments"}],"url":"https://url.spec.whatwg.org/#concept-url-scheme"},
+"3ab2ec8b": {"dfnID":"3ab2ec8b","dfnText":"query","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-url-query"}],"title":"3.4. Validating and parsing payment method manifests"}],"url":"https://url.spec.whatwg.org/#concept-url-query"},
+"3de9e659": {"dfnID":"3de9e659","dfnText":"byte sequence","external":true,"refSections":[{"refs":[{"id":"ref-for-byte-sequence"},{"id":"ref-for-byte-sequence\u2460"},{"id":"ref-for-byte-sequence\u2461"}],"title":"3.3. Fetching payment method manifests"},{"refs":[{"id":"ref-for-byte-sequence\u2462"}],"title":"3.4. Validating and parsing payment method manifests"},{"refs":[{"id":"ref-for-byte-sequence\u2463"}],"title":"3.5. Fetching web app manifests"}],"url":"https://infra.spec.whatwg.org/#byte-sequence"},
+"3e12e042": {"dfnID":"3e12e042","dfnText":"environment settings object","external":true,"refSections":[{"refs":[{"id":"ref-for-environment-settings-object"}],"title":"3.2. Ingesting payment method manifests"},{"refs":[{"id":"ref-for-environment-settings-object\u2460"}],"title":"3.3. Fetching payment method manifests"},{"refs":[{"id":"ref-for-environment-settings-object\u2461"}],"title":"3.5. Fetching web app manifests"}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object"},
+"3fca5a9e": {"dfnID":"3fca5a9e","dfnText":"map","external":true,"refSections":[{"refs":[{"id":"ref-for-ordered-map"},{"id":"ref-for-ordered-map\u2460"}],"title":"3.3. Fetching payment method manifests"},{"refs":[{"id":"ref-for-ordered-map\u2461"}],"title":"3.4. Validating and parsing payment method manifests"}],"url":"https://infra.spec.whatwg.org/#ordered-map"},
+"4aff89a3": {"dfnID":"4aff89a3","dfnText":"processed web app manifest","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-processed-manifest"},{"id":"ref-for-dfn-processed-manifest\u2460"},{"id":"ref-for-dfn-processed-manifest\u2461"}],"title":"3.2. Ingesting payment method manifests"}],"url":"https://www.w3.org/TR/appmanifest/#dfn-processed-manifest"},
+"4d540443": {"dfnID":"4d540443","dfnText":"steps for obtaining a web app manifest","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-obtaining-the-manifest"}],"title":"3.5. Fetching web app manifests"}],"url":"https://www.w3.org/TR/appmanifest/#dfn-obtaining-the-manifest"},
+"50b05fad": {"dfnID":"50b05fad","dfnText":"method","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-request-method"}],"title":"3.3. Fetching payment method manifests"}],"url":"https://fetch.spec.whatwg.org/#concept-request-method"},
+"53275e46": {"dfnID":"53275e46","dfnText":"append (for list)","external":true,"refSections":[{"refs":[{"id":"ref-for-list-append"}],"title":"3.3. Fetching payment method manifests"}],"url":"https://infra.spec.whatwg.org/#list-append"},
+"55213b5b": {"dfnID":"55213b5b","dfnText":"request","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-request"},{"id":"ref-for-concept-request\u2460"}],"title":"3.3. Fetching payment method manifests"},{"refs":[{"id":"ref-for-concept-request\u2461"}],"title":"3.5. Fetching web app manifests"}],"url":"https://fetch.spec.whatwg.org/#concept-request"},
+"57def0af": {"dfnID":"57def0af","dfnText":"payment app","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-payment-apps"},{"id":"ref-for-dfn-payment-apps\u2460"},{"id":"ref-for-dfn-payment-apps\u2461"}],"title":"1.1. Use cases"},{"refs":[{"id":"ref-for-dfn-payment-apps\u2462"},{"id":"ref-for-dfn-payment-apps\u2463"},{"id":"ref-for-dfn-payment-apps\u2464"}],"title":"1.3. Example manifest file"},{"refs":[{"id":"ref-for-dfn-payment-apps\u2465"}],"title":"3.1. Modifications to Payment Request API"},{"refs":[{"id":"ref-for-dfn-payment-apps\u2466"},{"id":"ref-for-dfn-payment-apps\u2467"},{"id":"ref-for-dfn-payment-apps\u2468"}],"title":"3.2. Ingesting payment method manifests"},{"refs":[{"id":"ref-for-dfn-payment-apps\u2460\u24ea"}],"title":"3.5. Fetching web app manifests"},{"refs":[{"id":"ref-for-dfn-payment-apps\u2460\u2460"}],"title":"4.1. Revealing user activity to payment providers"}],"url":"https://w3c.github.io/payment-request/#dfn-payment-apps"},
+"5b59a696": {"dfnID":"5b59a696","dfnText":"steps for processing a web app manifest","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-processing-a-manifest"},{"id":"ref-for-dfn-processing-a-manifest\u2460"}],"title":"3.2. Ingesting payment method manifests"}],"url":"https://www.w3.org/TR/appmanifest/#dfn-processing-a-manifest"},
+"61025082": {"dfnID":"61025082","dfnText":"extract header list values","external":true,"refSections":[{"refs":[{"id":"ref-for-extract-header-list-values"}],"title":"3.3. Fetching payment method manifests"}],"url":"https://fetch.spec.whatwg.org/#extract-header-list-values"},
+"621925c8": {"dfnID":"621925c8","dfnText":"[[serializedmethoddata]]","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-serializedmethoddata"}],"title":"3.1. Modifications to Payment Request API"}],"url":"https://w3c.github.io/payment-request/#dfn-serializedmethoddata"},
+"649608b9": {"dfnID":"649608b9","dfnText":"list","external":true,"refSections":[{"refs":[{"id":"ref-for-list"},{"id":"ref-for-list\u2460"}],"title":"3.3. Fetching payment method manifests"},{"refs":[{"id":"ref-for-list\u2461"},{"id":"ref-for-list\u2462"}],"title":"3.4. Validating and parsing payment method manifests"}],"url":"https://infra.spec.whatwg.org/#list"},
+"64b62ea0": {"dfnID":"64b62ea0","dfnText":"redirect mode","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-request-redirect-mode"},{"id":"ref-for-concept-request-redirect-mode\u2460"}],"title":"3.3. Fetching payment method manifests"},{"refs":[{"id":"ref-for-concept-request-redirect-mode\u2461"}],"title":"3.5. Fetching web app manifests"}],"url":"https://fetch.spec.whatwg.org/#concept-request-redirect-mode"},
+"6723bdad": {"dfnID":"6723bdad","dfnText":"web app manifest","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-manifest"}],"title":"1.1. Use cases"},{"refs":[{"id":"ref-for-dfn-manifest\u2460"}],"title":"1.3. Example manifest file"},{"refs":[{"id":"ref-for-dfn-manifest\u2461"}],"title":"3.5. Fetching web app manifests"}],"url":"https://www.w3.org/TR/appmanifest/#dfn-manifest"},
+"692595fe": {"dfnID":"692595fe","dfnText":"ordered set","external":true,"refSections":[{"refs":[{"id":"ref-for-ordered-set"},{"id":"ref-for-ordered-set\u2460"},{"id":"ref-for-ordered-set\u2461"},{"id":"ref-for-ordered-set\u2462"}],"title":"3.4. Validating and parsing payment method manifests"}],"url":"https://infra.spec.whatwg.org/#ordered-set"},
+"70b9716d": {"dfnID":"70b9716d","dfnText":"validate a url-based payment method identifier","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-validate-a-url-based-payment-method-identifier"}],"title":"3.3. Fetching payment method manifests"}],"url":"https://w3c.github.io/payment-method-id/#dfn-validate-a-url-based-payment-method-identifier"},
+"75f46ef4": {"dfnID":"75f46ef4","dfnText":"payment method","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-payment-method"}],"title":"Unnumbered Section"},{"refs":[{"id":"ref-for-dfn-payment-method\u2460"},{"id":"ref-for-dfn-payment-method\u2461"},{"id":"ref-for-dfn-payment-method\u2462"},{"id":"ref-for-dfn-payment-method\u2463"},{"id":"ref-for-dfn-payment-method\u2464"},{"id":"ref-for-dfn-payment-method\u2465"}],"title":"1.1. Use cases"},{"refs":[{"id":"ref-for-dfn-payment-method\u2466"}],"title":"1.2. Accessing the manifest"},{"refs":[{"id":"ref-for-dfn-payment-method\u2467"},{"id":"ref-for-dfn-payment-method\u2468"},{"id":"ref-for-dfn-payment-method\u2460\u24ea"}],"title":"1.3. Example manifest file"},{"refs":[{"id":"ref-for-dfn-payment-method\u2460\u2460"},{"id":"ref-for-dfn-payment-method\u2460\u2461"}],"title":"3.2. Ingesting payment method manifests"},{"refs":[{"id":"ref-for-dfn-payment-method\u2460\u2462"}],"title":"4.1. Revealing user activity to payment providers"},{"refs":[{"id":"ref-for-dfn-payment-method\u2460\u2463"}],"title":"5.1. The payment-method-manifest link relation"}],"url":"https://w3c.github.io/payment-request/#dfn-payment-method"},
+"762869d3": {"dfnID":"762869d3","dfnText":"scalar value string","external":true,"refSections":[{"refs":[{"id":"ref-for-scalar-value-string"}],"title":"3.5. Fetching web app manifests"}],"url":"https://infra.spec.whatwg.org/#scalar-value-string"},
+"7b0d918d": {"dfnID":"7b0d918d","dfnText":"break","external":true,"refSections":[{"refs":[{"id":"ref-for-iteration-break"}],"title":"3.3. Fetching payment method manifests"}],"url":"https://infra.spec.whatwg.org/#iteration-break"},
+"7f9469b5": {"dfnID":"7f9469b5","dfnText":"ascii case-insensitive","external":true,"refSections":[{"refs":[{"id":"ref-for-ascii-case-insensitive"},{"id":"ref-for-ascii-case-insensitive\u2460"}],"title":"3.3. Fetching payment method manifests"}],"url":"https://infra.spec.whatwg.org/#ascii-case-insensitive"},
+"81a76425": {"dfnID":"81a76425","dfnText":"body","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-response-body"},{"id":"ref-for-concept-response-body\u2460"},{"id":"ref-for-concept-response-body\u2461"}],"title":"3.3. Fetching payment method manifests"},{"refs":[{"id":"ref-for-concept-response-body\u2462"}],"title":"3.5. Fetching web app manifests"}],"url":"https://fetch.spec.whatwg.org/#concept-response-body"},
+"84b454ff": {"dfnID":"84b454ff","dfnText":"ordered map","external":true,"refSections":[{"refs":[{"id":"ref-for-ordered-map"},{"id":"ref-for-ordered-map\u2460"}],"title":"3.3. Fetching payment method manifests"},{"refs":[{"id":"ref-for-ordered-map\u2461"}],"title":"3.4. Validating and parsing payment method manifests"}],"url":"https://infra.spec.whatwg.org/#ordered-map"},
+"857d5516": {"dfnID":"857d5516","dfnText":"client","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-request-client"},{"id":"ref-for-concept-request-client\u2460"}],"title":"3.3. Fetching payment method manifests"},{"refs":[{"id":"ref-for-concept-request-client\u2461"}],"title":"3.5. Fetching web app manifests"}],"url":"https://fetch.spec.whatwg.org/#concept-request-client"},
+"8e8decb4": {"dfnID":"8e8decb4","dfnText":"parse json into infra values","external":true,"refSections":[{"refs":[{"id":"ref-for-parse-a-json-string-to-an-infra-value"}],"title":"3.4. Validating and parsing payment method manifests"}],"url":"https://infra.spec.whatwg.org/#parse-a-json-string-to-an-infra-value"},
+"902380f7": {"dfnID":"902380f7","dfnText":"credentials mode","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-request-credentials-mode"},{"id":"ref-for-concept-request-credentials-mode\u2460"}],"title":"3.3. Fetching payment method manifests"},{"refs":[{"id":"ref-for-concept-request-credentials-mode\u2461"}],"title":"3.5. Fetching web app manifests"}],"url":"https://fetch.spec.whatwg.org/#concept-request-credentials-mode"},
+"959ad97b": {"dfnID":"959ad97b","dfnText":"origin","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-url-origin"}],"title":"2. Manifest format"},{"refs":[{"id":"ref-for-concept-url-origin\u2460"}],"title":"3.4. Validating and parsing payment method manifests"}],"url":"https://url.spec.whatwg.org/#concept-url-origin"},
+"984221ca": {"dfnID":"984221ca","dfnText":"struct","external":true,"refSections":[{"refs":[{"id":"ref-for-struct"}],"title":"3.4. Validating and parsing payment method manifests"}],"url":"https://infra.spec.whatwg.org/#struct"},
+"9ed8b710": {"dfnID":"9ed8b710","dfnText":"basic url parser","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-basic-url-parser"},{"id":"ref-for-concept-basic-url-parser\u2460"}],"title":"3.3. Fetching payment method manifests"},{"refs":[{"id":"ref-for-concept-basic-url-parser\u2461"},{"id":"ref-for-concept-basic-url-parser\u2462"}],"title":"3.4. Validating and parsing payment method manifests"}],"url":"https://url.spec.whatwg.org/#concept-basic-url-parser"},
+"a1288f2a": {"dfnID":"a1288f2a","dfnText":"password","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-url-password"}],"title":"3.4. Validating and parsing payment method manifests"}],"url":"https://url.spec.whatwg.org/#concept-url-password"},
+"a1d47575": {"dfnID":"a1d47575","dfnText":"status","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-response-status"},{"id":"ref-for-concept-response-status\u2460"}],"title":"3.3. Fetching payment method manifests"},{"refs":[{"id":"ref-for-concept-response-status\u2461"}],"title":"3.5. Fetching web app manifests"}],"url":"https://fetch.spec.whatwg.org/#concept-response-status"},
+"a27468c5": {"dfnID":"a27468c5","dfnText":"ok status","external":true,"refSections":[{"refs":[{"id":"ref-for-ok-status"},{"id":"ref-for-ok-status\u2460"}],"title":"3.3. Fetching payment method manifests"},{"refs":[{"id":"ref-for-ok-status\u2461"}],"title":"3.5. Fetching web app manifests"}],"url":"https://fetch.spec.whatwg.org/#ok-status"},
+"a33db89a": {"dfnID":"a33db89a","dfnText":"fetch","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-fetch"},{"id":"ref-for-concept-fetch\u2460"},{"id":"ref-for-concept-fetch\u2461"}],"title":"3.3. Fetching payment method manifests"},{"refs":[{"id":"ref-for-concept-fetch\u2462"}],"title":"3.5. Fetching web app manifests"}],"url":"https://fetch.spec.whatwg.org/#concept-fetch"},
+"a3b18719": {"dfnID":"a3b18719","dfnText":"append (for set)","external":true,"refSections":[{"refs":[{"id":"ref-for-set-append"},{"id":"ref-for-set-append\u2460"}],"title":"3.4. Validating and parsing payment method manifests"}],"url":"https://infra.spec.whatwg.org/#set-append"},
+"a8389e54": {"dfnID":"a8389e54","dfnText":"standardized payment method identifier","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-standardized-payment-method-identifiers"}],"title":"3.3. Fetching payment method manifests"}],"url":"https://w3c.github.io/payment-method-id/#dfn-standardized-payment-method-identifiers"},
+"b0fcb8d7": {"dfnID":"b0fcb8d7","dfnText":"utf-8 decode","external":true,"refSections":[{"refs":[{"id":"ref-for-utf-8-decode"}],"title":"3.4. Validating and parsing payment method manifests"},{"refs":[{"id":"ref-for-utf-8-decode\u2460"}],"title":"3.5. Fetching web app manifests"}],"url":"https://encoding.spec.whatwg.org/#utf-8-decode"},
+"b38d7ca1": {"dfnID":"b38d7ca1","dfnText":"javascript string","external":true,"refSections":[{"refs":[{"id":"ref-for-string"}],"title":"3.3. Fetching payment method manifests"}],"url":"https://infra.spec.whatwg.org/#string"},
+"bffb633e": {"dfnID":"bffb633e","dfnText":"utf-8","external":true,"refSections":[{"refs":[{"id":"ref-for-utf-8"}],"title":"2. Manifest format"}],"url":"https://encoding.spec.whatwg.org/#utf-8"},
+"c0868016": {"dfnID":"c0868016","dfnText":"path","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-url-path"}],"title":"3.4. Validating and parsing payment method manifests"}],"url":"https://url.spec.whatwg.org/#concept-url-path"},
+"c88f3887": {"dfnID":"c88f3887","dfnText":"item","external":true,"refSections":[{"refs":[{"id":"ref-for-struct-item"}],"title":"3.1. Modifications to Payment Request API"}],"url":"https://infra.spec.whatwg.org/#struct-item"},
+"cb98f71f": {"dfnID":"cb98f71f","dfnText":"mode","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-request-mode"},{"id":"ref-for-concept-request-mode\u2460"}],"title":"3.3. Fetching payment method manifests"},{"refs":[{"id":"ref-for-concept-request-mode\u2461"}],"title":"3.5. Fetching web app manifests"}],"url":"https://fetch.spec.whatwg.org/#concept-request-mode"},
+"dae0bfde": {"dfnID":"dae0bfde","dfnText":"serialization of an origin","external":true,"refSections":[{"refs":[{"id":"ref-for-ascii-serialisation-of-an-origin"}],"title":"2. Manifest format"}],"url":"https://html.spec.whatwg.org/multipage/browsers.html#ascii-serialisation-of-an-origin"},
+"dc1cd39b": {"dfnID":"dc1cd39b","dfnText":"url (for request)","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-request-url"},{"id":"ref-for-concept-request-url\u2460"}],"title":"3.3. Fetching payment method manifests"},{"refs":[{"id":"ref-for-concept-request-url\u2461"}],"title":"3.5. Fetching web app manifests"}],"url":"https://fetch.spec.whatwg.org/#concept-request-url"},
+"dcffbccd": {"dfnID":"dcffbccd","dfnText":"url","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-url"},{"id":"ref-for-concept-url\u2460"}],"title":"2. Manifest format"},{"refs":[{"id":"ref-for-concept-url\u2461"},{"id":"ref-for-concept-url\u2462"},{"id":"ref-for-concept-url\u2463"}],"title":"3.3. Fetching payment method manifests"},{"refs":[{"id":"ref-for-concept-url\u2464"},{"id":"ref-for-concept-url\u2465"}],"title":"3.4. Validating and parsing payment method manifests"},{"refs":[{"id":"ref-for-concept-url\u2466"}],"title":"3.5. Fetching web app manifests"}],"url":"https://url.spec.whatwg.org/#concept-url"},
+"e0f06068": {"dfnID":"e0f06068","dfnText":"PaymentRequest(methodData, details, options)","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-paymentrequest-paymentrequest"}],"title":"3.1. Modifications to Payment Request API"}],"url":"https://w3c.github.io/payment-request/#dfn-paymentrequest-paymentrequest"},
+"eb1b1af3": {"dfnID":"eb1b1af3","dfnText":"network error","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-network-error"},{"id":"ref-for-concept-network-error\u2460"}],"title":"3.3. Fetching payment method manifests"},{"refs":[{"id":"ref-for-concept-network-error\u2461"}],"title":"3.5. Fetching web app manifests"}],"url":"https://fetch.spec.whatwg.org/#concept-network-error"},
+"ed948033": {"dfnID":"ed948033","dfnText":"fragment","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-url-fragment"}],"title":"3.4. Validating and parsing payment method manifests"}],"url":"https://url.spec.whatwg.org/#concept-url-fragment"},
+"ee7bba09": {"dfnID":"ee7bba09","dfnText":"response","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-response"},{"id":"ref-for-concept-response\u2460"},{"id":"ref-for-concept-response\u2461"}],"title":"3.3. Fetching payment method manifests"},{"refs":[{"id":"ref-for-concept-response\u2462"}],"title":"3.5. Fetching web app manifests"}],"url":"https://fetch.spec.whatwg.org/#concept-response"},
+"ef28f15d": {"dfnID":"ef28f15d","dfnText":"get a reader","external":true,"refSections":[{"refs":[{"id":"ref-for-readablestream-get-a-reader"},{"id":"ref-for-readablestream-get-a-reader\u2460"}],"title":"3.3. Fetching payment method manifests"},{"refs":[{"id":"ref-for-readablestream-get-a-reader\u2461"}],"title":"3.5. Fetching web app manifests"}],"url":"https://streams.spec.whatwg.org/#readablestream-get-a-reader"},
+"f14ed351": {"dfnID":"f14ed351","dfnText":"upon rejection","external":true,"refSections":[{"refs":[{"id":"ref-for-upon-rejection"}],"title":"3.5. Fetching web app manifests"}],"url":"https://webidl.spec.whatwg.org/#upon-rejection"},
+"f679a0bc": {"dfnID":"f679a0bc","dfnText":"PaymentRequest","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-paymentrequest"},{"id":"ref-for-dom-paymentrequest\u2460"}],"title":"3.1. Modifications to Payment Request API"},{"refs":[{"id":"ref-for-dom-paymentrequest\u2461"}],"title":"4.1. Revealing user activity to payment providers"}],"url":"https://w3c.github.io/payment-request/#dom-paymentrequest"},
+"f7b00a8b": {"dfnID":"f7b00a8b","dfnText":"header list","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-response-header-list"}],"title":"3.3. Fetching payment method manifests"}],"url":"https://fetch.spec.whatwg.org/#concept-response-header-list"},
+"f937b7b6": {"dfnID":"f937b7b6","dfnText":"continue","external":true,"refSections":[{"refs":[{"id":"ref-for-iteration-continue"},{"id":"ref-for-iteration-continue\u2460"}],"title":"3.2. Ingesting payment method manifests"},{"refs":[{"id":"ref-for-iteration-continue\u2461"},{"id":"ref-for-iteration-continue\u2462"},{"id":"ref-for-iteration-continue\u2463"},{"id":"ref-for-iteration-continue\u2464"},{"id":"ref-for-iteration-continue\u2465"},{"id":"ref-for-iteration-continue\u2466"},{"id":"ref-for-iteration-continue\u2467"},{"id":"ref-for-iteration-continue\u2468"},{"id":"ref-for-iteration-continue\u2460\u24ea"},{"id":"ref-for-iteration-continue\u2460\u2460"},{"id":"ref-for-iteration-continue\u2460\u2461"}],"title":"3.3. Fetching payment method manifests"}],"url":"https://infra.spec.whatwg.org/#iteration-continue"},
+"fetch-payment-method-manifests": {"dfnID":"fetch-payment-method-manifests","dfnText":"fetch payment method manifests","external":false,"refSections":[{"refs":[{"id":"ref-for-fetch-payment-method-manifests"}],"title":"3.2. Ingesting payment method manifests"},{"refs":[{"id":"ref-for-fetch-payment-method-manifests\u2460"}],"title":"4.1. Revealing user activity to payment providers"},{"refs":[{"id":"ref-for-fetch-payment-method-manifests\u2461"}],"title":"4.2. Considerations for development environments"}],"url":"#fetch-payment-method-manifests"},
+"fetch-the-web-app-manifest-for-a-default-payment-app": {"dfnID":"fetch-the-web-app-manifest-for-a-default-payment-app","dfnText":"fetch the web app manifest for a default payment app","external":false,"refSections":[{"refs":[{"id":"ref-for-fetch-the-web-app-manifest-for-a-default-payment-app"}],"title":"3.2. Ingesting payment method manifests"}],"url":"#fetch-the-web-app-manifest-for-a-default-payment-app"},
+"ingest-payment-method-manifests": {"dfnID":"ingest-payment-method-manifests","dfnText":"ingest payment method manifests","external":false,"refSections":[{"refs":[{"id":"ref-for-ingest-payment-method-manifests"}],"title":"3.1. Modifications to Payment Request API"},{"refs":[{"id":"ref-for-ingest-payment-method-manifests\u2460"}],"title":"4.1. Revealing user activity to payment providers"}],"url":"#ingest-payment-method-manifests"},
+"parsed-payment-method-manifest": {"dfnID":"parsed-payment-method-manifest","dfnText":"parsed payment method manifest","external":false,"refSections":[{"refs":[{"id":"ref-for-parsed-payment-method-manifest"},{"id":"ref-for-parsed-payment-method-manifest\u2460"}],"title":"3.4. Validating and parsing payment method manifests"}],"url":"#parsed-payment-method-manifest"},
+"parsed-payment-method-manifest-default-applications": {"dfnID":"parsed-payment-method-manifest-default-applications","dfnText":"default applications","external":false,"refSections":[{"refs":[{"id":"ref-for-parsed-payment-method-manifest-default-applications"}],"title":"3.2. Ingesting payment method manifests"},{"refs":[{"id":"ref-for-parsed-payment-method-manifest-default-applications\u2460"}],"title":"3.4. Validating and parsing payment method manifests"}],"url":"#parsed-payment-method-manifest-default-applications"},
+"parsed-payment-method-manifest-supported-origins": {"dfnID":"parsed-payment-method-manifest-supported-origins","dfnText":"supported origins","external":false,"refSections":[{"refs":[{"id":"ref-for-parsed-payment-method-manifest-supported-origins"}],"title":"3.2. Ingesting payment method manifests"},{"refs":[{"id":"ref-for-parsed-payment-method-manifest-supported-origins\u2460"}],"title":"3.4. Validating and parsing payment method manifests"}],"url":"#parsed-payment-method-manifest-supported-origins"},
+"payment-method-manifest": {"dfnID":"payment-method-manifest","dfnText":"payment method manifest","external":false,"refSections":[{"refs":[{"id":"ref-for-payment-method-manifest"}],"title":"1.1. Use cases"},{"refs":[{"id":"ref-for-payment-method-manifest\u2460"},{"id":"ref-for-payment-method-manifest\u2461"}],"title":"1.2. Accessing the manifest"},{"refs":[{"id":"ref-for-payment-method-manifest\u2462"}],"title":"1.3. Example manifest file"},{"refs":[{"id":"ref-for-payment-method-manifest\u2463"},{"id":"ref-for-payment-method-manifest\u2464"},{"id":"ref-for-payment-method-manifest\u2465"},{"id":"ref-for-payment-method-manifest\u2466"}],"title":"2. Manifest format"}],"url":"#payment-method-manifest"},
+"valid-payment-method-manifest": {"dfnID":"valid-payment-method-manifest","dfnText":"valid payment method manifest","external":false,"refSections":[{"refs":[{"id":"ref-for-valid-payment-method-manifest"},{"id":"ref-for-valid-payment-method-manifest\u2460"},{"id":"ref-for-valid-payment-method-manifest\u2461"}],"title":"2. Manifest format"},{"refs":[{"id":"ref-for-valid-payment-method-manifest\u2462"}],"title":"3.4. Validating and parsing payment method manifests"}],"url":"#valid-payment-method-manifest"},
+"validate-and-parse-the-payment-method-manifest": {"dfnID":"validate-and-parse-the-payment-method-manifest","dfnText":"validate and parse","external":false,"refSections":[{"refs":[{"id":"ref-for-validate-and-parse-the-payment-method-manifest"}],"title":"3.2. Ingesting payment method manifests"},{"refs":[{"id":"ref-for-validate-and-parse-the-payment-method-manifest\u2460"}],"title":"4.2. Considerations for development environments"}],"url":"#validate-and-parse-the-payment-method-manifest"},
+};
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+});
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        dfn.panelData = panelData;
+        insertDfnPopupAction(dfn);
+    }
+}
+
+function genDfnPanel(dfn, { dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel on",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel({dfnPanel});
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.dfn = dfn;
+    dfn.dfnPanel = dfnPanel;
+    return dfnPanel;
+}
+
+
+
+function hideAllDfnPanels() {
+    // Delete the currently-active dfn panel.
+    queryAll(".dfn-panel").forEach(dfnPanel=>hideDfnPanel({dfnPanel}));
+}
+
+function showDfnPanel(dfn) {
+    hideAllDfnPanels(); // Only display one at a time.
+
+    dfn.setAttribute("aria-expanded", "true");
+
+    const dfnPanel = genDfnPanel(dfn, dfn.panelData);
+
+    // Give the dfn a unique tabindex, and then
+    // give all the tabbable panel bits successive indexes.
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+
+    append(document.body, dfnPanel);
+    positionDfnPanel(dfnPanel);
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.dfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }
+}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel({dfn, dfnPanel}) {
+    if(!dfnPanel) dfnPanel = dfn.dfnPanel;
+    if(!dfn) dfn = dfnPanel.dfn;
+    dfn.dfnPanel = undefined;
+    dfnPanel.dfn = undefined;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.remove()
+}
+
+function toggleDfnPanel(dfn) {
+    if(dfn.dfnPanel) {
+        hideDfnPanel(dfn);
+    } else {
+        showDfnPanel(dfn);
+    }
+}
+
+function insertDfnPopupAction(dfn) {
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        toggleDfnPanel(dfn);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+function needsFor(type) {
+    switch(type) {
+        case "descriptor":
+        case "value":
+        case "element-attr":
+        case "attr-value":
+        case "element-state":
+        case "method":
+        case "constructor":
+        case "argument":
+        case "attribute":
+        case "const":
+        case "dict-member":
+        case "event":
+        case "enum-value":
+        case "stringifier":
+        case "serializer":
+        case "iterator":
+        case "maplike":
+        case "setlike":
+        case "state":
+        case "mode":
+        case "context":
+        case "facet": return true;
+
+        default: return false;
+    }
+}
+function refusesFor(type) {
+    switch(type) {
+        case "property":
+        case "element":
+        case "interface":
+        case "namespace":
+        case "callback":
+        case "dictionary":
+        case "enum":
+        case "exception":
+        case "typedef":
+        case "http-header":
+        case "permission": return true;
+
+        default: return false;
+    }
+}
+function linkFormatterFromType(type) {
+    switch(type) {
+        case 'scheme':
+        case 'permission':
+        case 'dfn': return (text) => `[=${text}=]`;
+
+        case 'abstract-op': return (text) => `[\$${text}\$]`;
+
+        case 'function':
+        case 'at-rule':
+        case 'selector':
+        case 'value': return (text) => `''${text}''`;
+
+        case 'http-header': return (text) => `[:${text}:]`;
+
+        case 'interface':
+        case 'constructor':
+        case 'method':
+        case 'argument':
+        case 'attribute':
+        case 'callback':
+        case 'dictionary':
+        case 'dict-member':
+        case 'enum':
+        case 'enum-value':
+        case 'exception':
+        case 'const':
+        case 'typedef':
+        case 'stringifier':
+        case 'serializer':
+        case 'iterator':
+        case 'maplike':
+        case 'setlike':
+        case 'extended-attribute':
+        case 'event':
+        case 'idl': return (text) => `{{${text}}}`;
+
+        case 'element-state':
+        case 'element-attr':
+        case 'attr-value':
+        case 'element': return (element) => `<{${element}}>`;
+
+        case 'grammar': return (text) => `${text} (within a <pre class=prod>)`;
+
+        case 'type': return (text)=> `<<${text}>>`;
+
+        case 'descriptor':
+        case 'property': return (text) => `'${text}'`;
+
+        default: return;
+    };
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!needsFor(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!refusesFor(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
 }
 </script>
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
-                mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
+let refsData = {
+"#fetch-payment-method-manifests": {"export":true,"for_":[],"level":"","normative":true,"shortname":"payment-method-manifest","spec":"payment-method-manifest","status":"local","text":"fetch payment method manifests","type":"dfn","url":"#fetch-payment-method-manifests"},
+"#fetch-the-web-app-manifest-for-a-default-payment-app": {"export":true,"for_":[],"level":"","normative":true,"shortname":"payment-method-manifest","spec":"payment-method-manifest","status":"local","text":"fetch the web app manifest for a default payment app","type":"dfn","url":"#fetch-the-web-app-manifest-for-a-default-payment-app"},
+"#ingest-payment-method-manifests": {"export":true,"for_":[],"level":"","normative":true,"shortname":"payment-method-manifest","spec":"payment-method-manifest","status":"local","text":"ingest payment method manifests","type":"dfn","url":"#ingest-payment-method-manifests"},
+"#parsed-payment-method-manifest": {"export":true,"for_":[],"level":"","normative":true,"shortname":"payment-method-manifest","spec":"payment-method-manifest","status":"local","text":"parsed payment method manifest","type":"dfn","url":"#parsed-payment-method-manifest"},
+"#parsed-payment-method-manifest-default-applications": {"export":true,"for_":["parsed payment method manifest"],"level":"","normative":true,"shortname":"payment-method-manifest","spec":"payment-method-manifest","status":"local","text":"default applications","type":"dfn","url":"#parsed-payment-method-manifest-default-applications"},
+"#parsed-payment-method-manifest-supported-origins": {"export":true,"for_":["parsed payment method manifest"],"level":"","normative":true,"shortname":"payment-method-manifest","spec":"payment-method-manifest","status":"local","text":"supported origins","type":"dfn","url":"#parsed-payment-method-manifest-supported-origins"},
+"#payment-method-manifest": {"export":true,"for_":[],"level":"","normative":true,"shortname":"payment-method-manifest","spec":"payment-method-manifest","status":"local","text":"payment method manifest","type":"dfn","url":"#payment-method-manifest"},
+"#valid-payment-method-manifest": {"export":true,"for_":[],"level":"","normative":true,"shortname":"payment-method-manifest","spec":"payment-method-manifest","status":"local","text":"valid","type":"dfn","url":"#valid-payment-method-manifest"},
+"#validate-and-parse-the-payment-method-manifest": {"export":true,"for_":[],"level":"","normative":true,"shortname":"payment-method-manifest","spec":"payment-method-manifest","status":"local","text":"validate and parse the payment method manifest","type":"dfn","url":"#validate-and-parse-the-payment-method-manifest"},
+"https://encoding.spec.whatwg.org/#utf-8": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"encoding","spec":"encoding","status":"current","text":"utf-8","type":"dfn","url":"https://encoding.spec.whatwg.org/#utf-8"},
+"https://encoding.spec.whatwg.org/#utf-8-decode": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"encoding","spec":"encoding","status":"current","text":"utf-8 decode","type":"dfn","url":"https://encoding.spec.whatwg.org/#utf-8-decode"},
+"https://fetch.spec.whatwg.org/#concept-fetch": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"fetch","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-fetch"},
+"https://fetch.spec.whatwg.org/#concept-network-error": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"network error","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-network-error"},
+"https://fetch.spec.whatwg.org/#concept-request": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"request","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-request"},
+"https://fetch.spec.whatwg.org/#concept-request-client": {"export":true,"for_":["request"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"client","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-request-client"},
+"https://fetch.spec.whatwg.org/#concept-request-credentials-mode": {"export":true,"for_":["request"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"credentials mode","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-request-credentials-mode"},
+"https://fetch.spec.whatwg.org/#concept-request-method": {"export":true,"for_":["request"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"method","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-request-method"},
+"https://fetch.spec.whatwg.org/#concept-request-mode": {"export":true,"for_":["request"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"mode","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-request-mode"},
+"https://fetch.spec.whatwg.org/#concept-request-redirect-mode": {"export":true,"for_":["request"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"redirect mode","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-request-redirect-mode"},
+"https://fetch.spec.whatwg.org/#concept-request-referrer": {"export":true,"for_":["request"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"referrer","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-request-referrer"},
+"https://fetch.spec.whatwg.org/#concept-request-referrer-policy": {"export":true,"for_":["request"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"referrer policy","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-request-referrer-policy"},
+"https://fetch.spec.whatwg.org/#concept-request-url": {"export":true,"for_":["request"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"url","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-request-url"},
+"https://fetch.spec.whatwg.org/#concept-response": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"response","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-response"},
+"https://fetch.spec.whatwg.org/#concept-response-body": {"export":true,"for_":["response"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"body","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-response-body"},
+"https://fetch.spec.whatwg.org/#concept-response-header-list": {"export":true,"for_":["response"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"header list","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-response-header-list"},
+"https://fetch.spec.whatwg.org/#concept-response-status": {"export":true,"for_":["response"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"status","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-response-status"},
+"https://fetch.spec.whatwg.org/#concept-response-url": {"export":true,"for_":["response"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"url","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-response-url"},
+"https://fetch.spec.whatwg.org/#extract-header-list-values": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"extract header list values","type":"dfn","url":"https://fetch.spec.whatwg.org/#extract-header-list-values"},
+"https://fetch.spec.whatwg.org/#ok-status": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"ok status","type":"dfn","url":"https://fetch.spec.whatwg.org/#ok-status"},
+"https://html.spec.whatwg.org/multipage/browsers.html#ascii-serialisation-of-an-origin": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"serialization of an origin","type":"dfn","url":"https://html.spec.whatwg.org/multipage/browsers.html#ascii-serialisation-of-an-origin"},
+"https://html.spec.whatwg.org/multipage/browsers.html#concept-origin": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"origin","type":"dfn","url":"https://html.spec.whatwg.org/multipage/browsers.html#concept-origin"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#current-settings-object": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"current settings object","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#current-settings-object"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"environment settings object","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object"},
+"https://infra.spec.whatwg.org/#ascii-case-insensitive": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"ascii case-insensitive","type":"dfn","url":"https://infra.spec.whatwg.org/#ascii-case-insensitive"},
+"https://infra.spec.whatwg.org/#byte-sequence": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"byte sequence","type":"dfn","url":"https://infra.spec.whatwg.org/#byte-sequence"},
+"https://infra.spec.whatwg.org/#iteration-break": {"export":true,"for_":["iteration"],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"break","type":"dfn","url":"https://infra.spec.whatwg.org/#iteration-break"},
+"https://infra.spec.whatwg.org/#iteration-continue": {"export":true,"for_":["iteration"],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"continue","type":"dfn","url":"https://infra.spec.whatwg.org/#iteration-continue"},
+"https://infra.spec.whatwg.org/#list": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"list","type":"dfn","url":"https://infra.spec.whatwg.org/#list"},
+"https://infra.spec.whatwg.org/#list-append": {"export":true,"for_":["list"],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"append","type":"dfn","url":"https://infra.spec.whatwg.org/#list-append"},
+"https://infra.spec.whatwg.org/#list-iterate": {"export":true,"for_":["list","set"],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"for each","type":"dfn","url":"https://infra.spec.whatwg.org/#list-iterate"},
+"https://infra.spec.whatwg.org/#list-size": {"export":true,"for_":["list","stack","queue","set"],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"size","type":"dfn","url":"https://infra.spec.whatwg.org/#list-size"},
+"https://infra.spec.whatwg.org/#map-exists": {"export":true,"for_":["map"],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"exist","type":"dfn","url":"https://infra.spec.whatwg.org/#map-exists"},
+"https://infra.spec.whatwg.org/#map-set": {"export":true,"for_":["map"],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"set","type":"dfn","url":"https://infra.spec.whatwg.org/#map-set"},
+"https://infra.spec.whatwg.org/#ordered-map": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"map","type":"dfn","url":"https://infra.spec.whatwg.org/#ordered-map"},
+"https://infra.spec.whatwg.org/#ordered-set": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"ordered set","type":"dfn","url":"https://infra.spec.whatwg.org/#ordered-set"},
+"https://infra.spec.whatwg.org/#parse-a-json-string-to-an-infra-value": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"parse json into infra values","type":"dfn","url":"https://infra.spec.whatwg.org/#parse-a-json-string-to-an-infra-value"},
+"https://infra.spec.whatwg.org/#scalar-value-string": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"scalar value string","type":"dfn","url":"https://infra.spec.whatwg.org/#scalar-value-string"},
+"https://infra.spec.whatwg.org/#set-append": {"export":true,"for_":["set"],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"append","type":"dfn","url":"https://infra.spec.whatwg.org/#set-append"},
+"https://infra.spec.whatwg.org/#string": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"javascript string","type":"dfn","url":"https://infra.spec.whatwg.org/#string"},
+"https://infra.spec.whatwg.org/#struct": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"struct","type":"dfn","url":"https://infra.spec.whatwg.org/#struct"},
+"https://infra.spec.whatwg.org/#struct-item": {"export":true,"for_":["struct","tuple"],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"item","type":"dfn","url":"https://infra.spec.whatwg.org/#struct-item"},
+"https://infra.spec.whatwg.org/#tuple": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"tuple","type":"dfn","url":"https://infra.spec.whatwg.org/#tuple"},
+"https://streams.spec.whatwg.org/#readablestream-get-a-reader": {"export":true,"for_":["ReadableStream"],"level":"1","normative":true,"shortname":"streams","spec":"streams","status":"current","text":"get a reader","type":"dfn","url":"https://streams.spec.whatwg.org/#readablestream-get-a-reader"},
+"https://url.spec.whatwg.org/#absolute-url-string": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"url","spec":"url","status":"current","text":"absolute-url string","type":"dfn","url":"https://url.spec.whatwg.org/#absolute-url-string"},
+"https://url.spec.whatwg.org/#concept-basic-url-parser": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"url","spec":"url","status":"current","text":"basic url parser","type":"dfn","url":"https://url.spec.whatwg.org/#concept-basic-url-parser"},
+"https://url.spec.whatwg.org/#concept-url": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"url","spec":"url","status":"current","text":"url","type":"dfn","url":"https://url.spec.whatwg.org/#concept-url"},
+"https://url.spec.whatwg.org/#concept-url-fragment": {"export":true,"for_":["url"],"level":"1","normative":true,"shortname":"url","spec":"url","status":"current","text":"fragment","type":"dfn","url":"https://url.spec.whatwg.org/#concept-url-fragment"},
+"https://url.spec.whatwg.org/#concept-url-origin": {"export":true,"for_":["url"],"level":"1","normative":true,"shortname":"url","spec":"url","status":"current","text":"origin","type":"dfn","url":"https://url.spec.whatwg.org/#concept-url-origin"},
+"https://url.spec.whatwg.org/#concept-url-password": {"export":true,"for_":["url"],"level":"1","normative":true,"shortname":"url","spec":"url","status":"current","text":"password","type":"dfn","url":"https://url.spec.whatwg.org/#concept-url-password"},
+"https://url.spec.whatwg.org/#concept-url-path": {"export":true,"for_":["url"],"level":"1","normative":true,"shortname":"url","spec":"url","status":"current","text":"path","type":"dfn","url":"https://url.spec.whatwg.org/#concept-url-path"},
+"https://url.spec.whatwg.org/#concept-url-query": {"export":true,"for_":["url"],"level":"1","normative":true,"shortname":"url","spec":"url","status":"current","text":"query","type":"dfn","url":"https://url.spec.whatwg.org/#concept-url-query"},
+"https://url.spec.whatwg.org/#concept-url-scheme": {"export":true,"for_":["url"],"level":"1","normative":true,"shortname":"url","spec":"url","status":"current","text":"scheme","type":"dfn","url":"https://url.spec.whatwg.org/#concept-url-scheme"},
+"https://url.spec.whatwg.org/#concept-url-username": {"export":true,"for_":["url"],"level":"1","normative":true,"shortname":"url","spec":"url","status":"current","text":"username","type":"dfn","url":"https://url.spec.whatwg.org/#concept-url-username"},
+"https://url.spec.whatwg.org/#valid-url-string": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"url","spec":"url","status":"current","text":"valid url string","type":"dfn","url":"https://url.spec.whatwg.org/#valid-url-string"},
+"https://w3c.github.io/payment-method-id/#dfn-payment-method-identifiers": {"export":true,"for_":[],"level":"","normative":true,"shortname":"payment-method-id","spec":"payment-method-id","status":"anchor-block","text":"payment method identifier","type":"dfn","url":"https://w3c.github.io/payment-method-id/#dfn-payment-method-identifiers"},
+"https://w3c.github.io/payment-method-id/#dfn-standardized-payment-method-identifiers": {"export":true,"for_":[],"level":"","normative":true,"shortname":"payment-method-id","spec":"payment-method-id","status":"anchor-block","text":"standardized payment method identifier","type":"dfn","url":"https://w3c.github.io/payment-method-id/#dfn-standardized-payment-method-identifiers"},
+"https://w3c.github.io/payment-method-id/#dfn-url-based-payment-method-identifiers": {"export":true,"for_":[],"level":"","normative":true,"shortname":"payment-method-id","spec":"payment-method-id","status":"anchor-block","text":"url-based payment method identifier","type":"dfn","url":"https://w3c.github.io/payment-method-id/#dfn-url-based-payment-method-identifiers"},
+"https://w3c.github.io/payment-method-id/#dfn-validate-a-url-based-payment-method-identifier": {"export":true,"for_":[],"level":"","normative":true,"shortname":"payment-method-id","spec":"payment-method-id","status":"anchor-block","text":"validate a url-based payment method identifier","type":"dfn","url":"https://w3c.github.io/payment-method-id/#dfn-validate-a-url-based-payment-method-identifier"},
+"https://w3c.github.io/payment-request/#dfn-payment-apps": {"export":true,"for_":[],"level":"","normative":true,"shortname":"payment-request","spec":"payment-request","status":"anchor-block","text":"payment app","type":"dfn","url":"https://w3c.github.io/payment-request/#dfn-payment-apps"},
+"https://w3c.github.io/payment-request/#dfn-payment-method": {"export":true,"for_":[],"level":"","normative":true,"shortname":"payment-request","spec":"payment-request","status":"anchor-block","text":"payment method","type":"dfn","url":"https://w3c.github.io/payment-request/#dfn-payment-method"},
+"https://w3c.github.io/payment-request/#dfn-paymentrequest-paymentrequest": {"export":true,"for_":["PaymentRequest"],"level":"","normative":true,"shortname":"payment-request","spec":"payment-request","status":"anchor-block","text":"PaymentRequest(methodData, details, options)","type":"constructor","url":"https://w3c.github.io/payment-request/#dfn-paymentrequest-paymentrequest"},
+"https://w3c.github.io/payment-request/#dfn-serializedmethoddata": {"export":true,"for_":[],"level":"","normative":true,"shortname":"payment-request","spec":"payment-request","status":"anchor-block","text":"[[serializedmethoddata]]","type":"dfn","url":"https://w3c.github.io/payment-request/#dfn-serializedmethoddata"},
+"https://w3c.github.io/payment-request/#dom-paymentrequest": {"export":true,"for_":[],"level":"","normative":true,"shortname":"payment-request","spec":"payment-request","status":"anchor-block","text":"PaymentRequest","type":"interface","url":"https://w3c.github.io/payment-request/#dom-paymentrequest"},
+"https://webidl.spec.whatwg.org/#upon-fulfillment": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"upon fulfillment","type":"dfn","url":"https://webidl.spec.whatwg.org/#upon-fulfillment"},
+"https://webidl.spec.whatwg.org/#upon-rejection": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"upon rejection","type":"dfn","url":"https://webidl.spec.whatwg.org/#upon-rejection"},
+"https://www.w3.org/TR/appmanifest/#dfn-manifest": {"export":true,"for_":[],"level":"","normative":true,"shortname":"appmanifest","spec":"appmanifest","status":"anchor-block","text":"web app manifest","type":"dfn","url":"https://www.w3.org/TR/appmanifest/#dfn-manifest"},
+"https://www.w3.org/TR/appmanifest/#dfn-manifest-url": {"export":true,"for_":["web app manifest"],"level":"","normative":true,"shortname":"appmanifest","spec":"appmanifest","status":"anchor-block","text":"url","type":"dfn","url":"https://www.w3.org/TR/appmanifest/#dfn-manifest-url"},
+"https://www.w3.org/TR/appmanifest/#dfn-obtaining-the-manifest": {"export":true,"for_":[],"level":"","normative":true,"shortname":"appmanifest","spec":"appmanifest","status":"anchor-block","text":"steps for obtaining a web app manifest","type":"dfn","url":"https://www.w3.org/TR/appmanifest/#dfn-obtaining-the-manifest"},
+"https://www.w3.org/TR/appmanifest/#dfn-processed-manifest": {"export":true,"for_":[],"level":"","normative":true,"shortname":"appmanifest","spec":"appmanifest","status":"anchor-block","text":"processed web app manifest","type":"dfn","url":"https://www.w3.org/TR/appmanifest/#dfn-processed-manifest"},
+"https://www.w3.org/TR/appmanifest/#dfn-processing-a-manifest": {"export":true,"for_":[],"level":"","normative":true,"shortname":"appmanifest","spec":"appmanifest","status":"anchor-block","text":"steps for processing a web app manifest","type":"dfn","url":"https://www.w3.org/TR/appmanifest/#dfn-processing-a-manifest"},
+};
+
+function mkRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "Term: "),
+                mk.span({}, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    let forListElements;
+    if(forList.length == 0) {
+        forListElements = [];
+    } else if(forList.length == 1) {
+        forListElements = mk.li({},
+            mk.b({}, "For: "),
+            mk.span({}, forList[0]),
+        );
+    } else {
+        forListElements = mk.li({},
             mk.b({}, "For: "),
             mk.ul({},
                 ...forList.map(forItem =>
                     mk.li({},
-                        mk.span({}, `${forItem}`)
+                        mk.span({}, forItem)
                     ),
                 ),
             ),
         );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+    }
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    setupRefHintEventListeners(link, hintPanel);
+    return hintPanel;
+}
+
+function hideAllRefHints() {
+    queryAll(".ref-hint").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    if(refHint.teardownEventListeners) {
+        refHint.teardownEventListeners();
     }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+    refHint.remove();
+}
+
+function showRefHint(link) {
+    if(link.classList.contains("dfn-link")) return;
+    const url = link.getAttribute("href");
+    const ref = refsData[url];
+    if(!ref) return;
+
+    hideAllRefHints(); // Only display one at this time.
+
+    const refHint = mkRefHint(link, ref);
+    append(document.body, refHint);
+    link.setAttribute("aria-expanded", "true");
+    positionRefHint(refHint);
+}
+
+function setupRefHintEventListeners(link, refHint) {
+    if (refHint.teardownEventListeners) return;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
+
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
-
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
-    }
-
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
-        }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
-
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
-    }
-
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+document.addEventListener("DOMContentLoaded", () => {
+    document.body.addEventListener("mouseover", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
+    });
+    document.body.addEventListener("focus", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
     });
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['https://w3c.github.io/payment-request/#dfn-payment-method'] = {"text": "payment method", "type": "dfn", "spec": "payment-request", "shortname": "payment-request", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/payment-request/#dfn-payment-method", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/payment-request/#dfn-payment-apps'] = {"text": "payment app", "type": "dfn", "spec": "payment-request", "shortname": "payment-request", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/payment-request/#dfn-payment-apps", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/payment-method-id/#dfn-payment-method-identifiers'] = {"text": "payment method identifier", "type": "dfn", "spec": "payment-method-id", "shortname": "payment-method-id", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/payment-method-id/#dfn-payment-method-identifiers", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/payment-method-id/#dfn-url-based-payment-method-identifiers'] = {"text": "url-based payment method identifier", "type": "dfn", "spec": "payment-method-id", "shortname": "payment-method-id", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/payment-method-id/#dfn-url-based-payment-method-identifiers", "export": true, "normative": true, "for_": []};
-window.refsData['#payment-method-manifest'] = {"text": "payment method manifest", "type": "dfn", "spec": "payment-method-manifest", "shortname": "payment-method-manifest", "level": "", "status": "local", "url": "#payment-method-manifest", "export": true, "normative": true, "for_": []};
-window.refsData['https://url.spec.whatwg.org/#absolute-url-string'] = {"text": "absolute-url string", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#absolute-url-string", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/appmanifest/#dfn-manifest-url'] = {"text": "url", "type": "dfn", "spec": "appmanifest", "shortname": "appmanifest", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/appmanifest/#dfn-manifest-url", "export": true, "normative": true, "for_": ["web app manifest"]};
-window.refsData['https://www.w3.org/TR/appmanifest/#dfn-manifest'] = {"text": "web app manifest", "type": "dfn", "spec": "appmanifest", "shortname": "appmanifest", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/appmanifest/#dfn-manifest", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#concept-origin'] = {"text": "origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-origin", "export": true, "normative": true, "for_": []};
-window.refsData['https://encoding.spec.whatwg.org/#utf-8'] = {"text": "utf-8", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "1", "status": "current", "url": "https://encoding.spec.whatwg.org/#utf-8", "export": true, "normative": true, "for_": []};
-window.refsData['https://url.spec.whatwg.org/#valid-url-string'] = {"text": "valid url string", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#valid-url-string", "export": true, "normative": true, "for_": []};
-window.refsData['https://url.spec.whatwg.org/#concept-url'] = {"text": "url", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url", "export": true, "normative": true, "for_": []};
-window.refsData['https://url.spec.whatwg.org/#concept-url-scheme'] = {"text": "scheme", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-scheme", "export": true, "normative": true, "for_": ["url"]};
-window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#ascii-serialisation-of-an-origin'] = {"text": "serialization of an origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#ascii-serialisation-of-an-origin", "export": true, "normative": true, "for_": []};
-window.refsData['https://url.spec.whatwg.org/#concept-url-origin'] = {"text": "origin", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-origin", "export": true, "normative": true, "for_": ["url"]};
-window.refsData['#valid-payment-method-manifest'] = {"text": "valid", "type": "dfn", "spec": "payment-method-manifest", "shortname": "payment-method-manifest", "level": "", "status": "local", "url": "#valid-payment-method-manifest", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/payment-request/#dfn-paymentrequest-paymentrequest'] = {"text": "PaymentRequest(methodData, details, options)", "type": "constructor", "spec": "payment-request", "shortname": "payment-request", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/payment-request/#dfn-paymentrequest-paymentrequest", "export": true, "normative": true, "for_": ["PaymentRequest"]};
-window.refsData['https://w3c.github.io/payment-request/#dom-paymentrequest'] = {"text": "PaymentRequest", "type": "interface", "spec": "payment-request", "shortname": "payment-request", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/payment-request/#dom-paymentrequest", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#struct-item'] = {"text": "item", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#struct-item", "export": true, "normative": true, "for_": ["struct", "tuple"]};
-window.refsData['https://w3c.github.io/payment-request/#dfn-serializedmethoddata'] = {"text": "[[serializedmethoddata]]", "type": "dfn", "spec": "payment-request", "shortname": "payment-request", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/payment-request/#dfn-serializedmethoddata", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#current-settings-object'] = {"text": "current settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#current-settings-object", "export": true, "normative": true, "for_": []};
-window.refsData['#ingest-payment-method-manifests'] = {"text": "ingest payment method manifests", "type": "dfn", "spec": "payment-method-manifest", "shortname": "payment-method-manifest", "level": "", "status": "local", "url": "#ingest-payment-method-manifests", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object'] = {"text": "environment settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object", "export": true, "normative": true, "for_": []};
-window.refsData['#fetch-payment-method-manifests'] = {"text": "fetch payment method manifests", "type": "dfn", "spec": "payment-method-manifest", "shortname": "payment-method-manifest", "level": "", "status": "local", "url": "#fetch-payment-method-manifests", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#list-iterate'] = {"text": "for each", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-iterate", "export": true, "normative": true, "for_": ["list", "set"]};
-window.refsData['#validate-and-parse-the-payment-method-manifest'] = {"text": "validate and parse the payment method manifest", "type": "dfn", "spec": "payment-method-manifest", "shortname": "payment-method-manifest", "level": "", "status": "local", "url": "#validate-and-parse-the-payment-method-manifest", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#iteration-continue'] = {"text": "continue", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#iteration-continue", "export": true, "normative": true, "for_": ["iteration"]};
-window.refsData['#parsed-payment-method-manifest-default-applications'] = {"text": "default applications", "type": "dfn", "spec": "payment-method-manifest", "shortname": "payment-method-manifest", "level": "", "status": "local", "url": "#parsed-payment-method-manifest-default-applications", "export": true, "normative": true, "for_": ["parsed payment method manifest"]};
-window.refsData['#fetch-the-web-app-manifest-for-a-default-payment-app'] = {"text": "fetch the web app manifest for a default payment app", "type": "dfn", "spec": "payment-method-manifest", "shortname": "payment-method-manifest", "level": "", "status": "local", "url": "#fetch-the-web-app-manifest-for-a-default-payment-app", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/appmanifest/#dfn-processing-a-manifest'] = {"text": "steps for processing a web app manifest", "type": "dfn", "spec": "appmanifest", "shortname": "appmanifest", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/appmanifest/#dfn-processing-a-manifest", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/appmanifest/#dfn-processed-manifest'] = {"text": "processed web app manifest", "type": "dfn", "spec": "appmanifest", "shortname": "appmanifest", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/appmanifest/#dfn-processed-manifest", "export": true, "normative": true, "for_": []};
-window.refsData['#parsed-payment-method-manifest-supported-origins'] = {"text": "supported origins", "type": "dfn", "spec": "payment-method-manifest", "shortname": "payment-method-manifest", "level": "", "status": "local", "url": "#parsed-payment-method-manifest-supported-origins", "export": true, "normative": true, "for_": ["parsed payment method manifest"]};
-window.refsData['https://infra.spec.whatwg.org/#list'] = {"text": "list", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#string'] = {"text": "javascript string", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#string", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#ordered-map'] = {"text": "map", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ordered-map", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#byte-sequence'] = {"text": "byte sequence", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#byte-sequence", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#tuple'] = {"text": "tuple", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#tuple", "export": true, "normative": true, "for_": []};
-window.refsData['https://url.spec.whatwg.org/#concept-basic-url-parser'] = {"text": "basic url parser", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-basic-url-parser", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/payment-method-id/#dfn-standardized-payment-method-identifiers'] = {"text": "standardized payment method identifier", "type": "dfn", "spec": "payment-method-id", "shortname": "payment-method-id", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/payment-method-id/#dfn-standardized-payment-method-identifiers", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/payment-method-id/#dfn-validate-a-url-based-payment-method-identifier'] = {"text": "validate a url-based payment method identifier", "type": "dfn", "spec": "payment-method-id", "shortname": "payment-method-id", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/payment-method-id/#dfn-validate-a-url-based-payment-method-identifier", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#list-append'] = {"text": "append", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-append", "export": true, "normative": true, "for_": ["list"]};
-window.refsData['https://fetch.spec.whatwg.org/#concept-request'] = {"text": "request", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#concept-request-method'] = {"text": "method", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-method", "export": true, "normative": true, "for_": ["request"]};
-window.refsData['https://fetch.spec.whatwg.org/#concept-request-url'] = {"text": "url", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-url", "export": true, "normative": true, "for_": ["request"]};
-window.refsData['https://fetch.spec.whatwg.org/#concept-request-client'] = {"text": "client", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-client", "export": true, "normative": true, "for_": ["request"]};
-window.refsData['https://fetch.spec.whatwg.org/#concept-request-mode'] = {"text": "mode", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-mode", "export": true, "normative": true, "for_": ["request"]};
-window.refsData['https://fetch.spec.whatwg.org/#concept-request-credentials-mode'] = {"text": "credentials mode", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-credentials-mode", "export": true, "normative": true, "for_": ["request"]};
-window.refsData['https://fetch.spec.whatwg.org/#concept-request-redirect-mode'] = {"text": "redirect mode", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-redirect-mode", "export": true, "normative": true, "for_": ["request"]};
-window.refsData['https://fetch.spec.whatwg.org/#concept-request-referrer-policy'] = {"text": "referrer policy", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-referrer-policy", "export": true, "normative": true, "for_": ["request"]};
-window.refsData['https://fetch.spec.whatwg.org/#concept-fetch'] = {"text": "fetch", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-fetch", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#concept-response'] = {"text": "response", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#concept-network-error'] = {"text": "network error", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-network-error", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#concept-response-status'] = {"text": "status", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response-status", "export": true, "normative": true, "for_": ["response"]};
-window.refsData['https://fetch.spec.whatwg.org/#ok-status'] = {"text": "ok status", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#ok-status", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#extract-header-list-values'] = {"text": "extract header list values", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#extract-header-list-values", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#concept-response-header-list'] = {"text": "header list", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response-header-list", "export": true, "normative": true, "for_": ["response"]};
-window.refsData['https://infra.spec.whatwg.org/#ascii-case-insensitive'] = {"text": "ascii case-insensitive", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-case-insensitive", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#iteration-break'] = {"text": "break", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#iteration-break", "export": true, "normative": true, "for_": ["iteration"]};
-window.refsData['https://fetch.spec.whatwg.org/#concept-response-body'] = {"text": "body", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response-body", "export": true, "normative": true, "for_": ["response"]};
-window.refsData['https://fetch.spec.whatwg.org/#concept-response-url'] = {"text": "url", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response-url", "export": true, "normative": true, "for_": ["response"]};
-window.refsData['https://fetch.spec.whatwg.org/#concept-request-referrer'] = {"text": "referrer", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-referrer", "export": true, "normative": true, "for_": ["request"]};
-window.refsData['https://streams.spec.whatwg.org/#readablestream-get-a-reader'] = {"text": "get a reader", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#readablestream-get-a-reader", "export": true, "normative": true, "for_": ["ReadableStream"]};
-window.refsData['https://webidl.spec.whatwg.org/#upon-fulfillment'] = {"text": "upon fulfillment", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#upon-fulfillment", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#map-set'] = {"text": "set", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-set", "export": true, "normative": true, "for_": ["map"]};
-window.refsData['https://infra.spec.whatwg.org/#struct'] = {"text": "struct", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#struct", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#ordered-set'] = {"text": "ordered set", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ordered-set", "export": true, "normative": true, "for_": []};
-window.refsData['#parsed-payment-method-manifest'] = {"text": "parsed payment method manifest", "type": "dfn", "spec": "payment-method-manifest", "shortname": "payment-method-manifest", "level": "", "status": "local", "url": "#parsed-payment-method-manifest", "export": true, "normative": true, "for_": []};
-window.refsData['https://encoding.spec.whatwg.org/#utf-8-decode'] = {"text": "utf-8 decode", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "1", "status": "current", "url": "https://encoding.spec.whatwg.org/#utf-8-decode", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#parse-a-json-string-to-an-infra-value'] = {"text": "parse json into infra values", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#parse-a-json-string-to-an-infra-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#map-exists'] = {"text": "exist", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-exists", "export": true, "normative": true, "for_": ["map"]};
-window.refsData['https://infra.spec.whatwg.org/#list-size'] = {"text": "size", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-size", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
-window.refsData['https://infra.spec.whatwg.org/#set-append'] = {"text": "append", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#set-append", "export": true, "normative": true, "for_": ["set"]};
-window.refsData['https://url.spec.whatwg.org/#concept-url-username'] = {"text": "username", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-username", "export": true, "normative": true, "for_": ["url"]};
-window.refsData['https://url.spec.whatwg.org/#concept-url-password'] = {"text": "password", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-password", "export": true, "normative": true, "for_": ["url"]};
-window.refsData['https://url.spec.whatwg.org/#concept-url-path'] = {"text": "path", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-path", "export": true, "normative": true, "for_": ["url"]};
-window.refsData['https://url.spec.whatwg.org/#concept-url-query'] = {"text": "query", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-query", "export": true, "normative": true, "for_": ["url"]};
-window.refsData['https://url.spec.whatwg.org/#concept-url-fragment'] = {"text": "fragment", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-fragment", "export": true, "normative": true, "for_": ["url"]};
-window.refsData['https://www.w3.org/TR/appmanifest/#dfn-obtaining-the-manifest'] = {"text": "steps for obtaining a web app manifest", "type": "dfn", "spec": "appmanifest", "shortname": "appmanifest", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/appmanifest/#dfn-obtaining-the-manifest", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#scalar-value-string'] = {"text": "scalar value string", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#scalar-value-string", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#upon-rejection'] = {"text": "upon rejection", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#upon-rejection", "export": true, "normative": true, "for_": []};
 </script>

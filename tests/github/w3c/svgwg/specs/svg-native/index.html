@@ -77,7 +77,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -483,7 +482,7 @@ a[href].issue-return {
 }
 
 .ref-hint {
-    display: none;
+    display: inline-block;
     position: absolute;
     z-index: 35;
     width: 20em;
@@ -499,16 +498,11 @@ a[href].issue-return {
     white-space: normal; /* in case it's moved into a pre */
 }
 
-.ref-hint.on {
-    display: inline-block;
-}
-
 .ref-hint * { margin: 0; padding: 0; text-indent: 0; }
 
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -1224,517 +1218,8 @@ dfn > a.self-link::before      { content: "#"; }
   <div style="counter-reset:issue">
    <div class="issue"> The file type and mime type is being discussed in <a href="https://github.com/w3c/svgwg/issues/664">this GitHub issue</a>. <a class="issue-return" href="#issue-7110f720" title="Jump to section">↵</a></div>
   </div>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['6e51b40a'] = {"dfnID": "6e51b40a", "url": "https://drafts.csswg.org/css-align-3/#valdef-align-self-auto", "dfnText": "auto", "refSections": [{"refs": [{"id": "ref-for-valdef-align-self-auto"}], "title": "2. Rendering Model"}, {"refs": [{"id": "ref-for-valdef-align-self-auto\u2460"}], "title": "5. Geometry Properties"}], "external": true};
-window.dfnpanelData['f47d48ea'] = {"dfnID": "f47d48ea", "url": "https://drafts.csswg.org/css-backgrounds-3/#valdef-background-attachment-scroll", "dfnText": "scroll", "refSections": [{"refs": [{"id": "ref-for-valdef-background-attachment-scroll"}, {"id": "ref-for-valdef-background-attachment-scroll\u2460"}], "title": "2. Rendering Model"}], "external": true};
-window.dfnpanelData['a8ac6f1b'] = {"dfnID": "a8ac6f1b", "url": "https://drafts.csswg.org/css-cascade-4/#valdef-all-revert", "dfnText": "revert", "refSections": [{"refs": [{"id": "ref-for-valdef-all-revert"}], "title": "4. Styling"}], "external": true};
-window.dfnpanelData['d95397a7'] = {"dfnID": "d95397a7", "url": "https://drafts.csswg.org/css-cascade-5/#propdef-all", "dfnText": "all", "refSections": [{"refs": [{"id": "ref-for-propdef-all"}], "title": "4. Styling"}], "external": true};
-window.dfnpanelData['c388d253'] = {"dfnID": "c388d253", "url": "https://drafts.csswg.org/css-cascade-5/#valdef-all-inherit", "dfnText": "inherit", "refSections": [{"refs": [{"id": "ref-for-valdef-all-inherit"}], "title": "4. Styling"}], "external": true};
-window.dfnpanelData['4d7d3dcd'] = {"dfnID": "4d7d3dcd", "url": "https://drafts.csswg.org/css-cascade-5/#valdef-all-initial", "dfnText": "initial", "refSections": [{"refs": [{"id": "ref-for-valdef-all-initial"}], "title": "4. Styling"}], "external": true};
-window.dfnpanelData['9e004c39'] = {"dfnID": "9e004c39", "url": "https://drafts.csswg.org/css-cascade-5/#valdef-all-unset", "dfnText": "unset", "refSections": [{"refs": [{"id": "ref-for-valdef-all-unset"}], "title": "4. Styling"}], "external": true};
-window.dfnpanelData['cad72d2f'] = {"dfnID": "cad72d2f", "url": "https://drafts.csswg.org/css-color-4/#valdef-color-currentcolor", "dfnText": "currentcolor", "refSections": [{"refs": [{"id": "ref-for-valdef-color-currentcolor"}, {"id": "ref-for-valdef-color-currentcolor\u2460"}], "title": "10. Painting: Filling, Stroking, and Marker Symbols"}], "external": true};
-window.dfnpanelData['e7f0dd6c'] = {"dfnID": "e7f0dd6c", "url": "https://drafts.csswg.org/css-display-4/#propdef-display", "dfnText": "display", "refSections": [{"refs": [{"id": "ref-for-propdef-display"}], "title": "10. Painting: Filling, Stroking, and Marker Symbols"}], "external": true};
-window.dfnpanelData['12f8fb07'] = {"dfnID": "12f8fb07", "url": "https://drafts.csswg.org/css-display-4/#propdef-visibility", "dfnText": "visibility", "refSections": [{"refs": [{"id": "ref-for-propdef-visibility"}], "title": "10. Painting: Filling, Stroking, and Marker Symbols"}], "external": true};
-window.dfnpanelData['807f9351'] = {"dfnID": "807f9351", "url": "https://drafts.csswg.org/css-env-1/#funcdef-env", "dfnText": "env()", "refSections": [{"refs": [{"id": "ref-for-funcdef-env"}], "title": "4. Styling"}], "external": true};
-window.dfnpanelData['2c57f900'] = {"dfnID": "2c57f900", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font", "dfnText": "font", "refSections": [{"refs": [{"id": "ref-for-propdef-font"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['d65d17df'] = {"dfnID": "d65d17df", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-family", "dfnText": "font-family", "refSections": [{"refs": [{"id": "ref-for-propdef-font-family"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['00d808eb'] = {"dfnID": "00d808eb", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-feature-settings", "dfnText": "font-feature-settings", "refSections": [{"refs": [{"id": "ref-for-propdef-font-feature-settings"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['1bebb82c'] = {"dfnID": "1bebb82c", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-kerning", "dfnText": "font-kerning", "refSections": [{"refs": [{"id": "ref-for-propdef-font-kerning"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['fdf6efd5'] = {"dfnID": "fdf6efd5", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-size", "dfnText": "font-size", "refSections": [{"refs": [{"id": "ref-for-propdef-font-size"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['e7cd6f5a'] = {"dfnID": "e7cd6f5a", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-stretch", "dfnText": "font-stretch", "refSections": [{"refs": [{"id": "ref-for-propdef-font-stretch"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['d45afbab'] = {"dfnID": "d45afbab", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-style", "dfnText": "font-style", "refSections": [{"refs": [{"id": "ref-for-propdef-font-style"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['fb7153bd'] = {"dfnID": "fb7153bd", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-variant", "dfnText": "font-variant", "refSections": [{"refs": [{"id": "ref-for-propdef-font-variant"}, {"id": "ref-for-propdef-font-variant\u2460"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['a8fe91d7'] = {"dfnID": "a8fe91d7", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-weight", "dfnText": "font-weight", "refSections": [{"refs": [{"id": "ref-for-propdef-font-weight"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['caf45308'] = {"dfnID": "caf45308", "url": "https://drafts.csswg.org/css-fonts-5/#propdef-font-size-adjust", "dfnText": "font-size-adjust", "refSections": [{"refs": [{"id": "ref-for-propdef-font-size-adjust"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['e453a13a'] = {"dfnID": "e453a13a", "url": "https://drafts.csswg.org/css-inline-3/#propdef-alignment-baseline", "dfnText": "alignment-baseline", "refSections": [{"refs": [{"id": "ref-for-propdef-alignment-baseline"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['eb76a058'] = {"dfnID": "eb76a058", "url": "https://drafts.csswg.org/css-inline-3/#propdef-baseline-shift", "dfnText": "baseline-shift", "refSections": [{"refs": [{"id": "ref-for-propdef-baseline-shift"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['b9aaa547'] = {"dfnID": "b9aaa547", "url": "https://drafts.csswg.org/css-inline-3/#propdef-dominant-baseline", "dfnText": "dominant-baseline", "refSections": [{"refs": [{"id": "ref-for-propdef-dominant-baseline"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['e0b6ed58'] = {"dfnID": "e0b6ed58", "url": "https://drafts.csswg.org/css-inline-3/#propdef-vertical-align", "dfnText": "vertical-align", "refSections": [{"refs": [{"id": "ref-for-propdef-vertical-align"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['0fffddd1'] = {"dfnID": "0fffddd1", "url": "https://drafts.csswg.org/css-logical-1/#propdef-inline-size", "dfnText": "inline-size", "refSections": [{"refs": [{"id": "ref-for-propdef-inline-size"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['6b14b18a'] = {"dfnID": "6b14b18a", "url": "https://drafts.fxtf.org/css-masking-1/#propdef-clip", "dfnText": "clip", "refSections": [{"refs": [{"id": "ref-for-propdef-clip"}], "title": "2. Rendering Model"}], "external": true};
-window.dfnpanelData['77f17203'] = {"dfnID": "77f17203", "url": "https://drafts.fxtf.org/css-masking-1/#propdef-clip-path", "dfnText": "clip-path", "refSections": [{"refs": [{"id": "ref-for-propdef-clip-path"}], "title": "2. Rendering Model"}], "external": true};
-window.dfnpanelData['f00710cb'] = {"dfnID": "f00710cb", "url": "https://drafts.fxtf.org/css-masking-1/#elementdef-clippath", "dfnText": "clippath", "refSections": [{"refs": [{"id": "ref-for-elementdef-clippath"}, {"id": "ref-for-elementdef-clippath\u2460"}], "title": "2. Rendering Model"}, {"refs": [{"id": "ref-for-elementdef-clippath\u2461"}], "title": "6. Coordinate Systems, Transformations, and Units"}], "external": true};
-window.dfnpanelData['59d52fb7'] = {"dfnID": "59d52fb7", "url": "https://drafts.fxtf.org/css-masking-1/#valdef-clippathunits-objectboundingbox", "dfnText": "objectboundingbox", "refSections": [{"refs": [{"id": "ref-for-valdef-clippathunits-objectboundingbox"}], "title": "11. Gradients and Patterns"}], "external": true};
-window.dfnpanelData['eb5ae40f'] = {"dfnID": "eb5ae40f", "url": "https://drafts.fxtf.org/css-masking-1/#valdef-clippathunits-userspaceonuse", "dfnText": "userspaceonuse", "refSections": [{"refs": [{"id": "ref-for-valdef-clippathunits-userspaceonuse"}], "title": "11. Gradients and Patterns"}], "external": true};
-window.dfnpanelData['86928bde'] = {"dfnID": "86928bde", "url": "https://drafts.csswg.org/css-overflow-3/#propdef-overflow", "dfnText": "overflow", "refSections": [{"refs": [{"id": "ref-for-propdef-overflow"}, {"id": "ref-for-propdef-overflow\u2460"}], "title": "2. Rendering Model"}], "external": true};
-window.dfnpanelData['ad1e8377'] = {"dfnID": "ad1e8377", "url": "https://drafts.csswg.org/css-overflow-4/#propdef-text-overflow", "dfnText": "text-overflow", "refSections": [{"refs": [{"id": "ref-for-propdef-text-overflow"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['30b9c51d'] = {"dfnID": "30b9c51d", "url": "https://drafts.csswg.org/css-round-display-1/#propdef-shape-inside", "dfnText": "shape-inside", "refSections": [{"refs": [{"id": "ref-for-propdef-shape-inside"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['078a8991'] = {"dfnID": "078a8991", "url": "https://drafts.csswg.org/css-shapes-1/#propdef-shape-image-threshold", "dfnText": "shape-image-threshold", "refSections": [{"refs": [{"id": "ref-for-propdef-shape-image-threshold"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['6e57cf97'] = {"dfnID": "6e57cf97", "url": "https://drafts.csswg.org/css-shapes-1/#propdef-shape-margin", "dfnText": "shape-margin", "refSections": [{"refs": [{"id": "ref-for-propdef-shape-margin"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['4985f121'] = {"dfnID": "4985f121", "url": "https://drafts.csswg.org/css-shapes-2/#propdef-shape-padding", "dfnText": "shape-padding", "refSections": [{"refs": [{"id": "ref-for-propdef-shape-padding"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['68019d7a'] = {"dfnID": "68019d7a", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-height", "dfnText": "height", "refSections": [{"refs": [{"id": "ref-for-propdef-height"}], "title": "5. Geometry Properties"}], "external": true};
-window.dfnpanelData['88643fe0'] = {"dfnID": "88643fe0", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-width", "dfnText": "width", "refSections": [{"refs": [{"id": "ref-for-propdef-width"}], "title": "5. Geometry Properties"}], "external": true};
-window.dfnpanelData['4356bfe3'] = {"dfnID": "4356bfe3", "url": "https://drafts.csswg.org/css-text-3/#propdef-text-align", "dfnText": "text-align", "refSections": [{"refs": [{"id": "ref-for-propdef-text-align"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['cacc0af2'] = {"dfnID": "cacc0af2", "url": "https://drafts.csswg.org/css-text-4/#propdef-letter-spacing", "dfnText": "letter-spacing", "refSections": [{"refs": [{"id": "ref-for-propdef-letter-spacing"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['82c8f3df'] = {"dfnID": "82c8f3df", "url": "https://drafts.csswg.org/css-text-4/#propdef-text-align-last", "dfnText": "text-align-last", "refSections": [{"refs": [{"id": "ref-for-propdef-text-align-last"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['8831f13c'] = {"dfnID": "8831f13c", "url": "https://drafts.csswg.org/css-text-4/#propdef-text-indent", "dfnText": "text-indent", "refSections": [{"refs": [{"id": "ref-for-propdef-text-indent"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['6501e5b3'] = {"dfnID": "6501e5b3", "url": "https://drafts.csswg.org/css-text-4/#propdef-white-space", "dfnText": "white-space", "refSections": [{"refs": [{"id": "ref-for-propdef-white-space"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['b2356074'] = {"dfnID": "b2356074", "url": "https://drafts.csswg.org/css-text-4/#propdef-word-spacing", "dfnText": "word-spacing", "refSections": [{"refs": [{"id": "ref-for-propdef-word-spacing"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['5bc3d0ec'] = {"dfnID": "5bc3d0ec", "url": "https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration", "dfnText": "text-decoration", "refSections": [{"refs": [{"id": "ref-for-propdef-text-decoration"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['044536a2'] = {"dfnID": "044536a2", "url": "https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration-color", "dfnText": "text-decoration-color", "refSections": [{"refs": [{"id": "ref-for-propdef-text-decoration-color"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['9e84e011'] = {"dfnID": "9e84e011", "url": "https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration-line", "dfnText": "text-decoration-line", "refSections": [{"refs": [{"id": "ref-for-propdef-text-decoration-line"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['63488d6e'] = {"dfnID": "63488d6e", "url": "https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration-style", "dfnText": "text-decoration-style", "refSections": [{"refs": [{"id": "ref-for-propdef-text-decoration-style"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['e2e08d07'] = {"dfnID": "e2e08d07", "url": "https://drafts.csswg.org/css-transforms-1/#propdef-transform", "dfnText": "transform", "refSections": [{"refs": [{"id": "ref-for-propdef-transform"}], "title": "6. Coordinate Systems, Transformations, and Units"}], "external": true};
-window.dfnpanelData['73bc6606'] = {"dfnID": "73bc6606", "url": "https://drafts.csswg.org/css-ui-4/#propdef-pointer-events", "dfnText": "pointer-events", "refSections": [{"refs": [{"id": "ref-for-propdef-pointer-events"}], "title": "12. Scripting and Interactivity"}], "external": true};
-window.dfnpanelData['584e9c31'] = {"dfnID": "584e9c31", "url": "https://drafts.csswg.org/css-values-4/#funcdef-calc", "dfnText": "calc()", "refSections": [{"refs": [{"id": "ref-for-funcdef-calc"}], "title": "4. Styling"}], "external": true};
-window.dfnpanelData['cbae5084'] = {"dfnID": "cbae5084", "url": "https://drafts.csswg.org/css-values-4/#cm", "dfnText": "cm", "refSections": [{"refs": [{"id": "ref-for-cm"}], "title": "6. Coordinate Systems, Transformations, and Units"}], "external": true};
-window.dfnpanelData['9e1a434a'] = {"dfnID": "9e1a434a", "url": "https://drafts.csswg.org/css-values-4/#in", "dfnText": "in", "refSections": [{"refs": [{"id": "ref-for-in"}], "title": "6. Coordinate Systems, Transformations, and Units"}], "external": true};
-window.dfnpanelData['f054c76d'] = {"dfnID": "f054c76d", "url": "https://drafts.csswg.org/css-values-4/#mm", "dfnText": "mm", "refSections": [{"refs": [{"id": "ref-for-mm"}], "title": "6. Coordinate Systems, Transformations, and Units"}], "external": true};
-window.dfnpanelData['f52f83f2'] = {"dfnID": "f52f83f2", "url": "https://drafts.csswg.org/css-values-4/#pc", "dfnText": "pc", "refSections": [{"refs": [{"id": "ref-for-pc"}], "title": "6. Coordinate Systems, Transformations, and Units"}], "external": true};
-window.dfnpanelData['941d204d'] = {"dfnID": "941d204d", "url": "https://drafts.csswg.org/css-values-4/#pt", "dfnText": "pt", "refSections": [{"refs": [{"id": "ref-for-pt"}], "title": "6. Coordinate Systems, Transformations, and Units"}], "external": true};
-window.dfnpanelData['9ddea951'] = {"dfnID": "9ddea951", "url": "https://drafts.csswg.org/css-values-4/#px", "dfnText": "px", "refSections": [{"refs": [{"id": "ref-for-px"}], "title": "6. Coordinate Systems, Transformations, and Units"}], "external": true};
-window.dfnpanelData['dbba942a'] = {"dfnID": "dbba942a", "url": "https://drafts.csswg.org/css-variables-2/#funcdef-var", "dfnText": "var()", "refSections": [{"refs": [{"id": "ref-for-funcdef-var"}], "title": "4. Styling"}], "external": true};
-window.dfnpanelData['34de5360'] = {"dfnID": "34de5360", "url": "https://drafts.csswg.org/css-will-change-1/#propdef-will-change", "dfnText": "will-change", "refSections": [{"refs": [{"id": "ref-for-propdef-will-change"}], "title": "10. Painting: Filling, Stroking, and Marker Symbols"}], "external": true};
-window.dfnpanelData['5bc8bd12'] = {"dfnID": "5bc8bd12", "url": "https://drafts.csswg.org/css-writing-modes-3/#propdef-direction", "dfnText": "direction", "refSections": [{"refs": [{"id": "ref-for-propdef-direction"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['fcbf3baa'] = {"dfnID": "fcbf3baa", "url": "https://drafts.csswg.org/css-writing-modes-4/#propdef-glyph-orientation-vertical", "dfnText": "glyph-orientation-vertical", "refSections": [{"refs": [{"id": "ref-for-propdef-glyph-orientation-vertical"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['3bd4bbe9'] = {"dfnID": "3bd4bbe9", "url": "https://drafts.csswg.org/css-writing-modes-4/#propdef-text-orientation", "dfnText": "text-orientation", "refSections": [{"refs": [{"id": "ref-for-propdef-text-orientation"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['385326d7'] = {"dfnID": "385326d7", "url": "https://drafts.csswg.org/css-writing-modes-4/#propdef-writing-mode", "dfnText": "writing-mode", "refSections": [{"refs": [{"id": "ref-for-propdef-writing-mode"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['68bf3d31'] = {"dfnID": "68bf3d31", "url": "https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-a-element", "dfnText": "a", "refSections": [{"refs": [{"id": "ref-for-the-a-element"}], "title": "13. Linking"}], "external": true};
-window.dfnpanelData['91dcc557'] = {"dfnID": "91dcc557", "url": "https://html.spec.whatwg.org/multipage/obsolete.html#font", "dfnText": "font", "refSections": [{"refs": [{"id": "ref-for-font"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['f0811ff8'] = {"dfnID": "f0811ff8", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element", "dfnText": "img", "refSections": [{"refs": [{"id": "ref-for-the-img-element"}], "title": "1.2. Basics"}], "external": true};
-window.dfnpanelData['64b89595'] = {"dfnID": "64b89595", "url": "https://html.spec.whatwg.org/multipage/semantics.html#meta", "dfnText": "meta", "refSections": [{"refs": [{"id": "ref-for-meta"}], "title": "3. Document Structure"}], "external": true};
-window.dfnpanelData['0cf3964f'] = {"dfnID": "0cf3964f", "url": "https://html.spec.whatwg.org/multipage/scripting.html#script", "dfnText": "script", "refSections": [{"refs": [{"id": "ref-for-script"}], "title": "12. Scripting and Interactivity"}], "external": true};
-window.dfnpanelData['ba920583'] = {"dfnID": "ba920583", "url": "https://html.spec.whatwg.org/multipage/semantics.html#the-style-element", "dfnText": "style", "refSections": [{"refs": [{"id": "ref-for-the-style-element"}], "title": "4. Styling"}], "external": true};
-window.dfnpanelData['2316fa58'] = {"dfnID": "2316fa58", "url": "https://svgwg.org/svg2-draft/shapes.html#elementdef-circle", "dfnText": "circle", "refSections": [{"refs": [{"id": "ref-for-elementdef-circle"}], "title": "6. Coordinate Systems, Transformations, and Units"}], "external": true};
-window.dfnpanelData['691fe546'] = {"dfnID": "691fe546", "url": "https://svgwg.org/svg2-draft/painting.html#ColorInterpolationProperty", "dfnText": "color-interpolation", "refSections": [{"refs": [{"id": "ref-for-ColorInterpolationProperty"}], "title": "10. Painting: Filling, Stroking, and Marker Symbols"}], "external": true};
-window.dfnpanelData['0f07310d'] = {"dfnID": "0f07310d", "url": "https://svgwg.org/svg2-draft/geometry.html#CxProperty", "dfnText": "cx", "refSections": [{"refs": [{"id": "ref-for-CxProperty"}], "title": "5. Geometry Properties"}], "external": true};
-window.dfnpanelData['dfd78ca3'] = {"dfnID": "dfd78ca3", "url": "https://svgwg.org/svg2-draft/geometry.html#CyProperty", "dfnText": "cy", "refSections": [{"refs": [{"id": "ref-for-CyProperty"}], "title": "5. Geometry Properties"}], "external": true};
-window.dfnpanelData['9cc7fe1b'] = {"dfnID": "9cc7fe1b", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-defs", "dfnText": "defs", "refSections": [{"refs": [{"id": "ref-for-elementdef-defs"}], "title": "6. Coordinate Systems, Transformations, and Units"}], "external": true};
-window.dfnpanelData['4ed3d261'] = {"dfnID": "4ed3d261", "url": "https://svgwg.org/svg2-draft/shapes.html#elementdef-ellipse", "dfnText": "ellipse", "refSections": [{"refs": [{"id": "ref-for-elementdef-ellipse"}], "title": "6. Coordinate Systems, Transformations, and Units"}], "external": true};
-window.dfnpanelData['511b3636'] = {"dfnID": "511b3636", "url": "https://svgwg.org/svg2-draft/embedded.html#elementdef-foreignObject", "dfnText": "foreignobject", "refSections": [{"refs": [{"id": "ref-for-elementdef-foreignObject"}], "title": "9. Embedded Content"}], "external": true};
-window.dfnpanelData['79b35220'] = {"dfnID": "79b35220", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-g", "dfnText": "g", "refSections": [{"refs": [{"id": "ref-for-elementdef-g"}], "title": "6. Coordinate Systems, Transformations, and Units"}], "external": true};
-window.dfnpanelData['11a8832d'] = {"dfnID": "11a8832d", "url": "https://svgwg.org/svg2-draft/embedded.html#elementdef-image", "dfnText": "image", "refSections": [{"refs": [{"id": "ref-for-elementdef-image"}], "title": "3. Document Structure"}, {"refs": [{"id": "ref-for-elementdef-image\u2460"}, {"id": "ref-for-elementdef-image\u2461"}], "title": "6. Coordinate Systems, Transformations, and Units"}], "external": true};
-window.dfnpanelData['f861d7f6'] = {"dfnID": "f861d7f6", "url": "https://svgwg.org/svg2-draft/shapes.html#elementdef-line", "dfnText": "line", "refSections": [{"refs": [{"id": "ref-for-elementdef-line"}], "title": "6. Coordinate Systems, Transformations, and Units"}], "external": true};
-window.dfnpanelData['b229503c'] = {"dfnID": "b229503c", "url": "https://svgwg.org/svg2-draft/painting.html#MarkerProperty", "dfnText": "marker", "refSections": [{"refs": [{"id": "ref-for-MarkerProperty"}], "title": "10. Painting: Filling, Stroking, and Marker Symbols"}], "external": true};
-window.dfnpanelData['970c7ba6'] = {"dfnID": "970c7ba6", "url": "https://svgwg.org/svg2-draft/painting.html#MarkerEndProperty", "dfnText": "marker-end", "refSections": [{"refs": [{"id": "ref-for-MarkerEndProperty"}], "title": "10. Painting: Filling, Stroking, and Marker Symbols"}], "external": true};
-window.dfnpanelData['5671b56e'] = {"dfnID": "5671b56e", "url": "https://svgwg.org/svg2-draft/painting.html#MarkerMidProperty", "dfnText": "marker-mid", "refSections": [{"refs": [{"id": "ref-for-MarkerMidProperty"}], "title": "10. Painting: Filling, Stroking, and Marker Symbols"}], "external": true};
-window.dfnpanelData['6a10a8b5'] = {"dfnID": "6a10a8b5", "url": "https://svgwg.org/svg2-draft/painting.html#MarkerStartProperty", "dfnText": "marker-start", "refSections": [{"refs": [{"id": "ref-for-MarkerStartProperty"}], "title": "10. Painting: Filling, Stroking, and Marker Symbols"}], "external": true};
-window.dfnpanelData['44c5f27a'] = {"dfnID": "44c5f27a", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-metadata", "dfnText": "metadata", "refSections": [{"refs": [{"id": "ref-for-elementdef-metadata"}], "title": "3. Document Structure"}], "external": true};
-window.dfnpanelData['1c2f3cd4'] = {"dfnID": "1c2f3cd4", "url": "https://svgwg.org/svg2-draft/painting.html#PaintOrderProperty", "dfnText": "paint-order", "refSections": [{"refs": [{"id": "ref-for-PaintOrderProperty"}], "title": "10. Painting: Filling, Stroking, and Marker Symbols"}], "external": true};
-window.dfnpanelData['0c48b9b1'] = {"dfnID": "0c48b9b1", "url": "https://svgwg.org/svg2-draft/paths.html#elementdef-path", "dfnText": "path", "refSections": [{"refs": [{"id": "ref-for-elementdef-path"}], "title": "6. Coordinate Systems, Transformations, and Units"}, {"refs": [{"id": "ref-for-elementdef-path\u2460"}], "title": "7. Paths"}], "external": true};
-window.dfnpanelData['abdfd54a'] = {"dfnID": "abdfd54a", "url": "https://svgwg.org/svg2-draft/pservers.html#elementdef-pattern", "dfnText": "pattern", "refSections": [{"refs": [{"id": "ref-for-elementdef-pattern"}], "title": "6. Coordinate Systems, Transformations, and Units"}, {"refs": [{"id": "ref-for-elementdef-pattern\u2460"}], "title": "11. Gradients and Patterns"}], "external": true};
-window.dfnpanelData['fe8a389a'] = {"dfnID": "fe8a389a", "url": "https://svgwg.org/svg2-draft/shapes.html#elementdef-polygon", "dfnText": "polygon", "refSections": [{"refs": [{"id": "ref-for-elementdef-polygon"}], "title": "6. Coordinate Systems, Transformations, and Units"}], "external": true};
-window.dfnpanelData['ff5047e4'] = {"dfnID": "ff5047e4", "url": "https://svgwg.org/svg2-draft/shapes.html#elementdef-polyline", "dfnText": "polyline", "refSections": [{"refs": [{"id": "ref-for-elementdef-polyline"}], "title": "6. Coordinate Systems, Transformations, and Units"}], "external": true};
-window.dfnpanelData['0a0ddd55'] = {"dfnID": "0a0ddd55", "url": "https://svgwg.org/svg2-draft/geometry.html#RProperty", "dfnText": "r", "refSections": [{"refs": [{"id": "ref-for-RProperty"}], "title": "5. Geometry Properties"}], "external": true};
-window.dfnpanelData['abbd4058'] = {"dfnID": "abbd4058", "url": "https://svgwg.org/svg2-draft/shapes.html#elementdef-rect", "dfnText": "rect", "refSections": [{"refs": [{"id": "ref-for-elementdef-rect"}], "title": "6. Coordinate Systems, Transformations, and Units"}], "external": true};
-window.dfnpanelData['7b665bf7'] = {"dfnID": "7b665bf7", "url": "https://svgwg.org/svg2-draft/geometry.html#RxProperty", "dfnText": "rx", "refSections": [{"refs": [{"id": "ref-for-RxProperty"}], "title": "5. Geometry Properties"}], "external": true};
-window.dfnpanelData['fc8d4e6c'] = {"dfnID": "fc8d4e6c", "url": "https://svgwg.org/svg2-draft/geometry.html#RyProperty", "dfnText": "ry", "refSections": [{"refs": [{"id": "ref-for-RyProperty"}], "title": "5. Geometry Properties"}], "external": true};
-window.dfnpanelData['423406b4'] = {"dfnID": "423406b4", "url": "https://svgwg.org/svg2-draft/text.html#ShapesubtractProperty", "dfnText": "shape-subtract", "refSections": [{"refs": [{"id": "ref-for-ShapesubtractProperty"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['4299a926'] = {"dfnID": "4299a926", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-svg", "dfnText": "svg", "refSections": [{"refs": [{"id": "ref-for-elementdef-svg"}, {"id": "ref-for-elementdef-svg\u2460"}], "title": "3. Document Structure"}, {"refs": [{"id": "ref-for-elementdef-svg\u2461"}, {"id": "ref-for-elementdef-svg\u2462"}, {"id": "ref-for-elementdef-svg\u2463"}], "title": "6. Coordinate Systems, Transformations, and Units"}], "external": true};
-window.dfnpanelData['c400bde8'] = {"dfnID": "c400bde8", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-switch", "dfnText": "switch", "refSections": [{"refs": [{"id": "ref-for-elementdef-switch"}], "title": "3. Document Structure"}], "external": true};
-window.dfnpanelData['653040a2'] = {"dfnID": "653040a2", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-symbol", "dfnText": "symbol", "refSections": [{"refs": [{"id": "ref-for-elementdef-symbol"}], "title": "3. Document Structure"}], "external": true};
-window.dfnpanelData['09b0661c'] = {"dfnID": "09b0661c", "url": "https://svgwg.org/svg2-draft/text.html#elementdef-text", "dfnText": "text", "refSections": [{"refs": [{"id": "ref-for-elementdef-text"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['bf29f5ff'] = {"dfnID": "bf29f5ff", "url": "https://svgwg.org/svg2-draft/text.html#TextAnchorProperty", "dfnText": "text-anchor", "refSections": [{"refs": [{"id": "ref-for-TextAnchorProperty"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['510cef3b'] = {"dfnID": "510cef3b", "url": "https://www.w3.org/TR/SVG2/text.html#TextDecorationFillProperty", "dfnText": "text-decoration-fill", "refSections": [{"refs": [{"id": "ref-for-TextDecorationFillProperty"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['b6029199'] = {"dfnID": "b6029199", "url": "https://www.w3.org/TR/SVG2/text.html#TextDecorationStrokeProperty", "dfnText": "text-decoration-stroke", "refSections": [{"refs": [{"id": "ref-for-TextDecorationStrokeProperty"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['bb72d539'] = {"dfnID": "bb72d539", "url": "https://svgwg.org/svg2-draft/painting.html#TextRenderingProperty", "dfnText": "text-rendering", "refSections": [{"refs": [{"id": "ref-for-TextRenderingProperty"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['d616644b'] = {"dfnID": "d616644b", "url": "https://svgwg.org/svg2-draft/text.html#elementdef-textPath", "dfnText": "textpath", "refSections": [{"refs": [{"id": "ref-for-elementdef-textPath"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['e6409866'] = {"dfnID": "e6409866", "url": "https://svgwg.org/svg2-draft/text.html#elementdef-tspan", "dfnText": "tspan", "refSections": [{"refs": [{"id": "ref-for-elementdef-tspan"}], "title": "8. Text"}], "external": true};
-window.dfnpanelData['f24162b9'] = {"dfnID": "f24162b9", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-use", "dfnText": "use", "refSections": [{"refs": [{"id": "ref-for-elementdef-use"}], "title": "6. Coordinate Systems, Transformations, and Units"}], "external": true};
-window.dfnpanelData['b0bdddb2'] = {"dfnID": "b0bdddb2", "url": "https://svgwg.org/svg2-draft/coords.html#VectorEffectProperty", "dfnText": "vector-effect", "refSections": [{"refs": [{"id": "ref-for-VectorEffectProperty"}], "title": "10. Painting: Filling, Stroking, and Marker Symbols"}], "external": true};
-window.dfnpanelData['a82a381d'] = {"dfnID": "a82a381d", "url": "https://svgwg.org/svg2-draft/linking.html#elementdef-view", "dfnText": "view", "refSections": [{"refs": [{"id": "ref-for-elementdef-view"}], "title": "13. Linking"}], "external": true};
-window.dfnpanelData['801118f1'] = {"dfnID": "801118f1", "url": "https://svgwg.org/svg2-draft/geometry.html#XProperty", "dfnText": "x", "refSections": [{"refs": [{"id": "ref-for-XProperty"}], "title": "5. Geometry Properties"}], "external": true};
-window.dfnpanelData['9987a023'] = {"dfnID": "9987a023", "url": "https://svgwg.org/svg2-draft/geometry.html#YProperty", "dfnText": "y", "refSections": [{"refs": [{"id": "ref-for-YProperty"}], "title": "5. Geometry Properties"}], "external": true};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -1928,328 +1413,838 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"00d808eb": {"dfnID":"00d808eb","dfnText":"font-feature-settings","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-font-feature-settings"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-fonts-4/#propdef-font-feature-settings"},
+"044536a2": {"dfnID":"044536a2","dfnText":"text-decoration-color","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-text-decoration-color"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration-color"},
+"078a8991": {"dfnID":"078a8991","dfnText":"shape-image-threshold","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-shape-image-threshold"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-shapes-1/#propdef-shape-image-threshold"},
+"09b0661c": {"dfnID":"09b0661c","dfnText":"text","external":true,"refSections":[{"refs":[{"id":"ref-for-elementdef-text"}],"title":"8. Text"}],"url":"https://svgwg.org/svg2-draft/text.html#elementdef-text"},
+"0a0ddd55": {"dfnID":"0a0ddd55","dfnText":"r","external":true,"refSections":[{"refs":[{"id":"ref-for-RProperty"}],"title":"5. Geometry Properties"}],"url":"https://svgwg.org/svg2-draft/geometry.html#RProperty"},
+"0c48b9b1": {"dfnID":"0c48b9b1","dfnText":"path","external":true,"refSections":[{"refs":[{"id":"ref-for-elementdef-path"}],"title":"6. Coordinate Systems, Transformations, and Units"},{"refs":[{"id":"ref-for-elementdef-path\u2460"}],"title":"7. Paths"}],"url":"https://svgwg.org/svg2-draft/paths.html#elementdef-path"},
+"0cf3964f": {"dfnID":"0cf3964f","dfnText":"script","external":true,"refSections":[{"refs":[{"id":"ref-for-script"}],"title":"12. Scripting and Interactivity"}],"url":"https://html.spec.whatwg.org/multipage/scripting.html#script"},
+"0f07310d": {"dfnID":"0f07310d","dfnText":"cx","external":true,"refSections":[{"refs":[{"id":"ref-for-CxProperty"}],"title":"5. Geometry Properties"}],"url":"https://svgwg.org/svg2-draft/geometry.html#CxProperty"},
+"0fffddd1": {"dfnID":"0fffddd1","dfnText":"inline-size","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-inline-size"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-logical-1/#propdef-inline-size"},
+"11a8832d": {"dfnID":"11a8832d","dfnText":"image","external":true,"refSections":[{"refs":[{"id":"ref-for-elementdef-image"}],"title":"3. Document Structure"},{"refs":[{"id":"ref-for-elementdef-image\u2460"},{"id":"ref-for-elementdef-image\u2461"}],"title":"6. Coordinate Systems, Transformations, and Units"}],"url":"https://svgwg.org/svg2-draft/embedded.html#elementdef-image"},
+"12f8fb07": {"dfnID":"12f8fb07","dfnText":"visibility","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-visibility"}],"title":"10. Painting: Filling, Stroking, and Marker Symbols"}],"url":"https://drafts.csswg.org/css-display-4/#propdef-visibility"},
+"1bebb82c": {"dfnID":"1bebb82c","dfnText":"font-kerning","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-font-kerning"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-fonts-4/#propdef-font-kerning"},
+"1c2f3cd4": {"dfnID":"1c2f3cd4","dfnText":"paint-order","external":true,"refSections":[{"refs":[{"id":"ref-for-PaintOrderProperty"}],"title":"10. Painting: Filling, Stroking, and Marker Symbols"}],"url":"https://svgwg.org/svg2-draft/painting.html#PaintOrderProperty"},
+"2316fa58": {"dfnID":"2316fa58","dfnText":"circle","external":true,"refSections":[{"refs":[{"id":"ref-for-elementdef-circle"}],"title":"6. Coordinate Systems, Transformations, and Units"}],"url":"https://svgwg.org/svg2-draft/shapes.html#elementdef-circle"},
+"2c57f900": {"dfnID":"2c57f900","dfnText":"font","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-font"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-fonts-4/#propdef-font"},
+"30b9c51d": {"dfnID":"30b9c51d","dfnText":"shape-inside","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-shape-inside"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-round-display-1/#propdef-shape-inside"},
+"34de5360": {"dfnID":"34de5360","dfnText":"will-change","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-will-change"}],"title":"10. Painting: Filling, Stroking, and Marker Symbols"}],"url":"https://drafts.csswg.org/css-will-change-1/#propdef-will-change"},
+"385326d7": {"dfnID":"385326d7","dfnText":"writing-mode","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-writing-mode"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#propdef-writing-mode"},
+"3bd4bbe9": {"dfnID":"3bd4bbe9","dfnText":"text-orientation","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-text-orientation"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#propdef-text-orientation"},
+"423406b4": {"dfnID":"423406b4","dfnText":"shape-subtract","external":true,"refSections":[{"refs":[{"id":"ref-for-ShapesubtractProperty"}],"title":"8. Text"}],"url":"https://svgwg.org/svg2-draft/text.html#ShapesubtractProperty"},
+"4299a926": {"dfnID":"4299a926","dfnText":"svg","external":true,"refSections":[{"refs":[{"id":"ref-for-elementdef-svg"},{"id":"ref-for-elementdef-svg\u2460"}],"title":"3. Document Structure"},{"refs":[{"id":"ref-for-elementdef-svg\u2461"},{"id":"ref-for-elementdef-svg\u2462"},{"id":"ref-for-elementdef-svg\u2463"}],"title":"6. Coordinate Systems, Transformations, and Units"}],"url":"https://svgwg.org/svg2-draft/struct.html#elementdef-svg"},
+"4356bfe3": {"dfnID":"4356bfe3","dfnText":"text-align","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-text-align"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-text-3/#propdef-text-align"},
+"44c5f27a": {"dfnID":"44c5f27a","dfnText":"metadata","external":true,"refSections":[{"refs":[{"id":"ref-for-elementdef-metadata"}],"title":"3. Document Structure"}],"url":"https://svgwg.org/svg2-draft/struct.html#elementdef-metadata"},
+"4985f121": {"dfnID":"4985f121","dfnText":"shape-padding","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-shape-padding"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-shapes-2/#propdef-shape-padding"},
+"4d7d3dcd": {"dfnID":"4d7d3dcd","dfnText":"initial","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-all-initial"}],"title":"4. Styling"}],"url":"https://drafts.csswg.org/css-cascade-5/#valdef-all-initial"},
+"4ed3d261": {"dfnID":"4ed3d261","dfnText":"ellipse","external":true,"refSections":[{"refs":[{"id":"ref-for-elementdef-ellipse"}],"title":"6. Coordinate Systems, Transformations, and Units"}],"url":"https://svgwg.org/svg2-draft/shapes.html#elementdef-ellipse"},
+"510cef3b": {"dfnID":"510cef3b","dfnText":"text-decoration-fill","external":true,"refSections":[{"refs":[{"id":"ref-for-TextDecorationFillProperty"}],"title":"8. Text"}],"url":"https://www.w3.org/TR/SVG2/text.html#TextDecorationFillProperty"},
+"511b3636": {"dfnID":"511b3636","dfnText":"foreignobject","external":true,"refSections":[{"refs":[{"id":"ref-for-elementdef-foreignObject"}],"title":"9. Embedded Content"}],"url":"https://svgwg.org/svg2-draft/embedded.html#elementdef-foreignObject"},
+"5671b56e": {"dfnID":"5671b56e","dfnText":"marker-mid","external":true,"refSections":[{"refs":[{"id":"ref-for-MarkerMidProperty"}],"title":"10. Painting: Filling, Stroking, and Marker Symbols"}],"url":"https://svgwg.org/svg2-draft/painting.html#MarkerMidProperty"},
+"584e9c31": {"dfnID":"584e9c31","dfnText":"calc()","external":true,"refSections":[{"refs":[{"id":"ref-for-funcdef-calc"}],"title":"4. Styling"}],"url":"https://drafts.csswg.org/css-values-4/#funcdef-calc"},
+"59d52fb7": {"dfnID":"59d52fb7","dfnText":"objectboundingbox","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-clippathunits-objectboundingbox"}],"title":"11. Gradients and Patterns"}],"url":"https://drafts.fxtf.org/css-masking-1/#valdef-clippathunits-objectboundingbox"},
+"5bc3d0ec": {"dfnID":"5bc3d0ec","dfnText":"text-decoration","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-text-decoration"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration"},
+"5bc8bd12": {"dfnID":"5bc8bd12","dfnText":"direction","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-direction"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-writing-modes-3/#propdef-direction"},
+"63488d6e": {"dfnID":"63488d6e","dfnText":"text-decoration-style","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-text-decoration-style"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration-style"},
+"64b89595": {"dfnID":"64b89595","dfnText":"meta","external":true,"refSections":[{"refs":[{"id":"ref-for-meta"}],"title":"3. Document Structure"}],"url":"https://html.spec.whatwg.org/multipage/semantics.html#meta"},
+"6501e5b3": {"dfnID":"6501e5b3","dfnText":"white-space","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-white-space"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-text-4/#propdef-white-space"},
+"653040a2": {"dfnID":"653040a2","dfnText":"symbol","external":true,"refSections":[{"refs":[{"id":"ref-for-elementdef-symbol"}],"title":"3. Document Structure"}],"url":"https://svgwg.org/svg2-draft/struct.html#elementdef-symbol"},
+"68019d7a": {"dfnID":"68019d7a","dfnText":"height","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-height"}],"title":"5. Geometry Properties"}],"url":"https://drafts.csswg.org/css-sizing-3/#propdef-height"},
+"68bf3d31": {"dfnID":"68bf3d31","dfnText":"a","external":true,"refSections":[{"refs":[{"id":"ref-for-the-a-element"}],"title":"13. Linking"}],"url":"https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-a-element"},
+"691fe546": {"dfnID":"691fe546","dfnText":"color-interpolation","external":true,"refSections":[{"refs":[{"id":"ref-for-ColorInterpolationProperty"}],"title":"10. Painting: Filling, Stroking, and Marker Symbols"}],"url":"https://svgwg.org/svg2-draft/painting.html#ColorInterpolationProperty"},
+"6a10a8b5": {"dfnID":"6a10a8b5","dfnText":"marker-start","external":true,"refSections":[{"refs":[{"id":"ref-for-MarkerStartProperty"}],"title":"10. Painting: Filling, Stroking, and Marker Symbols"}],"url":"https://svgwg.org/svg2-draft/painting.html#MarkerStartProperty"},
+"6b14b18a": {"dfnID":"6b14b18a","dfnText":"clip","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-clip"}],"title":"2. Rendering Model"}],"url":"https://drafts.fxtf.org/css-masking-1/#propdef-clip"},
+"6e51b40a": {"dfnID":"6e51b40a","dfnText":"auto","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-align-self-auto"}],"title":"2. Rendering Model"},{"refs":[{"id":"ref-for-valdef-align-self-auto\u2460"}],"title":"5. Geometry Properties"}],"url":"https://drafts.csswg.org/css-align-3/#valdef-align-self-auto"},
+"6e57cf97": {"dfnID":"6e57cf97","dfnText":"shape-margin","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-shape-margin"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-shapes-1/#propdef-shape-margin"},
+"73bc6606": {"dfnID":"73bc6606","dfnText":"pointer-events","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-pointer-events"}],"title":"12. Scripting and Interactivity"}],"url":"https://drafts.csswg.org/css-ui-4/#propdef-pointer-events"},
+"77f17203": {"dfnID":"77f17203","dfnText":"clip-path","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-clip-path"}],"title":"2. Rendering Model"}],"url":"https://drafts.fxtf.org/css-masking-1/#propdef-clip-path"},
+"79b35220": {"dfnID":"79b35220","dfnText":"g","external":true,"refSections":[{"refs":[{"id":"ref-for-elementdef-g"}],"title":"6. Coordinate Systems, Transformations, and Units"}],"url":"https://svgwg.org/svg2-draft/struct.html#elementdef-g"},
+"7b665bf7": {"dfnID":"7b665bf7","dfnText":"rx","external":true,"refSections":[{"refs":[{"id":"ref-for-RxProperty"}],"title":"5. Geometry Properties"}],"url":"https://svgwg.org/svg2-draft/geometry.html#RxProperty"},
+"801118f1": {"dfnID":"801118f1","dfnText":"x","external":true,"refSections":[{"refs":[{"id":"ref-for-XProperty"}],"title":"5. Geometry Properties"}],"url":"https://svgwg.org/svg2-draft/geometry.html#XProperty"},
+"807f9351": {"dfnID":"807f9351","dfnText":"env()","external":true,"refSections":[{"refs":[{"id":"ref-for-funcdef-env"}],"title":"4. Styling"}],"url":"https://drafts.csswg.org/css-env-1/#funcdef-env"},
+"82c8f3df": {"dfnID":"82c8f3df","dfnText":"text-align-last","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-text-align-last"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-text-4/#propdef-text-align-last"},
+"86928bde": {"dfnID":"86928bde","dfnText":"overflow","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-overflow"},{"id":"ref-for-propdef-overflow\u2460"}],"title":"2. Rendering Model"}],"url":"https://drafts.csswg.org/css-overflow-3/#propdef-overflow"},
+"8831f13c": {"dfnID":"8831f13c","dfnText":"text-indent","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-text-indent"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-text-4/#propdef-text-indent"},
+"88643fe0": {"dfnID":"88643fe0","dfnText":"width","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-width"}],"title":"5. Geometry Properties"}],"url":"https://drafts.csswg.org/css-sizing-3/#propdef-width"},
+"91dcc557": {"dfnID":"91dcc557","dfnText":"font","external":true,"refSections":[{"refs":[{"id":"ref-for-font"}],"title":"8. Text"}],"url":"https://html.spec.whatwg.org/multipage/obsolete.html#font"},
+"941d204d": {"dfnID":"941d204d","dfnText":"pt","external":true,"refSections":[{"refs":[{"id":"ref-for-pt"}],"title":"6. Coordinate Systems, Transformations, and Units"}],"url":"https://drafts.csswg.org/css-values-4/#pt"},
+"970c7ba6": {"dfnID":"970c7ba6","dfnText":"marker-end","external":true,"refSections":[{"refs":[{"id":"ref-for-MarkerEndProperty"}],"title":"10. Painting: Filling, Stroking, and Marker Symbols"}],"url":"https://svgwg.org/svg2-draft/painting.html#MarkerEndProperty"},
+"9987a023": {"dfnID":"9987a023","dfnText":"y","external":true,"refSections":[{"refs":[{"id":"ref-for-YProperty"}],"title":"5. Geometry Properties"}],"url":"https://svgwg.org/svg2-draft/geometry.html#YProperty"},
+"9cc7fe1b": {"dfnID":"9cc7fe1b","dfnText":"defs","external":true,"refSections":[{"refs":[{"id":"ref-for-elementdef-defs"}],"title":"6. Coordinate Systems, Transformations, and Units"}],"url":"https://svgwg.org/svg2-draft/struct.html#elementdef-defs"},
+"9ddea951": {"dfnID":"9ddea951","dfnText":"px","external":true,"refSections":[{"refs":[{"id":"ref-for-px"}],"title":"6. Coordinate Systems, Transformations, and Units"}],"url":"https://drafts.csswg.org/css-values-4/#px"},
+"9e004c39": {"dfnID":"9e004c39","dfnText":"unset","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-all-unset"}],"title":"4. Styling"}],"url":"https://drafts.csswg.org/css-cascade-5/#valdef-all-unset"},
+"9e1a434a": {"dfnID":"9e1a434a","dfnText":"in","external":true,"refSections":[{"refs":[{"id":"ref-for-in"}],"title":"6. Coordinate Systems, Transformations, and Units"}],"url":"https://drafts.csswg.org/css-values-4/#in"},
+"9e84e011": {"dfnID":"9e84e011","dfnText":"text-decoration-line","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-text-decoration-line"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration-line"},
+"a82a381d": {"dfnID":"a82a381d","dfnText":"view","external":true,"refSections":[{"refs":[{"id":"ref-for-elementdef-view"}],"title":"13. Linking"}],"url":"https://svgwg.org/svg2-draft/linking.html#elementdef-view"},
+"a8ac6f1b": {"dfnID":"a8ac6f1b","dfnText":"revert","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-all-revert"}],"title":"4. Styling"}],"url":"https://drafts.csswg.org/css-cascade-4/#valdef-all-revert"},
+"a8fe91d7": {"dfnID":"a8fe91d7","dfnText":"font-weight","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-font-weight"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-fonts-4/#propdef-font-weight"},
+"abbd4058": {"dfnID":"abbd4058","dfnText":"rect","external":true,"refSections":[{"refs":[{"id":"ref-for-elementdef-rect"}],"title":"6. Coordinate Systems, Transformations, and Units"}],"url":"https://svgwg.org/svg2-draft/shapes.html#elementdef-rect"},
+"abdfd54a": {"dfnID":"abdfd54a","dfnText":"pattern","external":true,"refSections":[{"refs":[{"id":"ref-for-elementdef-pattern"}],"title":"6. Coordinate Systems, Transformations, and Units"},{"refs":[{"id":"ref-for-elementdef-pattern\u2460"}],"title":"11. Gradients and Patterns"}],"url":"https://svgwg.org/svg2-draft/pservers.html#elementdef-pattern"},
+"ad1e8377": {"dfnID":"ad1e8377","dfnText":"text-overflow","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-text-overflow"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-overflow-4/#propdef-text-overflow"},
+"b0bdddb2": {"dfnID":"b0bdddb2","dfnText":"vector-effect","external":true,"refSections":[{"refs":[{"id":"ref-for-VectorEffectProperty"}],"title":"10. Painting: Filling, Stroking, and Marker Symbols"}],"url":"https://svgwg.org/svg2-draft/coords.html#VectorEffectProperty"},
+"b229503c": {"dfnID":"b229503c","dfnText":"marker","external":true,"refSections":[{"refs":[{"id":"ref-for-MarkerProperty"}],"title":"10. Painting: Filling, Stroking, and Marker Symbols"}],"url":"https://svgwg.org/svg2-draft/painting.html#MarkerProperty"},
+"b2356074": {"dfnID":"b2356074","dfnText":"word-spacing","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-word-spacing"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-text-4/#propdef-word-spacing"},
+"b6029199": {"dfnID":"b6029199","dfnText":"text-decoration-stroke","external":true,"refSections":[{"refs":[{"id":"ref-for-TextDecorationStrokeProperty"}],"title":"8. Text"}],"url":"https://www.w3.org/TR/SVG2/text.html#TextDecorationStrokeProperty"},
+"b9aaa547": {"dfnID":"b9aaa547","dfnText":"dominant-baseline","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-dominant-baseline"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-inline-3/#propdef-dominant-baseline"},
+"ba920583": {"dfnID":"ba920583","dfnText":"style","external":true,"refSections":[{"refs":[{"id":"ref-for-the-style-element"}],"title":"4. Styling"}],"url":"https://html.spec.whatwg.org/multipage/semantics.html#the-style-element"},
+"bb72d539": {"dfnID":"bb72d539","dfnText":"text-rendering","external":true,"refSections":[{"refs":[{"id":"ref-for-TextRenderingProperty"}],"title":"8. Text"}],"url":"https://svgwg.org/svg2-draft/painting.html#TextRenderingProperty"},
+"bf29f5ff": {"dfnID":"bf29f5ff","dfnText":"text-anchor","external":true,"refSections":[{"refs":[{"id":"ref-for-TextAnchorProperty"}],"title":"8. Text"}],"url":"https://svgwg.org/svg2-draft/text.html#TextAnchorProperty"},
+"c388d253": {"dfnID":"c388d253","dfnText":"inherit","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-all-inherit"}],"title":"4. Styling"}],"url":"https://drafts.csswg.org/css-cascade-5/#valdef-all-inherit"},
+"c400bde8": {"dfnID":"c400bde8","dfnText":"switch","external":true,"refSections":[{"refs":[{"id":"ref-for-elementdef-switch"}],"title":"3. Document Structure"}],"url":"https://svgwg.org/svg2-draft/struct.html#elementdef-switch"},
+"cacc0af2": {"dfnID":"cacc0af2","dfnText":"letter-spacing","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-letter-spacing"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-text-4/#propdef-letter-spacing"},
+"cad72d2f": {"dfnID":"cad72d2f","dfnText":"currentcolor","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-color-currentcolor"},{"id":"ref-for-valdef-color-currentcolor\u2460"}],"title":"10. Painting: Filling, Stroking, and Marker Symbols"}],"url":"https://drafts.csswg.org/css-color-4/#valdef-color-currentcolor"},
+"caf45308": {"dfnID":"caf45308","dfnText":"font-size-adjust","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-font-size-adjust"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-fonts-5/#propdef-font-size-adjust"},
+"cbae5084": {"dfnID":"cbae5084","dfnText":"cm","external":true,"refSections":[{"refs":[{"id":"ref-for-cm"}],"title":"6. Coordinate Systems, Transformations, and Units"}],"url":"https://drafts.csswg.org/css-values-4/#cm"},
+"d45afbab": {"dfnID":"d45afbab","dfnText":"font-style","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-font-style"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-fonts-4/#propdef-font-style"},
+"d616644b": {"dfnID":"d616644b","dfnText":"textpath","external":true,"refSections":[{"refs":[{"id":"ref-for-elementdef-textPath"}],"title":"8. Text"}],"url":"https://svgwg.org/svg2-draft/text.html#elementdef-textPath"},
+"d65d17df": {"dfnID":"d65d17df","dfnText":"font-family","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-font-family"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-fonts-4/#propdef-font-family"},
+"d95397a7": {"dfnID":"d95397a7","dfnText":"all","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-all"}],"title":"4. Styling"}],"url":"https://drafts.csswg.org/css-cascade-5/#propdef-all"},
+"dbba942a": {"dfnID":"dbba942a","dfnText":"var()","external":true,"refSections":[{"refs":[{"id":"ref-for-funcdef-var"}],"title":"4. Styling"}],"url":"https://drafts.csswg.org/css-variables-2/#funcdef-var"},
+"dfd78ca3": {"dfnID":"dfd78ca3","dfnText":"cy","external":true,"refSections":[{"refs":[{"id":"ref-for-CyProperty"}],"title":"5. Geometry Properties"}],"url":"https://svgwg.org/svg2-draft/geometry.html#CyProperty"},
+"e0b6ed58": {"dfnID":"e0b6ed58","dfnText":"vertical-align","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-vertical-align"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-inline-3/#propdef-vertical-align"},
+"e2e08d07": {"dfnID":"e2e08d07","dfnText":"transform","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-transform"}],"title":"6. Coordinate Systems, Transformations, and Units"}],"url":"https://drafts.csswg.org/css-transforms-1/#propdef-transform"},
+"e453a13a": {"dfnID":"e453a13a","dfnText":"alignment-baseline","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-alignment-baseline"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-inline-3/#propdef-alignment-baseline"},
+"e6409866": {"dfnID":"e6409866","dfnText":"tspan","external":true,"refSections":[{"refs":[{"id":"ref-for-elementdef-tspan"}],"title":"8. Text"}],"url":"https://svgwg.org/svg2-draft/text.html#elementdef-tspan"},
+"e7cd6f5a": {"dfnID":"e7cd6f5a","dfnText":"font-stretch","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-font-stretch"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-fonts-4/#propdef-font-stretch"},
+"e7f0dd6c": {"dfnID":"e7f0dd6c","dfnText":"display","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-display"}],"title":"10. Painting: Filling, Stroking, and Marker Symbols"}],"url":"https://drafts.csswg.org/css-display-4/#propdef-display"},
+"eb5ae40f": {"dfnID":"eb5ae40f","dfnText":"userspaceonuse","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-clippathunits-userspaceonuse"}],"title":"11. Gradients and Patterns"}],"url":"https://drafts.fxtf.org/css-masking-1/#valdef-clippathunits-userspaceonuse"},
+"eb76a058": {"dfnID":"eb76a058","dfnText":"baseline-shift","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-baseline-shift"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-inline-3/#propdef-baseline-shift"},
+"f00710cb": {"dfnID":"f00710cb","dfnText":"clippath","external":true,"refSections":[{"refs":[{"id":"ref-for-elementdef-clippath"},{"id":"ref-for-elementdef-clippath\u2460"}],"title":"2. Rendering Model"},{"refs":[{"id":"ref-for-elementdef-clippath\u2461"}],"title":"6. Coordinate Systems, Transformations, and Units"}],"url":"https://drafts.fxtf.org/css-masking-1/#elementdef-clippath"},
+"f054c76d": {"dfnID":"f054c76d","dfnText":"mm","external":true,"refSections":[{"refs":[{"id":"ref-for-mm"}],"title":"6. Coordinate Systems, Transformations, and Units"}],"url":"https://drafts.csswg.org/css-values-4/#mm"},
+"f0811ff8": {"dfnID":"f0811ff8","dfnText":"img","external":true,"refSections":[{"refs":[{"id":"ref-for-the-img-element"}],"title":"1.2. Basics"}],"url":"https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element"},
+"f24162b9": {"dfnID":"f24162b9","dfnText":"use","external":true,"refSections":[{"refs":[{"id":"ref-for-elementdef-use"}],"title":"6. Coordinate Systems, Transformations, and Units"}],"url":"https://svgwg.org/svg2-draft/struct.html#elementdef-use"},
+"f47d48ea": {"dfnID":"f47d48ea","dfnText":"scroll","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-background-attachment-scroll"},{"id":"ref-for-valdef-background-attachment-scroll\u2460"}],"title":"2. Rendering Model"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#valdef-background-attachment-scroll"},
+"f52f83f2": {"dfnID":"f52f83f2","dfnText":"pc","external":true,"refSections":[{"refs":[{"id":"ref-for-pc"}],"title":"6. Coordinate Systems, Transformations, and Units"}],"url":"https://drafts.csswg.org/css-values-4/#pc"},
+"f861d7f6": {"dfnID":"f861d7f6","dfnText":"line","external":true,"refSections":[{"refs":[{"id":"ref-for-elementdef-line"}],"title":"6. Coordinate Systems, Transformations, and Units"}],"url":"https://svgwg.org/svg2-draft/shapes.html#elementdef-line"},
+"fb7153bd": {"dfnID":"fb7153bd","dfnText":"font-variant","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-font-variant"},{"id":"ref-for-propdef-font-variant\u2460"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-fonts-4/#propdef-font-variant"},
+"fc8d4e6c": {"dfnID":"fc8d4e6c","dfnText":"ry","external":true,"refSections":[{"refs":[{"id":"ref-for-RyProperty"}],"title":"5. Geometry Properties"}],"url":"https://svgwg.org/svg2-draft/geometry.html#RyProperty"},
+"fcbf3baa": {"dfnID":"fcbf3baa","dfnText":"glyph-orientation-vertical","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-glyph-orientation-vertical"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#propdef-glyph-orientation-vertical"},
+"fdf6efd5": {"dfnID":"fdf6efd5","dfnText":"font-size","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-font-size"}],"title":"8. Text"}],"url":"https://drafts.csswg.org/css-fonts-4/#propdef-font-size"},
+"fe8a389a": {"dfnID":"fe8a389a","dfnText":"polygon","external":true,"refSections":[{"refs":[{"id":"ref-for-elementdef-polygon"}],"title":"6. Coordinate Systems, Transformations, and Units"}],"url":"https://svgwg.org/svg2-draft/shapes.html#elementdef-polygon"},
+"ff5047e4": {"dfnID":"ff5047e4","dfnText":"polyline","external":true,"refSections":[{"refs":[{"id":"ref-for-elementdef-polyline"}],"title":"6. Coordinate Systems, Transformations, and Units"}],"url":"https://svgwg.org/svg2-draft/shapes.html#elementdef-polyline"},
+};
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+});
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        dfn.panelData = panelData;
+        insertDfnPopupAction(dfn);
+    }
+}
+
+function genDfnPanel(dfn, { dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel on",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel({dfnPanel});
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.dfn = dfn;
+    dfn.dfnPanel = dfnPanel;
+    return dfnPanel;
+}
+
+
+
+function hideAllDfnPanels() {
+    // Delete the currently-active dfn panel.
+    queryAll(".dfn-panel").forEach(dfnPanel=>hideDfnPanel({dfnPanel}));
+}
+
+function showDfnPanel(dfn) {
+    hideAllDfnPanels(); // Only display one at a time.
+
+    dfn.setAttribute("aria-expanded", "true");
+
+    const dfnPanel = genDfnPanel(dfn, dfn.panelData);
+
+    // Give the dfn a unique tabindex, and then
+    // give all the tabbable panel bits successive indexes.
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+
+    append(document.body, dfnPanel);
+    positionDfnPanel(dfnPanel);
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.dfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }
+}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel({dfn, dfnPanel}) {
+    if(!dfnPanel) dfnPanel = dfn.dfnPanel;
+    if(!dfn) dfn = dfnPanel.dfn;
+    dfn.dfnPanel = undefined;
+    dfnPanel.dfn = undefined;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.remove()
+}
+
+function toggleDfnPanel(dfn) {
+    if(dfn.dfnPanel) {
+        hideDfnPanel(dfn);
+    } else {
+        showDfnPanel(dfn);
+    }
+}
+
+function insertDfnPopupAction(dfn) {
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        toggleDfnPanel(dfn);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+function needsFor(type) {
+    switch(type) {
+        case "descriptor":
+        case "value":
+        case "element-attr":
+        case "attr-value":
+        case "element-state":
+        case "method":
+        case "constructor":
+        case "argument":
+        case "attribute":
+        case "const":
+        case "dict-member":
+        case "event":
+        case "enum-value":
+        case "stringifier":
+        case "serializer":
+        case "iterator":
+        case "maplike":
+        case "setlike":
+        case "state":
+        case "mode":
+        case "context":
+        case "facet": return true;
+
+        default: return false;
+    }
+}
+function refusesFor(type) {
+    switch(type) {
+        case "property":
+        case "element":
+        case "interface":
+        case "namespace":
+        case "callback":
+        case "dictionary":
+        case "enum":
+        case "exception":
+        case "typedef":
+        case "http-header":
+        case "permission": return true;
+
+        default: return false;
+    }
+}
+function linkFormatterFromType(type) {
+    switch(type) {
+        case 'scheme':
+        case 'permission':
+        case 'dfn': return (text) => `[=${text}=]`;
+
+        case 'abstract-op': return (text) => `[\$${text}\$]`;
+
+        case 'function':
+        case 'at-rule':
+        case 'selector':
+        case 'value': return (text) => `''${text}''`;
+
+        case 'http-header': return (text) => `[:${text}:]`;
+
+        case 'interface':
+        case 'constructor':
+        case 'method':
+        case 'argument':
+        case 'attribute':
+        case 'callback':
+        case 'dictionary':
+        case 'dict-member':
+        case 'enum':
+        case 'enum-value':
+        case 'exception':
+        case 'const':
+        case 'typedef':
+        case 'stringifier':
+        case 'serializer':
+        case 'iterator':
+        case 'maplike':
+        case 'setlike':
+        case 'extended-attribute':
+        case 'event':
+        case 'idl': return (text) => `{{${text}}}`;
+
+        case 'element-state':
+        case 'element-attr':
+        case 'attr-value':
+        case 'element': return (element) => `<{${element}}>`;
+
+        case 'grammar': return (text) => `${text} (within a <pre class=prod>)`;
+
+        case 'type': return (text)=> `<<${text}>>`;
+
+        case 'descriptor':
+        case 'property': return (text) => `'${text}'`;
+
+        default: return;
+    };
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!needsFor(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!refusesFor(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
 }
 </script>
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
-                mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
+let refsData = {
+"https://drafts.csswg.org/css-align-3/#valdef-align-self-auto": {"export":true,"for_":["align-self"],"level":"3","normative":true,"shortname":"css-align","spec":"css-align-3","status":"current","text":"auto","type":"value","url":"https://drafts.csswg.org/css-align-3/#valdef-align-self-auto"},
+"https://drafts.csswg.org/css-backgrounds-3/#valdef-background-attachment-scroll": {"export":true,"for_":["background-attachment"],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"current","text":"scroll","type":"value","url":"https://drafts.csswg.org/css-backgrounds-3/#valdef-background-attachment-scroll"},
+"https://drafts.csswg.org/css-cascade-4/#valdef-all-revert": {"export":true,"for_":["all"],"level":"4","normative":true,"shortname":"css-cascade","spec":"css-cascade-4","status":"current","text":"revert","type":"value","url":"https://drafts.csswg.org/css-cascade-4/#valdef-all-revert"},
+"https://drafts.csswg.org/css-cascade-5/#propdef-all": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-cascade","spec":"css-cascade-5","status":"current","text":"all","type":"property","url":"https://drafts.csswg.org/css-cascade-5/#propdef-all"},
+"https://drafts.csswg.org/css-cascade-5/#valdef-all-inherit": {"export":true,"for_":["all"],"level":"5","normative":true,"shortname":"css-cascade","spec":"css-cascade-5","status":"current","text":"inherit","type":"value","url":"https://drafts.csswg.org/css-cascade-5/#valdef-all-inherit"},
+"https://drafts.csswg.org/css-cascade-5/#valdef-all-initial": {"export":true,"for_":["all"],"level":"5","normative":true,"shortname":"css-cascade","spec":"css-cascade-5","status":"current","text":"initial","type":"value","url":"https://drafts.csswg.org/css-cascade-5/#valdef-all-initial"},
+"https://drafts.csswg.org/css-cascade-5/#valdef-all-unset": {"export":true,"for_":["all"],"level":"5","normative":true,"shortname":"css-cascade","spec":"css-cascade-5","status":"current","text":"unset","type":"value","url":"https://drafts.csswg.org/css-cascade-5/#valdef-all-unset"},
+"https://drafts.csswg.org/css-color-4/#valdef-color-currentcolor": {"export":true,"for_":["<color>"],"level":"4","normative":true,"shortname":"css-color","spec":"css-color-4","status":"current","text":"currentcolor","type":"value","url":"https://drafts.csswg.org/css-color-4/#valdef-color-currentcolor"},
+"https://drafts.csswg.org/css-display-4/#propdef-display": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"display","type":"property","url":"https://drafts.csswg.org/css-display-4/#propdef-display"},
+"https://drafts.csswg.org/css-display-4/#propdef-visibility": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"visibility","type":"property","url":"https://drafts.csswg.org/css-display-4/#propdef-visibility"},
+"https://drafts.csswg.org/css-env-1/#funcdef-env": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-env","spec":"css-env-1","status":"current","text":"env()","type":"function","url":"https://drafts.csswg.org/css-env-1/#funcdef-env"},
+"https://drafts.csswg.org/css-fonts-4/#propdef-font": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-fonts","spec":"css-fonts-4","status":"current","text":"font","type":"property","url":"https://drafts.csswg.org/css-fonts-4/#propdef-font"},
+"https://drafts.csswg.org/css-fonts-4/#propdef-font-family": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-fonts","spec":"css-fonts-4","status":"current","text":"font-family","type":"property","url":"https://drafts.csswg.org/css-fonts-4/#propdef-font-family"},
+"https://drafts.csswg.org/css-fonts-4/#propdef-font-feature-settings": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-fonts","spec":"css-fonts-4","status":"current","text":"font-feature-settings","type":"property","url":"https://drafts.csswg.org/css-fonts-4/#propdef-font-feature-settings"},
+"https://drafts.csswg.org/css-fonts-4/#propdef-font-kerning": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-fonts","spec":"css-fonts-4","status":"current","text":"font-kerning","type":"property","url":"https://drafts.csswg.org/css-fonts-4/#propdef-font-kerning"},
+"https://drafts.csswg.org/css-fonts-4/#propdef-font-size": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-fonts","spec":"css-fonts-4","status":"current","text":"font-size","type":"property","url":"https://drafts.csswg.org/css-fonts-4/#propdef-font-size"},
+"https://drafts.csswg.org/css-fonts-4/#propdef-font-stretch": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-fonts","spec":"css-fonts-4","status":"current","text":"font-stretch","type":"property","url":"https://drafts.csswg.org/css-fonts-4/#propdef-font-stretch"},
+"https://drafts.csswg.org/css-fonts-4/#propdef-font-style": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-fonts","spec":"css-fonts-4","status":"current","text":"font-style","type":"property","url":"https://drafts.csswg.org/css-fonts-4/#propdef-font-style"},
+"https://drafts.csswg.org/css-fonts-4/#propdef-font-variant": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-fonts","spec":"css-fonts-4","status":"current","text":"font-variant","type":"property","url":"https://drafts.csswg.org/css-fonts-4/#propdef-font-variant"},
+"https://drafts.csswg.org/css-fonts-4/#propdef-font-weight": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-fonts","spec":"css-fonts-4","status":"current","text":"font-weight","type":"property","url":"https://drafts.csswg.org/css-fonts-4/#propdef-font-weight"},
+"https://drafts.csswg.org/css-fonts-5/#propdef-font-size-adjust": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-fonts","spec":"css-fonts-5","status":"current","text":"font-size-adjust","type":"property","url":"https://drafts.csswg.org/css-fonts-5/#propdef-font-size-adjust"},
+"https://drafts.csswg.org/css-inline-3/#propdef-alignment-baseline": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-inline","spec":"css-inline-3","status":"current","text":"alignment-baseline","type":"property","url":"https://drafts.csswg.org/css-inline-3/#propdef-alignment-baseline"},
+"https://drafts.csswg.org/css-inline-3/#propdef-baseline-shift": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-inline","spec":"css-inline-3","status":"current","text":"baseline-shift","type":"property","url":"https://drafts.csswg.org/css-inline-3/#propdef-baseline-shift"},
+"https://drafts.csswg.org/css-inline-3/#propdef-dominant-baseline": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-inline","spec":"css-inline-3","status":"current","text":"dominant-baseline","type":"property","url":"https://drafts.csswg.org/css-inline-3/#propdef-dominant-baseline"},
+"https://drafts.csswg.org/css-inline-3/#propdef-vertical-align": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-inline","spec":"css-inline-3","status":"current","text":"vertical-align","type":"property","url":"https://drafts.csswg.org/css-inline-3/#propdef-vertical-align"},
+"https://drafts.csswg.org/css-logical-1/#propdef-inline-size": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-logical","spec":"css-logical-1","status":"current","text":"inline-size","type":"property","url":"https://drafts.csswg.org/css-logical-1/#propdef-inline-size"},
+"https://drafts.csswg.org/css-overflow-3/#propdef-overflow": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-overflow","spec":"css-overflow-3","status":"current","text":"overflow","type":"property","url":"https://drafts.csswg.org/css-overflow-3/#propdef-overflow"},
+"https://drafts.csswg.org/css-overflow-4/#propdef-text-overflow": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-overflow","spec":"css-overflow-4","status":"current","text":"text-overflow","type":"property","url":"https://drafts.csswg.org/css-overflow-4/#propdef-text-overflow"},
+"https://drafts.csswg.org/css-round-display-1/#propdef-shape-inside": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-round-display","spec":"css-round-display-1","status":"current","text":"shape-inside","type":"property","url":"https://drafts.csswg.org/css-round-display-1/#propdef-shape-inside"},
+"https://drafts.csswg.org/css-shapes-1/#propdef-shape-image-threshold": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-shapes","spec":"css-shapes-1","status":"current","text":"shape-image-threshold","type":"property","url":"https://drafts.csswg.org/css-shapes-1/#propdef-shape-image-threshold"},
+"https://drafts.csswg.org/css-shapes-1/#propdef-shape-margin": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-shapes","spec":"css-shapes-1","status":"current","text":"shape-margin","type":"property","url":"https://drafts.csswg.org/css-shapes-1/#propdef-shape-margin"},
+"https://drafts.csswg.org/css-shapes-2/#propdef-shape-padding": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-shapes","spec":"css-shapes-2","status":"current","text":"shape-padding","type":"property","url":"https://drafts.csswg.org/css-shapes-2/#propdef-shape-padding"},
+"https://drafts.csswg.org/css-sizing-3/#propdef-height": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-sizing","spec":"css-sizing-3","status":"current","text":"height","type":"property","url":"https://drafts.csswg.org/css-sizing-3/#propdef-height"},
+"https://drafts.csswg.org/css-sizing-3/#propdef-width": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-sizing","spec":"css-sizing-3","status":"current","text":"width","type":"property","url":"https://drafts.csswg.org/css-sizing-3/#propdef-width"},
+"https://drafts.csswg.org/css-text-3/#propdef-text-align": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-text","spec":"css-text-3","status":"current","text":"text-align","type":"property","url":"https://drafts.csswg.org/css-text-3/#propdef-text-align"},
+"https://drafts.csswg.org/css-text-4/#propdef-letter-spacing": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-text","spec":"css-text-4","status":"current","text":"letter-spacing","type":"property","url":"https://drafts.csswg.org/css-text-4/#propdef-letter-spacing"},
+"https://drafts.csswg.org/css-text-4/#propdef-text-align-last": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-text","spec":"css-text-4","status":"current","text":"text-align-last","type":"property","url":"https://drafts.csswg.org/css-text-4/#propdef-text-align-last"},
+"https://drafts.csswg.org/css-text-4/#propdef-text-indent": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-text","spec":"css-text-4","status":"current","text":"text-indent","type":"property","url":"https://drafts.csswg.org/css-text-4/#propdef-text-indent"},
+"https://drafts.csswg.org/css-text-4/#propdef-white-space": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-text","spec":"css-text-4","status":"current","text":"white-space","type":"property","url":"https://drafts.csswg.org/css-text-4/#propdef-white-space"},
+"https://drafts.csswg.org/css-text-4/#propdef-word-spacing": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-text","spec":"css-text-4","status":"current","text":"word-spacing","type":"property","url":"https://drafts.csswg.org/css-text-4/#propdef-word-spacing"},
+"https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-text-decor","spec":"css-text-decor-4","status":"current","text":"text-decoration","type":"property","url":"https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration"},
+"https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration-color": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-text-decor","spec":"css-text-decor-4","status":"current","text":"text-decoration-color","type":"property","url":"https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration-color"},
+"https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration-line": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-text-decor","spec":"css-text-decor-4","status":"current","text":"text-decoration-line","type":"property","url":"https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration-line"},
+"https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration-style": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-text-decor","spec":"css-text-decor-4","status":"current","text":"text-decoration-style","type":"property","url":"https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration-style"},
+"https://drafts.csswg.org/css-transforms-1/#propdef-transform": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-transforms","spec":"css-transforms-1","status":"current","text":"transform","type":"property","url":"https://drafts.csswg.org/css-transforms-1/#propdef-transform"},
+"https://drafts.csswg.org/css-ui-4/#propdef-pointer-events": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-ui","spec":"css-ui-4","status":"current","text":"pointer-events","type":"property","url":"https://drafts.csswg.org/css-ui-4/#propdef-pointer-events"},
+"https://drafts.csswg.org/css-values-4/#cm": {"export":true,"for_":["<length>"],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"cm","type":"value","url":"https://drafts.csswg.org/css-values-4/#cm"},
+"https://drafts.csswg.org/css-values-4/#funcdef-calc": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"calc()","type":"function","url":"https://drafts.csswg.org/css-values-4/#funcdef-calc"},
+"https://drafts.csswg.org/css-values-4/#in": {"export":true,"for_":["<length>"],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"in","type":"value","url":"https://drafts.csswg.org/css-values-4/#in"},
+"https://drafts.csswg.org/css-values-4/#mm": {"export":true,"for_":["<length>"],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"mm","type":"value","url":"https://drafts.csswg.org/css-values-4/#mm"},
+"https://drafts.csswg.org/css-values-4/#pc": {"export":true,"for_":["<length>"],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"pc","type":"value","url":"https://drafts.csswg.org/css-values-4/#pc"},
+"https://drafts.csswg.org/css-values-4/#pt": {"export":true,"for_":["<length>"],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"pt","type":"value","url":"https://drafts.csswg.org/css-values-4/#pt"},
+"https://drafts.csswg.org/css-values-4/#px": {"export":true,"for_":["<length>"],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"px","type":"value","url":"https://drafts.csswg.org/css-values-4/#px"},
+"https://drafts.csswg.org/css-variables-2/#funcdef-var": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-variables","spec":"css-variables-2","status":"current","text":"var()","type":"function","url":"https://drafts.csswg.org/css-variables-2/#funcdef-var"},
+"https://drafts.csswg.org/css-will-change-1/#propdef-will-change": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-will-change","spec":"css-will-change-1","status":"current","text":"will-change","type":"property","url":"https://drafts.csswg.org/css-will-change-1/#propdef-will-change"},
+"https://drafts.csswg.org/css-writing-modes-3/#propdef-direction": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-3","status":"current","text":"direction","type":"property","url":"https://drafts.csswg.org/css-writing-modes-3/#propdef-direction"},
+"https://drafts.csswg.org/css-writing-modes-4/#propdef-glyph-orientation-vertical": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"glyph-orientation-vertical","type":"property","url":"https://drafts.csswg.org/css-writing-modes-4/#propdef-glyph-orientation-vertical"},
+"https://drafts.csswg.org/css-writing-modes-4/#propdef-text-orientation": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"text-orientation","type":"property","url":"https://drafts.csswg.org/css-writing-modes-4/#propdef-text-orientation"},
+"https://drafts.csswg.org/css-writing-modes-4/#propdef-writing-mode": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"writing-mode","type":"property","url":"https://drafts.csswg.org/css-writing-modes-4/#propdef-writing-mode"},
+"https://drafts.fxtf.org/css-masking-1/#elementdef-clippath": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-masking","spec":"css-masking-1","status":"current","text":"clippath","type":"element","url":"https://drafts.fxtf.org/css-masking-1/#elementdef-clippath"},
+"https://drafts.fxtf.org/css-masking-1/#propdef-clip": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-masking","spec":"css-masking-1","status":"current","text":"clip","type":"property","url":"https://drafts.fxtf.org/css-masking-1/#propdef-clip"},
+"https://drafts.fxtf.org/css-masking-1/#propdef-clip-path": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-masking","spec":"css-masking-1","status":"current","text":"clip-path","type":"property","url":"https://drafts.fxtf.org/css-masking-1/#propdef-clip-path"},
+"https://drafts.fxtf.org/css-masking-1/#valdef-clippathunits-objectboundingbox": {"export":true,"for_":["clipPathUnits"],"level":"1","normative":true,"shortname":"css-masking","spec":"css-masking-1","status":"current","text":"objectboundingbox","type":"value","url":"https://drafts.fxtf.org/css-masking-1/#valdef-clippathunits-objectboundingbox"},
+"https://drafts.fxtf.org/css-masking-1/#valdef-clippathunits-userspaceonuse": {"export":true,"for_":["clipPathUnits"],"level":"1","normative":true,"shortname":"css-masking","spec":"css-masking-1","status":"current","text":"userspaceonuse","type":"value","url":"https://drafts.fxtf.org/css-masking-1/#valdef-clippathunits-userspaceonuse"},
+"https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"img","type":"element","url":"https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element"},
+"https://html.spec.whatwg.org/multipage/obsolete.html#font": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"font","type":"element","url":"https://html.spec.whatwg.org/multipage/obsolete.html#font"},
+"https://html.spec.whatwg.org/multipage/scripting.html#script": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"script","type":"element","url":"https://html.spec.whatwg.org/multipage/scripting.html#script"},
+"https://html.spec.whatwg.org/multipage/semantics.html#meta": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"meta","type":"element","url":"https://html.spec.whatwg.org/multipage/semantics.html#meta"},
+"https://html.spec.whatwg.org/multipage/semantics.html#the-style-element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"style","type":"element","url":"https://html.spec.whatwg.org/multipage/semantics.html#the-style-element"},
+"https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-a-element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"a","type":"element","url":"https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-a-element"},
+"https://svgwg.org/svg2-draft/coords.html#VectorEffectProperty": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"vector-effect","type":"property","url":"https://svgwg.org/svg2-draft/coords.html#VectorEffectProperty"},
+"https://svgwg.org/svg2-draft/embedded.html#elementdef-foreignObject": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"foreignobject","type":"element","url":"https://svgwg.org/svg2-draft/embedded.html#elementdef-foreignObject"},
+"https://svgwg.org/svg2-draft/embedded.html#elementdef-image": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"image","type":"element","url":"https://svgwg.org/svg2-draft/embedded.html#elementdef-image"},
+"https://svgwg.org/svg2-draft/geometry.html#CxProperty": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"cx","type":"property","url":"https://svgwg.org/svg2-draft/geometry.html#CxProperty"},
+"https://svgwg.org/svg2-draft/geometry.html#CyProperty": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"cy","type":"property","url":"https://svgwg.org/svg2-draft/geometry.html#CyProperty"},
+"https://svgwg.org/svg2-draft/geometry.html#RProperty": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"r","type":"property","url":"https://svgwg.org/svg2-draft/geometry.html#RProperty"},
+"https://svgwg.org/svg2-draft/geometry.html#RxProperty": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"rx","type":"property","url":"https://svgwg.org/svg2-draft/geometry.html#RxProperty"},
+"https://svgwg.org/svg2-draft/geometry.html#RyProperty": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"ry","type":"property","url":"https://svgwg.org/svg2-draft/geometry.html#RyProperty"},
+"https://svgwg.org/svg2-draft/geometry.html#XProperty": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"x","type":"property","url":"https://svgwg.org/svg2-draft/geometry.html#XProperty"},
+"https://svgwg.org/svg2-draft/geometry.html#YProperty": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"y","type":"property","url":"https://svgwg.org/svg2-draft/geometry.html#YProperty"},
+"https://svgwg.org/svg2-draft/linking.html#elementdef-view": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"view","type":"element","url":"https://svgwg.org/svg2-draft/linking.html#elementdef-view"},
+"https://svgwg.org/svg2-draft/painting.html#ColorInterpolationProperty": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"color-interpolation","type":"property","url":"https://svgwg.org/svg2-draft/painting.html#ColorInterpolationProperty"},
+"https://svgwg.org/svg2-draft/painting.html#MarkerEndProperty": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"marker-end","type":"property","url":"https://svgwg.org/svg2-draft/painting.html#MarkerEndProperty"},
+"https://svgwg.org/svg2-draft/painting.html#MarkerMidProperty": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"marker-mid","type":"property","url":"https://svgwg.org/svg2-draft/painting.html#MarkerMidProperty"},
+"https://svgwg.org/svg2-draft/painting.html#MarkerProperty": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"marker","type":"property","url":"https://svgwg.org/svg2-draft/painting.html#MarkerProperty"},
+"https://svgwg.org/svg2-draft/painting.html#MarkerStartProperty": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"marker-start","type":"property","url":"https://svgwg.org/svg2-draft/painting.html#MarkerStartProperty"},
+"https://svgwg.org/svg2-draft/painting.html#PaintOrderProperty": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"paint-order","type":"property","url":"https://svgwg.org/svg2-draft/painting.html#PaintOrderProperty"},
+"https://svgwg.org/svg2-draft/painting.html#TextRenderingProperty": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"text-rendering","type":"property","url":"https://svgwg.org/svg2-draft/painting.html#TextRenderingProperty"},
+"https://svgwg.org/svg2-draft/painting.html#elementdef-marker": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"marker","type":"element","url":"https://svgwg.org/svg2-draft/painting.html#elementdef-marker"},
+"https://svgwg.org/svg2-draft/paths.html#elementdef-path": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"path","type":"element","url":"https://svgwg.org/svg2-draft/paths.html#elementdef-path"},
+"https://svgwg.org/svg2-draft/pservers.html#elementdef-pattern": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"pattern","type":"element","url":"https://svgwg.org/svg2-draft/pservers.html#elementdef-pattern"},
+"https://svgwg.org/svg2-draft/shapes.html#elementdef-circle": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"circle","type":"element","url":"https://svgwg.org/svg2-draft/shapes.html#elementdef-circle"},
+"https://svgwg.org/svg2-draft/shapes.html#elementdef-ellipse": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"ellipse","type":"element","url":"https://svgwg.org/svg2-draft/shapes.html#elementdef-ellipse"},
+"https://svgwg.org/svg2-draft/shapes.html#elementdef-line": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"line","type":"element","url":"https://svgwg.org/svg2-draft/shapes.html#elementdef-line"},
+"https://svgwg.org/svg2-draft/shapes.html#elementdef-polygon": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"polygon","type":"element","url":"https://svgwg.org/svg2-draft/shapes.html#elementdef-polygon"},
+"https://svgwg.org/svg2-draft/shapes.html#elementdef-polyline": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"polyline","type":"element","url":"https://svgwg.org/svg2-draft/shapes.html#elementdef-polyline"},
+"https://svgwg.org/svg2-draft/shapes.html#elementdef-rect": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"rect","type":"element","url":"https://svgwg.org/svg2-draft/shapes.html#elementdef-rect"},
+"https://svgwg.org/svg2-draft/struct.html#elementdef-defs": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"defs","type":"element","url":"https://svgwg.org/svg2-draft/struct.html#elementdef-defs"},
+"https://svgwg.org/svg2-draft/struct.html#elementdef-g": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"g","type":"element","url":"https://svgwg.org/svg2-draft/struct.html#elementdef-g"},
+"https://svgwg.org/svg2-draft/struct.html#elementdef-metadata": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"metadata","type":"element","url":"https://svgwg.org/svg2-draft/struct.html#elementdef-metadata"},
+"https://svgwg.org/svg2-draft/struct.html#elementdef-svg": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"svg","type":"element","url":"https://svgwg.org/svg2-draft/struct.html#elementdef-svg"},
+"https://svgwg.org/svg2-draft/struct.html#elementdef-switch": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"switch","type":"element","url":"https://svgwg.org/svg2-draft/struct.html#elementdef-switch"},
+"https://svgwg.org/svg2-draft/struct.html#elementdef-symbol": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"symbol","type":"element","url":"https://svgwg.org/svg2-draft/struct.html#elementdef-symbol"},
+"https://svgwg.org/svg2-draft/struct.html#elementdef-use": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"use","type":"element","url":"https://svgwg.org/svg2-draft/struct.html#elementdef-use"},
+"https://svgwg.org/svg2-draft/text.html#ShapesubtractProperty": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"shape-subtract","type":"property","url":"https://svgwg.org/svg2-draft/text.html#ShapesubtractProperty"},
+"https://svgwg.org/svg2-draft/text.html#TextAnchorProperty": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"text-anchor","type":"property","url":"https://svgwg.org/svg2-draft/text.html#TextAnchorProperty"},
+"https://svgwg.org/svg2-draft/text.html#elementdef-text": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"text","type":"element","url":"https://svgwg.org/svg2-draft/text.html#elementdef-text"},
+"https://svgwg.org/svg2-draft/text.html#elementdef-textPath": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"textpath","type":"element","url":"https://svgwg.org/svg2-draft/text.html#elementdef-textPath"},
+"https://svgwg.org/svg2-draft/text.html#elementdef-tspan": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"tspan","type":"element","url":"https://svgwg.org/svg2-draft/text.html#elementdef-tspan"},
+"https://www.w3.org/TR/SVG2/text.html#TextDecorationFillProperty": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"snapshot","text":"text-decoration-fill","type":"property","url":"https://www.w3.org/TR/SVG2/text.html#TextDecorationFillProperty"},
+"https://www.w3.org/TR/SVG2/text.html#TextDecorationStrokeProperty": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"snapshot","text":"text-decoration-stroke","type":"property","url":"https://www.w3.org/TR/SVG2/text.html#TextDecorationStrokeProperty"},
+};
+
+function mkRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "Term: "),
+                mk.span({}, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    let forListElements;
+    if(forList.length == 0) {
+        forListElements = [];
+    } else if(forList.length == 1) {
+        forListElements = mk.li({},
+            mk.b({}, "For: "),
+            mk.span({}, forList[0]),
+        );
+    } else {
+        forListElements = mk.li({},
             mk.b({}, "For: "),
             mk.ul({},
                 ...forList.map(forItem =>
                     mk.li({},
-                        mk.span({}, `${forItem}`)
+                        mk.span({}, forItem)
                     ),
                 ),
             ),
         );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+    }
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    setupRefHintEventListeners(link, hintPanel);
+    return hintPanel;
+}
+
+function hideAllRefHints() {
+    queryAll(".ref-hint").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    if(refHint.teardownEventListeners) {
+        refHint.teardownEventListeners();
     }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+    refHint.remove();
+}
+
+function showRefHint(link) {
+    if(link.classList.contains("dfn-link")) return;
+    const url = link.getAttribute("href");
+    const ref = refsData[url];
+    if(!ref) return;
+
+    hideAllRefHints(); // Only display one at this time.
+
+    const refHint = mkRefHint(link, ref);
+    append(document.body, refHint);
+    link.setAttribute("aria-expanded", "true");
+    positionRefHint(refHint);
+}
+
+function setupRefHintEventListeners(link, refHint) {
+    if (refHint.teardownEventListeners) return;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
+
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
-
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
-    }
-
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
-        }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
-
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
-    }
-
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+document.addEventListener("DOMContentLoaded", () => {
+    document.body.addEventListener("mouseover", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
+    });
+    document.body.addEventListener("focus", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
     });
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element'] = {"text": "img", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.fxtf.org/css-masking-1/#propdef-clip'] = {"text": "clip", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/css-masking-1/#propdef-clip", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#valdef-background-attachment-scroll'] = {"text": "scroll", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#valdef-background-attachment-scroll", "export": true, "normative": true, "for_": ["background-attachment"]};
-window.refsData['https://drafts.csswg.org/css-overflow-3/#propdef-overflow'] = {"text": "overflow", "type": "property", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#propdef-overflow", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.fxtf.org/css-masking-1/#propdef-clip-path'] = {"text": "clip-path", "type": "property", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/css-masking-1/#propdef-clip-path", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.fxtf.org/css-masking-1/#elementdef-clippath'] = {"text": "clippath", "type": "element", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/css-masking-1/#elementdef-clippath", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-align-3/#valdef-align-self-auto'] = {"text": "auto", "type": "value", "spec": "css-align-3", "shortname": "css-align", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-align-3/#valdef-align-self-auto", "export": true, "normative": true, "for_": ["align-self"]};
-window.refsData['https://svgwg.org/svg2-draft/struct.html#elementdef-svg'] = {"text": "svg", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-svg", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/struct.html#elementdef-switch'] = {"text": "switch", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-switch", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/semantics.html#meta'] = {"text": "meta", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/semantics.html#meta", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/struct.html#elementdef-metadata'] = {"text": "metadata", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-metadata", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/embedded.html#elementdef-image'] = {"text": "image", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/embedded.html#elementdef-image", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/struct.html#elementdef-symbol'] = {"text": "symbol", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-symbol", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/semantics.html#the-style-element'] = {"text": "style", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/semantics.html#the-style-element", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#funcdef-calc'] = {"text": "calc()", "type": "function", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#funcdef-calc", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-env-1/#funcdef-env'] = {"text": "env()", "type": "function", "spec": "css-env-1", "shortname": "css-env", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-env-1/#funcdef-env", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-variables-2/#funcdef-var'] = {"text": "var()", "type": "function", "spec": "css-variables-2", "shortname": "css-variables", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-variables-2/#funcdef-var", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-cascade-5/#propdef-all'] = {"text": "all", "type": "property", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#propdef-all", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-cascade-5/#valdef-all-initial'] = {"text": "initial", "type": "value", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#valdef-all-initial", "export": true, "normative": true, "for_": ["all"]};
-window.refsData['https://drafts.csswg.org/css-cascade-5/#valdef-all-inherit'] = {"text": "inherit", "type": "value", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#valdef-all-inherit", "export": true, "normative": true, "for_": ["all"]};
-window.refsData['https://drafts.csswg.org/css-cascade-5/#valdef-all-unset'] = {"text": "unset", "type": "value", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#valdef-all-unset", "export": true, "normative": true, "for_": ["all"]};
-window.refsData['https://drafts.csswg.org/css-cascade-4/#valdef-all-revert'] = {"text": "revert", "type": "value", "spec": "css-cascade-4", "shortname": "css-cascade", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-cascade-4/#valdef-all-revert", "export": true, "normative": true, "for_": ["all"]};
-window.refsData['https://svgwg.org/svg2-draft/geometry.html#CxProperty'] = {"text": "cx", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/geometry.html#CxProperty", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/geometry.html#CyProperty'] = {"text": "cy", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/geometry.html#CyProperty", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/geometry.html#RProperty'] = {"text": "r", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/geometry.html#RProperty", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/geometry.html#RxProperty'] = {"text": "rx", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/geometry.html#RxProperty", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/geometry.html#RyProperty'] = {"text": "ry", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/geometry.html#RyProperty", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/geometry.html#XProperty'] = {"text": "x", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/geometry.html#XProperty", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/geometry.html#YProperty'] = {"text": "y", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/geometry.html#YProperty", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-sizing-3/#propdef-width'] = {"text": "width", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-width", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-sizing-3/#propdef-height'] = {"text": "height", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-height", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#px'] = {"text": "px", "type": "value", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#px", "export": true, "normative": true, "for_": ["<length>"]};
-window.refsData['https://drafts.csswg.org/css-values-4/#pt'] = {"text": "pt", "type": "value", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#pt", "export": true, "normative": true, "for_": ["<length>"]};
-window.refsData['https://drafts.csswg.org/css-values-4/#pc'] = {"text": "pc", "type": "value", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#pc", "export": true, "normative": true, "for_": ["<length>"]};
-window.refsData['https://drafts.csswg.org/css-values-4/#mm'] = {"text": "mm", "type": "value", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mm", "export": true, "normative": true, "for_": ["<length>"]};
-window.refsData['https://drafts.csswg.org/css-values-4/#cm'] = {"text": "cm", "type": "value", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#cm", "export": true, "normative": true, "for_": ["<length>"]};
-window.refsData['https://drafts.csswg.org/css-values-4/#in'] = {"text": "in", "type": "value", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#in", "export": true, "normative": true, "for_": ["<length>"]};
-window.refsData['https://drafts.csswg.org/css-transforms-1/#propdef-transform'] = {"text": "transform", "type": "property", "spec": "css-transforms-1", "shortname": "css-transforms", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transforms-1/#propdef-transform", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/struct.html#elementdef-g'] = {"text": "g", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-g", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/struct.html#elementdef-defs'] = {"text": "defs", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-defs", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/struct.html#elementdef-use'] = {"text": "use", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-use", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/paths.html#elementdef-path'] = {"text": "path", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/paths.html#elementdef-path", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/shapes.html#elementdef-rect'] = {"text": "rect", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/shapes.html#elementdef-rect", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/shapes.html#elementdef-circle'] = {"text": "circle", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/shapes.html#elementdef-circle", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/shapes.html#elementdef-ellipse'] = {"text": "ellipse", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/shapes.html#elementdef-ellipse", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/shapes.html#elementdef-line'] = {"text": "line", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/shapes.html#elementdef-line", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/shapes.html#elementdef-polyline'] = {"text": "polyline", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/shapes.html#elementdef-polyline", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/shapes.html#elementdef-polygon'] = {"text": "polygon", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/shapes.html#elementdef-polygon", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/pservers.html#elementdef-pattern'] = {"text": "pattern", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/pservers.html#elementdef-pattern", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/text.html#elementdef-text'] = {"text": "text", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/text.html#elementdef-text", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/text.html#elementdef-tspan'] = {"text": "tspan", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/text.html#elementdef-tspan", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/text.html#elementdef-textPath'] = {"text": "textpath", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/text.html#elementdef-textPath", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/obsolete.html#font'] = {"text": "font", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/obsolete.html#font", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-logical-1/#propdef-inline-size'] = {"text": "inline-size", "type": "property", "spec": "css-logical-1", "shortname": "css-logical", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-logical-1/#propdef-inline-size", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-round-display-1/#propdef-shape-inside'] = {"text": "shape-inside", "type": "property", "spec": "css-round-display-1", "shortname": "css-round-display", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-round-display-1/#propdef-shape-inside", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/text.html#ShapesubtractProperty'] = {"text": "shape-subtract", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/text.html#ShapesubtractProperty", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-shapes-1/#propdef-shape-image-threshold'] = {"text": "shape-image-threshold", "type": "property", "spec": "css-shapes-1", "shortname": "css-shapes", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-shapes-1/#propdef-shape-image-threshold", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-shapes-1/#propdef-shape-margin'] = {"text": "shape-margin", "type": "property", "spec": "css-shapes-1", "shortname": "css-shapes", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-shapes-1/#propdef-shape-margin", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-shapes-2/#propdef-shape-padding'] = {"text": "shape-padding", "type": "property", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-shapes-2/#propdef-shape-padding", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/text.html#TextAnchorProperty'] = {"text": "text-anchor", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/text.html#TextAnchorProperty", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#propdef-glyph-orientation-vertical'] = {"text": "glyph-orientation-vertical", "type": "property", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#propdef-glyph-orientation-vertical", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-overflow-4/#propdef-text-overflow'] = {"text": "text-overflow", "type": "property", "spec": "css-overflow-4", "shortname": "css-overflow", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-overflow-4/#propdef-text-overflow", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/SVG2/text.html#TextDecorationFillProperty'] = {"text": "text-decoration-fill", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "snapshot", "url": "https://www.w3.org/TR/SVG2/text.html#TextDecorationFillProperty", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/SVG2/text.html#TextDecorationStrokeProperty'] = {"text": "text-decoration-stroke", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "snapshot", "url": "https://www.w3.org/TR/SVG2/text.html#TextDecorationStrokeProperty", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-text-4/#propdef-letter-spacing'] = {"text": "letter-spacing", "type": "property", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#propdef-letter-spacing", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-text-3/#propdef-text-align'] = {"text": "text-align", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-text-3/#propdef-text-align", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-text-4/#propdef-text-align-last'] = {"text": "text-align-last", "type": "property", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#propdef-text-align-last", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-text-4/#propdef-text-indent'] = {"text": "text-indent", "type": "property", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#propdef-text-indent", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-text-4/#propdef-word-spacing'] = {"text": "word-spacing", "type": "property", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#propdef-word-spacing", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-text-4/#propdef-white-space'] = {"text": "white-space", "type": "property", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#propdef-white-space", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-inline-3/#propdef-vertical-align'] = {"text": "vertical-align", "type": "property", "spec": "css-inline-3", "shortname": "css-inline", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-inline-3/#propdef-vertical-align", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-inline-3/#propdef-dominant-baseline'] = {"text": "dominant-baseline", "type": "property", "spec": "css-inline-3", "shortname": "css-inline", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-inline-3/#propdef-dominant-baseline", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-inline-3/#propdef-alignment-baseline'] = {"text": "alignment-baseline", "type": "property", "spec": "css-inline-3", "shortname": "css-inline", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-inline-3/#propdef-alignment-baseline", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-inline-3/#propdef-baseline-shift'] = {"text": "baseline-shift", "type": "property", "spec": "css-inline-3", "shortname": "css-inline", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-inline-3/#propdef-baseline-shift", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-3/#propdef-direction'] = {"text": "direction", "type": "property", "spec": "css-writing-modes-3", "shortname": "css-writing-modes", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-3/#propdef-direction", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#propdef-text-orientation'] = {"text": "text-orientation", "type": "property", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#propdef-text-orientation", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#propdef-writing-mode'] = {"text": "writing-mode", "type": "property", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#propdef-writing-mode", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font'] = {"text": "font", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font-family'] = {"text": "font-family", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-family", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font-feature-settings'] = {"text": "font-feature-settings", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-feature-settings", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font-kerning'] = {"text": "font-kerning", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-kerning", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font-size'] = {"text": "font-size", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-size", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-fonts-5/#propdef-font-size-adjust'] = {"text": "font-size-adjust", "type": "property", "spec": "css-fonts-5", "shortname": "css-fonts", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-fonts-5/#propdef-font-size-adjust", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font-stretch'] = {"text": "font-stretch", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-stretch", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font-style'] = {"text": "font-style", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-style", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font-variant'] = {"text": "font-variant", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-variant", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font-weight'] = {"text": "font-weight", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-weight", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration'] = {"text": "text-decoration", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration-line'] = {"text": "text-decoration-line", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration-line", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration-style'] = {"text": "text-decoration-style", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration-style", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration-color'] = {"text": "text-decoration-color", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration-color", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/painting.html#TextRenderingProperty'] = {"text": "text-rendering", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/painting.html#TextRenderingProperty", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/embedded.html#elementdef-foreignObject'] = {"text": "foreignobject", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/embedded.html#elementdef-foreignObject", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#propdef-display'] = {"text": "display", "type": "property", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#propdef-display", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#propdef-visibility'] = {"text": "visibility", "type": "property", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#propdef-visibility", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/painting.html#elementdef-marker'] = {"text": "marker", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/painting.html#elementdef-marker", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/painting.html#MarkerProperty'] = {"text": "marker", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/painting.html#MarkerProperty", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/painting.html#MarkerStartProperty'] = {"text": "marker-start", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/painting.html#MarkerStartProperty", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/painting.html#MarkerMidProperty'] = {"text": "marker-mid", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/painting.html#MarkerMidProperty", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/painting.html#MarkerEndProperty'] = {"text": "marker-end", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/painting.html#MarkerEndProperty", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-color-4/#valdef-color-currentcolor'] = {"text": "currentcolor", "type": "value", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-color-4/#valdef-color-currentcolor", "export": true, "normative": true, "for_": ["<color>"]};
-window.refsData['https://svgwg.org/svg2-draft/coords.html#VectorEffectProperty'] = {"text": "vector-effect", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/coords.html#VectorEffectProperty", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/painting.html#PaintOrderProperty'] = {"text": "paint-order", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/painting.html#PaintOrderProperty", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/painting.html#ColorInterpolationProperty'] = {"text": "color-interpolation", "type": "property", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/painting.html#ColorInterpolationProperty", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-will-change-1/#propdef-will-change'] = {"text": "will-change", "type": "property", "spec": "css-will-change-1", "shortname": "css-will-change", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-will-change-1/#propdef-will-change", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.fxtf.org/css-masking-1/#valdef-clippathunits-userspaceonuse'] = {"text": "userspaceonuse", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/css-masking-1/#valdef-clippathunits-userspaceonuse", "export": true, "normative": true, "for_": ["clipPathUnits"]};
-window.refsData['https://drafts.fxtf.org/css-masking-1/#valdef-clippathunits-objectboundingbox'] = {"text": "objectboundingbox", "type": "value", "spec": "css-masking-1", "shortname": "css-masking", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/css-masking-1/#valdef-clippathunits-objectboundingbox", "export": true, "normative": true, "for_": ["clipPathUnits"]};
-window.refsData['https://drafts.csswg.org/css-ui-4/#propdef-pointer-events'] = {"text": "pointer-events", "type": "property", "spec": "css-ui-4", "shortname": "css-ui", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-ui-4/#propdef-pointer-events", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/scripting.html#script'] = {"text": "script", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/scripting.html#script", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-a-element'] = {"text": "a", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-a-element", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/linking.html#elementdef-view'] = {"text": "view", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/linking.html#elementdef-view", "export": true, "normative": true, "for_": []};
 </script>

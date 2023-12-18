@@ -79,7 +79,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -705,7 +704,7 @@ a[href].issue-return {
 }
 
 .ref-hint {
-    display: none;
+    display: inline-block;
     position: absolute;
     z-index: 35;
     width: 20em;
@@ -721,16 +720,11 @@ a[href].issue-return {
     white-space: normal; /* in case it's moved into a pre */
 }
 
-.ref-hint.on {
-    display: inline-block;
-}
-
 .ref-hint * { margin: 0; padding: 0; text-indent: 0; }
 
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -790,7 +784,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -847,7 +840,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -2017,457 +2009,8 @@ svg|foreignObject { forced-color-adjust: auto; }
     </div>
    </div>
   </details>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['11fb4d5b'] = {"dfnID": "11fb4d5b", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background-color", "dfnText": "background-color", "refSections": [{"refs": [{"id": "ref-for-propdef-background-color"}, {"id": "ref-for-propdef-background-color\u2460"}, {"id": "ref-for-propdef-background-color\u2461"}], "title": "3.1. Properties Affected by Forced Colors Mode"}], "external": true};
-window.dfnpanelData['f831c141'] = {"dfnID": "f831c141", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background-image", "dfnText": "background-image", "refSections": [{"refs": [{"id": "ref-for-propdef-background-image"}], "title": "3.1. Properties Affected by Forced Colors Mode"}], "external": true};
-window.dfnpanelData['73759fff'] = {"dfnID": "73759fff", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-color", "dfnText": "border-color", "refSections": [{"refs": [{"id": "ref-for-propdef-border-color"}], "title": "3.1. Properties Affected by Forced Colors Mode"}], "external": true};
-window.dfnpanelData['6916104d'] = {"dfnID": "6916104d", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-box-shadow", "dfnText": "box-shadow", "refSections": [{"refs": [{"id": "ref-for-propdef-box-shadow"}], "title": "3.1. Properties Affected by Forced Colors Mode"}], "external": true};
-window.dfnpanelData['7b70d28c'] = {"dfnID": "7b70d28c", "url": "https://drafts.csswg.org/css-backgrounds-3/#valdef-background-image-none", "dfnText": "none (for background-image)", "refSections": [{"refs": [{"id": "ref-for-valdef-background-image-none"}], "title": "3.1. Properties Affected by Forced Colors Mode"}], "external": true};
-window.dfnpanelData['c15300b0'] = {"dfnID": "c15300b0", "url": "https://drafts.csswg.org/css-backgrounds-3/#box-shadow-none", "dfnText": "none (for box-shadow)", "refSections": [{"refs": [{"id": "ref-for-box-shadow-none"}], "title": "3.1. Properties Affected by Forced Colors Mode"}], "external": true};
-window.dfnpanelData['a8ac6f1b'] = {"dfnID": "a8ac6f1b", "url": "https://drafts.csswg.org/css-cascade-4/#valdef-all-revert", "dfnText": "revert", "refSections": [{"refs": [{"id": "ref-for-valdef-all-revert"}, {"id": "ref-for-valdef-all-revert\u2460"}], "title": "7. Changes"}], "external": true};
-window.dfnpanelData['029830f0'] = {"dfnID": "029830f0", "url": "https://drafts.csswg.org/css-cascade-5/#cascade-origin-author", "dfnText": "author style sheet", "refSections": [{"refs": [{"id": "ref-for-cascade-origin-author"}], "title": "3.1. Properties Affected by Forced Colors Mode"}], "external": true};
-window.dfnpanelData['9cd25054'] = {"dfnID": "9cd25054", "url": "https://drafts.csswg.org/css-cascade-5/#computed-value", "dfnText": "computed value", "refSections": [{"refs": [{"id": "ref-for-computed-value"}], "title": "3.1. Properties Affected by Forced Colors Mode"}, {"refs": [{"id": "ref-for-computed-value\u2460"}], "title": "7. Changes"}], "external": true};
-window.dfnpanelData['a4eb3c57'] = {"dfnID": "a4eb3c57", "url": "https://drafts.csswg.org/css-cascade-5/#used-value", "dfnText": "used value", "refSections": [{"refs": [{"id": "ref-for-used-value"}], "title": "7. Changes"}], "external": true};
-window.dfnpanelData['02c921d1'] = {"dfnID": "02c921d1", "url": "https://drafts.csswg.org/css-color-4/#typedef-system-color", "dfnText": "<system-color>", "refSections": [{"refs": [{"id": "ref-for-typedef-system-color"}], "title": "2. Preferred Color Schemes"}, {"refs": [{"id": "ref-for-typedef-system-color\u2460"}, {"id": "ref-for-typedef-system-color\u2461"}], "title": "2.1. Opting Into a Preferred Color Scheme: the color-scheme property"}], "external": true};
-window.dfnpanelData['adf0c1da'] = {"dfnID": "adf0c1da", "url": "https://drafts.csswg.org/css-color-4/#valdef-system-color-canvas", "dfnText": "canvas", "refSections": [{"refs": [{"id": "ref-for-valdef-system-color-canvas"}], "title": "2.2. Effects of the Used Color Scheme"}, {"refs": [{"id": "ref-for-valdef-system-color-canvas\u2460"}], "title": "3. Forced Color Schemes"}, {"refs": [{"id": "ref-for-valdef-system-color-canvas\u2461"}], "title": "3.1. Properties Affected by Forced Colors Mode"}], "external": true};
-window.dfnpanelData['7589f2be'] = {"dfnID": "7589f2be", "url": "https://drafts.csswg.org/css-color-4/#valdef-system-color-canvastext", "dfnText": "canvastext", "refSections": [{"refs": [{"id": "ref-for-valdef-system-color-canvastext"}], "title": "3.1. Properties Affected by Forced Colors Mode"}], "external": true};
-window.dfnpanelData['73ea1d43'] = {"dfnID": "73ea1d43", "url": "https://drafts.csswg.org/css-color-4/#propdef-color", "dfnText": "color", "refSections": [{"refs": [{"id": "ref-for-propdef-color"}], "title": "2.2. Effects of the Used Color Scheme"}, {"refs": [{"id": "ref-for-propdef-color\u2460"}, {"id": "ref-for-propdef-color\u2461"}], "title": "3.1. Properties Affected by Forced Colors Mode"}], "external": true};
-window.dfnpanelData['ee7998a4'] = {"dfnID": "ee7998a4", "url": "https://drafts.csswg.org/css-color-4/#system-color-pairings", "dfnText": "system color pairings", "refSections": [{"refs": [{"id": "ref-for-system-color-pairings"}], "title": "3.1. Properties Affected by Forced Colors Mode"}], "external": true};
-window.dfnpanelData['03eee7b4'] = {"dfnID": "03eee7b4", "url": "https://drafts.csswg.org/css-color-5/#funcdef-color", "dfnText": "color()", "refSections": [{"refs": [{"id": "ref-for-funcdef-color"}], "title": "3.1. Properties Affected by Forced Colors Mode"}], "external": true};
-window.dfnpanelData['5f1b7f60'] = {"dfnID": "5f1b7f60", "url": "https://drafts.csswg.org/css-conditional-3/#at-ruledef-media", "dfnText": "@media", "refSections": [{"refs": [{"id": "ref-for-at-ruledef-media"}], "title": "2.1. Opting Into a Preferred Color Scheme: the color-scheme property"}], "external": true};
-window.dfnpanelData['44edcab1'] = {"dfnID": "44edcab1", "url": "https://drafts.csswg.org/css-multicol-1/#propdef-column-rule-color", "dfnText": "column-rule-color", "refSections": [{"refs": [{"id": "ref-for-propdef-column-rule-color"}], "title": "3.1. Properties Affected by Forced Colors Mode"}], "external": true};
-window.dfnpanelData['8bcc6e67'] = {"dfnID": "8bcc6e67", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-selection", "dfnText": "::selection", "refSections": [{"refs": [{"id": "ref-for-selectordef-selection"}], "title": "3. Forced Color Schemes"}], "external": true};
-window.dfnpanelData['4e4ba8b4'] = {"dfnID": "4e4ba8b4", "url": "https://drafts.csswg.org/css-scrollbars-1/#propdef-scrollbar-color", "dfnText": "scrollbar-color", "refSections": [{"refs": [{"id": "ref-for-propdef-scrollbar-color"}], "title": "3.1. Properties Affected by Forced Colors Mode"}], "external": true};
-window.dfnpanelData['044536a2'] = {"dfnID": "044536a2", "url": "https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration-color", "dfnText": "text-decoration-color", "refSections": [{"refs": [{"id": "ref-for-propdef-text-decoration-color"}], "title": "3.1. Properties Affected by Forced Colors Mode"}], "external": true};
-window.dfnpanelData['8025f703'] = {"dfnID": "8025f703", "url": "https://drafts.csswg.org/css-text-decor-4/#propdef-text-emphasis-color", "dfnText": "text-emphasis-color", "refSections": [{"refs": [{"id": "ref-for-propdef-text-emphasis-color"}], "title": "3.1. Properties Affected by Forced Colors Mode"}], "external": true};
-window.dfnpanelData['f338a9f0'] = {"dfnID": "f338a9f0", "url": "https://drafts.csswg.org/css-text-decor-4/#propdef-text-shadow", "dfnText": "text-shadow", "refSections": [{"refs": [{"id": "ref-for-propdef-text-shadow"}], "title": "3.1. Properties Affected by Forced Colors Mode"}], "external": true};
-window.dfnpanelData['1ee7f091'] = {"dfnID": "1ee7f091", "url": "https://drafts.csswg.org/css-ui-4/#propdef-outline-color", "dfnText": "outline-color", "refSections": [{"refs": [{"id": "ref-for-propdef-outline-color"}], "title": "3.1. Properties Affected by Forced Colors Mode"}], "external": true};
-window.dfnpanelData['bedd9d42'] = {"dfnID": "bedd9d42", "url": "https://drafts.csswg.org/css-values-4/#mult-one-plus", "dfnText": "+", "refSections": [{"refs": [{"id": "ref-for-mult-one-plus"}], "title": "2.1. Opting Into a Preferred Color Scheme: the color-scheme property"}], "external": true};
-window.dfnpanelData['e274345c'] = {"dfnID": "e274345c", "url": "https://drafts.csswg.org/css-values-4/#identifier-value", "dfnText": "<custom-ident>", "refSections": [{"refs": [{"id": "ref-for-identifier-value"}, {"id": "ref-for-identifier-value\u2460"}, {"id": "ref-for-identifier-value\u2461"}, {"id": "ref-for-identifier-value\u2462"}, {"id": "ref-for-identifier-value\u2463"}, {"id": "ref-for-identifier-value\u2464"}], "title": "2.1. Opting Into a Preferred Color Scheme: the color-scheme property"}], "external": true};
-window.dfnpanelData['358fd6ff'] = {"dfnID": "358fd6ff", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "dfnText": "css-wide keywords", "refSections": [{"refs": [{"id": "ref-for-css-wide-keywords"}], "title": "1.1. Value Definitions"}], "external": true};
-window.dfnpanelData['5a2f7ea1'] = {"dfnID": "5a2f7ea1", "url": "https://drafts.csswg.org/css-values-4/#funcdef-url", "dfnText": "url()", "refSections": [{"refs": [{"id": "ref-for-funcdef-url"}], "title": "3.1. Properties Affected by Forced Colors Mode"}], "external": true};
-window.dfnpanelData['6ec67710'] = {"dfnID": "6ec67710", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "dfnText": "|", "refSections": [{"refs": [{"id": "ref-for-comb-one"}, {"id": "ref-for-comb-one\u2460"}, {"id": "ref-for-comb-one\u2461"}], "title": "2.1. Opting Into a Preferred Color Scheme: the color-scheme property"}, {"refs": [{"id": "ref-for-comb-one\u2462"}], "title": "3.2. Opting Out of a Forced Color Scheme: the forced-color-adjust property"}, {"refs": [{"id": "ref-for-comb-one\u2463"}], "title": "4. Performance-based Color Adjustments: the color-adjust property"}], "external": true};
-window.dfnpanelData['890a8358'] = {"dfnID": "890a8358", "url": "https://drafts.fxtf.org/fill-stroke-3/#propdef-fill", "dfnText": "fill", "refSections": [{"refs": [{"id": "ref-for-propdef-fill"}], "title": "3.1. Properties Affected by Forced Colors Mode"}], "external": true};
-window.dfnpanelData['de9e224f'] = {"dfnID": "de9e224f", "url": "https://drafts.fxtf.org/fill-stroke-3/#propdef-stroke", "dfnText": "stroke", "refSections": [{"refs": [{"id": "ref-for-propdef-stroke"}], "title": "3.1. Properties Affected by Forced Colors Mode"}], "external": true};
-window.dfnpanelData['87fcd40c'] = {"dfnID": "87fcd40c", "url": "https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element", "dfnText": "iframe", "refSections": [{"refs": [{"id": "ref-for-the-iframe-element"}], "title": "2.2. Effects of the Used Color Scheme"}, {"refs": [{"id": "ref-for-the-iframe-element\u2460"}], "title": "5. Privacy and Security Considerations"}, {"refs": [{"id": "ref-for-the-iframe-element\u2461"}, {"id": "ref-for-the-iframe-element\u2462"}], "title": "7. Changes"}], "external": true};
-window.dfnpanelData['f0811ff8'] = {"dfnID": "f0811ff8", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element", "dfnText": "img", "refSections": [{"refs": [{"id": "ref-for-the-img-element"}], "title": "2.2. Effects of the Used Color Scheme"}], "external": true};
-window.dfnpanelData['64b89595'] = {"dfnID": "64b89595", "url": "https://html.spec.whatwg.org/multipage/semantics.html#meta", "dfnText": "meta", "refSections": [{"refs": [{"id": "ref-for-meta"}], "title": "2.1. Opting Into a Preferred Color Scheme: the color-scheme property"}, {"refs": [{"id": "ref-for-meta\u2460"}], "title": "7. Changes"}], "external": true};
-window.dfnpanelData['02808af8'] = {"dfnID": "02808af8", "url": "https://drafts.csswg.org/mediaqueries-5/#descdef-media-forced-colors", "dfnText": "forced-colors", "refSections": [{"refs": [{"id": "ref-for-descdef-media-forced-colors"}], "title": "3. Forced Color Schemes"}], "external": true};
-window.dfnpanelData['bd3d9ccd'] = {"dfnID": "bd3d9ccd", "url": "https://drafts.csswg.org/mediaqueries-5/#media-query", "dfnText": "media query", "refSections": [{"refs": [{"id": "ref-for-media-query"}], "title": "1. Introduction"}], "external": true};
-window.dfnpanelData['488ae577'] = {"dfnID": "488ae577", "url": "https://drafts.csswg.org/mediaqueries-5/#descdef-media-prefers-color-scheme", "dfnText": "prefers-color-scheme", "refSections": [{"refs": [{"id": "ref-for-descdef-media-prefers-color-scheme"}, {"id": "ref-for-descdef-media-prefers-color-scheme\u2460"}], "title": "2. Preferred Color Schemes"}, {"refs": [{"id": "ref-for-descdef-media-prefers-color-scheme\u2461"}], "title": "3. Forced Color Schemes"}], "external": true};
-window.dfnpanelData['preferred-color-scheme'] = {"dfnID": "preferred-color-scheme", "url": "#preferred-color-scheme", "dfnText": "preferred color scheme", "refSections": [{"refs": [{"id": "ref-for-preferred-color-scheme"}, {"id": "ref-for-preferred-color-scheme\u2460"}], "title": "2. Preferred Color Schemes"}, {"refs": [{"id": "ref-for-preferred-color-scheme\u2461"}], "title": "2.1. Opting Into a Preferred Color Scheme: the color-scheme property"}], "external": false};
-window.dfnpanelData['color-scheme'] = {"dfnID": "color-scheme", "url": "#color-scheme", "dfnText": "color scheme", "refSections": [{"refs": [{"id": "ref-for-color-scheme"}, {"id": "ref-for-color-scheme\u2460"}], "title": "1. Introduction"}, {"refs": [{"id": "ref-for-color-scheme\u2461"}, {"id": "ref-for-color-scheme\u2462"}, {"id": "ref-for-color-scheme\u2463"}, {"id": "ref-for-color-scheme\u2464"}, {"id": "ref-for-color-scheme\u2465"}], "title": "2. Preferred Color Schemes"}, {"refs": [{"id": "ref-for-color-scheme\u2466"}, {"id": "ref-for-color-scheme\u2467"}, {"id": "ref-for-color-scheme\u2468"}, {"id": "ref-for-color-scheme\u2460\u24ea"}, {"id": "ref-for-color-scheme\u2460\u2460"}, {"id": "ref-for-color-scheme\u2460\u2461"}, {"id": "ref-for-color-scheme\u2460\u2462"}, {"id": "ref-for-color-scheme\u2460\u2463"}, {"id": "ref-for-color-scheme\u2460\u2464"}], "title": "2.1. Opting Into a Preferred Color Scheme: the color-scheme property"}, {"refs": [{"id": "ref-for-color-scheme\u2460\u2465"}], "title": "2.2. Effects of the Used Color Scheme"}, {"refs": [{"id": "ref-for-color-scheme\u2460\u2466"}], "title": "5. Privacy and Security Considerations"}], "external": false};
-window.dfnpanelData['light-color-scheme'] = {"dfnID": "light-color-scheme", "url": "#light-color-scheme", "dfnText": "light color scheme", "refSections": [{"refs": [{"id": "ref-for-light-color-scheme"}], "title": "2. Preferred Color Schemes"}, {"refs": [{"id": "ref-for-light-color-scheme\u2460"}, {"id": "ref-for-light-color-scheme\u2461"}, {"id": "ref-for-light-color-scheme\u2462"}], "title": "2.1. Opting Into a Preferred Color Scheme: the color-scheme property"}], "external": false};
-window.dfnpanelData['dark-color-scheme'] = {"dfnID": "dark-color-scheme", "url": "#dark-color-scheme", "dfnText": "dark color scheme", "refSections": [{"refs": [{"id": "ref-for-dark-color-scheme"}], "title": "2. Preferred Color Schemes"}, {"refs": [{"id": "ref-for-dark-color-scheme\u2460"}, {"id": "ref-for-dark-color-scheme\u2461"}], "title": "2.1. Opting Into a Preferred Color Scheme: the color-scheme property"}], "external": false};
-window.dfnpanelData['propdef-color-scheme'] = {"dfnID": "propdef-color-scheme", "url": "#propdef-color-scheme", "dfnText": "color-scheme", "refSections": [{"refs": [{"id": "ref-for-propdef-color-scheme"}], "title": "1. Introduction"}, {"refs": [{"id": "ref-for-propdef-color-scheme\u2460"}, {"id": "ref-for-propdef-color-scheme\u2461"}], "title": "2. Preferred Color Schemes"}, {"refs": [{"id": "ref-for-propdef-color-scheme\u2462"}, {"id": "ref-for-propdef-color-scheme\u2463"}, {"id": "ref-for-propdef-color-scheme\u2464"}, {"id": "ref-for-propdef-color-scheme\u2465"}, {"id": "ref-for-propdef-color-scheme\u2466"}, {"id": "ref-for-propdef-color-scheme\u2467"}], "title": "2.1. Opting Into a Preferred Color Scheme: the color-scheme property"}, {"refs": [{"id": "ref-for-propdef-color-scheme\u2468"}], "title": "3. Forced Color Schemes"}, {"refs": [{"id": "ref-for-propdef-color-scheme\u2460\u24ea"}], "title": "3.1. Properties Affected by Forced Colors Mode"}, {"refs": [{"id": "ref-for-propdef-color-scheme\u2460\u2460"}], "title": "5. Privacy and Security Considerations"}, {"refs": [{"id": "ref-for-propdef-color-scheme\u2460\u2461"}, {"id": "ref-for-propdef-color-scheme\u2460\u2462"}, {"id": "ref-for-propdef-color-scheme\u2460\u2463"}, {"id": "ref-for-propdef-color-scheme\u2460\u2464"}, {"id": "ref-for-propdef-color-scheme\u2460\u2465"}], "title": "7. Changes"}], "external": false};
-window.dfnpanelData['used-color-scheme'] = {"dfnID": "used-color-scheme", "url": "#used-color-scheme", "dfnText": "used color scheme", "refSections": [{"refs": [{"id": "ref-for-used-color-scheme"}, {"id": "ref-for-used-color-scheme\u2460"}, {"id": "ref-for-used-color-scheme\u2461"}, {"id": "ref-for-used-color-scheme\u2462"}], "title": "2.1. Opting Into a Preferred Color Scheme: the color-scheme property"}, {"refs": [{"id": "ref-for-used-color-scheme\u2463"}, {"id": "ref-for-used-color-scheme\u2464"}, {"id": "ref-for-used-color-scheme\u2465"}, {"id": "ref-for-used-color-scheme\u2466"}, {"id": "ref-for-used-color-scheme\u2467"}], "title": "2.2. Effects of the Used Color Scheme"}], "external": false};
-window.dfnpanelData['valdef-color-scheme-normal'] = {"dfnID": "valdef-color-scheme-normal", "url": "#valdef-color-scheme-normal", "dfnText": "normal", "refSections": [{"refs": [{"id": "ref-for-valdef-color-scheme-normal"}, {"id": "ref-for-valdef-color-scheme-normal\u2460"}, {"id": "ref-for-valdef-color-scheme-normal\u2461"}], "title": "2.1. Opting Into a Preferred Color Scheme: the color-scheme property"}], "external": false};
-window.dfnpanelData['valdef-color-scheme-light'] = {"dfnID": "valdef-color-scheme-light", "url": "#valdef-color-scheme-light", "dfnText": "light", "refSections": [{"refs": [{"id": "ref-for-valdef-color-scheme-light"}], "title": "2.1. Opting Into a Preferred Color Scheme: the color-scheme property"}], "external": false};
-window.dfnpanelData['valdef-color-scheme-dark'] = {"dfnID": "valdef-color-scheme-dark", "url": "#valdef-color-scheme-dark", "dfnText": "dark", "refSections": [{"refs": [{"id": "ref-for-valdef-color-scheme-dark"}], "title": "2.1. Opting Into a Preferred Color Scheme: the color-scheme property"}], "external": false};
-window.dfnpanelData['forced-colors-mode'] = {"dfnID": "forced-colors-mode", "url": "#forced-colors-mode", "dfnText": "Forced colors mode", "refSections": [{"refs": [{"id": "ref-for-forced-colors-mode"}, {"id": "ref-for-forced-colors-mode\u2460"}], "title": "1. Introduction"}, {"refs": [{"id": "ref-for-forced-colors-mode\u2461"}, {"id": "ref-for-forced-colors-mode\u2462"}], "title": "3. Forced Color Schemes"}, {"refs": [{"id": "ref-for-forced-colors-mode\u2463"}, {"id": "ref-for-forced-colors-mode\u2464"}], "title": "3.1. Properties Affected by Forced Colors Mode"}, {"refs": [{"id": "ref-for-forced-colors-mode\u2465"}, {"id": "ref-for-forced-colors-mode\u2466"}, {"id": "ref-for-forced-colors-mode\u2467"}], "title": "3.2. Opting Out of a Forced Color Scheme: the forced-color-adjust property"}, {"refs": [{"id": "ref-for-forced-colors-mode\u2468"}], "title": "5. Privacy and Security Considerations"}, {"refs": [{"id": "ref-for-forced-colors-mode\u2460\u24ea"}], "title": "7. Changes"}], "external": false};
-window.dfnpanelData['propdef-forced-color-adjust'] = {"dfnID": "propdef-forced-color-adjust", "url": "#propdef-forced-color-adjust", "dfnText": "forced-color-adjust", "refSections": [{"refs": [{"id": "ref-for-propdef-forced-color-adjust"}], "title": "1. Introduction"}, {"refs": [{"id": "ref-for-propdef-forced-color-adjust\u2460"}], "title": "3.1. Properties Affected by Forced Colors Mode"}, {"refs": [{"id": "ref-for-propdef-forced-color-adjust\u2461"}, {"id": "ref-for-propdef-forced-color-adjust\u2462"}], "title": "3.2. Opting Out of a Forced Color Scheme: the forced-color-adjust property"}], "external": false};
-window.dfnpanelData['valdef-forced-color-adjust-auto'] = {"dfnID": "valdef-forced-color-adjust-auto", "url": "#valdef-forced-color-adjust-auto", "dfnText": "auto", "refSections": [{"refs": [{"id": "ref-for-valdef-forced-color-adjust-auto"}], "title": "3.1. Properties Affected by Forced Colors Mode"}], "external": false};
-window.dfnpanelData['propdef-color-adjust'] = {"dfnID": "propdef-color-adjust", "url": "#propdef-color-adjust", "dfnText": "color-adjust", "refSections": [{"refs": [{"id": "ref-for-propdef-color-adjust"}], "title": "1. Introduction"}, {"refs": [{"id": "ref-for-propdef-color-adjust\u2460"}], "title": "3.2. Opting Out of a Forced Color Scheme: the forced-color-adjust property"}, {"refs": [{"id": "ref-for-propdef-color-adjust\u2461"}, {"id": "ref-for-propdef-color-adjust\u2462"}, {"id": "ref-for-propdef-color-adjust\u2463"}, {"id": "ref-for-propdef-color-adjust\u2464"}], "title": "4. Performance-based Color Adjustments: the color-adjust property"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -2661,11 +2204,474 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"02808af8": {"dfnID":"02808af8","dfnText":"forced-colors","external":true,"refSections":[{"refs":[{"id":"ref-for-descdef-media-forced-colors"}],"title":"3. Forced Color Schemes"}],"url":"https://drafts.csswg.org/mediaqueries-5/#descdef-media-forced-colors"},
+"029830f0": {"dfnID":"029830f0","dfnText":"author style sheet","external":true,"refSections":[{"refs":[{"id":"ref-for-cascade-origin-author"}],"title":"3.1. Properties Affected by Forced Colors Mode"}],"url":"https://drafts.csswg.org/css-cascade-5/#cascade-origin-author"},
+"02c921d1": {"dfnID":"02c921d1","dfnText":"<system-color>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-system-color"}],"title":"2. Preferred Color Schemes"},{"refs":[{"id":"ref-for-typedef-system-color\u2460"},{"id":"ref-for-typedef-system-color\u2461"}],"title":"2.1. Opting Into a Preferred Color Scheme: the color-scheme property"}],"url":"https://drafts.csswg.org/css-color-4/#typedef-system-color"},
+"03eee7b4": {"dfnID":"03eee7b4","dfnText":"color()","external":true,"refSections":[{"refs":[{"id":"ref-for-funcdef-color"}],"title":"3.1. Properties Affected by Forced Colors Mode"}],"url":"https://drafts.csswg.org/css-color-5/#funcdef-color"},
+"044536a2": {"dfnID":"044536a2","dfnText":"text-decoration-color","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-text-decoration-color"}],"title":"3.1. Properties Affected by Forced Colors Mode"}],"url":"https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration-color"},
+"11fb4d5b": {"dfnID":"11fb4d5b","dfnText":"background-color","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-background-color"},{"id":"ref-for-propdef-background-color\u2460"},{"id":"ref-for-propdef-background-color\u2461"}],"title":"3.1. Properties Affected by Forced Colors Mode"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-background-color"},
+"1ee7f091": {"dfnID":"1ee7f091","dfnText":"outline-color","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-outline-color"}],"title":"3.1. Properties Affected by Forced Colors Mode"}],"url":"https://drafts.csswg.org/css-ui-4/#propdef-outline-color"},
+"358fd6ff": {"dfnID":"358fd6ff","dfnText":"css-wide keywords","external":true,"refSections":[{"refs":[{"id":"ref-for-css-wide-keywords"}],"title":"1.1. Value Definitions"}],"url":"https://drafts.csswg.org/css-values-4/#css-wide-keywords"},
+"44edcab1": {"dfnID":"44edcab1","dfnText":"column-rule-color","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-column-rule-color"}],"title":"3.1. Properties Affected by Forced Colors Mode"}],"url":"https://drafts.csswg.org/css-multicol-1/#propdef-column-rule-color"},
+"488ae577": {"dfnID":"488ae577","dfnText":"prefers-color-scheme","external":true,"refSections":[{"refs":[{"id":"ref-for-descdef-media-prefers-color-scheme"},{"id":"ref-for-descdef-media-prefers-color-scheme\u2460"}],"title":"2. Preferred Color Schemes"},{"refs":[{"id":"ref-for-descdef-media-prefers-color-scheme\u2461"}],"title":"3. Forced Color Schemes"}],"url":"https://drafts.csswg.org/mediaqueries-5/#descdef-media-prefers-color-scheme"},
+"4e4ba8b4": {"dfnID":"4e4ba8b4","dfnText":"scrollbar-color","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-scrollbar-color"}],"title":"3.1. Properties Affected by Forced Colors Mode"}],"url":"https://drafts.csswg.org/css-scrollbars-1/#propdef-scrollbar-color"},
+"5a2f7ea1": {"dfnID":"5a2f7ea1","dfnText":"url()","external":true,"refSections":[{"refs":[{"id":"ref-for-funcdef-url"}],"title":"3.1. Properties Affected by Forced Colors Mode"}],"url":"https://drafts.csswg.org/css-values-4/#funcdef-url"},
+"5f1b7f60": {"dfnID":"5f1b7f60","dfnText":"@media","external":true,"refSections":[{"refs":[{"id":"ref-for-at-ruledef-media"}],"title":"2.1. Opting Into a Preferred Color Scheme: the color-scheme property"}],"url":"https://drafts.csswg.org/css-conditional-3/#at-ruledef-media"},
+"64b89595": {"dfnID":"64b89595","dfnText":"meta","external":true,"refSections":[{"refs":[{"id":"ref-for-meta"}],"title":"2.1. Opting Into a Preferred Color Scheme: the color-scheme property"},{"refs":[{"id":"ref-for-meta\u2460"}],"title":"7. Changes"}],"url":"https://html.spec.whatwg.org/multipage/semantics.html#meta"},
+"6916104d": {"dfnID":"6916104d","dfnText":"box-shadow","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-box-shadow"}],"title":"3.1. Properties Affected by Forced Colors Mode"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-box-shadow"},
+"6ec67710": {"dfnID":"6ec67710","dfnText":"|","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-one"},{"id":"ref-for-comb-one\u2460"},{"id":"ref-for-comb-one\u2461"}],"title":"2.1. Opting Into a Preferred Color Scheme: the color-scheme property"},{"refs":[{"id":"ref-for-comb-one\u2462"}],"title":"3.2. Opting Out of a Forced Color Scheme: the forced-color-adjust property"},{"refs":[{"id":"ref-for-comb-one\u2463"}],"title":"4. Performance-based Color Adjustments: the color-adjust property"}],"url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"73759fff": {"dfnID":"73759fff","dfnText":"border-color","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-border-color"}],"title":"3.1. Properties Affected by Forced Colors Mode"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-border-color"},
+"73ea1d43": {"dfnID":"73ea1d43","dfnText":"color","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-color"}],"title":"2.2. Effects of the Used Color Scheme"},{"refs":[{"id":"ref-for-propdef-color\u2460"},{"id":"ref-for-propdef-color\u2461"}],"title":"3.1. Properties Affected by Forced Colors Mode"}],"url":"https://drafts.csswg.org/css-color-4/#propdef-color"},
+"7589f2be": {"dfnID":"7589f2be","dfnText":"canvastext","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-system-color-canvastext"}],"title":"3.1. Properties Affected by Forced Colors Mode"}],"url":"https://drafts.csswg.org/css-color-4/#valdef-system-color-canvastext"},
+"7b70d28c": {"dfnID":"7b70d28c","dfnText":"none (for background-image)","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-background-image-none"}],"title":"3.1. Properties Affected by Forced Colors Mode"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#valdef-background-image-none"},
+"8025f703": {"dfnID":"8025f703","dfnText":"text-emphasis-color","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-text-emphasis-color"}],"title":"3.1. Properties Affected by Forced Colors Mode"}],"url":"https://drafts.csswg.org/css-text-decor-4/#propdef-text-emphasis-color"},
+"87fcd40c": {"dfnID":"87fcd40c","dfnText":"iframe","external":true,"refSections":[{"refs":[{"id":"ref-for-the-iframe-element"}],"title":"2.2. Effects of the Used Color Scheme"},{"refs":[{"id":"ref-for-the-iframe-element\u2460"}],"title":"5. Privacy and Security Considerations"},{"refs":[{"id":"ref-for-the-iframe-element\u2461"},{"id":"ref-for-the-iframe-element\u2462"}],"title":"7. Changes"}],"url":"https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element"},
+"890a8358": {"dfnID":"890a8358","dfnText":"fill","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-fill"}],"title":"3.1. Properties Affected by Forced Colors Mode"}],"url":"https://drafts.fxtf.org/fill-stroke-3/#propdef-fill"},
+"8bcc6e67": {"dfnID":"8bcc6e67","dfnText":"::selection","external":true,"refSections":[{"refs":[{"id":"ref-for-selectordef-selection"}],"title":"3. Forced Color Schemes"}],"url":"https://drafts.csswg.org/css-pseudo-4/#selectordef-selection"},
+"9cd25054": {"dfnID":"9cd25054","dfnText":"computed value","external":true,"refSections":[{"refs":[{"id":"ref-for-computed-value"}],"title":"3.1. Properties Affected by Forced Colors Mode"},{"refs":[{"id":"ref-for-computed-value\u2460"}],"title":"7. Changes"}],"url":"https://drafts.csswg.org/css-cascade-5/#computed-value"},
+"a4eb3c57": {"dfnID":"a4eb3c57","dfnText":"used value","external":true,"refSections":[{"refs":[{"id":"ref-for-used-value"}],"title":"7. Changes"}],"url":"https://drafts.csswg.org/css-cascade-5/#used-value"},
+"a8ac6f1b": {"dfnID":"a8ac6f1b","dfnText":"revert","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-all-revert"},{"id":"ref-for-valdef-all-revert\u2460"}],"title":"7. Changes"}],"url":"https://drafts.csswg.org/css-cascade-4/#valdef-all-revert"},
+"adf0c1da": {"dfnID":"adf0c1da","dfnText":"canvas","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-system-color-canvas"}],"title":"2.2. Effects of the Used Color Scheme"},{"refs":[{"id":"ref-for-valdef-system-color-canvas\u2460"}],"title":"3. Forced Color Schemes"},{"refs":[{"id":"ref-for-valdef-system-color-canvas\u2461"}],"title":"3.1. Properties Affected by Forced Colors Mode"}],"url":"https://drafts.csswg.org/css-color-4/#valdef-system-color-canvas"},
+"bd3d9ccd": {"dfnID":"bd3d9ccd","dfnText":"media query","external":true,"refSections":[{"refs":[{"id":"ref-for-media-query"}],"title":"1. Introduction"}],"url":"https://drafts.csswg.org/mediaqueries-5/#media-query"},
+"bedd9d42": {"dfnID":"bedd9d42","dfnText":"+","external":true,"refSections":[{"refs":[{"id":"ref-for-mult-one-plus"}],"title":"2.1. Opting Into a Preferred Color Scheme: the color-scheme property"}],"url":"https://drafts.csswg.org/css-values-4/#mult-one-plus"},
+"c15300b0": {"dfnID":"c15300b0","dfnText":"none (for box-shadow)","external":true,"refSections":[{"refs":[{"id":"ref-for-box-shadow-none"}],"title":"3.1. Properties Affected by Forced Colors Mode"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#box-shadow-none"},
+"color-scheme": {"dfnID":"color-scheme","dfnText":"color scheme","external":false,"refSections":[{"refs":[{"id":"ref-for-color-scheme"},{"id":"ref-for-color-scheme\u2460"}],"title":"1. Introduction"},{"refs":[{"id":"ref-for-color-scheme\u2461"},{"id":"ref-for-color-scheme\u2462"},{"id":"ref-for-color-scheme\u2463"},{"id":"ref-for-color-scheme\u2464"},{"id":"ref-for-color-scheme\u2465"}],"title":"2. Preferred Color Schemes"},{"refs":[{"id":"ref-for-color-scheme\u2466"},{"id":"ref-for-color-scheme\u2467"},{"id":"ref-for-color-scheme\u2468"},{"id":"ref-for-color-scheme\u2460\u24ea"},{"id":"ref-for-color-scheme\u2460\u2460"},{"id":"ref-for-color-scheme\u2460\u2461"},{"id":"ref-for-color-scheme\u2460\u2462"},{"id":"ref-for-color-scheme\u2460\u2463"},{"id":"ref-for-color-scheme\u2460\u2464"}],"title":"2.1. Opting Into a Preferred Color Scheme: the color-scheme property"},{"refs":[{"id":"ref-for-color-scheme\u2460\u2465"}],"title":"2.2. Effects of the Used Color Scheme"},{"refs":[{"id":"ref-for-color-scheme\u2460\u2466"}],"title":"5. Privacy and Security Considerations"}],"url":"#color-scheme"},
+"dark-color-scheme": {"dfnID":"dark-color-scheme","dfnText":"dark color scheme","external":false,"refSections":[{"refs":[{"id":"ref-for-dark-color-scheme"}],"title":"2. Preferred Color Schemes"},{"refs":[{"id":"ref-for-dark-color-scheme\u2460"},{"id":"ref-for-dark-color-scheme\u2461"}],"title":"2.1. Opting Into a Preferred Color Scheme: the color-scheme property"}],"url":"#dark-color-scheme"},
+"de9e224f": {"dfnID":"de9e224f","dfnText":"stroke","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-stroke"}],"title":"3.1. Properties Affected by Forced Colors Mode"}],"url":"https://drafts.fxtf.org/fill-stroke-3/#propdef-stroke"},
+"e274345c": {"dfnID":"e274345c","dfnText":"<custom-ident>","external":true,"refSections":[{"refs":[{"id":"ref-for-identifier-value"},{"id":"ref-for-identifier-value\u2460"},{"id":"ref-for-identifier-value\u2461"},{"id":"ref-for-identifier-value\u2462"},{"id":"ref-for-identifier-value\u2463"},{"id":"ref-for-identifier-value\u2464"}],"title":"2.1. Opting Into a Preferred Color Scheme: the color-scheme property"}],"url":"https://drafts.csswg.org/css-values-4/#identifier-value"},
+"ee7998a4": {"dfnID":"ee7998a4","dfnText":"system color pairings","external":true,"refSections":[{"refs":[{"id":"ref-for-system-color-pairings"}],"title":"3.1. Properties Affected by Forced Colors Mode"}],"url":"https://drafts.csswg.org/css-color-4/#system-color-pairings"},
+"f0811ff8": {"dfnID":"f0811ff8","dfnText":"img","external":true,"refSections":[{"refs":[{"id":"ref-for-the-img-element"}],"title":"2.2. Effects of the Used Color Scheme"}],"url":"https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element"},
+"f338a9f0": {"dfnID":"f338a9f0","dfnText":"text-shadow","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-text-shadow"}],"title":"3.1. Properties Affected by Forced Colors Mode"}],"url":"https://drafts.csswg.org/css-text-decor-4/#propdef-text-shadow"},
+"f831c141": {"dfnID":"f831c141","dfnText":"background-image","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-background-image"}],"title":"3.1. Properties Affected by Forced Colors Mode"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-background-image"},
+"forced-colors-mode": {"dfnID":"forced-colors-mode","dfnText":"Forced colors mode","external":false,"refSections":[{"refs":[{"id":"ref-for-forced-colors-mode"},{"id":"ref-for-forced-colors-mode\u2460"}],"title":"1. Introduction"},{"refs":[{"id":"ref-for-forced-colors-mode\u2461"},{"id":"ref-for-forced-colors-mode\u2462"}],"title":"3. Forced Color Schemes"},{"refs":[{"id":"ref-for-forced-colors-mode\u2463"},{"id":"ref-for-forced-colors-mode\u2464"}],"title":"3.1. Properties Affected by Forced Colors Mode"},{"refs":[{"id":"ref-for-forced-colors-mode\u2465"},{"id":"ref-for-forced-colors-mode\u2466"},{"id":"ref-for-forced-colors-mode\u2467"}],"title":"3.2. Opting Out of a Forced Color Scheme: the forced-color-adjust property"},{"refs":[{"id":"ref-for-forced-colors-mode\u2468"}],"title":"5. Privacy and Security Considerations"},{"refs":[{"id":"ref-for-forced-colors-mode\u2460\u24ea"}],"title":"7. Changes"}],"url":"#forced-colors-mode"},
+"light-color-scheme": {"dfnID":"light-color-scheme","dfnText":"light color scheme","external":false,"refSections":[{"refs":[{"id":"ref-for-light-color-scheme"}],"title":"2. Preferred Color Schemes"},{"refs":[{"id":"ref-for-light-color-scheme\u2460"},{"id":"ref-for-light-color-scheme\u2461"},{"id":"ref-for-light-color-scheme\u2462"}],"title":"2.1. Opting Into a Preferred Color Scheme: the color-scheme property"}],"url":"#light-color-scheme"},
+"preferred-color-scheme": {"dfnID":"preferred-color-scheme","dfnText":"preferred color scheme","external":false,"refSections":[{"refs":[{"id":"ref-for-preferred-color-scheme"},{"id":"ref-for-preferred-color-scheme\u2460"}],"title":"2. Preferred Color Schemes"},{"refs":[{"id":"ref-for-preferred-color-scheme\u2461"}],"title":"2.1. Opting Into a Preferred Color Scheme: the color-scheme property"}],"url":"#preferred-color-scheme"},
+"propdef-color-adjust": {"dfnID":"propdef-color-adjust","dfnText":"color-adjust","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-color-adjust"}],"title":"1. Introduction"},{"refs":[{"id":"ref-for-propdef-color-adjust\u2460"}],"title":"3.2. Opting Out of a Forced Color Scheme: the forced-color-adjust property"},{"refs":[{"id":"ref-for-propdef-color-adjust\u2461"},{"id":"ref-for-propdef-color-adjust\u2462"},{"id":"ref-for-propdef-color-adjust\u2463"},{"id":"ref-for-propdef-color-adjust\u2464"}],"title":"4. Performance-based Color Adjustments: the color-adjust property"}],"url":"#propdef-color-adjust"},
+"propdef-color-scheme": {"dfnID":"propdef-color-scheme","dfnText":"color-scheme","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-color-scheme"}],"title":"1. Introduction"},{"refs":[{"id":"ref-for-propdef-color-scheme\u2460"},{"id":"ref-for-propdef-color-scheme\u2461"}],"title":"2. Preferred Color Schemes"},{"refs":[{"id":"ref-for-propdef-color-scheme\u2462"},{"id":"ref-for-propdef-color-scheme\u2463"},{"id":"ref-for-propdef-color-scheme\u2464"},{"id":"ref-for-propdef-color-scheme\u2465"},{"id":"ref-for-propdef-color-scheme\u2466"},{"id":"ref-for-propdef-color-scheme\u2467"}],"title":"2.1. Opting Into a Preferred Color Scheme: the color-scheme property"},{"refs":[{"id":"ref-for-propdef-color-scheme\u2468"}],"title":"3. Forced Color Schemes"},{"refs":[{"id":"ref-for-propdef-color-scheme\u2460\u24ea"}],"title":"3.1. Properties Affected by Forced Colors Mode"},{"refs":[{"id":"ref-for-propdef-color-scheme\u2460\u2460"}],"title":"5. Privacy and Security Considerations"},{"refs":[{"id":"ref-for-propdef-color-scheme\u2460\u2461"},{"id":"ref-for-propdef-color-scheme\u2460\u2462"},{"id":"ref-for-propdef-color-scheme\u2460\u2463"},{"id":"ref-for-propdef-color-scheme\u2460\u2464"},{"id":"ref-for-propdef-color-scheme\u2460\u2465"}],"title":"7. Changes"}],"url":"#propdef-color-scheme"},
+"propdef-forced-color-adjust": {"dfnID":"propdef-forced-color-adjust","dfnText":"forced-color-adjust","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-forced-color-adjust"}],"title":"1. Introduction"},{"refs":[{"id":"ref-for-propdef-forced-color-adjust\u2460"}],"title":"3.1. Properties Affected by Forced Colors Mode"},{"refs":[{"id":"ref-for-propdef-forced-color-adjust\u2461"},{"id":"ref-for-propdef-forced-color-adjust\u2462"}],"title":"3.2. Opting Out of a Forced Color Scheme: the forced-color-adjust property"}],"url":"#propdef-forced-color-adjust"},
+"used-color-scheme": {"dfnID":"used-color-scheme","dfnText":"used color scheme","external":false,"refSections":[{"refs":[{"id":"ref-for-used-color-scheme"},{"id":"ref-for-used-color-scheme\u2460"},{"id":"ref-for-used-color-scheme\u2461"},{"id":"ref-for-used-color-scheme\u2462"}],"title":"2.1. Opting Into a Preferred Color Scheme: the color-scheme property"},{"refs":[{"id":"ref-for-used-color-scheme\u2463"},{"id":"ref-for-used-color-scheme\u2464"},{"id":"ref-for-used-color-scheme\u2465"},{"id":"ref-for-used-color-scheme\u2466"},{"id":"ref-for-used-color-scheme\u2467"}],"title":"2.2. Effects of the Used Color Scheme"}],"url":"#used-color-scheme"},
+"valdef-color-scheme-dark": {"dfnID":"valdef-color-scheme-dark","dfnText":"dark","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-color-scheme-dark"}],"title":"2.1. Opting Into a Preferred Color Scheme: the color-scheme property"}],"url":"#valdef-color-scheme-dark"},
+"valdef-color-scheme-light": {"dfnID":"valdef-color-scheme-light","dfnText":"light","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-color-scheme-light"}],"title":"2.1. Opting Into a Preferred Color Scheme: the color-scheme property"}],"url":"#valdef-color-scheme-light"},
+"valdef-color-scheme-normal": {"dfnID":"valdef-color-scheme-normal","dfnText":"normal","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-color-scheme-normal"},{"id":"ref-for-valdef-color-scheme-normal\u2460"},{"id":"ref-for-valdef-color-scheme-normal\u2461"}],"title":"2.1. Opting Into a Preferred Color Scheme: the color-scheme property"}],"url":"#valdef-color-scheme-normal"},
+"valdef-forced-color-adjust-auto": {"dfnID":"valdef-forced-color-adjust-auto","dfnText":"auto","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-forced-color-adjust-auto"}],"title":"3.1. Properties Affected by Forced Colors Mode"}],"url":"#valdef-forced-color-adjust-auto"},
+};
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+});
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        dfn.panelData = panelData;
+        insertDfnPopupAction(dfn);
+    }
+}
+
+function genDfnPanel(dfn, { dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel on",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel({dfnPanel});
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.dfn = dfn;
+    dfn.dfnPanel = dfnPanel;
+    return dfnPanel;
+}
+
+
+
+function hideAllDfnPanels() {
+    // Delete the currently-active dfn panel.
+    queryAll(".dfn-panel").forEach(dfnPanel=>hideDfnPanel({dfnPanel}));
+}
+
+function showDfnPanel(dfn) {
+    hideAllDfnPanels(); // Only display one at a time.
+
+    dfn.setAttribute("aria-expanded", "true");
+
+    const dfnPanel = genDfnPanel(dfn, dfn.panelData);
+
+    // Give the dfn a unique tabindex, and then
+    // give all the tabbable panel bits successive indexes.
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+
+    append(document.body, dfnPanel);
+    positionDfnPanel(dfnPanel);
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.dfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }
+}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel({dfn, dfnPanel}) {
+    if(!dfnPanel) dfnPanel = dfn.dfnPanel;
+    if(!dfn) dfn = dfnPanel.dfn;
+    dfn.dfnPanel = undefined;
+    dfnPanel.dfn = undefined;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.remove()
+}
+
+function toggleDfnPanel(dfn) {
+    if(dfn.dfnPanel) {
+        hideDfnPanel(dfn);
+    } else {
+        showDfnPanel(dfn);
+    }
+}
+
+function insertDfnPopupAction(dfn) {
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        toggleDfnPanel(dfn);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+function needsFor(type) {
+    switch(type) {
+        case "descriptor":
+        case "value":
+        case "element-attr":
+        case "attr-value":
+        case "element-state":
+        case "method":
+        case "constructor":
+        case "argument":
+        case "attribute":
+        case "const":
+        case "dict-member":
+        case "event":
+        case "enum-value":
+        case "stringifier":
+        case "serializer":
+        case "iterator":
+        case "maplike":
+        case "setlike":
+        case "state":
+        case "mode":
+        case "context":
+        case "facet": return true;
+
+        default: return false;
+    }
+}
+function refusesFor(type) {
+    switch(type) {
+        case "property":
+        case "element":
+        case "interface":
+        case "namespace":
+        case "callback":
+        case "dictionary":
+        case "enum":
+        case "exception":
+        case "typedef":
+        case "http-header":
+        case "permission": return true;
+
+        default: return false;
+    }
+}
+function linkFormatterFromType(type) {
+    switch(type) {
+        case 'scheme':
+        case 'permission':
+        case 'dfn': return (text) => `[=${text}=]`;
+
+        case 'abstract-op': return (text) => `[\$${text}\$]`;
+
+        case 'function':
+        case 'at-rule':
+        case 'selector':
+        case 'value': return (text) => `''${text}''`;
+
+        case 'http-header': return (text) => `[:${text}:]`;
+
+        case 'interface':
+        case 'constructor':
+        case 'method':
+        case 'argument':
+        case 'attribute':
+        case 'callback':
+        case 'dictionary':
+        case 'dict-member':
+        case 'enum':
+        case 'enum-value':
+        case 'exception':
+        case 'const':
+        case 'typedef':
+        case 'stringifier':
+        case 'serializer':
+        case 'iterator':
+        case 'maplike':
+        case 'setlike':
+        case 'extended-attribute':
+        case 'event':
+        case 'idl': return (text) => `{{${text}}}`;
+
+        case 'element-state':
+        case 'element-attr':
+        case 'attr-value':
+        case 'element': return (element) => `<{${element}}>`;
+
+        case 'grammar': return (text) => `${text} (within a <pre class=prod>)`;
+
+        case 'type': return (text)=> `<<${text}>>`;
+
+        case 'descriptor':
+        case 'property': return (text) => `'${text}'`;
+
+        default: return;
+    };
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!needsFor(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!refusesFor(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
 }
 </script>
 <script>/* Boilerplate: script-link-titles */
+"use strict";
+{
 let linkTitleData = {
- "https://drafts.csswg.org/css-color-4/#typedef-system-color": "Expands to: accentcolor | accentcolortext | activetext | buttonborder | buttonface | buttontext | canvas | canvastext | field | fieldtext | graytext | highlight | highlighttext | linktext | mark | marktext | selecteditem | selecteditemtext | visitedtext"
+"https://drafts.csswg.org/css-color-4/#typedef-system-color": "Expands to: accentcolor | accentcolortext | activetext | buttonborder | buttonface | buttontext | canvas | canvastext | field | fieldtext | graytext | highlight | highlighttext | linktext | mark | marktext | selecteditem | selecteditemtext | visitedtext",
 };
 
 function setTypeTitles() {
@@ -2677,33 +2683,14 @@ function setTypeTitles() {
 }
 
 document.addEventListener("DOMContentLoaded", setTypeTitles);
+}
 </script>
 <script>/* Boilerplate: script-position-annos */
 "use strict";
 {
-
 function repositionAnnoPanels(){
     const panels = [...document.querySelectorAll("[data-anno-for]")];
-    const main = document.querySelector("main");
-    let mainRect;
-    if(main) mainRect = main.getBoundingClientRect();
-    for(const panel of panels) {
-        const dfn = document.getElementById(panel.getAttribute("data-anno-for"));
-        if(!dfn) {
-            console.log("Can't find the annotation panel target:", panel);
-            continue;
-        }
-        const rect = dfn.getBoundingClientRect();
-        const top = window.scrollY + rect.top
-        panel.style.top = top + "px";
-        panel.top = top;
-        panel.height = rect.height;
-        panel.classList.remove("unpositioned");
-        const panelRect = panel.getBoundingClientRect()
-        if(main) {
-            panel.classList.toggle("overlapping-main", panelRect.left < mainRect.right)
-        }
-    }
+    hydratePanels(panels);
     let vSoFar = 0;
     for(const panel of panels.sort(cmpTops)) {
         if(panel.top < vSoFar) {
@@ -2711,6 +2698,39 @@ function repositionAnnoPanels(){
             panel.style.top = vSoFar + "px";
         }
         vSoFar = panel.top + panel.height + 15;
+    }
+}
+function hydratePanels(panels) {
+    const main = document.querySelector("main");
+    let mainRect;
+    if(main) mainRect = main.getBoundingClientRect();
+    // First display them all, if they're not already visible.
+    for(const panel of panels) {
+        panel.classList.remove("unpositioned");
+    }
+    // Measure them all
+    for(const panel of panels) {
+        const dfn = document.getElementById(panel.getAttribute("data-anno-for"));
+        if(!dfn) {
+            console.log("Can't find the annotation panel target:", panel);
+            continue;
+        }
+        panel.dfn = dfn;
+        panel.top = window.scrollY + dfn.getBoundingClientRect().top;
+        let panelRect = panel.getBoundingClientRect();
+        panel.height = panelRect.height;
+        if(main) {
+            panel.overlappingMain = panelRect.left < mainRect.right;
+        } else {
+            panel.overlappingMain = false;
+        }
+    }
+    // And finally position them
+    for(const panel of panels) {
+        const dfn = panel.dfn;
+        if(!dfn) continue;
+        panel.style.top = panel.top + "px";
+        panel.classList.toggle("overlapping-main", panel.overlappingMain);
     }
 }
 
@@ -2725,264 +2745,251 @@ window.addEventListener("resize", repositionAnnoPanels);
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
-                mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
+let refsData = {
+"#color-scheme": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-color-adjust","spec":"css-color-adjust-1","status":"local","text":"color scheme","type":"dfn","url":"#color-scheme"},
+"#dark-color-scheme": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-color-adjust","spec":"css-color-adjust-1","status":"local","text":"dark color scheme","type":"dfn","url":"#dark-color-scheme"},
+"#forced-colors-mode": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-color-adjust","spec":"css-color-adjust-1","status":"local","text":"forced colors mode","type":"dfn","url":"#forced-colors-mode"},
+"#light-color-scheme": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-color-adjust","spec":"css-color-adjust-1","status":"local","text":"light","type":"dfn","url":"#light-color-scheme"},
+"#preferred-color-scheme": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-color-adjust","spec":"css-color-adjust-1","status":"local","text":"preferred color scheme","type":"dfn","url":"#preferred-color-scheme"},
+"#propdef-color-adjust": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-color-adjust","spec":"css-color-adjust-1","status":"local","text":"color-adjust","type":"property","url":"#propdef-color-adjust"},
+"#propdef-color-scheme": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-color-adjust","spec":"css-color-adjust-1","status":"local","text":"color-scheme","type":"property","url":"#propdef-color-scheme"},
+"#propdef-forced-color-adjust": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-color-adjust","spec":"css-color-adjust-1","status":"local","text":"forced-color-adjust","type":"property","url":"#propdef-forced-color-adjust"},
+"#used-color-scheme": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-color-adjust","spec":"css-color-adjust-1","status":"local","text":"used color scheme","type":"dfn","url":"#used-color-scheme"},
+"#valdef-color-scheme-dark": {"export":true,"for_":["color-scheme"],"level":"1","normative":true,"shortname":"css-color-adjust","spec":"css-color-adjust-1","status":"local","text":"dark","type":"value","url":"#valdef-color-scheme-dark"},
+"#valdef-color-scheme-light": {"export":true,"for_":["color-scheme"],"level":"1","normative":true,"shortname":"css-color-adjust","spec":"css-color-adjust-1","status":"local","text":"light","type":"value","url":"#valdef-color-scheme-light"},
+"#valdef-color-scheme-normal": {"export":true,"for_":["color-scheme"],"level":"1","normative":true,"shortname":"css-color-adjust","spec":"css-color-adjust-1","status":"local","text":"normal","type":"value","url":"#valdef-color-scheme-normal"},
+"#valdef-forced-color-adjust-auto": {"export":true,"for_":["forced-color-adjust"],"level":"1","normative":true,"shortname":"css-color-adjust","spec":"css-color-adjust-1","status":"local","text":"auto","type":"value","url":"#valdef-forced-color-adjust-auto"},
+"https://drafts.csswg.org/css-backgrounds-3/#box-shadow-none": {"export":true,"for_":["box-shadow"],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"current","text":"none","type":"value","url":"https://drafts.csswg.org/css-backgrounds-3/#box-shadow-none"},
+"https://drafts.csswg.org/css-backgrounds-3/#propdef-background-color": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"current","text":"background-color","type":"property","url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-background-color"},
+"https://drafts.csswg.org/css-backgrounds-3/#propdef-background-image": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"current","text":"background-image","type":"property","url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-background-image"},
+"https://drafts.csswg.org/css-backgrounds-3/#propdef-border-color": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"current","text":"border-color","type":"property","url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-border-color"},
+"https://drafts.csswg.org/css-backgrounds-3/#propdef-box-shadow": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"current","text":"box-shadow","type":"property","url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-box-shadow"},
+"https://drafts.csswg.org/css-backgrounds-3/#valdef-background-image-none": {"export":true,"for_":["background-image"],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"current","text":"none","type":"value","url":"https://drafts.csswg.org/css-backgrounds-3/#valdef-background-image-none"},
+"https://drafts.csswg.org/css-cascade-4/#valdef-all-revert": {"export":true,"for_":["all"],"level":"4","normative":true,"shortname":"css-cascade","spec":"css-cascade-4","status":"current","text":"revert","type":"value","url":"https://drafts.csswg.org/css-cascade-4/#valdef-all-revert"},
+"https://drafts.csswg.org/css-cascade-5/#cascade-origin-author": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-cascade","spec":"css-cascade-5","status":"current","text":"author style sheet","type":"dfn","url":"https://drafts.csswg.org/css-cascade-5/#cascade-origin-author"},
+"https://drafts.csswg.org/css-cascade-5/#computed-value": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-cascade","spec":"css-cascade-5","status":"current","text":"computed value","type":"dfn","url":"https://drafts.csswg.org/css-cascade-5/#computed-value"},
+"https://drafts.csswg.org/css-cascade-5/#used-value": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-cascade","spec":"css-cascade-5","status":"current","text":"used value","type":"dfn","url":"https://drafts.csswg.org/css-cascade-5/#used-value"},
+"https://drafts.csswg.org/css-color-4/#propdef-color": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-color","spec":"css-color-4","status":"current","text":"color","type":"property","url":"https://drafts.csswg.org/css-color-4/#propdef-color"},
+"https://drafts.csswg.org/css-color-4/#system-color-pairings": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-color","spec":"css-color-4","status":"current","text":"system color pairings","type":"dfn","url":"https://drafts.csswg.org/css-color-4/#system-color-pairings"},
+"https://drafts.csswg.org/css-color-4/#typedef-system-color": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-color","spec":"css-color-4","status":"current","text":"<system-color>","type":"type","url":"https://drafts.csswg.org/css-color-4/#typedef-system-color"},
+"https://drafts.csswg.org/css-color-4/#valdef-system-color-canvas": {"export":true,"for_":["<system-color>"],"level":"4","normative":true,"shortname":"css-color","spec":"css-color-4","status":"current","text":"canvas","type":"value","url":"https://drafts.csswg.org/css-color-4/#valdef-system-color-canvas"},
+"https://drafts.csswg.org/css-color-4/#valdef-system-color-canvastext": {"export":true,"for_":["<system-color>"],"level":"4","normative":true,"shortname":"css-color","spec":"css-color-4","status":"current","text":"canvastext","type":"value","url":"https://drafts.csswg.org/css-color-4/#valdef-system-color-canvastext"},
+"https://drafts.csswg.org/css-color-5/#funcdef-color": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-color","spec":"css-color-5","status":"current","text":"color()","type":"function","url":"https://drafts.csswg.org/css-color-5/#funcdef-color"},
+"https://drafts.csswg.org/css-conditional-3/#at-ruledef-media": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-conditional","spec":"css-conditional-3","status":"current","text":"@media","type":"at-rule","url":"https://drafts.csswg.org/css-conditional-3/#at-ruledef-media"},
+"https://drafts.csswg.org/css-multicol-1/#propdef-column-rule-color": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-multicol","spec":"css-multicol-1","status":"current","text":"column-rule-color","type":"property","url":"https://drafts.csswg.org/css-multicol-1/#propdef-column-rule-color"},
+"https://drafts.csswg.org/css-pseudo-4/#selectordef-selection": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-pseudo","spec":"css-pseudo-4","status":"current","text":"::selection","type":"selector","url":"https://drafts.csswg.org/css-pseudo-4/#selectordef-selection"},
+"https://drafts.csswg.org/css-scrollbars-1/#propdef-scrollbar-color": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-scrollbars","spec":"css-scrollbars-1","status":"current","text":"scrollbar-color","type":"property","url":"https://drafts.csswg.org/css-scrollbars-1/#propdef-scrollbar-color"},
+"https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration-color": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-text-decor","spec":"css-text-decor-4","status":"current","text":"text-decoration-color","type":"property","url":"https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration-color"},
+"https://drafts.csswg.org/css-text-decor-4/#propdef-text-emphasis-color": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-text-decor","spec":"css-text-decor-4","status":"current","text":"text-emphasis-color","type":"property","url":"https://drafts.csswg.org/css-text-decor-4/#propdef-text-emphasis-color"},
+"https://drafts.csswg.org/css-text-decor-4/#propdef-text-shadow": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-text-decor","spec":"css-text-decor-4","status":"current","text":"text-shadow","type":"property","url":"https://drafts.csswg.org/css-text-decor-4/#propdef-text-shadow"},
+"https://drafts.csswg.org/css-ui-4/#propdef-outline-color": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-ui","spec":"css-ui-4","status":"current","text":"outline-color","type":"property","url":"https://drafts.csswg.org/css-ui-4/#propdef-outline-color"},
+"https://drafts.csswg.org/css-values-4/#comb-one": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"|","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"https://drafts.csswg.org/css-values-4/#css-wide-keywords": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"css-wide keywords","type":"dfn","url":"https://drafts.csswg.org/css-values-4/#css-wide-keywords"},
+"https://drafts.csswg.org/css-values-4/#funcdef-url": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"url()","type":"function","url":"https://drafts.csswg.org/css-values-4/#funcdef-url"},
+"https://drafts.csswg.org/css-values-4/#identifier-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<custom-ident>","type":"type","url":"https://drafts.csswg.org/css-values-4/#identifier-value"},
+"https://drafts.csswg.org/css-values-4/#mult-one-plus": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"+","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#mult-one-plus"},
+"https://drafts.csswg.org/mediaqueries-5/#descdef-media-forced-colors": {"export":true,"for_":["@media"],"level":"5","normative":true,"shortname":"mediaqueries","spec":"mediaqueries-5","status":"current","text":"forced-colors","type":"descriptor","url":"https://drafts.csswg.org/mediaqueries-5/#descdef-media-forced-colors"},
+"https://drafts.csswg.org/mediaqueries-5/#descdef-media-prefers-color-scheme": {"export":true,"for_":["@media"],"level":"5","normative":true,"shortname":"mediaqueries","spec":"mediaqueries-5","status":"current","text":"prefers-color-scheme","type":"descriptor","url":"https://drafts.csswg.org/mediaqueries-5/#descdef-media-prefers-color-scheme"},
+"https://drafts.csswg.org/mediaqueries-5/#media-query": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"mediaqueries","spec":"mediaqueries-5","status":"current","text":"media query","type":"dfn","url":"https://drafts.csswg.org/mediaqueries-5/#media-query"},
+"https://drafts.fxtf.org/fill-stroke-3/#propdef-fill": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"fill-stroke","spec":"fill-stroke-3","status":"current","text":"fill","type":"property","url":"https://drafts.fxtf.org/fill-stroke-3/#propdef-fill"},
+"https://drafts.fxtf.org/fill-stroke-3/#propdef-stroke": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"fill-stroke","spec":"fill-stroke-3","status":"current","text":"stroke","type":"property","url":"https://drafts.fxtf.org/fill-stroke-3/#propdef-stroke"},
+"https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"img","type":"element","url":"https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element"},
+"https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"iframe","type":"element","url":"https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element"},
+"https://html.spec.whatwg.org/multipage/semantics.html#meta": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"meta","type":"element","url":"https://html.spec.whatwg.org/multipage/semantics.html#meta"},
+};
+
+function mkRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "Term: "),
+                mk.span({}, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    let forListElements;
+    if(forList.length == 0) {
+        forListElements = [];
+    } else if(forList.length == 1) {
+        forListElements = mk.li({},
+            mk.b({}, "For: "),
+            mk.span({}, forList[0]),
+        );
+    } else {
+        forListElements = mk.li({},
             mk.b({}, "For: "),
             mk.ul({},
                 ...forList.map(forItem =>
                     mk.li({},
-                        mk.span({}, `${forItem}`)
+                        mk.span({}, forItem)
                     ),
                 ),
             ),
         );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+    }
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    setupRefHintEventListeners(link, hintPanel);
+    return hintPanel;
+}
+
+function hideAllRefHints() {
+    queryAll(".ref-hint").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    if(refHint.teardownEventListeners) {
+        refHint.teardownEventListeners();
     }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+    refHint.remove();
+}
+
+function showRefHint(link) {
+    if(link.classList.contains("dfn-link")) return;
+    const url = link.getAttribute("href");
+    const ref = refsData[url];
+    if(!ref) return;
+
+    hideAllRefHints(); // Only display one at this time.
+
+    const refHint = mkRefHint(link, ref);
+    append(document.body, refHint);
+    link.setAttribute("aria-expanded", "true");
+    positionRefHint(refHint);
+}
+
+function setupRefHintEventListeners(link, refHint) {
+    if (refHint.teardownEventListeners) return;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
+
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
-
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
-    }
-
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
-        }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
-
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
-    }
-
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+document.addEventListener("DOMContentLoaded", () => {
+    document.body.addEventListener("mouseover", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
+    });
+    document.body.addEventListener("focus", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
     });
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['#color-scheme'] = {"text": "color scheme", "type": "dfn", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "local", "url": "#color-scheme", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-color-scheme'] = {"text": "color-scheme", "type": "property", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "local", "url": "#propdef-color-scheme", "export": true, "normative": true, "for_": []};
-window.refsData['#forced-colors-mode'] = {"text": "forced colors mode", "type": "dfn", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "local", "url": "#forced-colors-mode", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-forced-color-adjust'] = {"text": "forced-color-adjust", "type": "property", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "local", "url": "#propdef-forced-color-adjust", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-color-adjust'] = {"text": "color-adjust", "type": "property", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "local", "url": "#propdef-color-adjust", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/mediaqueries-5/#media-query'] = {"text": "media query", "type": "dfn", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-5/#media-query", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#css-wide-keywords'] = {"text": "css-wide keywords", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "export": true, "normative": true, "for_": []};
-window.refsData['#light-color-scheme'] = {"text": "light", "type": "dfn", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "local", "url": "#light-color-scheme", "export": true, "normative": true, "for_": []};
-window.refsData['#dark-color-scheme'] = {"text": "dark color scheme", "type": "dfn", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "local", "url": "#dark-color-scheme", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-color-4/#typedef-system-color'] = {"text": "<system-color>", "type": "type", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-color-4/#typedef-system-color", "export": true, "normative": true, "for_": []};
-window.refsData['#preferred-color-scheme'] = {"text": "preferred color scheme", "type": "dfn", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "local", "url": "#preferred-color-scheme", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/mediaqueries-5/#descdef-media-prefers-color-scheme'] = {"text": "prefers-color-scheme", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-5/#descdef-media-prefers-color-scheme", "export": true, "normative": true, "for_": ["@media"]};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#identifier-value'] = {"text": "<custom-ident>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#identifier-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#mult-one-plus'] = {"text": "+", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-one-plus", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-color-scheme-normal'] = {"text": "normal", "type": "value", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "local", "url": "#valdef-color-scheme-normal", "export": true, "normative": true, "for_": ["color-scheme"]};
-window.refsData['#valdef-color-scheme-light'] = {"text": "light", "type": "value", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "local", "url": "#valdef-color-scheme-light", "export": true, "normative": true, "for_": ["color-scheme"]};
-window.refsData['#valdef-color-scheme-dark'] = {"text": "dark", "type": "value", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "local", "url": "#valdef-color-scheme-dark", "export": true, "normative": true, "for_": ["color-scheme"]};
-window.refsData['#used-color-scheme'] = {"text": "used color scheme", "type": "dfn", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "local", "url": "#used-color-scheme", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-conditional-3/#at-ruledef-media'] = {"text": "@media", "type": "at-rule", "spec": "css-conditional-3", "shortname": "css-conditional", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-conditional-3/#at-ruledef-media", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/semantics.html#meta'] = {"text": "meta", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/semantics.html#meta", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-color-4/#propdef-color'] = {"text": "color", "type": "property", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-color-4/#propdef-color", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element'] = {"text": "iframe", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-color-4/#valdef-system-color-canvas'] = {"text": "canvas", "type": "value", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-color-4/#valdef-system-color-canvas", "export": true, "normative": true, "for_": ["<system-color>"]};
-window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element'] = {"text": "img", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-selection'] = {"text": "::selection", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-selection", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/mediaqueries-5/#descdef-media-forced-colors'] = {"text": "forced-colors", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-5/#descdef-media-forced-colors", "export": true, "normative": true, "for_": ["@media"]};
-window.refsData['#valdef-forced-color-adjust-auto'] = {"text": "auto", "type": "value", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "local", "url": "#valdef-forced-color-adjust-auto", "export": true, "normative": true, "for_": ["forced-color-adjust"]};
-window.refsData['https://drafts.fxtf.org/fill-stroke-3/#propdef-fill'] = {"text": "fill", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "current", "url": "https://drafts.fxtf.org/fill-stroke-3/#propdef-fill", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.fxtf.org/fill-stroke-3/#propdef-stroke'] = {"text": "stroke", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "current", "url": "https://drafts.fxtf.org/fill-stroke-3/#propdef-stroke", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration-color'] = {"text": "text-decoration-color", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration-color", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-text-decor-4/#propdef-text-emphasis-color'] = {"text": "text-emphasis-color", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-decor-4/#propdef-text-emphasis-color", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border-color'] = {"text": "border-color", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-color", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-ui-4/#propdef-outline-color'] = {"text": "outline-color", "type": "property", "spec": "css-ui-4", "shortname": "css-ui", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-ui-4/#propdef-outline-color", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-multicol-1/#propdef-column-rule-color'] = {"text": "column-rule-color", "type": "property", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-multicol-1/#propdef-column-rule-color", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-scrollbars-1/#propdef-scrollbar-color'] = {"text": "scrollbar-color", "type": "property", "spec": "css-scrollbars-1", "shortname": "css-scrollbars", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-scrollbars-1/#propdef-scrollbar-color", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-background-color'] = {"text": "background-color", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background-color", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-cascade-5/#computed-value'] = {"text": "computed value", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#computed-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-color-5/#funcdef-color'] = {"text": "color()", "type": "function", "spec": "css-color-5", "shortname": "css-color", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-color-5/#funcdef-color", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-color-4/#system-color-pairings'] = {"text": "system color pairings", "type": "dfn", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-color-4/#system-color-pairings", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-color-4/#valdef-system-color-canvastext'] = {"text": "canvastext", "type": "value", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-color-4/#valdef-system-color-canvastext", "export": true, "normative": true, "for_": ["<system-color>"]};
-window.refsData['https://drafts.csswg.org/css-cascade-5/#cascade-origin-author'] = {"text": "author style sheet", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#cascade-origin-author", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-box-shadow'] = {"text": "box-shadow", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-box-shadow", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-text-decor-4/#propdef-text-shadow'] = {"text": "text-shadow", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-decor-4/#propdef-text-shadow", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#box-shadow-none'] = {"text": "none", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#box-shadow-none", "export": true, "normative": true, "for_": ["box-shadow"]};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-background-image'] = {"text": "background-image", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background-image", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#valdef-background-image-none'] = {"text": "none", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#valdef-background-image-none", "export": true, "normative": true, "for_": ["background-image"]};
-window.refsData['https://drafts.csswg.org/css-values-4/#funcdef-url'] = {"text": "url()", "type": "function", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#funcdef-url", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-cascade-4/#valdef-all-revert'] = {"text": "revert", "type": "value", "spec": "css-cascade-4", "shortname": "css-cascade", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-cascade-4/#valdef-all-revert", "export": true, "normative": true, "for_": ["all"]};
-window.refsData['https://drafts.csswg.org/css-cascade-5/#used-value'] = {"text": "used value", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#used-value", "export": true, "normative": true, "for_": []};window.refsData['#propdef-color-adjust'] = {"text": "color-adjust", "type": "property", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "local", "url": "#propdef-color-adjust", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-color-scheme'] = {"text": "color-scheme", "type": "property", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "local", "url": "#propdef-color-scheme", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-forced-color-adjust'] = {"text": "forced-color-adjust", "type": "property", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "local", "url": "#propdef-forced-color-adjust", "export": true, "normative": true, "for_": []};
 </script>

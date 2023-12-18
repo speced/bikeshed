@@ -78,7 +78,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -452,6 +451,11 @@ figcaption:not(.no-marker)::before {
     }
 }
 </style>
+<style>/* Boilerplate: style-idl-highlighting */
+pre.idl.highlight {
+    background: var(--borderedblock-bg, var(--def-bg));
+}
+</style>
 <style>/* Boilerplate: style-issues */
 a[href].issue-return {
     float: right;
@@ -484,7 +488,7 @@ a[href].issue-return {
 }
 
 .ref-hint {
-    display: none;
+    display: inline-block;
     position: absolute;
     z-index: 35;
     width: 20em;
@@ -500,16 +504,11 @@ a[href].issue-return {
     white-space: normal; /* in case it's moved into a pre */
 }
 
-.ref-hint.on {
-    display: inline-block;
-}
-
 .ref-hint * { margin: 0; padding: 0; text-indent: 0; }
 
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -569,7 +568,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -626,7 +624,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -703,14 +700,14 @@ D50 2deg illuminant, L in [0,100], a and b in [-128, 128]
 5 = lab(85,-10,-50)
 6 = lab(85,35,-15)
 */
-var { cursor: pointer; }
-var.selected0 { background-color: #F4D200; box-shadow: 0 0 0 2px #F4D200; }
-var.selected1 { background-color: #FF87A2; box-shadow: 0 0 0 2px #FF87A2; }
-var.selected2 { background-color: #96E885; box-shadow: 0 0 0 2px #96E885; }
-var.selected3 { background-color: #3EEED2; box-shadow: 0 0 0 2px #3EEED2; }
-var.selected4 { background-color: #EACFB6; box-shadow: 0 0 0 2px #EACFB6; }
-var.selected5 { background-color: #82DDFF; box-shadow: 0 0 0 2px #82DDFF; }
-var.selected6 { background-color: #FFBCF2; box-shadow: 0 0 0 2px #FFBCF2; }
+[data-algorithm] var { cursor: pointer; }
+var[data-var-color="0"] { background-color: #F4D200; box-shadow: 0 0 0 2px #F4D200; }
+var[data-var-color="1"] { background-color: #FF87A2; box-shadow: 0 0 0 2px #FF87A2; }
+var[data-var-color="2"] { background-color: #96E885; box-shadow: 0 0 0 2px #96E885; }
+var[data-var-color="3"] { background-color: #3EEED2; box-shadow: 0 0 0 2px #3EEED2; }
+var[data-var-color="4"] { background-color: #EACFB6; box-shadow: 0 0 0 2px #EACFB6; }
+var[data-var-color="5"] { background-color: #82DDFF; box-shadow: 0 0 0 2px #82DDFF; }
+var[data-var-color="6"] { background-color: #FFBCF2; box-shadow: 0 0 0 2px #FFBCF2; }
 </style>
  <body class="h-entry">
   <div class="head">
@@ -1404,470 +1401,8 @@ conforming IDL fragments, as described in the Web IDL specification. <a data-lin
 };
 
 </pre>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['ffcc175a'] = {"dfnID": "ffcc175a", "url": "https://w3c.github.io/accelerometer/#accelerometer", "dfnText": "Accelerometer", "refSections": [{"refs": [{"id": "ref-for-accelerometer"}, {"id": "ref-for-accelerometer\u2460"}, {"id": "ref-for-accelerometer\u2461"}], "title": "5. Model"}], "external": true};
-window.dfnpanelData['7892f569'] = {"dfnID": "7892f569", "url": "https://w3c.github.io/accelerometer/#device-coordinate-system", "dfnText": "device coordinate system", "refSections": [{"refs": [{"id": "ref-for-device-coordinate-system"}], "title": "5.1. The AbsoluteOrientationSensor Model"}, {"refs": [{"id": "ref-for-device-coordinate-system\u2460"}], "title": "5.2. The RelativeOrientationSensor Model"}, {"refs": [{"id": "ref-for-device-coordinate-system\u2461"}], "title": "7.1. Construct an Orientation Sensor object"}], "external": true};
-window.dfnpanelData['9d689cca'] = {"dfnID": "9d689cca", "url": "https://w3c.github.io/accelerometer/#screen-coordinate-system", "dfnText": "screen coordinate system", "refSections": [{"refs": [{"id": "ref-for-screen-coordinate-system"}], "title": "5.1. The AbsoluteOrientationSensor Model"}, {"refs": [{"id": "ref-for-screen-coordinate-system\u2460"}], "title": "5.2. The RelativeOrientationSensor Model"}, {"refs": [{"id": "ref-for-screen-coordinate-system\u2461"}], "title": "7.1. Construct an Orientation Sensor object"}], "external": true};
-window.dfnpanelData['32e66fc3'] = {"dfnID": "32e66fc3", "url": "https://www.w3.org/TR/2016/CR-orientation-event-20160818/#deviceorientation_event", "dfnText": "DeviceOrientationEvent", "refSections": [{"refs": [{"id": "ref-for-deviceorientation_event"}, {"id": "ref-for-deviceorientation_event\u2460"}], "title": "1. Introduction"}], "external": true};
-window.dfnpanelData['1405315e'] = {"dfnID": "1405315e", "url": "https://w3c.github.io/sensors/#dom-mocksensortype-absolute-orientation", "dfnText": "\"absolute-orientation\"", "refSections": [{"refs": [{"id": "ref-for-dom-mocksensortype-absolute-orientation"}], "title": "8.1. Mock Sensor Type"}], "external": true};
-window.dfnpanelData['0fe98df2'] = {"dfnID": "0fe98df2", "url": "https://w3c.github.io/sensors/#dom-mocksensortype-relative-orientation", "dfnText": "\"relative-orientation\"", "refSections": [{"refs": [{"id": "ref-for-dom-mocksensortype-relative-orientation"}], "title": "8.1. Mock Sensor Type"}], "external": true};
-window.dfnpanelData['1b956603'] = {"dfnID": "1b956603", "url": "https://w3c.github.io/sensors/#sensor", "dfnText": "Sensor", "refSections": [{"refs": [{"id": "ref-for-sensor"}, {"id": "ref-for-sensor\u2460"}], "title": "5. Model"}, {"refs": [{"id": "ref-for-sensor\u2461"}], "title": "6.1. The OrientationSensor Interface"}], "external": true};
-window.dfnpanelData['207de9db'] = {"dfnID": "207de9db", "url": "https://w3c.github.io/sensors/#dictdef-sensoroptions", "dfnText": "SensorOptions", "refSections": [{"refs": [{"id": "ref-for-dictdef-sensoroptions"}], "title": "1. Introduction"}, {"refs": [{"id": "ref-for-dictdef-sensoroptions\u2460"}], "title": "6.1. The OrientationSensor Interface"}], "external": true};
-window.dfnpanelData['8b05f5b6'] = {"dfnID": "8b05f5b6", "url": "https://w3c.github.io/sensors/#automation", "dfnText": "automation", "refSections": [{"refs": [{"id": "ref-for-automation"}], "title": "8. Automation"}], "external": true};
-window.dfnpanelData['5822d2f3'] = {"dfnID": "5822d2f3", "url": "https://w3c.github.io/sensors/#check-sensor-policy-controlled-features", "dfnText": "check sensor policy-controlled features", "refSections": [{"refs": [{"id": "ref-for-check-sensor-policy-controlled-features"}], "title": "7.1. Construct an Orientation Sensor object"}], "external": true};
-window.dfnpanelData['d30469fc'] = {"dfnID": "d30469fc", "url": "https://w3c.github.io/sensors/#equivalent", "dfnText": "equivalent", "refSections": [{"refs": [{"id": "ref-for-equivalent"}], "title": "6.1.2. OrientationSensor.populateMatrix()"}], "external": true};
-window.dfnpanelData['fd4ad34f'] = {"dfnID": "fd4ad34f", "url": "https://w3c.github.io/sensors/#get-value-from-latest-reading", "dfnText": "get value from latest reading", "refSections": [{"refs": [{"id": "ref-for-get-value-from-latest-reading"}], "title": "6.1.1. OrientationSensor.quaternion"}, {"refs": [{"id": "ref-for-get-value-from-latest-reading\u2460"}], "title": "6.1.2. OrientationSensor.populateMatrix()"}], "external": true};
-window.dfnpanelData['0026f53f'] = {"dfnID": "0026f53f", "url": "https://w3c.github.io/sensors/#initialize-a-sensor-object", "dfnText": "initialize a sensor object", "refSections": [{"refs": [{"id": "ref-for-initialize-a-sensor-object"}], "title": "7.1. Construct an Orientation Sensor object"}], "external": true};
-window.dfnpanelData['378064f9'] = {"dfnID": "378064f9", "url": "https://w3c.github.io/sensors/#latest-reading", "dfnText": "latest reading", "refSections": [{"refs": [{"id": "ref-for-latest-reading"}, {"id": "ref-for-latest-reading\u2460"}], "title": "5. Model"}, {"refs": [{"id": "ref-for-latest-reading\u2461"}, {"id": "ref-for-latest-reading\u2462"}], "title": "5.1. The AbsoluteOrientationSensor Model"}, {"refs": [{"id": "ref-for-latest-reading\u2463"}], "title": "5.2. The RelativeOrientationSensor Model"}, {"refs": [{"id": "ref-for-latest-reading\u2464"}], "title": "6.1.2. OrientationSensor.populateMatrix()"}], "external": true};
-window.dfnpanelData['95a8cb5f'] = {"dfnID": "95a8cb5f", "url": "https://w3c.github.io/sensors/#local-coordinate-system", "dfnText": "local coordinate system", "refSections": [{"refs": [{"id": "ref-for-local-coordinate-system"}, {"id": "ref-for-local-coordinate-system\u2460"}, {"id": "ref-for-local-coordinate-system\u2461"}], "title": "5.1. The AbsoluteOrientationSensor Model"}, {"refs": [{"id": "ref-for-local-coordinate-system\u2462"}, {"id": "ref-for-local-coordinate-system\u2463"}], "title": "5.2. The RelativeOrientationSensor Model"}, {"refs": [{"id": "ref-for-local-coordinate-system\u2464"}, {"id": "ref-for-local-coordinate-system\u2465"}], "title": "7.1. Construct an Orientation Sensor object"}], "external": true};
-window.dfnpanelData['eb8343c0'] = {"dfnID": "eb8343c0", "url": "https://w3c.github.io/sensors/#low-level", "dfnText": "low-level", "refSections": [{"refs": [{"id": "ref-for-low-level"}], "title": "1. Introduction"}, {"refs": [{"id": "ref-for-low-level\u2460"}, {"id": "ref-for-low-level\u2461"}, {"id": "ref-for-low-level\u2462"}, {"id": "ref-for-low-level\u2463"}, {"id": "ref-for-low-level\u2464"}], "title": "5. Model"}, {"refs": [{"id": "ref-for-low-level\u2465"}], "title": "5.1. The AbsoluteOrientationSensor Model"}, {"refs": [{"id": "ref-for-low-level\u2466"}], "title": "5.2. The RelativeOrientationSensor Model"}], "external": true};
-window.dfnpanelData['4acdbf1c'] = {"dfnID": "4acdbf1c", "url": "https://w3c.github.io/sensors/#mock-sensor-reading-values", "dfnText": "mock sensor reading values", "refSections": [{"refs": [{"id": "ref-for-mock-sensor-reading-values"}, {"id": "ref-for-mock-sensor-reading-values\u2460"}], "title": "8.1. Mock Sensor Type"}], "external": true};
-window.dfnpanelData['c3b7f760'] = {"dfnID": "c3b7f760", "url": "https://w3c.github.io/sensors/#mock-sensor-type", "dfnText": "mock sensor type", "refSections": [{"refs": [{"id": "ref-for-mock-sensor-type"}, {"id": "ref-for-mock-sensor-type\u2460"}], "title": "8.1. Mock Sensor Type"}], "external": true};
-window.dfnpanelData['fd03f682'] = {"dfnID": "fd03f682", "url": "https://w3c.github.io/sensors/#dom-sensor-onerror", "dfnText": "onerror", "refSections": [{"refs": [{"id": "ref-for-dom-sensor-onerror"}], "title": "5. Model"}], "external": true};
-window.dfnpanelData['277a4c80'] = {"dfnID": "277a4c80", "url": "https://w3c.github.io/sensors/#request-sensor-access", "dfnText": "request sensor access", "refSections": [{"refs": [{"id": "ref-for-request-sensor-access"}], "title": "5. Model"}], "external": true};
-window.dfnpanelData['f96b75e9'] = {"dfnID": "f96b75e9", "url": "https://w3c.github.io/sensors/#sensor-type", "dfnText": "sensor type", "refSections": [{"refs": [{"id": "ref-for-sensor-type"}, {"id": "ref-for-sensor-type\u2460"}], "title": "5. Model"}], "external": true};
-window.dfnpanelData['61e7f6a4'] = {"dfnID": "61e7f6a4", "url": "https://w3c.github.io/sensors/#sensor-fusion", "dfnText": "sensor-fusion", "refSections": [{"refs": [{"id": "ref-for-sensor-fusion"}, {"id": "ref-for-sensor-fusion\u2460"}], "title": "5. Model"}], "external": true};
-window.dfnpanelData['c29c300e'] = {"dfnID": "c29c300e", "url": "https://w3c.github.io/sensors/#dom-sensor-start", "dfnText": "start()", "refSections": [{"refs": [{"id": "ref-for-dom-sensor-start"}, {"id": "ref-for-dom-sensor-start\u2460"}], "title": "5. Model"}], "external": true};
-window.dfnpanelData['13f5be19'] = {"dfnID": "13f5be19", "url": "https://w3c.github.io/sensors/#supported-sensor-options", "dfnText": "supported sensor options", "refSections": [{"refs": [{"id": "ref-for-supported-sensor-options"}], "title": "6.2. The AbsoluteOrientationSensor Interface"}, {"refs": [{"id": "ref-for-supported-sensor-options\u2460"}], "title": "6.3. The RelativeOrientationSensor Interface"}], "external": true};
-window.dfnpanelData['4ffe871f'] = {"dfnID": "4ffe871f", "url": "https://drafts.fxtf.org/geometry-1/#dommatrix", "dfnText": "DOMMatrix", "refSections": [{"refs": [{"id": "ref-for-dommatrix"}], "title": "6.1. The OrientationSensor Interface"}, {"refs": [{"id": "ref-for-dommatrix\u2460"}], "title": "6.1.2. OrientationSensor.populateMatrix()"}], "external": true};
-window.dfnpanelData['68c96227'] = {"dfnID": "68c96227", "url": "https://w3c.github.io/gyroscope/#gyroscope", "dfnText": "Gyroscope", "refSections": [{"refs": [{"id": "ref-for-gyroscope"}, {"id": "ref-for-gyroscope\u2460"}, {"id": "ref-for-gyroscope\u2461"}], "title": "5. Model"}], "external": true};
-window.dfnpanelData['6a5a59a0'] = {"dfnID": "6a5a59a0", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-handlers", "dfnText": "event handler", "refSections": [{"refs": [{"id": "ref-for-event-handlers"}], "title": "5. Model"}], "external": true};
-window.dfnpanelData['8958b003'] = {"dfnID": "8958b003", "url": "https://infra.spec.whatwg.org/#map-entry", "dfnText": "entry", "refSections": [{"refs": [{"id": "ref-for-map-entry"}], "title": "5. Model"}], "external": true};
-window.dfnpanelData['d14a6f26'] = {"dfnID": "d14a6f26", "url": "https://infra.spec.whatwg.org/#map-key", "dfnText": "key", "refSections": [{"refs": [{"id": "ref-for-map-key"}], "title": "5. Model"}], "external": true};
-window.dfnpanelData['649608b9'] = {"dfnID": "649608b9", "url": "https://infra.spec.whatwg.org/#list", "dfnText": "list", "refSections": [{"refs": [{"id": "ref-for-list"}, {"id": "ref-for-list\u2460"}, {"id": "ref-for-list\u2461"}], "title": "5. Model"}], "external": true};
-window.dfnpanelData['802b0fdd'] = {"dfnID": "802b0fdd", "url": "https://infra.spec.whatwg.org/#map-value", "dfnText": "value", "refSections": [{"refs": [{"id": "ref-for-map-value"}], "title": "5. Model"}], "external": true};
-window.dfnpanelData['5e19184b'] = {"dfnID": "5e19184b", "url": "https://w3c.github.io/magnetometer/#magnetometer", "dfnText": "Magnetometer", "refSections": [{"refs": [{"id": "ref-for-magnetometer"}, {"id": "ref-for-magnetometer\u2460"}], "title": "5. Model"}], "external": true};
-window.dfnpanelData['75e1dbe0'] = {"dfnID": "75e1dbe0", "url": "https://w3c.github.io/motion-sensors/#absolute-orientation", "dfnText": "absolute orientation sensor", "refSections": [{"refs": [{"id": "ref-for-absolute-orientation"}], "title": "5.1. The AbsoluteOrientationSensor Model"}], "external": true};
-window.dfnpanelData['10634796'] = {"dfnID": "10634796", "url": "https://w3c.github.io/motion-sensors/#relative-orientation", "dfnText": "relative orientation sensor", "refSections": [{"refs": [{"id": "ref-for-relative-orientation"}], "title": "5.2. The RelativeOrientationSensor Model"}], "external": true};
-window.dfnpanelData['dca2de17'] = {"dfnID": "dca2de17", "url": "https://webidl.spec.whatwg.org/#idl-DOMException", "dfnText": "DOMException", "refSections": [{"refs": [{"id": "ref-for-idl-DOMException"}], "title": "6.1.2. OrientationSensor.populateMatrix()"}, {"refs": [{"id": "ref-for-idl-DOMException\u2460"}], "title": "7.1. Construct an Orientation Sensor object"}], "external": true};
-window.dfnpanelData['889e932f'] = {"dfnID": "889e932f", "url": "https://webidl.spec.whatwg.org/#Exposed", "dfnText": "Exposed", "refSections": [{"refs": [{"id": "ref-for-Exposed"}], "title": "6.1. The OrientationSensor Interface"}, {"refs": [{"id": "ref-for-Exposed\u2460"}], "title": "6.2. The AbsoluteOrientationSensor Interface"}, {"refs": [{"id": "ref-for-Exposed\u2461"}], "title": "6.3. The RelativeOrientationSensor Interface"}], "external": true};
-window.dfnpanelData['0a296dfe'] = {"dfnID": "0a296dfe", "url": "https://webidl.spec.whatwg.org/#idl-Float32Array", "dfnText": "Float32Array", "refSections": [{"refs": [{"id": "ref-for-idl-Float32Array"}], "title": "6.1. The OrientationSensor Interface"}, {"refs": [{"id": "ref-for-idl-Float32Array\u2460"}, {"id": "ref-for-idl-Float32Array\u2461"}], "title": "6.1.2. OrientationSensor.populateMatrix()"}], "external": true};
-window.dfnpanelData['f6ac79fb'] = {"dfnID": "f6ac79fb", "url": "https://webidl.spec.whatwg.org/#idl-Float64Array", "dfnText": "Float64Array", "refSections": [{"refs": [{"id": "ref-for-idl-Float64Array"}], "title": "6.1. The OrientationSensor Interface"}, {"refs": [{"id": "ref-for-idl-Float64Array\u2460"}, {"id": "ref-for-idl-Float64Array\u2461"}], "title": "6.1.2. OrientationSensor.populateMatrix()"}], "external": true};
-window.dfnpanelData['dcf5fafa'] = {"dfnID": "dcf5fafa", "url": "https://webidl.spec.whatwg.org/#idl-frozen-array", "dfnText": "FrozenArray", "refSections": [{"refs": [{"id": "ref-for-idl-frozen-array"}], "title": "6.1. The OrientationSensor Interface"}, {"refs": [{"id": "ref-for-idl-frozen-array\u2460"}], "title": "6.1.1. OrientationSensor.quaternion"}, {"refs": [{"id": "ref-for-idl-frozen-array\u2461"}], "title": "8.1. Mock Sensor Type"}], "external": true};
-window.dfnpanelData['0be3911e'] = {"dfnID": "0be3911e", "url": "https://webidl.spec.whatwg.org/#notreadableerror", "dfnText": "NotReadableError", "refSections": [{"refs": [{"id": "ref-for-notreadableerror"}], "title": "6.1.2. OrientationSensor.populateMatrix()"}], "external": true};
-window.dfnpanelData['b75bb3bd'] = {"dfnID": "b75bb3bd", "url": "https://webidl.spec.whatwg.org/#SecureContext", "dfnText": "SecureContext", "refSections": [{"refs": [{"id": "ref-for-SecureContext"}], "title": "6.1. The OrientationSensor Interface"}, {"refs": [{"id": "ref-for-SecureContext\u2460"}], "title": "6.2. The AbsoluteOrientationSensor Interface"}, {"refs": [{"id": "ref-for-SecureContext\u2461"}], "title": "6.3. The RelativeOrientationSensor Interface"}], "external": true};
-window.dfnpanelData['c3e881ef'] = {"dfnID": "c3e881ef", "url": "https://webidl.spec.whatwg.org/#securityerror", "dfnText": "SecurityError", "refSections": [{"refs": [{"id": "ref-for-securityerror"}], "title": "7.1. Construct an Orientation Sensor object"}], "external": true};
-window.dfnpanelData['82ca3efc'] = {"dfnID": "82ca3efc", "url": "https://webidl.spec.whatwg.org/#exceptiondef-typeerror", "dfnText": "TypeError", "refSections": [{"refs": [{"id": "ref-for-exceptiondef-typeerror"}, {"id": "ref-for-exceptiondef-typeerror\u2460"}], "title": "6.1.2. OrientationSensor.populateMatrix()"}], "external": true};
-window.dfnpanelData['8c800cdf'] = {"dfnID": "8c800cdf", "url": "https://webidl.spec.whatwg.org/#idl-double", "dfnText": "double", "refSections": [{"refs": [{"id": "ref-for-idl-double"}], "title": "6.1. The OrientationSensor Interface"}, {"refs": [{"id": "ref-for-idl-double\u2460"}], "title": "8.1. Mock Sensor Type"}], "external": true};
-window.dfnpanelData['980252f2'] = {"dfnID": "980252f2", "url": "https://webidl.spec.whatwg.org/#dfn-identifier", "dfnText": "identifier", "refSections": [{"refs": [{"id": "ref-for-dfn-identifier"}], "title": "7.1. Construct an Orientation Sensor object"}], "external": true};
-window.dfnpanelData['fc14fa8a'] = {"dfnID": "fc14fa8a", "url": "https://webidl.spec.whatwg.org/#dfn-inherited-interfaces", "dfnText": "inherited interfaces", "refSections": [{"refs": [{"id": "ref-for-dfn-inherited-interfaces"}], "title": "7.1. Construct an Orientation Sensor object"}], "external": true};
-window.dfnpanelData['1422ec4e'] = {"dfnID": "1422ec4e", "url": "https://webidl.spec.whatwg.org/#dfn-interface", "dfnText": "interface", "refSections": [{"refs": [{"id": "ref-for-dfn-interface"}, {"id": "ref-for-dfn-interface\u2460"}, {"id": "ref-for-dfn-interface\u2461"}], "title": "7.1. Construct an Orientation Sensor object"}], "external": true};
-window.dfnpanelData['b4cfa5ce'] = {"dfnID": "b4cfa5ce", "url": "https://webidl.spec.whatwg.org/#dfn-throw", "dfnText": "throw", "refSections": [{"refs": [{"id": "ref-for-dfn-throw"}, {"id": "ref-for-dfn-throw\u2460"}, {"id": "ref-for-dfn-throw\u2461"}], "title": "6.1.2. OrientationSensor.populateMatrix()"}, {"refs": [{"id": "ref-for-dfn-throw\u2462"}], "title": "7.1. Construct an Orientation Sensor object"}], "external": true};
-window.dfnpanelData['5f90bbfb'] = {"dfnID": "5f90bbfb", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "dfnText": "undefined", "refSections": [{"refs": [{"id": "ref-for-idl-undefined"}], "title": "6.1. The OrientationSensor Interface"}], "external": true};
-window.dfnpanelData['orientation-sensor'] = {"dfnID": "orientation-sensor", "url": "#orientation-sensor", "dfnText": "Orientation Sensor", "refSections": [{"refs": [{"id": "ref-for-orientation-sensor"}], "title": "5. Model"}], "external": false};
-window.dfnpanelData['earths-reference-coordinate-system'] = {"dfnID": "earths-reference-coordinate-system", "url": "#earths-reference-coordinate-system", "dfnText": "Earth\u2019s reference\ncoordinate system", "refSections": [{"refs": [{"id": "ref-for-earths-reference-coordinate-system"}], "title": "1. Introduction"}, {"refs": [{"id": "ref-for-earths-reference-coordinate-system\u2460"}], "title": "5.1. The AbsoluteOrientationSensor Model"}], "external": false};
-window.dfnpanelData['stationary-reference-coordinate-system'] = {"dfnID": "stationary-reference-coordinate-system", "url": "#stationary-reference-coordinate-system", "dfnText": "stationary reference coordinate system", "refSections": [{"refs": [{"id": "ref-for-stationary-reference-coordinate-system"}, {"id": "ref-for-stationary-reference-coordinate-system\u2460"}], "title": "5.2. The RelativeOrientationSensor Model"}], "external": false};
-window.dfnpanelData['typedefdef-rotationmatrixtype'] = {"dfnID": "typedefdef-rotationmatrixtype", "url": "#typedefdef-rotationmatrixtype", "dfnText": "RotationMatrixType", "refSections": [{"refs": [{"id": "ref-for-typedefdef-rotationmatrixtype"}], "title": "6.1. The OrientationSensor Interface"}, {"refs": [{"id": "ref-for-typedefdef-rotationmatrixtype\u2460"}], "title": "6.1.2. OrientationSensor.populateMatrix()"}], "external": false};
-window.dfnpanelData['orientationsensor'] = {"dfnID": "orientationsensor", "url": "#orientationsensor", "dfnText": "OrientationSensor", "refSections": [{"refs": [{"id": "ref-for-orientationsensor"}, {"id": "ref-for-orientationsensor\u2460"}, {"id": "ref-for-orientationsensor\u2461"}, {"id": "ref-for-orientationsensor\u2462"}], "title": "1. Introduction"}, {"refs": [{"id": "ref-for-orientationsensor\u2463"}, {"id": "ref-for-orientationsensor\u2464"}], "title": "5. Model"}, {"refs": [{"id": "ref-for-orientationsensor\u2465"}], "title": "5.1. The AbsoluteOrientationSensor Model"}, {"refs": [{"id": "ref-for-orientationsensor\u2466"}], "title": "5.2. The RelativeOrientationSensor Model"}, {"refs": [{"id": "ref-for-orientationsensor\u2467"}], "title": "6.2. The AbsoluteOrientationSensor Interface"}, {"refs": [{"id": "ref-for-orientationsensor\u2468"}], "title": "6.3. The RelativeOrientationSensor Interface"}, {"refs": [{"id": "ref-for-orientationsensor\u2460\u24ea"}, {"id": "ref-for-orientationsensor\u2460\u2460"}], "title": "7.1. Construct an Orientation Sensor object"}], "external": false};
-window.dfnpanelData['dom-orientationsensor-populatematrix'] = {"dfnID": "dom-orientationsensor-populatematrix", "url": "#dom-orientationsensor-populatematrix", "dfnText": "populateMatrix", "refSections": [{"refs": [{"id": "ref-for-dom-orientationsensor-populatematrix"}, {"id": "ref-for-dom-orientationsensor-populatematrix\u2460"}], "title": "6.1.2. OrientationSensor.populateMatrix()"}], "external": false};
-window.dfnpanelData['enumdef-orientationsensorlocalcoordinatesystem'] = {"dfnID": "enumdef-orientationsensorlocalcoordinatesystem", "url": "#enumdef-orientationsensorlocalcoordinatesystem", "dfnText": "OrientationSensorLocalCoordinateSystem", "refSections": [{"refs": [{"id": "ref-for-enumdef-orientationsensorlocalcoordinatesystem"}], "title": "6.1. The OrientationSensor Interface"}], "external": false};
-window.dfnpanelData['dictdef-orientationsensoroptions'] = {"dfnID": "dictdef-orientationsensoroptions", "url": "#dictdef-orientationsensoroptions", "dfnText": "OrientationSensorOptions", "refSections": [{"refs": [{"id": "ref-for-dictdef-orientationsensoroptions"}], "title": "6.2. The AbsoluteOrientationSensor Interface"}, {"refs": [{"id": "ref-for-dictdef-orientationsensoroptions\u2460"}], "title": "6.3. The RelativeOrientationSensor Interface"}, {"refs": [{"id": "ref-for-dictdef-orientationsensoroptions\u2461"}], "title": "7.1. Construct an Orientation Sensor object"}], "external": false};
-window.dfnpanelData['dom-orientationsensoroptions-referenceframe'] = {"dfnID": "dom-orientationsensoroptions-referenceframe", "url": "#dom-orientationsensoroptions-referenceframe", "dfnText": "referenceFrame", "refSections": [{"refs": [{"id": "ref-for-dom-orientationsensoroptions-referenceframe"}], "title": "7.1. Construct an Orientation Sensor object"}], "external": false};
-window.dfnpanelData['populate-rotation-matrix'] = {"dfnID": "populate-rotation-matrix", "url": "#populate-rotation-matrix", "dfnText": "populate rotation matrix", "refSections": [{"refs": [{"id": "ref-for-populate-rotation-matrix"}], "title": "6.1.2. OrientationSensor.populateMatrix()"}], "external": false};
-window.dfnpanelData['absoluteorientationsensor'] = {"dfnID": "absoluteorientationsensor", "url": "#absoluteorientationsensor", "dfnText": "AbsoluteOrientationSensor", "refSections": [{"refs": [{"id": "ref-for-absoluteorientationsensor"}], "title": "1. Introduction"}, {"refs": [{"id": "ref-for-absoluteorientationsensor\u2460"}, {"id": "ref-for-absoluteorientationsensor\u2461"}, {"id": "ref-for-absoluteorientationsensor\u2462"}], "title": "5. Model"}, {"refs": [{"id": "ref-for-absoluteorientationsensor\u2463"}], "title": "5.1. The AbsoluteOrientationSensor Model"}, {"refs": [{"id": "ref-for-absoluteorientationsensor\u2464"}, {"id": "ref-for-absoluteorientationsensor\u2465"}, {"id": "ref-for-absoluteorientationsensor\u2466"}], "title": "6.2. The AbsoluteOrientationSensor Interface"}, {"refs": [{"id": "ref-for-absoluteorientationsensor\u2467"}], "title": "8. Automation"}, {"refs": [{"id": "ref-for-absoluteorientationsensor\u2468"}], "title": "8.1. Mock Sensor Type"}], "external": false};
-window.dfnpanelData['relativeorientationsensor'] = {"dfnID": "relativeorientationsensor", "url": "#relativeorientationsensor", "dfnText": "RelativeOrientationSensor", "refSections": [{"refs": [{"id": "ref-for-relativeorientationsensor"}, {"id": "ref-for-relativeorientationsensor\u2460"}], "title": "5. Model"}, {"refs": [{"id": "ref-for-relativeorientationsensor\u2461"}], "title": "5.2. The RelativeOrientationSensor Model"}, {"refs": [{"id": "ref-for-relativeorientationsensor\u2462"}, {"id": "ref-for-relativeorientationsensor\u2463"}, {"id": "ref-for-relativeorientationsensor\u2464"}], "title": "6.3. The RelativeOrientationSensor Interface"}, {"refs": [{"id": "ref-for-relativeorientationsensor\u2465"}], "title": "8. Automation"}, {"refs": [{"id": "ref-for-relativeorientationsensor\u2466"}], "title": "8.1. Mock Sensor Type"}], "external": false};
-window.dfnpanelData['construct-an-orientation-sensor-object'] = {"dfnID": "construct-an-orientation-sensor-object", "url": "#construct-an-orientation-sensor-object", "dfnText": "7.1. Construct an Orientation Sensor object", "refSections": [{"refs": [{"id": "ref-for-construct-an-orientation-sensor-object"}], "title": "6.2. The AbsoluteOrientationSensor Interface"}, {"refs": [{"id": "ref-for-construct-an-orientation-sensor-object\u2460"}], "title": "6.3. The RelativeOrientationSensor Interface"}, {"refs": [{"id": "ref-for-construct-an-orientation-sensor-object"}], "title": "7.1. Construct an Orientation Sensor object"}], "external": false};
-window.dfnpanelData['dictdef-absoluteorientationreadingvalues'] = {"dfnID": "dictdef-absoluteorientationreadingvalues", "url": "#dictdef-absoluteorientationreadingvalues", "dfnText": "AbsoluteOrientationReadingValues", "refSections": [{"refs": [{"id": "ref-for-dictdef-absoluteorientationreadingvalues"}], "title": "8.1. Mock Sensor Type"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -2061,378 +1596,830 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"0026f53f": {"dfnID":"0026f53f","dfnText":"initialize a sensor object","external":true,"refSections":[{"refs":[{"id":"ref-for-initialize-a-sensor-object"}],"title":"7.1. Construct an Orientation Sensor object"}],"url":"https://w3c.github.io/sensors/#initialize-a-sensor-object"},
+"0a296dfe": {"dfnID":"0a296dfe","dfnText":"Float32Array","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-Float32Array"}],"title":"6.1. The OrientationSensor Interface"},{"refs":[{"id":"ref-for-idl-Float32Array\u2460"},{"id":"ref-for-idl-Float32Array\u2461"}],"title":"6.1.2. OrientationSensor.populateMatrix()"}],"url":"https://webidl.spec.whatwg.org/#idl-Float32Array"},
+"0be3911e": {"dfnID":"0be3911e","dfnText":"NotReadableError","external":true,"refSections":[{"refs":[{"id":"ref-for-notreadableerror"}],"title":"6.1.2. OrientationSensor.populateMatrix()"}],"url":"https://webidl.spec.whatwg.org/#notreadableerror"},
+"0fe98df2": {"dfnID":"0fe98df2","dfnText":"\"relative-orientation\"","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-mocksensortype-relative-orientation"}],"title":"8.1. Mock Sensor Type"}],"url":"https://w3c.github.io/sensors/#dom-mocksensortype-relative-orientation"},
+"10634796": {"dfnID":"10634796","dfnText":"relative orientation sensor","external":true,"refSections":[{"refs":[{"id":"ref-for-relative-orientation"}],"title":"5.2. The RelativeOrientationSensor Model"}],"url":"https://w3c.github.io/motion-sensors/#relative-orientation"},
+"13f5be19": {"dfnID":"13f5be19","dfnText":"supported sensor options","external":true,"refSections":[{"refs":[{"id":"ref-for-supported-sensor-options"}],"title":"6.2. The AbsoluteOrientationSensor Interface"},{"refs":[{"id":"ref-for-supported-sensor-options\u2460"}],"title":"6.3. The RelativeOrientationSensor Interface"}],"url":"https://w3c.github.io/sensors/#supported-sensor-options"},
+"1405315e": {"dfnID":"1405315e","dfnText":"\"absolute-orientation\"","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-mocksensortype-absolute-orientation"}],"title":"8.1. Mock Sensor Type"}],"url":"https://w3c.github.io/sensors/#dom-mocksensortype-absolute-orientation"},
+"1422ec4e": {"dfnID":"1422ec4e","dfnText":"interface","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-interface"},{"id":"ref-for-dfn-interface\u2460"},{"id":"ref-for-dfn-interface\u2461"}],"title":"7.1. Construct an Orientation Sensor object"}],"url":"https://webidl.spec.whatwg.org/#dfn-interface"},
+"1b956603": {"dfnID":"1b956603","dfnText":"Sensor","external":true,"refSections":[{"refs":[{"id":"ref-for-sensor"},{"id":"ref-for-sensor\u2460"}],"title":"5. Model"},{"refs":[{"id":"ref-for-sensor\u2461"}],"title":"6.1. The OrientationSensor Interface"}],"url":"https://w3c.github.io/sensors/#sensor"},
+"207de9db": {"dfnID":"207de9db","dfnText":"SensorOptions","external":true,"refSections":[{"refs":[{"id":"ref-for-dictdef-sensoroptions"}],"title":"1. Introduction"},{"refs":[{"id":"ref-for-dictdef-sensoroptions\u2460"}],"title":"6.1. The OrientationSensor Interface"}],"url":"https://w3c.github.io/sensors/#dictdef-sensoroptions"},
+"277a4c80": {"dfnID":"277a4c80","dfnText":"request sensor access","external":true,"refSections":[{"refs":[{"id":"ref-for-request-sensor-access"}],"title":"5. Model"}],"url":"https://w3c.github.io/sensors/#request-sensor-access"},
+"32e66fc3": {"dfnID":"32e66fc3","dfnText":"DeviceOrientationEvent","external":true,"refSections":[{"refs":[{"id":"ref-for-deviceorientation_event"},{"id":"ref-for-deviceorientation_event\u2460"}],"title":"1. Introduction"}],"url":"https://www.w3.org/TR/2016/CR-orientation-event-20160818/#deviceorientation_event"},
+"378064f9": {"dfnID":"378064f9","dfnText":"latest reading","external":true,"refSections":[{"refs":[{"id":"ref-for-latest-reading"},{"id":"ref-for-latest-reading\u2460"}],"title":"5. Model"},{"refs":[{"id":"ref-for-latest-reading\u2461"},{"id":"ref-for-latest-reading\u2462"}],"title":"5.1. The AbsoluteOrientationSensor Model"},{"refs":[{"id":"ref-for-latest-reading\u2463"}],"title":"5.2. The RelativeOrientationSensor Model"},{"refs":[{"id":"ref-for-latest-reading\u2464"}],"title":"6.1.2. OrientationSensor.populateMatrix()"}],"url":"https://w3c.github.io/sensors/#latest-reading"},
+"4acdbf1c": {"dfnID":"4acdbf1c","dfnText":"mock sensor reading values","external":true,"refSections":[{"refs":[{"id":"ref-for-mock-sensor-reading-values"},{"id":"ref-for-mock-sensor-reading-values\u2460"}],"title":"8.1. Mock Sensor Type"}],"url":"https://w3c.github.io/sensors/#mock-sensor-reading-values"},
+"4ffe871f": {"dfnID":"4ffe871f","dfnText":"DOMMatrix","external":true,"refSections":[{"refs":[{"id":"ref-for-dommatrix"}],"title":"6.1. The OrientationSensor Interface"},{"refs":[{"id":"ref-for-dommatrix\u2460"}],"title":"6.1.2. OrientationSensor.populateMatrix()"}],"url":"https://drafts.fxtf.org/geometry-1/#dommatrix"},
+"5822d2f3": {"dfnID":"5822d2f3","dfnText":"check sensor policy-controlled features","external":true,"refSections":[{"refs":[{"id":"ref-for-check-sensor-policy-controlled-features"}],"title":"7.1. Construct an Orientation Sensor object"}],"url":"https://w3c.github.io/sensors/#check-sensor-policy-controlled-features"},
+"5e19184b": {"dfnID":"5e19184b","dfnText":"Magnetometer","external":true,"refSections":[{"refs":[{"id":"ref-for-magnetometer"},{"id":"ref-for-magnetometer\u2460"}],"title":"5. Model"}],"url":"https://w3c.github.io/magnetometer/#magnetometer"},
+"5f90bbfb": {"dfnID":"5f90bbfb","dfnText":"undefined","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-undefined"}],"title":"6.1. The OrientationSensor Interface"}],"url":"https://webidl.spec.whatwg.org/#idl-undefined"},
+"61e7f6a4": {"dfnID":"61e7f6a4","dfnText":"sensor-fusion","external":true,"refSections":[{"refs":[{"id":"ref-for-sensor-fusion"},{"id":"ref-for-sensor-fusion\u2460"}],"title":"5. Model"}],"url":"https://w3c.github.io/sensors/#sensor-fusion"},
+"649608b9": {"dfnID":"649608b9","dfnText":"list","external":true,"refSections":[{"refs":[{"id":"ref-for-list"},{"id":"ref-for-list\u2460"},{"id":"ref-for-list\u2461"}],"title":"5. Model"}],"url":"https://infra.spec.whatwg.org/#list"},
+"68c96227": {"dfnID":"68c96227","dfnText":"Gyroscope","external":true,"refSections":[{"refs":[{"id":"ref-for-gyroscope"},{"id":"ref-for-gyroscope\u2460"},{"id":"ref-for-gyroscope\u2461"}],"title":"5. Model"}],"url":"https://w3c.github.io/gyroscope/#gyroscope"},
+"6a5a59a0": {"dfnID":"6a5a59a0","dfnText":"event handler","external":true,"refSections":[{"refs":[{"id":"ref-for-event-handlers"}],"title":"5. Model"}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#event-handlers"},
+"75e1dbe0": {"dfnID":"75e1dbe0","dfnText":"absolute orientation sensor","external":true,"refSections":[{"refs":[{"id":"ref-for-absolute-orientation"}],"title":"5.1. The AbsoluteOrientationSensor Model"}],"url":"https://w3c.github.io/motion-sensors/#absolute-orientation"},
+"7892f569": {"dfnID":"7892f569","dfnText":"device coordinate system","external":true,"refSections":[{"refs":[{"id":"ref-for-device-coordinate-system"}],"title":"5.1. The AbsoluteOrientationSensor Model"},{"refs":[{"id":"ref-for-device-coordinate-system\u2460"}],"title":"5.2. The RelativeOrientationSensor Model"},{"refs":[{"id":"ref-for-device-coordinate-system\u2461"}],"title":"7.1. Construct an Orientation Sensor object"}],"url":"https://w3c.github.io/accelerometer/#device-coordinate-system"},
+"802b0fdd": {"dfnID":"802b0fdd","dfnText":"value","external":true,"refSections":[{"refs":[{"id":"ref-for-map-value"}],"title":"5. Model"}],"url":"https://infra.spec.whatwg.org/#map-value"},
+"82ca3efc": {"dfnID":"82ca3efc","dfnText":"TypeError","external":true,"refSections":[{"refs":[{"id":"ref-for-exceptiondef-typeerror"},{"id":"ref-for-exceptiondef-typeerror\u2460"}],"title":"6.1.2. OrientationSensor.populateMatrix()"}],"url":"https://webidl.spec.whatwg.org/#exceptiondef-typeerror"},
+"889e932f": {"dfnID":"889e932f","dfnText":"Exposed","external":true,"refSections":[{"refs":[{"id":"ref-for-Exposed"}],"title":"6.1. The OrientationSensor Interface"},{"refs":[{"id":"ref-for-Exposed\u2460"}],"title":"6.2. The AbsoluteOrientationSensor Interface"},{"refs":[{"id":"ref-for-Exposed\u2461"}],"title":"6.3. The RelativeOrientationSensor Interface"}],"url":"https://webidl.spec.whatwg.org/#Exposed"},
+"8958b003": {"dfnID":"8958b003","dfnText":"entry","external":true,"refSections":[{"refs":[{"id":"ref-for-map-entry"}],"title":"5. Model"}],"url":"https://infra.spec.whatwg.org/#map-entry"},
+"8b05f5b6": {"dfnID":"8b05f5b6","dfnText":"automation","external":true,"refSections":[{"refs":[{"id":"ref-for-automation"}],"title":"8. Automation"}],"url":"https://w3c.github.io/sensors/#automation"},
+"8c800cdf": {"dfnID":"8c800cdf","dfnText":"double","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-double"}],"title":"6.1. The OrientationSensor Interface"},{"refs":[{"id":"ref-for-idl-double\u2460"}],"title":"8.1. Mock Sensor Type"}],"url":"https://webidl.spec.whatwg.org/#idl-double"},
+"95a8cb5f": {"dfnID":"95a8cb5f","dfnText":"local coordinate system","external":true,"refSections":[{"refs":[{"id":"ref-for-local-coordinate-system"},{"id":"ref-for-local-coordinate-system\u2460"},{"id":"ref-for-local-coordinate-system\u2461"}],"title":"5.1. The AbsoluteOrientationSensor Model"},{"refs":[{"id":"ref-for-local-coordinate-system\u2462"},{"id":"ref-for-local-coordinate-system\u2463"}],"title":"5.2. The RelativeOrientationSensor Model"},{"refs":[{"id":"ref-for-local-coordinate-system\u2464"},{"id":"ref-for-local-coordinate-system\u2465"}],"title":"7.1. Construct an Orientation Sensor object"}],"url":"https://w3c.github.io/sensors/#local-coordinate-system"},
+"980252f2": {"dfnID":"980252f2","dfnText":"identifier","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-identifier"}],"title":"7.1. Construct an Orientation Sensor object"}],"url":"https://webidl.spec.whatwg.org/#dfn-identifier"},
+"9d689cca": {"dfnID":"9d689cca","dfnText":"screen coordinate system","external":true,"refSections":[{"refs":[{"id":"ref-for-screen-coordinate-system"}],"title":"5.1. The AbsoluteOrientationSensor Model"},{"refs":[{"id":"ref-for-screen-coordinate-system\u2460"}],"title":"5.2. The RelativeOrientationSensor Model"},{"refs":[{"id":"ref-for-screen-coordinate-system\u2461"}],"title":"7.1. Construct an Orientation Sensor object"}],"url":"https://w3c.github.io/accelerometer/#screen-coordinate-system"},
+"absoluteorientationsensor": {"dfnID":"absoluteorientationsensor","dfnText":"AbsoluteOrientationSensor","external":false,"refSections":[{"refs":[{"id":"ref-for-absoluteorientationsensor"}],"title":"1. Introduction"},{"refs":[{"id":"ref-for-absoluteorientationsensor\u2460"},{"id":"ref-for-absoluteorientationsensor\u2461"},{"id":"ref-for-absoluteorientationsensor\u2462"}],"title":"5. Model"},{"refs":[{"id":"ref-for-absoluteorientationsensor\u2463"}],"title":"5.1. The AbsoluteOrientationSensor Model"},{"refs":[{"id":"ref-for-absoluteorientationsensor\u2464"},{"id":"ref-for-absoluteorientationsensor\u2465"},{"id":"ref-for-absoluteorientationsensor\u2466"}],"title":"6.2. The AbsoluteOrientationSensor Interface"},{"refs":[{"id":"ref-for-absoluteorientationsensor\u2467"}],"title":"8. Automation"},{"refs":[{"id":"ref-for-absoluteorientationsensor\u2468"}],"title":"8.1. Mock Sensor Type"}],"url":"#absoluteorientationsensor"},
+"b4cfa5ce": {"dfnID":"b4cfa5ce","dfnText":"throw","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-throw"},{"id":"ref-for-dfn-throw\u2460"},{"id":"ref-for-dfn-throw\u2461"}],"title":"6.1.2. OrientationSensor.populateMatrix()"},{"refs":[{"id":"ref-for-dfn-throw\u2462"}],"title":"7.1. Construct an Orientation Sensor object"}],"url":"https://webidl.spec.whatwg.org/#dfn-throw"},
+"b75bb3bd": {"dfnID":"b75bb3bd","dfnText":"SecureContext","external":true,"refSections":[{"refs":[{"id":"ref-for-SecureContext"}],"title":"6.1. The OrientationSensor Interface"},{"refs":[{"id":"ref-for-SecureContext\u2460"}],"title":"6.2. The AbsoluteOrientationSensor Interface"},{"refs":[{"id":"ref-for-SecureContext\u2461"}],"title":"6.3. The RelativeOrientationSensor Interface"}],"url":"https://webidl.spec.whatwg.org/#SecureContext"},
+"c29c300e": {"dfnID":"c29c300e","dfnText":"start()","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-sensor-start"},{"id":"ref-for-dom-sensor-start\u2460"}],"title":"5. Model"}],"url":"https://w3c.github.io/sensors/#dom-sensor-start"},
+"c3b7f760": {"dfnID":"c3b7f760","dfnText":"mock sensor type","external":true,"refSections":[{"refs":[{"id":"ref-for-mock-sensor-type"},{"id":"ref-for-mock-sensor-type\u2460"}],"title":"8.1. Mock Sensor Type"}],"url":"https://w3c.github.io/sensors/#mock-sensor-type"},
+"c3e881ef": {"dfnID":"c3e881ef","dfnText":"SecurityError","external":true,"refSections":[{"refs":[{"id":"ref-for-securityerror"}],"title":"7.1. Construct an Orientation Sensor object"}],"url":"https://webidl.spec.whatwg.org/#securityerror"},
+"construct-an-orientation-sensor-object": {"dfnID":"construct-an-orientation-sensor-object","dfnText":"7.1. Construct an Orientation Sensor object","external":false,"refSections":[{"refs":[{"id":"ref-for-construct-an-orientation-sensor-object"}],"title":"6.2. The AbsoluteOrientationSensor Interface"},{"refs":[{"id":"ref-for-construct-an-orientation-sensor-object\u2460"}],"title":"6.3. The RelativeOrientationSensor Interface"},{"refs":[{"id":"ref-for-construct-an-orientation-sensor-object"}],"title":"7.1. Construct an Orientation Sensor object"}],"url":"#construct-an-orientation-sensor-object"},
+"d14a6f26": {"dfnID":"d14a6f26","dfnText":"key","external":true,"refSections":[{"refs":[{"id":"ref-for-map-key"}],"title":"5. Model"}],"url":"https://infra.spec.whatwg.org/#map-key"},
+"d30469fc": {"dfnID":"d30469fc","dfnText":"equivalent","external":true,"refSections":[{"refs":[{"id":"ref-for-equivalent"}],"title":"6.1.2. OrientationSensor.populateMatrix()"}],"url":"https://w3c.github.io/sensors/#equivalent"},
+"dca2de17": {"dfnID":"dca2de17","dfnText":"DOMException","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-DOMException"}],"title":"6.1.2. OrientationSensor.populateMatrix()"},{"refs":[{"id":"ref-for-idl-DOMException\u2460"}],"title":"7.1. Construct an Orientation Sensor object"}],"url":"https://webidl.spec.whatwg.org/#idl-DOMException"},
+"dcf5fafa": {"dfnID":"dcf5fafa","dfnText":"FrozenArray","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-frozen-array"}],"title":"6.1. The OrientationSensor Interface"},{"refs":[{"id":"ref-for-idl-frozen-array\u2460"}],"title":"6.1.1. OrientationSensor.quaternion"},{"refs":[{"id":"ref-for-idl-frozen-array\u2461"}],"title":"8.1. Mock Sensor Type"}],"url":"https://webidl.spec.whatwg.org/#idl-frozen-array"},
+"dictdef-absoluteorientationreadingvalues": {"dfnID":"dictdef-absoluteorientationreadingvalues","dfnText":"AbsoluteOrientationReadingValues","external":false,"refSections":[{"refs":[{"id":"ref-for-dictdef-absoluteorientationreadingvalues"}],"title":"8.1. Mock Sensor Type"}],"url":"#dictdef-absoluteorientationreadingvalues"},
+"dictdef-orientationsensoroptions": {"dfnID":"dictdef-orientationsensoroptions","dfnText":"OrientationSensorOptions","external":false,"refSections":[{"refs":[{"id":"ref-for-dictdef-orientationsensoroptions"}],"title":"6.2. The AbsoluteOrientationSensor Interface"},{"refs":[{"id":"ref-for-dictdef-orientationsensoroptions\u2460"}],"title":"6.3. The RelativeOrientationSensor Interface"},{"refs":[{"id":"ref-for-dictdef-orientationsensoroptions\u2461"}],"title":"7.1. Construct an Orientation Sensor object"}],"url":"#dictdef-orientationsensoroptions"},
+"dom-orientationsensor-populatematrix": {"dfnID":"dom-orientationsensor-populatematrix","dfnText":"populateMatrix","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-orientationsensor-populatematrix"},{"id":"ref-for-dom-orientationsensor-populatematrix\u2460"}],"title":"6.1.2. OrientationSensor.populateMatrix()"}],"url":"#dom-orientationsensor-populatematrix"},
+"dom-orientationsensoroptions-referenceframe": {"dfnID":"dom-orientationsensoroptions-referenceframe","dfnText":"referenceFrame","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-orientationsensoroptions-referenceframe"}],"title":"7.1. Construct an Orientation Sensor object"}],"url":"#dom-orientationsensoroptions-referenceframe"},
+"earths-reference-coordinate-system": {"dfnID":"earths-reference-coordinate-system","dfnText":"Earth\u2019s reference\ncoordinate system","external":false,"refSections":[{"refs":[{"id":"ref-for-earths-reference-coordinate-system"}],"title":"1. Introduction"},{"refs":[{"id":"ref-for-earths-reference-coordinate-system\u2460"}],"title":"5.1. The AbsoluteOrientationSensor Model"}],"url":"#earths-reference-coordinate-system"},
+"eb8343c0": {"dfnID":"eb8343c0","dfnText":"low-level","external":true,"refSections":[{"refs":[{"id":"ref-for-low-level"}],"title":"1. Introduction"},{"refs":[{"id":"ref-for-low-level\u2460"},{"id":"ref-for-low-level\u2461"},{"id":"ref-for-low-level\u2462"},{"id":"ref-for-low-level\u2463"},{"id":"ref-for-low-level\u2464"}],"title":"5. Model"},{"refs":[{"id":"ref-for-low-level\u2465"}],"title":"5.1. The AbsoluteOrientationSensor Model"},{"refs":[{"id":"ref-for-low-level\u2466"}],"title":"5.2. The RelativeOrientationSensor Model"}],"url":"https://w3c.github.io/sensors/#low-level"},
+"enumdef-orientationsensorlocalcoordinatesystem": {"dfnID":"enumdef-orientationsensorlocalcoordinatesystem","dfnText":"OrientationSensorLocalCoordinateSystem","external":false,"refSections":[{"refs":[{"id":"ref-for-enumdef-orientationsensorlocalcoordinatesystem"}],"title":"6.1. The OrientationSensor Interface"}],"url":"#enumdef-orientationsensorlocalcoordinatesystem"},
+"f6ac79fb": {"dfnID":"f6ac79fb","dfnText":"Float64Array","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-Float64Array"}],"title":"6.1. The OrientationSensor Interface"},{"refs":[{"id":"ref-for-idl-Float64Array\u2460"},{"id":"ref-for-idl-Float64Array\u2461"}],"title":"6.1.2. OrientationSensor.populateMatrix()"}],"url":"https://webidl.spec.whatwg.org/#idl-Float64Array"},
+"f96b75e9": {"dfnID":"f96b75e9","dfnText":"sensor type","external":true,"refSections":[{"refs":[{"id":"ref-for-sensor-type"},{"id":"ref-for-sensor-type\u2460"}],"title":"5. Model"}],"url":"https://w3c.github.io/sensors/#sensor-type"},
+"fc14fa8a": {"dfnID":"fc14fa8a","dfnText":"inherited interfaces","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-inherited-interfaces"}],"title":"7.1. Construct an Orientation Sensor object"}],"url":"https://webidl.spec.whatwg.org/#dfn-inherited-interfaces"},
+"fd03f682": {"dfnID":"fd03f682","dfnText":"onerror","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-sensor-onerror"}],"title":"5. Model"}],"url":"https://w3c.github.io/sensors/#dom-sensor-onerror"},
+"fd4ad34f": {"dfnID":"fd4ad34f","dfnText":"get value from latest reading","external":true,"refSections":[{"refs":[{"id":"ref-for-get-value-from-latest-reading"}],"title":"6.1.1. OrientationSensor.quaternion"},{"refs":[{"id":"ref-for-get-value-from-latest-reading\u2460"}],"title":"6.1.2. OrientationSensor.populateMatrix()"}],"url":"https://w3c.github.io/sensors/#get-value-from-latest-reading"},
+"ffcc175a": {"dfnID":"ffcc175a","dfnText":"Accelerometer","external":true,"refSections":[{"refs":[{"id":"ref-for-accelerometer"},{"id":"ref-for-accelerometer\u2460"},{"id":"ref-for-accelerometer\u2461"}],"title":"5. Model"}],"url":"https://w3c.github.io/accelerometer/#accelerometer"},
+"orientation-sensor": {"dfnID":"orientation-sensor","dfnText":"Orientation Sensor","external":false,"refSections":[{"refs":[{"id":"ref-for-orientation-sensor"}],"title":"5. Model"}],"url":"#orientation-sensor"},
+"orientationsensor": {"dfnID":"orientationsensor","dfnText":"OrientationSensor","external":false,"refSections":[{"refs":[{"id":"ref-for-orientationsensor"},{"id":"ref-for-orientationsensor\u2460"},{"id":"ref-for-orientationsensor\u2461"},{"id":"ref-for-orientationsensor\u2462"}],"title":"1. Introduction"},{"refs":[{"id":"ref-for-orientationsensor\u2463"},{"id":"ref-for-orientationsensor\u2464"}],"title":"5. Model"},{"refs":[{"id":"ref-for-orientationsensor\u2465"}],"title":"5.1. The AbsoluteOrientationSensor Model"},{"refs":[{"id":"ref-for-orientationsensor\u2466"}],"title":"5.2. The RelativeOrientationSensor Model"},{"refs":[{"id":"ref-for-orientationsensor\u2467"}],"title":"6.2. The AbsoluteOrientationSensor Interface"},{"refs":[{"id":"ref-for-orientationsensor\u2468"}],"title":"6.3. The RelativeOrientationSensor Interface"},{"refs":[{"id":"ref-for-orientationsensor\u2460\u24ea"},{"id":"ref-for-orientationsensor\u2460\u2460"}],"title":"7.1. Construct an Orientation Sensor object"}],"url":"#orientationsensor"},
+"populate-rotation-matrix": {"dfnID":"populate-rotation-matrix","dfnText":"populate rotation matrix","external":false,"refSections":[{"refs":[{"id":"ref-for-populate-rotation-matrix"}],"title":"6.1.2. OrientationSensor.populateMatrix()"}],"url":"#populate-rotation-matrix"},
+"relativeorientationsensor": {"dfnID":"relativeorientationsensor","dfnText":"RelativeOrientationSensor","external":false,"refSections":[{"refs":[{"id":"ref-for-relativeorientationsensor"},{"id":"ref-for-relativeorientationsensor\u2460"}],"title":"5. Model"},{"refs":[{"id":"ref-for-relativeorientationsensor\u2461"}],"title":"5.2. The RelativeOrientationSensor Model"},{"refs":[{"id":"ref-for-relativeorientationsensor\u2462"},{"id":"ref-for-relativeorientationsensor\u2463"},{"id":"ref-for-relativeorientationsensor\u2464"}],"title":"6.3. The RelativeOrientationSensor Interface"},{"refs":[{"id":"ref-for-relativeorientationsensor\u2465"}],"title":"8. Automation"},{"refs":[{"id":"ref-for-relativeorientationsensor\u2466"}],"title":"8.1. Mock Sensor Type"}],"url":"#relativeorientationsensor"},
+"stationary-reference-coordinate-system": {"dfnID":"stationary-reference-coordinate-system","dfnText":"stationary reference coordinate system","external":false,"refSections":[{"refs":[{"id":"ref-for-stationary-reference-coordinate-system"},{"id":"ref-for-stationary-reference-coordinate-system\u2460"}],"title":"5.2. The RelativeOrientationSensor Model"}],"url":"#stationary-reference-coordinate-system"},
+"typedefdef-rotationmatrixtype": {"dfnID":"typedefdef-rotationmatrixtype","dfnText":"RotationMatrixType","external":false,"refSections":[{"refs":[{"id":"ref-for-typedefdef-rotationmatrixtype"}],"title":"6.1. The OrientationSensor Interface"},{"refs":[{"id":"ref-for-typedefdef-rotationmatrixtype\u2460"}],"title":"6.1.2. OrientationSensor.populateMatrix()"}],"url":"#typedefdef-rotationmatrixtype"},
+};
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+});
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        dfn.panelData = panelData;
+        insertDfnPopupAction(dfn);
+    }
+}
+
+function genDfnPanel(dfn, { dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel on",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel({dfnPanel});
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.dfn = dfn;
+    dfn.dfnPanel = dfnPanel;
+    return dfnPanel;
+}
+
+
+
+function hideAllDfnPanels() {
+    // Delete the currently-active dfn panel.
+    queryAll(".dfn-panel").forEach(dfnPanel=>hideDfnPanel({dfnPanel}));
+}
+
+function showDfnPanel(dfn) {
+    hideAllDfnPanels(); // Only display one at a time.
+
+    dfn.setAttribute("aria-expanded", "true");
+
+    const dfnPanel = genDfnPanel(dfn, dfn.panelData);
+
+    // Give the dfn a unique tabindex, and then
+    // give all the tabbable panel bits successive indexes.
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+
+    append(document.body, dfnPanel);
+    positionDfnPanel(dfnPanel);
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.dfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }
+}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel({dfn, dfnPanel}) {
+    if(!dfnPanel) dfnPanel = dfn.dfnPanel;
+    if(!dfn) dfn = dfnPanel.dfn;
+    dfn.dfnPanel = undefined;
+    dfnPanel.dfn = undefined;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.remove()
+}
+
+function toggleDfnPanel(dfn) {
+    if(dfn.dfnPanel) {
+        hideDfnPanel(dfn);
+    } else {
+        showDfnPanel(dfn);
+    }
+}
+
+function insertDfnPopupAction(dfn) {
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        toggleDfnPanel(dfn);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+function needsFor(type) {
+    switch(type) {
+        case "descriptor":
+        case "value":
+        case "element-attr":
+        case "attr-value":
+        case "element-state":
+        case "method":
+        case "constructor":
+        case "argument":
+        case "attribute":
+        case "const":
+        case "dict-member":
+        case "event":
+        case "enum-value":
+        case "stringifier":
+        case "serializer":
+        case "iterator":
+        case "maplike":
+        case "setlike":
+        case "state":
+        case "mode":
+        case "context":
+        case "facet": return true;
+
+        default: return false;
+    }
+}
+function refusesFor(type) {
+    switch(type) {
+        case "property":
+        case "element":
+        case "interface":
+        case "namespace":
+        case "callback":
+        case "dictionary":
+        case "enum":
+        case "exception":
+        case "typedef":
+        case "http-header":
+        case "permission": return true;
+
+        default: return false;
+    }
+}
+function linkFormatterFromType(type) {
+    switch(type) {
+        case 'scheme':
+        case 'permission':
+        case 'dfn': return (text) => `[=${text}=]`;
+
+        case 'abstract-op': return (text) => `[\$${text}\$]`;
+
+        case 'function':
+        case 'at-rule':
+        case 'selector':
+        case 'value': return (text) => `''${text}''`;
+
+        case 'http-header': return (text) => `[:${text}:]`;
+
+        case 'interface':
+        case 'constructor':
+        case 'method':
+        case 'argument':
+        case 'attribute':
+        case 'callback':
+        case 'dictionary':
+        case 'dict-member':
+        case 'enum':
+        case 'enum-value':
+        case 'exception':
+        case 'const':
+        case 'typedef':
+        case 'stringifier':
+        case 'serializer':
+        case 'iterator':
+        case 'maplike':
+        case 'setlike':
+        case 'extended-attribute':
+        case 'event':
+        case 'idl': return (text) => `{{${text}}}`;
+
+        case 'element-state':
+        case 'element-attr':
+        case 'attr-value':
+        case 'element': return (element) => `<{${element}}>`;
+
+        case 'grammar': return (text) => `${text} (within a <pre class=prod>)`;
+
+        case 'type': return (text)=> `<<${text}>>`;
+
+        case 'descriptor':
+        case 'property': return (text) => `'${text}'`;
+
+        default: return;
+    };
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!needsFor(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!refusesFor(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
 }
 </script>
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
-                mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
+let refsData = {
+"#absoluteorientationsensor": {"export":true,"for_":[],"level":"","normative":true,"shortname":"orientation-sensor","spec":"orientation-sensor","status":"local","text":"AbsoluteOrientationSensor","type":"interface","url":"#absoluteorientationsensor"},
+"#construct-an-orientation-sensor-object": {"export":true,"for_":[],"level":"","normative":true,"shortname":"orientation-sensor","spec":"orientation-sensor","status":"local","text":"construct an orientation sensor object","type":"dfn","url":"#construct-an-orientation-sensor-object"},
+"#dictdef-absoluteorientationreadingvalues": {"export":true,"for_":[],"level":"","normative":true,"shortname":"orientation-sensor","spec":"orientation-sensor","status":"local","text":"AbsoluteOrientationReadingValues","type":"dictionary","url":"#dictdef-absoluteorientationreadingvalues"},
+"#dictdef-orientationsensoroptions": {"export":true,"for_":[],"level":"","normative":true,"shortname":"orientation-sensor","spec":"orientation-sensor","status":"local","text":"OrientationSensorOptions","type":"dictionary","url":"#dictdef-orientationsensoroptions"},
+"#dom-orientationsensor-populatematrix": {"export":true,"for_":["OrientationSensor"],"level":"","normative":true,"shortname":"orientation-sensor","spec":"orientation-sensor","status":"local","text":"populateMatrix(targetMatrix)","type":"method","url":"#dom-orientationsensor-populatematrix"},
+"#dom-orientationsensoroptions-referenceframe": {"export":true,"for_":["OrientationSensorOptions"],"level":"","normative":true,"shortname":"orientation-sensor","spec":"orientation-sensor","status":"local","text":"referenceFrame","type":"dict-member","url":"#dom-orientationsensoroptions-referenceframe"},
+"#earths-reference-coordinate-system": {"export":true,"for_":[],"level":"","normative":true,"shortname":"orientation-sensor","spec":"orientation-sensor","status":"local","text":"earth's reference coordinate system","type":"dfn","url":"#earths-reference-coordinate-system"},
+"#enumdef-orientationsensorlocalcoordinatesystem": {"export":true,"for_":[],"level":"","normative":true,"shortname":"orientation-sensor","spec":"orientation-sensor","status":"local","text":"OrientationSensorLocalCoordinateSystem","type":"enum","url":"#enumdef-orientationsensorlocalcoordinatesystem"},
+"#orientation-sensor": {"export":true,"for_":[],"level":"","normative":true,"shortname":"orientation-sensor","spec":"orientation-sensor","status":"local","text":"orientation sensor","type":"dfn","url":"#orientation-sensor"},
+"#orientationsensor": {"export":true,"for_":[],"level":"","normative":true,"shortname":"orientation-sensor","spec":"orientation-sensor","status":"local","text":"OrientationSensor","type":"interface","url":"#orientationsensor"},
+"#populate-rotation-matrix": {"export":true,"for_":[],"level":"","normative":true,"shortname":"orientation-sensor","spec":"orientation-sensor","status":"local","text":"populate rotation matrix","type":"dfn","url":"#populate-rotation-matrix"},
+"#relativeorientationsensor": {"export":true,"for_":[],"level":"","normative":true,"shortname":"orientation-sensor","spec":"orientation-sensor","status":"local","text":"RelativeOrientationSensor","type":"interface","url":"#relativeorientationsensor"},
+"#stationary-reference-coordinate-system": {"export":true,"for_":[],"level":"","normative":true,"shortname":"orientation-sensor","spec":"orientation-sensor","status":"local","text":"stationary reference coordinate system","type":"dfn","url":"#stationary-reference-coordinate-system"},
+"#typedefdef-rotationmatrixtype": {"export":true,"for_":[],"level":"","normative":true,"shortname":"orientation-sensor","spec":"orientation-sensor","status":"local","text":"RotationMatrixType","type":"typedef","url":"#typedefdef-rotationmatrixtype"},
+"https://drafts.fxtf.org/geometry-1/#dommatrix": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"geometry","spec":"geometry-1","status":"current","text":"DOMMatrix","type":"interface","url":"https://drafts.fxtf.org/geometry-1/#dommatrix"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#event-handlers": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"event handler","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#event-handlers"},
+"https://infra.spec.whatwg.org/#list": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"list","type":"dfn","url":"https://infra.spec.whatwg.org/#list"},
+"https://infra.spec.whatwg.org/#map-entry": {"export":true,"for_":["map"],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"entry","type":"dfn","url":"https://infra.spec.whatwg.org/#map-entry"},
+"https://infra.spec.whatwg.org/#map-key": {"export":true,"for_":["map"],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"key","type":"dfn","url":"https://infra.spec.whatwg.org/#map-key"},
+"https://infra.spec.whatwg.org/#map-value": {"export":true,"for_":["map"],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"value","type":"dfn","url":"https://infra.spec.whatwg.org/#map-value"},
+"https://w3c.github.io/accelerometer/#accelerometer": {"export":true,"for_":[],"level":"","normative":true,"shortname":"accelerometer","spec":"accelerometer","status":"anchor-block","text":"Accelerometer","type":"interface","url":"https://w3c.github.io/accelerometer/#accelerometer"},
+"https://w3c.github.io/accelerometer/#device-coordinate-system": {"export":true,"for_":[],"level":"","normative":true,"shortname":"accelerometer","spec":"accelerometer","status":"anchor-block","text":"device coordinate system","type":"dfn","url":"https://w3c.github.io/accelerometer/#device-coordinate-system"},
+"https://w3c.github.io/accelerometer/#screen-coordinate-system": {"export":true,"for_":[],"level":"","normative":true,"shortname":"accelerometer","spec":"accelerometer","status":"anchor-block","text":"screen coordinate system","type":"dfn","url":"https://w3c.github.io/accelerometer/#screen-coordinate-system"},
+"https://w3c.github.io/gyroscope/#gyroscope": {"export":true,"for_":[],"level":"","normative":true,"shortname":"gyroscope","spec":"gyroscope","status":"anchor-block","text":"Gyroscope","type":"interface","url":"https://w3c.github.io/gyroscope/#gyroscope"},
+"https://w3c.github.io/magnetometer/#magnetometer": {"export":true,"for_":[],"level":"","normative":true,"shortname":"magnetometer","spec":"magnetometer","status":"anchor-block","text":"Magnetometer","type":"interface","url":"https://w3c.github.io/magnetometer/#magnetometer"},
+"https://w3c.github.io/motion-sensors/#absolute-orientation": {"export":true,"for_":[],"level":"","normative":true,"shortname":"motionsensors","spec":"motionsensors","status":"anchor-block","text":"absolute orientation sensor","type":"dfn","url":"https://w3c.github.io/motion-sensors/#absolute-orientation"},
+"https://w3c.github.io/motion-sensors/#relative-orientation": {"export":true,"for_":[],"level":"","normative":true,"shortname":"motionsensors","spec":"motionsensors","status":"anchor-block","text":"relative orientation sensor","type":"dfn","url":"https://w3c.github.io/motion-sensors/#relative-orientation"},
+"https://w3c.github.io/sensors/#automation": {"export":true,"for_":[],"level":"","normative":true,"shortname":"generic-sensor","spec":"generic-sensor","status":"anchor-block","text":"automation","type":"dfn","url":"https://w3c.github.io/sensors/#automation"},
+"https://w3c.github.io/sensors/#check-sensor-policy-controlled-features": {"export":true,"for_":[],"level":"","normative":true,"shortname":"generic-sensor","spec":"generic-sensor","status":"anchor-block","text":"check sensor policy-controlled features","type":"dfn","url":"https://w3c.github.io/sensors/#check-sensor-policy-controlled-features"},
+"https://w3c.github.io/sensors/#dictdef-sensoroptions": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"generic-sensor","spec":"generic-sensor","status":"current","text":"SensorOptions","type":"dictionary","url":"https://w3c.github.io/sensors/#dictdef-sensoroptions"},
+"https://w3c.github.io/sensors/#dom-mocksensortype-absolute-orientation": {"export":true,"for_":["MockSensorType"],"level":"1","normative":true,"shortname":"generic-sensor","spec":"generic-sensor","status":"current","text":"\"absolute-orientation\"","type":"enum-value","url":"https://w3c.github.io/sensors/#dom-mocksensortype-absolute-orientation"},
+"https://w3c.github.io/sensors/#dom-mocksensortype-relative-orientation": {"export":true,"for_":["MockSensorType"],"level":"1","normative":true,"shortname":"generic-sensor","spec":"generic-sensor","status":"current","text":"\"relative-orientation\"","type":"enum-value","url":"https://w3c.github.io/sensors/#dom-mocksensortype-relative-orientation"},
+"https://w3c.github.io/sensors/#dom-sensor-onerror": {"export":true,"for_":["Sensor"],"level":"1","normative":true,"shortname":"generic-sensor","spec":"generic-sensor","status":"current","text":"onerror","type":"attribute","url":"https://w3c.github.io/sensors/#dom-sensor-onerror"},
+"https://w3c.github.io/sensors/#dom-sensor-start": {"export":true,"for_":["Sensor"],"level":"1","normative":true,"shortname":"generic-sensor","spec":"generic-sensor","status":"current","text":"start()","type":"method","url":"https://w3c.github.io/sensors/#dom-sensor-start"},
+"https://w3c.github.io/sensors/#equivalent": {"export":true,"for_":[],"level":"","normative":true,"shortname":"generic-sensor","spec":"generic-sensor","status":"anchor-block","text":"equivalent","type":"dfn","url":"https://w3c.github.io/sensors/#equivalent"},
+"https://w3c.github.io/sensors/#get-value-from-latest-reading": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"generic-sensor","spec":"generic-sensor","status":"current","text":"get value from latest reading","type":"dfn","url":"https://w3c.github.io/sensors/#get-value-from-latest-reading"},
+"https://w3c.github.io/sensors/#initialize-a-sensor-object": {"export":true,"for_":[],"level":"","normative":true,"shortname":"generic-sensor","spec":"generic-sensor","status":"anchor-block","text":"initialize a sensor object","type":"dfn","url":"https://w3c.github.io/sensors/#initialize-a-sensor-object"},
+"https://w3c.github.io/sensors/#latest-reading": {"export":true,"for_":[],"level":"","normative":true,"shortname":"generic-sensor","spec":"generic-sensor","status":"anchor-block","text":"latest reading","type":"dfn","url":"https://w3c.github.io/sensors/#latest-reading"},
+"https://w3c.github.io/sensors/#local-coordinate-system": {"export":true,"for_":[],"level":"","normative":true,"shortname":"generic-sensor","spec":"generic-sensor","status":"anchor-block","text":"local coordinate system","type":"dfn","url":"https://w3c.github.io/sensors/#local-coordinate-system"},
+"https://w3c.github.io/sensors/#low-level": {"export":true,"for_":[],"level":"","normative":true,"shortname":"generic-sensor","spec":"generic-sensor","status":"anchor-block","text":"low-level","type":"dfn","url":"https://w3c.github.io/sensors/#low-level"},
+"https://w3c.github.io/sensors/#mock-sensor-reading-values": {"export":true,"for_":[],"level":"","normative":true,"shortname":"generic-sensor","spec":"generic-sensor","status":"anchor-block","text":"mock sensor reading values","type":"dfn","url":"https://w3c.github.io/sensors/#mock-sensor-reading-values"},
+"https://w3c.github.io/sensors/#mock-sensor-type": {"export":true,"for_":[],"level":"","normative":true,"shortname":"generic-sensor","spec":"generic-sensor","status":"anchor-block","text":"mock sensor type","type":"dfn","url":"https://w3c.github.io/sensors/#mock-sensor-type"},
+"https://w3c.github.io/sensors/#request-sensor-access": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"generic-sensor","spec":"generic-sensor","status":"current","text":"request sensor access","type":"dfn","url":"https://w3c.github.io/sensors/#request-sensor-access"},
+"https://w3c.github.io/sensors/#sensor": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"generic-sensor","spec":"generic-sensor","status":"current","text":"Sensor","type":"interface","url":"https://w3c.github.io/sensors/#sensor"},
+"https://w3c.github.io/sensors/#sensor-fusion": {"export":true,"for_":[],"level":"","normative":true,"shortname":"generic-sensor","spec":"generic-sensor","status":"anchor-block","text":"sensor-fusion","type":"dfn","url":"https://w3c.github.io/sensors/#sensor-fusion"},
+"https://w3c.github.io/sensors/#sensor-type": {"export":true,"for_":[],"level":"","normative":true,"shortname":"generic-sensor","spec":"generic-sensor","status":"anchor-block","text":"sensor type","type":"dfn","url":"https://w3c.github.io/sensors/#sensor-type"},
+"https://w3c.github.io/sensors/#supported-sensor-options": {"export":true,"for_":[],"level":"","normative":true,"shortname":"generic-sensor","spec":"generic-sensor","status":"anchor-block","text":"supported sensor options","type":"dfn","url":"https://w3c.github.io/sensors/#supported-sensor-options"},
+"https://webidl.spec.whatwg.org/#Exposed": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"Exposed","type":"extended-attribute","url":"https://webidl.spec.whatwg.org/#Exposed"},
+"https://webidl.spec.whatwg.org/#SecureContext": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"SecureContext","type":"extended-attribute","url":"https://webidl.spec.whatwg.org/#SecureContext"},
+"https://webidl.spec.whatwg.org/#dfn-identifier": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"identifier","type":"dfn","url":"https://webidl.spec.whatwg.org/#dfn-identifier"},
+"https://webidl.spec.whatwg.org/#dfn-inherited-interfaces": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"inherited interfaces","type":"dfn","url":"https://webidl.spec.whatwg.org/#dfn-inherited-interfaces"},
+"https://webidl.spec.whatwg.org/#dfn-interface": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"interface","type":"dfn","url":"https://webidl.spec.whatwg.org/#dfn-interface"},
+"https://webidl.spec.whatwg.org/#dfn-throw": {"export":true,"for_":["exception"],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"throw","type":"dfn","url":"https://webidl.spec.whatwg.org/#dfn-throw"},
+"https://webidl.spec.whatwg.org/#exceptiondef-typeerror": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"TypeError","type":"exception","url":"https://webidl.spec.whatwg.org/#exceptiondef-typeerror"},
+"https://webidl.spec.whatwg.org/#idl-DOMException": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"DOMException","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-DOMException"},
+"https://webidl.spec.whatwg.org/#idl-Float32Array": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"Float32Array","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-Float32Array"},
+"https://webidl.spec.whatwg.org/#idl-Float64Array": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"Float64Array","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-Float64Array"},
+"https://webidl.spec.whatwg.org/#idl-double": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"double","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-double"},
+"https://webidl.spec.whatwg.org/#idl-frozen-array": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"FrozenArray","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-frozen-array"},
+"https://webidl.spec.whatwg.org/#idl-undefined": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"undefined","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-undefined"},
+"https://webidl.spec.whatwg.org/#notreadableerror": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"NotReadableError","type":"exception","url":"https://webidl.spec.whatwg.org/#notreadableerror"},
+"https://webidl.spec.whatwg.org/#securityerror": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"SecurityError","type":"exception","url":"https://webidl.spec.whatwg.org/#securityerror"},
+"https://www.w3.org/TR/2016/CR-orientation-event-20160818/#deviceorientation_event": {"export":true,"for_":[],"level":"","normative":true,"shortname":"deviceorientation","spec":"deviceorientation","status":"anchor-block","text":"DeviceOrientationEvent","type":"interface","url":"https://www.w3.org/TR/2016/CR-orientation-event-20160818/#deviceorientation_event"},
+};
+
+function mkRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "Term: "),
+                mk.span({}, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    let forListElements;
+    if(forList.length == 0) {
+        forListElements = [];
+    } else if(forList.length == 1) {
+        forListElements = mk.li({},
+            mk.b({}, "For: "),
+            mk.span({}, forList[0]),
+        );
+    } else {
+        forListElements = mk.li({},
             mk.b({}, "For: "),
             mk.ul({},
                 ...forList.map(forItem =>
                     mk.li({},
-                        mk.span({}, `${forItem}`)
+                        mk.span({}, forItem)
                     ),
                 ),
             ),
         );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+    }
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    setupRefHintEventListeners(link, hintPanel);
+    return hintPanel;
+}
+
+function hideAllRefHints() {
+    queryAll(".ref-hint").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    if(refHint.teardownEventListeners) {
+        refHint.teardownEventListeners();
     }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+    refHint.remove();
+}
+
+function showRefHint(link) {
+    if(link.classList.contains("dfn-link")) return;
+    const url = link.getAttribute("href");
+    const ref = refsData[url];
+    if(!ref) return;
+
+    hideAllRefHints(); // Only display one at this time.
+
+    const refHint = mkRefHint(link, ref);
+    append(document.body, refHint);
+    link.setAttribute("aria-expanded", "true");
+    positionRefHint(refHint);
+}
+
+function setupRefHintEventListeners(link, refHint) {
+    if (refHint.teardownEventListeners) return;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
+
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
-
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
-    }
-
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
-        }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
-
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
-    }
-
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+document.addEventListener("DOMContentLoaded", () => {
+    document.body.addEventListener("mouseover", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
+    });
+    document.body.addEventListener("focus", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
     });
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
 </script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['#absoluteorientationsensor'] = {"text": "AbsoluteOrientationSensor", "type": "interface", "spec": "orientation-sensor", "shortname": "orientation-sensor", "level": "", "status": "local", "url": "#absoluteorientationsensor", "export": true, "normative": true, "for_": []};
-window.refsData['#orientationsensor'] = {"text": "OrientationSensor", "type": "interface", "spec": "orientation-sensor", "shortname": "orientation-sensor", "level": "", "status": "local", "url": "#orientationsensor", "export": true, "normative": true, "for_": []};
-window.refsData['#earths-reference-coordinate-system'] = {"text": "earth's reference coordinate system", "type": "dfn", "spec": "orientation-sensor", "shortname": "orientation-sensor", "level": "", "status": "local", "url": "#earths-reference-coordinate-system", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/2016/CR-orientation-event-20160818/#deviceorientation_event'] = {"text": "DeviceOrientationEvent", "type": "interface", "spec": "deviceorientation", "shortname": "deviceorientation", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/2016/CR-orientation-event-20160818/#deviceorientation_event", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/sensors/#low-level'] = {"text": "low-level", "type": "dfn", "spec": "generic-sensor", "shortname": "generic-sensor", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/sensors/#low-level", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/sensors/#dictdef-sensoroptions'] = {"text": "SensorOptions", "type": "dictionary", "spec": "generic-sensor", "shortname": "generic-sensor", "level": "1", "status": "current", "url": "https://w3c.github.io/sensors/#dictdef-sensoroptions", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/sensors/#sensor'] = {"text": "Sensor", "type": "interface", "spec": "generic-sensor", "shortname": "generic-sensor", "level": "1", "status": "current", "url": "https://w3c.github.io/sensors/#sensor", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/sensors/#sensor-type'] = {"text": "sensor type", "type": "dfn", "spec": "generic-sensor", "shortname": "generic-sensor", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/sensors/#sensor-type", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/sensors/#latest-reading'] = {"text": "latest reading", "type": "dfn", "spec": "generic-sensor", "shortname": "generic-sensor", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/sensors/#latest-reading", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/sensors/#request-sensor-access'] = {"text": "request sensor access", "type": "dfn", "spec": "generic-sensor", "shortname": "generic-sensor", "level": "1", "status": "current", "url": "https://w3c.github.io/sensors/#request-sensor-access", "export": true, "normative": true, "for_": []};
-window.refsData['#relativeorientationsensor'] = {"text": "RelativeOrientationSensor", "type": "interface", "spec": "orientation-sensor", "shortname": "orientation-sensor", "level": "", "status": "local", "url": "#relativeorientationsensor", "export": true, "normative": true, "for_": []};
-window.refsData['#orientation-sensor'] = {"text": "orientation sensor", "type": "dfn", "spec": "orientation-sensor", "shortname": "orientation-sensor", "level": "", "status": "local", "url": "#orientation-sensor", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#map-entry'] = {"text": "entry", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-entry", "export": true, "normative": true, "for_": ["map"]};
-window.refsData['https://infra.spec.whatwg.org/#map-key'] = {"text": "key", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-key", "export": true, "normative": true, "for_": ["map"]};
-window.refsData['https://infra.spec.whatwg.org/#map-value'] = {"text": "value", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-value", "export": true, "normative": true, "for_": ["map"]};
-window.refsData['https://infra.spec.whatwg.org/#list'] = {"text": "list", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/sensors/#sensor-fusion'] = {"text": "sensor-fusion", "type": "dfn", "spec": "generic-sensor", "shortname": "generic-sensor", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/sensors/#sensor-fusion", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/accelerometer/#accelerometer'] = {"text": "Accelerometer", "type": "interface", "spec": "accelerometer", "shortname": "accelerometer", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/accelerometer/#accelerometer", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/gyroscope/#gyroscope'] = {"text": "Gyroscope", "type": "interface", "spec": "gyroscope", "shortname": "gyroscope", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/gyroscope/#gyroscope", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/magnetometer/#magnetometer'] = {"text": "Magnetometer", "type": "interface", "spec": "magnetometer", "shortname": "magnetometer", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/magnetometer/#magnetometer", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/sensors/#dom-sensor-start'] = {"text": "start()", "type": "method", "spec": "generic-sensor", "shortname": "generic-sensor", "level": "1", "status": "current", "url": "https://w3c.github.io/sensors/#dom-sensor-start", "export": true, "normative": true, "for_": ["Sensor"]};
-window.refsData['https://w3c.github.io/sensors/#dom-sensor-onerror'] = {"text": "onerror", "type": "attribute", "spec": "generic-sensor", "shortname": "generic-sensor", "level": "1", "status": "current", "url": "https://w3c.github.io/sensors/#dom-sensor-onerror", "export": true, "normative": true, "for_": ["Sensor"]};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-handlers'] = {"text": "event handler", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-handlers", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/motion-sensors/#absolute-orientation'] = {"text": "absolute orientation sensor", "type": "dfn", "spec": "motionsensors", "shortname": "motionsensors", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/motion-sensors/#absolute-orientation", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/sensors/#local-coordinate-system'] = {"text": "local coordinate system", "type": "dfn", "spec": "generic-sensor", "shortname": "generic-sensor", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/sensors/#local-coordinate-system", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/accelerometer/#device-coordinate-system'] = {"text": "device coordinate system", "type": "dfn", "spec": "accelerometer", "shortname": "accelerometer", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/accelerometer/#device-coordinate-system", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/accelerometer/#screen-coordinate-system'] = {"text": "screen coordinate system", "type": "dfn", "spec": "accelerometer", "shortname": "accelerometer", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/accelerometer/#screen-coordinate-system", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/motion-sensors/#relative-orientation'] = {"text": "relative orientation sensor", "type": "dfn", "spec": "motionsensors", "shortname": "motionsensors", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/motion-sensors/#relative-orientation", "export": true, "normative": true, "for_": []};
-window.refsData['#stationary-reference-coordinate-system'] = {"text": "stationary reference coordinate system", "type": "dfn", "spec": "orientation-sensor", "shortname": "orientation-sensor", "level": "", "status": "local", "url": "#stationary-reference-coordinate-system", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-Float32Array'] = {"text": "Float32Array", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-Float32Array", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-Float64Array'] = {"text": "Float64Array", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-Float64Array", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.fxtf.org/geometry-1/#dommatrix'] = {"text": "DOMMatrix", "type": "interface", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/geometry-1/#dommatrix", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#SecureContext'] = {"text": "SecureContext", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SecureContext", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-frozen-array'] = {"text": "FrozenArray", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-frozen-array", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-double'] = {"text": "double", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-double", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
-window.refsData['#typedefdef-rotationmatrixtype'] = {"text": "RotationMatrixType", "type": "typedef", "spec": "orientation-sensor", "shortname": "orientation-sensor", "level": "", "status": "local", "url": "#typedefdef-rotationmatrixtype", "export": true, "normative": true, "for_": []};
-window.refsData['#enumdef-orientationsensorlocalcoordinatesystem'] = {"text": "OrientationSensorLocalCoordinateSystem", "type": "enum", "spec": "orientation-sensor", "shortname": "orientation-sensor", "level": "", "status": "local", "url": "#enumdef-orientationsensorlocalcoordinatesystem", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/sensors/#get-value-from-latest-reading'] = {"text": "get value from latest reading", "type": "dfn", "spec": "generic-sensor", "shortname": "generic-sensor", "level": "1", "status": "current", "url": "https://w3c.github.io/sensors/#get-value-from-latest-reading", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-orientationsensor-populatematrix'] = {"text": "populateMatrix(targetMatrix)", "type": "method", "spec": "orientation-sensor", "shortname": "orientation-sensor", "level": "", "status": "local", "url": "#dom-orientationsensor-populatematrix", "export": true, "normative": true, "for_": ["OrientationSensor"]};
-window.refsData['#populate-rotation-matrix'] = {"text": "populate rotation matrix", "type": "dfn", "spec": "orientation-sensor", "shortname": "orientation-sensor", "level": "", "status": "local", "url": "#populate-rotation-matrix", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/sensors/#equivalent'] = {"text": "equivalent", "type": "dfn", "spec": "generic-sensor", "shortname": "generic-sensor", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/sensors/#equivalent", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#dfn-throw'] = {"text": "throw", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-throw", "export": true, "normative": true, "for_": ["exception"]};
-window.refsData['https://webidl.spec.whatwg.org/#exceptiondef-typeerror'] = {"text": "TypeError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#exceptiondef-typeerror", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#notreadableerror'] = {"text": "NotReadableError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#notreadableerror", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-DOMException'] = {"text": "DOMException", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMException", "export": true, "normative": true, "for_": []};
-window.refsData['#dictdef-orientationsensoroptions'] = {"text": "OrientationSensorOptions", "type": "dictionary", "spec": "orientation-sensor", "shortname": "orientation-sensor", "level": "", "status": "local", "url": "#dictdef-orientationsensoroptions", "export": true, "normative": true, "for_": []};
-window.refsData['#construct-an-orientation-sensor-object'] = {"text": "construct an orientation sensor object", "type": "dfn", "spec": "orientation-sensor", "shortname": "orientation-sensor", "level": "", "status": "local", "url": "#construct-an-orientation-sensor-object", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/sensors/#supported-sensor-options'] = {"text": "supported sensor options", "type": "dfn", "spec": "generic-sensor", "shortname": "generic-sensor", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/sensors/#supported-sensor-options", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#dfn-interface'] = {"text": "interface", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-interface", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#dfn-identifier'] = {"text": "identifier", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-identifier", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#dfn-inherited-interfaces'] = {"text": "inherited interfaces", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-inherited-interfaces", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/sensors/#check-sensor-policy-controlled-features'] = {"text": "check sensor policy-controlled features", "type": "dfn", "spec": "generic-sensor", "shortname": "generic-sensor", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/sensors/#check-sensor-policy-controlled-features", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#securityerror'] = {"text": "SecurityError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#securityerror", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/sensors/#initialize-a-sensor-object'] = {"text": "initialize a sensor object", "type": "dfn", "spec": "generic-sensor", "shortname": "generic-sensor", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/sensors/#initialize-a-sensor-object", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-orientationsensoroptions-referenceframe'] = {"text": "referenceFrame", "type": "dict-member", "spec": "orientation-sensor", "shortname": "orientation-sensor", "level": "", "status": "local", "url": "#dom-orientationsensoroptions-referenceframe", "export": true, "normative": true, "for_": ["OrientationSensorOptions"]};
-window.refsData['https://w3c.github.io/sensors/#automation'] = {"text": "automation", "type": "dfn", "spec": "generic-sensor", "shortname": "generic-sensor", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/sensors/#automation", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/sensors/#mock-sensor-type'] = {"text": "mock sensor type", "type": "dfn", "spec": "generic-sensor", "shortname": "generic-sensor", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/sensors/#mock-sensor-type", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/sensors/#dom-mocksensortype-absolute-orientation'] = {"text": "\"absolute-orientation\"", "type": "enum-value", "spec": "generic-sensor", "shortname": "generic-sensor", "level": "1", "status": "current", "url": "https://w3c.github.io/sensors/#dom-mocksensortype-absolute-orientation", "export": true, "normative": true, "for_": ["MockSensorType"]};
-window.refsData['https://w3c.github.io/sensors/#mock-sensor-reading-values'] = {"text": "mock sensor reading values", "type": "dfn", "spec": "generic-sensor", "shortname": "generic-sensor", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/sensors/#mock-sensor-reading-values", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/sensors/#dom-mocksensortype-relative-orientation'] = {"text": "\"relative-orientation\"", "type": "enum-value", "spec": "generic-sensor", "shortname": "generic-sensor", "level": "1", "status": "current", "url": "https://w3c.github.io/sensors/#dom-mocksensortype-relative-orientation", "export": true, "normative": true, "for_": ["MockSensorType"]};
-window.refsData['#dictdef-absoluteorientationreadingvalues'] = {"text": "AbsoluteOrientationReadingValues", "type": "dictionary", "spec": "orientation-sensor", "shortname": "orientation-sensor", "level": "", "status": "local", "url": "#dictdef-absoluteorientationreadingvalues", "export": true, "normative": true, "for_": []};
-</script>
 <script>/* Boilerplate: script-var-click-highlighting */
+"use strict";
+{
 /*
 Color-choosing design:
 
-Colors are ordered by goodness.
-Each color has a usage count (initially zero).
-Each variable has a last-used color.
-
-* If the var has a last-used color, and that color's usage is 0,
-    return that color.
-* Otherwise, return the lowest-indexed color with the lowest usage.
-    Increment the color's usage and set it as the last-used color
-    for that var.
-* On unclicking, decrement usage of the color.
+* Colors are ordered by goodness.
+* On clicking a var, give it the earliest color
+    with the lowest usage in the algorithm.
+* On re-clicking, re-use the var's most recent color
+    if that's not currently being used elsewhere.
 */
-"use strict";
-{
-    document.addEventListener("click", e=>{
-        if(e.target.nodeName == "VAR") {
-            highlightSameAlgoVars(e.target);
-        }
-    });
-    const indexCounts = new Map();
-    const indexNames = new Map();
-    function highlightSameAlgoVars(v) {
-        // Find the algorithm container.
-        let algoContainer = null;
-        let searchEl = v;
-        while(algoContainer == null && searchEl != document.body) {
-            searchEl = searchEl.parentNode;
-            if(searchEl.hasAttribute("data-algorithm")) {
-                algoContainer = searchEl;
-            }
-        }
 
-        // Not highlighting document-global vars,
-        // too likely to be unrelated.
-        if(algoContainer == null) return;
+const COLOR_COUNT = 7;
 
-        const algoName = algoContainer.getAttribute("data-algorithm");
-        const varName = getVarName(v);
-        const addClass = !v.classList.contains("selected");
-        let highlightClass = null;
-        if(addClass) {
-            const index = chooseHighlightIndex(algoName, varName);
-            indexCounts.get(algoName)[index] += 1;
-            indexNames.set(algoName+"///"+varName, index);
-            highlightClass = nameFromIndex(index);
-        } else {
-            const index = previousHighlightIndex(algoName, varName);
-            indexCounts.get(algoName)[index] -= 1;
-            highlightClass = nameFromIndex(index);
-        }
+document.addEventListener("click", e=>{
+    if(e.target.nodeName == "VAR") {
+        highlightSameAlgoVars(e.target);
+    }
+});
 
-        // Find all same-name vars, and toggle their class appropriately.
+function highlightSameAlgoVars(v) {
+    // Find the algorithm container.
+    let algoContainer = findAlgoContainer(v);
+
+    // Not highlighting document-global vars,
+    // too likely to be unrelated.
+    if(algoContainer == null) return;
+
+    const varName = nameFromVar(v);
+    if(!v.hasAttribute("data-var-color")) {
+        const newColor = chooseHighlightColor(algoContainer, v);
         for(const el of algoContainer.querySelectorAll("var")) {
-            if(getVarName(el) == varName) {
-                el.classList.toggle("selected", addClass);
-                el.classList.toggle(highlightClass, addClass);
+            if(nameFromVar(el) == varName) {
+                el.setAttribute("data-var-color", newColor);
+                el.setAttribute("data-var-last-color", newColor);
+            }
+        }
+    } else {
+        for(const el of algoContainer.querySelectorAll("var")) {
+            if(nameFromVar(el) == varName) {
+                el.removeAttribute("data-var-color");
             }
         }
     }
-    function getVarName(el) {
-        return el.textContent.replace(/(\s|\xa0)+/, " ").trim();
+}
+function findAlgoContainer(el) {
+    while(el != document.body) {
+        if(el.hasAttribute("data-algorithm")) return el;
+        el = el.parentNode;
     }
-    function chooseHighlightIndex(algoName, varName) {
-        let indexes = null;
-        if(indexCounts.has(algoName)) {
-            indexes = indexCounts.get(algoName);
-        } else {
-            // 7 classes right now
-            indexes = [0,0,0,0,0,0,0];
-            indexCounts.set(algoName, indexes);
-        }
+    return null;
+}
+function nameFromVar(el) {
+    return el.textContent.replace(/(\s|\xa0)+/, " ").trim();
+}
+function colorCountsFromContainer(container) {
+    const namesFromColor = Array.from({length:COLOR_COUNT}, x=>new Set());
+    for(let v of container.querySelectorAll("var[data-var-color]")) {
+        let color = +v.getAttribute("data-var-color");
+        namesFromColor[color].add(nameFromVar(v));
+    }
 
-        // If the element was recently unclicked,
-        // *and* that color is still unclaimed,
-        // give it back the same color.
-        const lastIndex = previousHighlightIndex(algoName, varName);
-        if(indexes[lastIndex] === 0) return lastIndex;
-
-        // Find the earliest index with the lowest count.
-        const minCount = Math.min.apply(null, indexes);
-        let index = null;
-        for(var i = 0; i < indexes.length; i++) {
-            if(indexes[i] == minCount) {
-                return i;
-            }
+    return namesFromColor.map(x=>x.size);
+}
+function leastUsedColor(colors) {
+    // Find the earliest color with the lowest count.
+    let minCount = Infinity;
+    let minColor = null;
+    for(var i = 0; i < colors.length; i++) {
+        if(colors[i] < minCount) {
+            minColor = i;
+            minCount = colors[i];
         }
     }
-    function previousHighlightIndex(algoName, varName) {
-        return indexNames.get(algoName+"///"+varName);
+    return minColor;
+}
+function chooseHighlightColor(container, v) {
+    const colorCounts = colorCountsFromContainer(container);
+    if(v.hasAttribute("data-var-last-color")) {
+        let color = +v.getAttribute("data-var-last-color");
+        if(colorCounts[color] == 0) return color;
     }
-    function nameFromIndex(index) {
-        return "selected" + index;
-    }
+    return leastUsedColor(colorCounts);
+}
 }
 </script>

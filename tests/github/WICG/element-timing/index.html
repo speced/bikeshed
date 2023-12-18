@@ -76,7 +76,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -450,6 +449,11 @@ figcaption:not(.no-marker)::before {
     }
 }
 </style>
+<style>/* Boilerplate: style-idl-highlighting */
+pre.idl.highlight {
+    background: var(--borderedblock-bg, var(--def-bg));
+}
+</style>
 <style>/* Boilerplate: style-issues */
 a[href].issue-return {
     float: right;
@@ -702,7 +706,7 @@ a[href].issue-return {
 }
 
 .ref-hint {
-    display: none;
+    display: inline-block;
     position: absolute;
     z-index: 35;
     width: 20em;
@@ -718,16 +722,11 @@ a[href].issue-return {
     white-space: normal; /* in case it's moved into a pre */
 }
 
-.ref-hint.on {
-    display: inline-block;
-}
-
 .ref-hint * { margin: 0; padding: 0; text-indent: 0; }
 
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -787,7 +786,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -844,7 +842,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -921,14 +918,14 @@ D50 2deg illuminant, L in [0,100], a and b in [-128, 128]
 5 = lab(85,-10,-50)
 6 = lab(85,35,-15)
 */
-var { cursor: pointer; }
-var.selected0 { background-color: #F4D200; box-shadow: 0 0 0 2px #F4D200; }
-var.selected1 { background-color: #FF87A2; box-shadow: 0 0 0 2px #FF87A2; }
-var.selected2 { background-color: #96E885; box-shadow: 0 0 0 2px #96E885; }
-var.selected3 { background-color: #3EEED2; box-shadow: 0 0 0 2px #3EEED2; }
-var.selected4 { background-color: #EACFB6; box-shadow: 0 0 0 2px #EACFB6; }
-var.selected5 { background-color: #82DDFF; box-shadow: 0 0 0 2px #82DDFF; }
-var.selected6 { background-color: #FFBCF2; box-shadow: 0 0 0 2px #FFBCF2; }
+[data-algorithm] var { cursor: pointer; }
+var[data-var-color="0"] { background-color: #F4D200; box-shadow: 0 0 0 2px #F4D200; }
+var[data-var-color="1"] { background-color: #FF87A2; box-shadow: 0 0 0 2px #FF87A2; }
+var[data-var-color="2"] { background-color: #96E885; box-shadow: 0 0 0 2px #96E885; }
+var[data-var-color="3"] { background-color: #3EEED2; box-shadow: 0 0 0 2px #3EEED2; }
+var[data-var-color="4"] { background-color: #EACFB6; box-shadow: 0 0 0 2px #EACFB6; }
+var[data-var-color="5"] { background-color: #82DDFF; box-shadow: 0 0 0 2px #82DDFF; }
+var[data-var-color="6"] { background-color: #FFBCF2; box-shadow: 0 0 0 2px #FFBCF2; }
 </style>
  <body class="h-entry">
   <div class="head">
@@ -1796,485 +1793,8 @@ This would unintentionally leak some of the display timing of the image.</p>
     </div>
    </div>
   </details>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['ffc19957'] = {"dfnID": "ffc19957", "url": "https://drafts.csswg.org/css2/zindex.html#painting-order", "dfnText": "painting order", "refSections": [{"refs": [{"id": "ref-for-painting-order"}, {"id": "ref-for-painting-order\u2460"}], "title": "3.2. Modifications to the CSS specification"}], "external": true};
-window.dfnpanelData['874e26dc'] = {"dfnID": "874e26dc", "url": "https://drafts.csswg.org/css-backgrounds-3#propdef-background-image", "dfnText": "background-image", "refSections": [{"refs": [{"id": "ref-for-propdef-background-image"}], "title": "1.1. Elements exposed"}, {"refs": [{"id": "ref-for-propdef-background-image\u2460"}, {"id": "ref-for-propdef-background-image\u2461"}, {"id": "ref-for-propdef-background-image\u2462"}], "title": "3.2. Modifications to the CSS specification"}], "external": true};
-window.dfnpanelData['ea663a43'] = {"dfnID": "ea663a43", "url": "https://drafts.csswg.org/css-display-4/#containing-block", "dfnText": "containing block", "refSections": [{"refs": [{"id": "ref-for-containing-block"}], "title": "3.2. Modifications to the CSS specification"}], "external": true};
-window.dfnpanelData['5b31c866'] = {"dfnID": "5b31c866", "url": "https://drafts.csswg.org/css-fonts-4/#font-block-period", "dfnText": "font block period", "refSections": [{"refs": [{"id": "ref-for-font-block-period"}], "title": "3.2. Modifications to the CSS specification"}], "external": true};
-window.dfnpanelData['85394472'] = {"dfnID": "85394472", "url": "https://dom.spec.whatwg.org/#document", "dfnText": "Document", "refSections": [{"refs": [{"id": "ref-for-document"}], "title": "2.1. PerformanceElementTiming interface"}, {"refs": [{"id": "ref-for-document\u2460"}, {"id": "ref-for-document\u2461"}], "title": "3.1. Modifications to the DOM specification"}, {"refs": [{"id": "ref-for-document\u2462"}, {"id": "ref-for-document\u2463"}], "title": "3.3. Modifications to the HTML specification"}, {"refs": [{"id": "ref-for-document\u2464"}], "title": "3.4. Process image that finished loading"}, {"refs": [{"id": "ref-for-document\u2465"}], "title": "3.5. Report image Element Timing"}, {"refs": [{"id": "ref-for-document\u2466"}], "title": "3.6. Report text Element Timing"}, {"refs": [{"id": "ref-for-document\u2467"}], "title": "3.7. Element Timing processing"}, {"refs": [{"id": "ref-for-document\u2468"}], "title": "3.8. Get an element algorithm"}], "external": true};
-window.dfnpanelData['296f3551'] = {"dfnID": "296f3551", "url": "https://dom.spec.whatwg.org/#element", "dfnText": "Element", "refSections": [{"refs": [{"id": "ref-for-element"}, {"id": "ref-for-element\u2460"}], "title": "2.1. PerformanceElementTiming interface"}, {"refs": [{"id": "ref-for-element\u2462"}, {"id": "ref-for-element\u2463"}, {"id": "ref-for-element\u2464"}, {"id": "ref-for-element\u2465"}, {"id": "ref-for-element\u2466"}, {"id": "ref-for-element\u2467"}, {"id": "ref-for-element\u2468"}, {"id": "ref-for-element\u2460\u24ea"}], "title": "3.1. Modifications to the DOM specification"}, {"refs": [{"id": "ref-for-element\u2460\u2460"}, {"id": "ref-for-element\u2460\u2461"}, {"id": "ref-for-element\u2460\u2462"}, {"id": "ref-for-element\u2460\u2463"}, {"id": "ref-for-element\u2460\u2464"}, {"id": "ref-for-element\u2460\u2465"}, {"id": "ref-for-element\u2460\u2466"}], "title": "3.2. Modifications to the CSS specification"}, {"refs": [{"id": "ref-for-element\u2460\u2467"}], "title": "3.4. Process image that finished loading"}, {"refs": [{"id": "ref-for-element\u2461\u24ea"}], "title": "3.6. Report text Element Timing"}, {"refs": [{"id": "ref-for-element\u2461\u2461"}], "title": "3.7. Element Timing processing"}, {"refs": [{"id": "ref-for-element\u2461\u2462"}], "title": "3.8. Get an element algorithm"}], "external": true};
-window.dfnpanelData['597088f0'] = {"dfnID": "597088f0", "url": "https://dom.spec.whatwg.org/#text", "dfnText": "Text", "refSections": [{"refs": [{"id": "ref-for-text"}], "title": "3.2. Modifications to the CSS specification"}, {"refs": [{"id": "ref-for-text\u2460"}], "title": "3.6. Report text Element Timing"}], "external": true};
-window.dfnpanelData['9638f92b'] = {"dfnID": "9638f92b", "url": "https://dom.spec.whatwg.org/#connected", "dfnText": "connected", "refSections": [{"refs": [{"id": "ref-for-connected"}], "title": "3.8. Get an element algorithm"}], "external": true};
-window.dfnpanelData['da8b8e0e'] = {"dfnID": "da8b8e0e", "url": "https://dom.spec.whatwg.org/#concept-tree-descendant", "dfnText": "descendant", "refSections": [{"refs": [{"id": "ref-for-concept-tree-descendant"}], "title": "2.1. PerformanceElementTiming interface"}, {"refs": [{"id": "ref-for-concept-tree-descendant\u2460"}], "title": "3.7. Element Timing processing"}], "external": true};
-window.dfnpanelData['d462b34f'] = {"dfnID": "d462b34f", "url": "https://dom.spec.whatwg.org/#boundary-point-node", "dfnText": "node", "refSections": [{"refs": [{"id": "ref-for-boundary-point-node"}], "title": "3.6. Report text Element Timing"}], "external": true};
-window.dfnpanelData['f7960529'] = {"dfnID": "f7960529", "url": "https://dom.spec.whatwg.org/#concept-tree-root", "dfnText": "root", "refSections": [{"refs": [{"id": "ref-for-concept-tree-root"}], "title": "3.4. Process image that finished loading"}, {"refs": [{"id": "ref-for-concept-tree-root\u2460"}], "title": "3.8. Get an element algorithm"}], "external": true};
-window.dfnpanelData['fdd2dd4e'] = {"dfnID": "fdd2dd4e", "url": "https://drafts.fxtf.org/geometry-1/#domrectreadonly", "dfnText": "DOMRectReadOnly", "refSections": [{"refs": [{"id": "ref-for-domrectreadonly"}], "title": "2.1. PerformanceElementTiming interface"}], "external": true};
-window.dfnpanelData['fe0bd60a'] = {"dfnID": "fe0bd60a", "url": "https://w3c.github.io/hr-time#dom-domhighrestimestamp", "dfnText": "DOMHighResTimeStamp", "refSections": [{"refs": [{"id": "ref-for-dom-domhighrestimestamp"}, {"id": "ref-for-dom-domhighrestimestamp\u2460"}], "title": "2.1. PerformanceElementTiming interface"}], "external": true};
-window.dfnpanelData['36672c76'] = {"dfnID": "36672c76", "url": "https://w3c.github.io/hr-time#dfn-current-high-resolution-time", "dfnText": "current high resolution time", "refSections": [{"refs": [{"id": "ref-for-dfn-current-high-resolution-time"}], "title": "3.4. Process image that finished loading"}, {"refs": [{"id": "ref-for-dfn-current-high-resolution-time\u2460"}], "title": "4. Security & privacy considerations"}], "external": true};
-window.dfnpanelData['402ed79d'] = {"dfnID": "402ed79d", "url": "https://html.spec.whatwg.org/multipage/custom-elements.html#cereactions", "dfnText": "CEReactions", "refSections": [{"refs": [{"id": "ref-for-cereactions"}], "title": "3.1. Modifications to the DOM specification"}], "external": true};
-window.dfnpanelData['c5891539'] = {"dfnID": "c5891539", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#htmlimageelement", "dfnText": "HTMLImageElement", "refSections": [{"refs": [{"id": "ref-for-htmlimageelement"}, {"id": "ref-for-htmlimageelement\u2460"}], "title": "3.1. Modifications to the DOM specification"}], "external": true};
-window.dfnpanelData['f57f330b'] = {"dfnID": "f57f330b", "url": "https://html.spec.whatwg.org/multipage/media.html#htmlvideoelement", "dfnText": "HTMLVideoElement", "refSections": [{"refs": [{"id": "ref-for-htmlvideoelement"}], "title": "3.1. Modifications to the DOM specification"}], "external": true};
-window.dfnpanelData['5d7209e9'] = {"dfnID": "5d7209e9", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window", "dfnText": "Window", "refSections": [{"refs": [{"id": "ref-for-window"}], "title": "3. Processing model"}], "external": true};
-window.dfnpanelData['f596a4ea'] = {"dfnID": "f596a4ea", "url": "https://html.spec.whatwg.org/multipage/images.html#img-all", "dfnText": "completely available", "refSections": [{"refs": [{"id": "ref-for-img-all"}], "title": "3.1. Modifications to the DOM specification"}, {"refs": [{"id": "ref-for-img-all\u2460"}], "title": "3.2. Modifications to the CSS specification"}], "external": true};
-window.dfnpanelData['a7bbaf9f'] = {"dfnID": "a7bbaf9f", "url": "https://html.spec.whatwg.org/multipage/grouping-content.html#the-div-element", "dfnText": "div", "refSections": [{"refs": [{"id": "ref-for-the-div-element"}, {"id": "ref-for-the-div-element\u2460"}], "title": "3.2. Modifications to the CSS specification"}], "external": true};
-window.dfnpanelData['0e3ba9f8'] = {"dfnID": "0e3ba9f8", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#fully-active", "dfnText": "fully active", "refSections": [{"refs": [{"id": "ref-for-fully-active"}], "title": "3.3. Modifications to the HTML specification"}, {"refs": [{"id": "ref-for-fully-active\u2460"}], "title": "3.8. Get an element algorithm"}], "external": true};
-window.dfnpanelData['55641d29'] = {"dfnID": "55641d29", "url": "https://html.spec.whatwg.org/multipage#image-request", "dfnText": "image request", "refSections": [{"refs": [{"id": "ref-for-image-request"}, {"id": "ref-for-image-request\u2460"}, {"id": "ref-for-image-request\u2461"}], "title": "3.1. Modifications to the DOM specification"}, {"refs": [{"id": "ref-for-image-request\u2462"}, {"id": "ref-for-image-request\u2463"}, {"id": "ref-for-image-request\u2464"}, {"id": "ref-for-image-request\u2465"}, {"id": "ref-for-image-request\u2466"}], "title": "3.2. Modifications to the CSS specification"}, {"refs": [{"id": "ref-for-image-request\u2467"}], "title": "3.7. Element Timing processing"}], "external": true};
-window.dfnpanelData['f0811ff8'] = {"dfnID": "f0811ff8", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element", "dfnText": "img", "refSections": [{"refs": [{"id": "ref-for-the-img-element"}], "title": "1.1. Elements exposed"}, {"refs": [{"id": "ref-for-the-img-element\u2460"}], "title": "3.5. Report image Element Timing"}], "external": true};
-window.dfnpanelData['33e96e84'] = {"dfnID": "33e96e84", "url": "https://html.spec.whatwg.org/multipageimages.html#list-of-available-images", "dfnText": "list of available images", "refSections": [{"refs": [{"id": "ref-for-list-of-available-images"}], "title": "3.1. Modifications to the DOM specification"}], "external": true};
-window.dfnpanelData['3f52e3d0'] = {"dfnID": "3f52e3d0", "url": "https://html.spec.whatwg.org/multipage#dom-img-naturalheight", "dfnText": "naturalHeight", "refSections": [{"refs": [{"id": "ref-for-dom-img-naturalheight"}], "title": "3.5. Report image Element Timing"}], "external": true};
-window.dfnpanelData['4cecaafa'] = {"dfnID": "4cecaafa", "url": "https://html.spec.whatwg.org/multipage#dom-img-naturalwidth", "dfnText": "naturalWidth", "refSections": [{"refs": [{"id": "ref-for-dom-img-naturalwidth"}], "title": "3.5. Report image Element Timing"}], "external": true};
-window.dfnpanelData['e99bd18e'] = {"dfnID": "e99bd18e", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-global", "dfnText": "relevant global object", "refSections": [{"refs": [{"id": "ref-for-concept-relevant-global"}], "title": "3.4. Process image that finished loading"}], "external": true};
-window.dfnpanelData['5991ccfb'] = {"dfnID": "5991ccfb", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-realm", "dfnText": "relevant realm", "refSections": [{"refs": [{"id": "ref-for-concept-relevant-realm"}], "title": "3.6. Report text Element Timing"}], "external": true};
-window.dfnpanelData['9c4c1e66'] = {"dfnID": "9c4c1e66", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object", "dfnText": "relevant settings object", "refSections": [{"refs": [{"id": "ref-for-relevant-settings-object"}], "title": "3.8. Get an element algorithm"}], "external": true};
-window.dfnpanelData['29e622ca'] = {"dfnID": "29e622ca", "url": "https://html.spec.whatwg.org/multipage/urls-and-fetching.html#resolve-a-url", "dfnText": "resolved url", "refSections": [{"refs": [{"id": "ref-for-resolve-a-url"}], "title": "2.1. PerformanceElementTiming interface"}], "external": true};
-window.dfnpanelData['b815f411'] = {"dfnID": "b815f411", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#update-the-rendering", "dfnText": "update the rendering", "refSections": [{"refs": [{"id": "ref-for-update-the-rendering"}], "title": "3.3. Modifications to the HTML specification"}, {"refs": [{"id": "ref-for-update-the-rendering\u2460"}], "title": "4. Security & privacy considerations"}], "external": true};
-window.dfnpanelData['aa7bbf63'] = {"dfnID": "aa7bbf63", "url": "https://html.spec.whatwg.org/multipage/media.html#video", "dfnText": "video", "refSections": [{"refs": [{"id": "ref-for-video"}], "title": "1.1. Elements exposed"}], "external": true};
-window.dfnpanelData['a3b18719'] = {"dfnID": "a3b18719", "url": "https://infra.spec.whatwg.org/#set-append", "dfnText": "append", "refSections": [{"refs": [{"id": "ref-for-set-append"}, {"id": "ref-for-set-append\u2460"}], "title": "3.2. Modifications to the CSS specification"}, {"refs": [{"id": "ref-for-set-append\u2461"}], "title": "3.7. Element Timing processing"}], "external": true};
-window.dfnpanelData['692595fe'] = {"dfnID": "692595fe", "url": "https://infra.spec.whatwg.org/#ordered-set", "dfnText": "ordered set", "refSections": [{"refs": [{"id": "ref-for-ordered-set"}, {"id": "ref-for-ordered-set\u2460"}], "title": "3.1. Modifications to the DOM specification"}], "external": true};
-window.dfnpanelData['53b3ac9d'] = {"dfnID": "53b3ac9d", "url": "https://w3c.github.io/IntersectionObserver#intersectionobserver", "dfnText": "IntersectionObserver", "refSections": [{"refs": [{"id": "ref-for-intersectionobserver"}, {"id": "ref-for-intersectionobserver\u2460"}], "title": "4. Security & privacy considerations"}], "external": true};
-window.dfnpanelData['12b24892'] = {"dfnID": "12b24892", "url": "https://w3c.github.io/IntersectionObserver#calculate-intersection-rect-algo", "dfnText": "intersection rect algorithm", "refSections": [{"refs": [{"id": "ref-for-calculate-intersection-rect-algo"}], "title": "3.5. Report image Element Timing"}], "external": true};
-window.dfnpanelData['28931d68'] = {"dfnID": "28931d68", "url": "https://wicg.github.io/largest-contentful-paint/#potentially-add-a-largestcontentfulpaint-entry", "dfnText": "potentially add a largestcontentfulpaint entry", "refSections": [{"refs": [{"id": "ref-for-potentially-add-a-largestcontentfulpaint-entry"}], "title": "3.5. Report image Element Timing"}, {"refs": [{"id": "ref-for-potentially-add-a-largestcontentfulpaint-entry\u2460"}], "title": "3.6. Report text Element Timing"}], "external": true};
-window.dfnpanelData['df79032a'] = {"dfnID": "df79032a", "url": "https://w3c.github.io/performance-timeline/#the-performanceentry-interface", "dfnText": "PerformanceEntry", "refSections": [{"refs": [{"id": "ref-for-the-performanceentry-interface"}], "title": "2.1. PerformanceElementTiming interface"}], "external": true};
-window.dfnpanelData['80e0e9c9'] = {"dfnID": "80e0e9c9", "url": "https://w3c.github.io/performance-timeline/#the-performanceobserver-interface", "dfnText": "PerformanceObserver", "refSections": [{"refs": [{"id": "ref-for-the-performanceobserver-interface"}], "title": "4. Security & privacy considerations"}], "external": true};
-window.dfnpanelData['fabd3046'] = {"dfnID": "fabd3046", "url": "https://w3c.github.io/performance-timeline/#dom-performanceentry-duration", "dfnText": "duration", "refSections": [{"refs": [{"id": "ref-for-dom-performanceentry-duration"}], "title": "2.1. PerformanceElementTiming interface"}], "external": true};
-window.dfnpanelData['08a90f22'] = {"dfnID": "08a90f22", "url": "https://w3c.github.io/performance-timeline/#dom-performanceentry-entrytype", "dfnText": "entryType", "refSections": [{"refs": [{"id": "ref-for-dom-performanceentry-entrytype"}], "title": "2.1. PerformanceElementTiming interface"}], "external": true};
-window.dfnpanelData['09c54b53'] = {"dfnID": "09c54b53", "url": "https://w3c.github.io/performance-timeline/#dom-performanceentry-name", "dfnText": "name", "refSections": [{"refs": [{"id": "ref-for-dom-performanceentry-name"}], "title": "2.1. PerformanceElementTiming interface"}, {"refs": [{"id": "ref-for-dom-performanceentry-name\u2460"}], "title": "3.5. Report image Element Timing"}, {"refs": [{"id": "ref-for-dom-performanceentry-name\u2461"}], "title": "3.6. Report text Element Timing"}], "external": true};
-window.dfnpanelData['3efa5dd7'] = {"dfnID": "3efa5dd7", "url": "https://w3c.github.io/performance-timeline/#dfn-queue-a-performanceentry", "dfnText": "queue the performanceentry", "refSections": [{"refs": [{"id": "ref-for-dfn-queue-a-performanceentry"}], "title": "3.5. Report image Element Timing"}, {"refs": [{"id": "ref-for-dfn-queue-a-performanceentry\u2460"}], "title": "3.6. Report text Element Timing"}], "external": true};
-window.dfnpanelData['cc7c9b78'] = {"dfnID": "cc7c9b78", "url": "https://w3c.github.io/performance-timeline/#dom-performanceentry-starttime", "dfnText": "startTime", "refSections": [{"refs": [{"id": "ref-for-dom-performanceentry-starttime"}], "title": "2.1. PerformanceElementTiming interface"}], "external": true};
-window.dfnpanelData['de4bb79b'] = {"dfnID": "de4bb79b", "url": "https://w3c.github.io/performance-timeline/#supportedentrytypes-attribute", "dfnText": "supportedEntryTypes", "refSections": [{"refs": [{"id": "ref-for-supportedentrytypes-attribute"}], "title": "3. Processing model"}], "external": true};
-window.dfnpanelData['2e117fc6'] = {"dfnID": "2e117fc6", "url": "https://w3c.github.io/resource-timing#dfn-timing-allow-check", "dfnText": "timing allow check", "refSections": [{"refs": [{"id": "ref-for-dfn-timing-allow-check"}], "title": "3.4. Process image that finished loading"}, {"refs": [{"id": "ref-for-dfn-timing-allow-check\u2460"}, {"id": "ref-for-dfn-timing-allow-check\u2461"}, {"id": "ref-for-dfn-timing-allow-check\u2462"}], "title": "4. Security & privacy considerations"}], "external": true};
-window.dfnpanelData['51c2724d'] = {"dfnID": "51c2724d", "url": "https://svgwg.org/svg2-draft/embedded.html#InterfaceSVGImageElement", "dfnText": "SVGImageElement", "refSections": [{"refs": [{"id": "ref-for-InterfaceSVGImageElement"}], "title": "3.1. Modifications to the DOM specification"}], "external": true};
-window.dfnpanelData['11a8832d'] = {"dfnID": "11a8832d", "url": "https://svgwg.org/svg2-draft/embedded.html#elementdef-image", "dfnText": "image", "refSections": [{"refs": [{"id": "ref-for-elementdef-image"}], "title": "1.1. Elements exposed"}], "external": true};
-window.dfnpanelData['4299a926'] = {"dfnID": "4299a926", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-svg", "dfnText": "svg", "refSections": [{"refs": [{"id": "ref-for-elementdef-svg"}], "title": "1.1. Elements exposed"}], "external": true};
-window.dfnpanelData['3a711be7'] = {"dfnID": "3a711be7", "url": "https://url.spec.whatwg.org/#concept-url-scheme", "dfnText": "scheme", "refSections": [{"refs": [{"id": "ref-for-concept-url-scheme"}], "title": "2.1. PerformanceElementTiming interface"}, {"refs": [{"id": "ref-for-concept-url-scheme\u2460"}], "title": "3.1. Modifications to the DOM specification"}], "external": true};
-window.dfnpanelData['8855a9aa'] = {"dfnID": "8855a9aa", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "dfnText": "DOMString", "refSections": [{"refs": [{"id": "ref-for-idl-DOMString"}, {"id": "ref-for-idl-DOMString\u2460"}, {"id": "ref-for-idl-DOMString\u2461"}, {"id": "ref-for-idl-DOMString\u2462"}], "title": "2.1. PerformanceElementTiming interface"}, {"refs": [{"id": "ref-for-idl-DOMString\u2463"}], "title": "3.1. Modifications to the DOM specification"}, {"refs": [{"id": "ref-for-idl-DOMString\u2464"}], "title": "3.5. Report image Element Timing"}, {"refs": [{"id": "ref-for-idl-DOMString\u2465"}], "title": "3.6. Report text Element Timing"}], "external": true};
-window.dfnpanelData['f4531911'] = {"dfnID": "f4531911", "url": "https://webidl.spec.whatwg.org/#Default", "dfnText": "Default", "refSections": [{"refs": [{"id": "ref-for-Default"}], "title": "2.1. PerformanceElementTiming interface"}], "external": true};
-window.dfnpanelData['889e932f'] = {"dfnID": "889e932f", "url": "https://webidl.spec.whatwg.org/#Exposed", "dfnText": "Exposed", "refSections": [{"refs": [{"id": "ref-for-Exposed"}], "title": "2.1. PerformanceElementTiming interface"}], "external": true};
-window.dfnpanelData['efd1ec5d'] = {"dfnID": "efd1ec5d", "url": "https://webidl.spec.whatwg.org/#idl-object", "dfnText": "object", "refSections": [{"refs": [{"id": "ref-for-idl-object"}], "title": "2.1. PerformanceElementTiming interface"}], "external": true};
-window.dfnpanelData['e97a9688'] = {"dfnID": "e97a9688", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-long", "dfnText": "unsigned long", "refSections": [{"refs": [{"id": "ref-for-idl-unsigned-long"}, {"id": "ref-for-idl-unsigned-long\u2460"}], "title": "2.1. PerformanceElementTiming interface"}], "external": true};
-window.dfnpanelData['performanceelementtiming'] = {"dfnID": "performanceelementtiming", "url": "#performanceelementtiming", "dfnText": "PerformanceElementTiming", "refSections": [{"refs": [{"id": "ref-for-performanceelementtiming"}, {"id": "ref-for-performanceelementtiming\u2460"}, {"id": "ref-for-performanceelementtiming\u2461"}, {"id": "ref-for-performanceelementtiming\u2462"}], "title": "2.1. PerformanceElementTiming interface"}, {"refs": [{"id": "ref-for-performanceelementtiming\u2463"}], "title": "3.2. Modifications to the CSS specification"}, {"refs": [{"id": "ref-for-performanceelementtiming\u2464"}], "title": "3.5. Report image Element Timing"}, {"refs": [{"id": "ref-for-performanceelementtiming\u2465"}], "title": "3.6. Report text Element Timing"}, {"refs": [{"id": "ref-for-performanceelementtiming\u2466"}], "title": "4. Security & privacy considerations"}], "external": false};
-window.dfnpanelData['dom-performanceelementtiming-rendertime'] = {"dfnID": "dom-performanceelementtiming-rendertime", "url": "#dom-performanceelementtiming-rendertime", "dfnText": "renderTime", "refSections": [{"refs": [{"id": "ref-for-dom-performanceelementtiming-rendertime"}, {"id": "ref-for-dom-performanceelementtiming-rendertime\u2460"}], "title": "2.1. PerformanceElementTiming interface"}, {"refs": [{"id": "ref-for-dom-performanceelementtiming-rendertime\u2461"}], "title": "3.5. Report image Element Timing"}, {"refs": [{"id": "ref-for-dom-performanceelementtiming-rendertime\u2462"}], "title": "3.6. Report text Element Timing"}, {"refs": [{"id": "ref-for-dom-performanceelementtiming-rendertime\u2463"}], "title": "4. Security & privacy considerations"}], "external": false};
-window.dfnpanelData['dom-performanceelementtiming-loadtime'] = {"dfnID": "dom-performanceelementtiming-loadtime", "url": "#dom-performanceelementtiming-loadtime", "dfnText": "loadTime", "refSections": [{"refs": [{"id": "ref-for-dom-performanceelementtiming-loadtime"}, {"id": "ref-for-dom-performanceelementtiming-loadtime\u2460"}], "title": "2.1. PerformanceElementTiming interface"}, {"refs": [{"id": "ref-for-dom-performanceelementtiming-loadtime\u2461"}], "title": "3.5. Report image Element Timing"}, {"refs": [{"id": "ref-for-dom-performanceelementtiming-loadtime\u2462"}], "title": "3.6. Report text Element Timing"}, {"refs": [{"id": "ref-for-dom-performanceelementtiming-loadtime\u2463"}], "title": "4. Security & privacy considerations"}], "external": false};
-window.dfnpanelData['dom-performanceelementtiming-intersectionrect'] = {"dfnID": "dom-performanceelementtiming-intersectionrect", "url": "#dom-performanceelementtiming-intersectionrect", "dfnText": "intersectionRect", "refSections": [{"refs": [{"id": "ref-for-dom-performanceelementtiming-intersectionrect"}], "title": "2.1. PerformanceElementTiming interface"}, {"refs": [{"id": "ref-for-dom-performanceelementtiming-intersectionrect\u2460"}], "title": "3.5. Report image Element Timing"}, {"refs": [{"id": "ref-for-dom-performanceelementtiming-intersectionrect\u2461"}], "title": "3.6. Report text Element Timing"}, {"refs": [{"id": "ref-for-dom-performanceelementtiming-intersectionrect\u2462"}, {"id": "ref-for-dom-performanceelementtiming-intersectionrect\u2463"}], "title": "4. Security & privacy considerations"}], "external": false};
-window.dfnpanelData['dom-performanceelementtiming-identifier'] = {"dfnID": "dom-performanceelementtiming-identifier", "url": "#dom-performanceelementtiming-identifier", "dfnText": "identifier", "refSections": [{"refs": [{"id": "ref-for-dom-performanceelementtiming-identifier"}], "title": "2.1. PerformanceElementTiming interface"}, {"refs": [{"id": "ref-for-dom-performanceelementtiming-identifier\u2460"}], "title": "3.5. Report image Element Timing"}, {"refs": [{"id": "ref-for-dom-performanceelementtiming-identifier\u2461"}], "title": "3.6. Report text Element Timing"}], "external": false};
-window.dfnpanelData['dom-performanceelementtiming-naturalwidth'] = {"dfnID": "dom-performanceelementtiming-naturalwidth", "url": "#dom-performanceelementtiming-naturalwidth", "dfnText": "naturalWidth", "refSections": [{"refs": [{"id": "ref-for-dom-performanceelementtiming-naturalwidth"}], "title": "2.1. PerformanceElementTiming interface"}, {"refs": [{"id": "ref-for-dom-performanceelementtiming-naturalwidth\u2460"}], "title": "3.5. Report image Element Timing"}, {"refs": [{"id": "ref-for-dom-performanceelementtiming-naturalwidth\u2461"}], "title": "3.6. Report text Element Timing"}], "external": false};
-window.dfnpanelData['dom-performanceelementtiming-naturalheight'] = {"dfnID": "dom-performanceelementtiming-naturalheight", "url": "#dom-performanceelementtiming-naturalheight", "dfnText": "naturalHeight", "refSections": [{"refs": [{"id": "ref-for-dom-performanceelementtiming-naturalheight"}], "title": "2.1. PerformanceElementTiming interface"}, {"refs": [{"id": "ref-for-dom-performanceelementtiming-naturalheight\u2460"}], "title": "3.5. Report image Element Timing"}, {"refs": [{"id": "ref-for-dom-performanceelementtiming-naturalheight\u2461"}], "title": "3.6. Report text Element Timing"}], "external": false};
-window.dfnpanelData['dom-performanceelementtiming-id'] = {"dfnID": "dom-performanceelementtiming-id", "url": "#dom-performanceelementtiming-id", "dfnText": "id", "refSections": [{"refs": [{"id": "ref-for-dom-performanceelementtiming-id"}], "title": "2.1. PerformanceElementTiming interface"}, {"refs": [{"id": "ref-for-dom-performanceelementtiming-id\u2460"}], "title": "3.5. Report image Element Timing"}, {"refs": [{"id": "ref-for-dom-performanceelementtiming-id\u2461"}], "title": "3.6. Report text Element Timing"}], "external": false};
-window.dfnpanelData['dom-performanceelementtiming-element'] = {"dfnID": "dom-performanceelementtiming-element", "url": "#dom-performanceelementtiming-element", "dfnText": "element", "refSections": [{"refs": [{"id": "ref-for-dom-performanceelementtiming-element"}, {"id": "ref-for-dom-performanceelementtiming-element\u2460"}], "title": "2.1. PerformanceElementTiming interface"}], "external": false};
-window.dfnpanelData['dom-performanceelementtiming-url'] = {"dfnID": "dom-performanceelementtiming-url", "url": "#dom-performanceelementtiming-url", "dfnText": "url", "refSections": [{"refs": [{"id": "ref-for-dom-performanceelementtiming-url"}], "title": "2.1. PerformanceElementTiming interface"}], "external": false};
-window.dfnpanelData['request'] = {"dfnID": "request", "url": "#request", "dfnText": "request", "refSections": [{"refs": [{"id": "ref-for-request"}], "title": "2.1. PerformanceElementTiming interface"}, {"refs": [{"id": "ref-for-request\u2460"}], "title": "3.5. Report image Element Timing"}], "external": false};
-window.dfnpanelData['element'] = {"dfnID": "element", "url": "#element", "dfnText": "element", "refSections": [{"refs": [{"id": "ref-for-element\u2461"}], "title": "2.1. PerformanceElementTiming interface"}, {"refs": [{"id": "ref-for-element\u2460\u2468"}], "title": "3.5. Report image Element Timing"}, {"refs": [{"id": "ref-for-element\u2461\u2460"}], "title": "3.6. Report text Element Timing"}], "external": false};
-window.dfnpanelData['dom-element-elementtiming'] = {"dfnID": "dom-element-elementtiming", "url": "#dom-element-elementtiming", "dfnText": "elementTiming", "refSections": [{"refs": [{"id": "ref-for-dom-element-elementtiming"}], "title": "3.1. Modifications to the DOM specification"}], "external": false};
-window.dfnpanelData['associated-image-request'] = {"dfnID": "associated-image-request", "url": "#associated-image-request", "dfnText": "associated image request", "refSections": [{"refs": [{"id": "ref-for-associated-image-request"}, {"id": "ref-for-associated-image-request\u2460"}, {"id": "ref-for-associated-image-request\u2461"}, {"id": "ref-for-associated-image-request\u2462"}], "title": "3.1. Modifications to the DOM specification"}, {"refs": [{"id": "ref-for-associated-image-request\u2463"}], "title": "3.4. Process image that finished loading"}], "external": false};
-window.dfnpanelData['set-of-owned-text-nodes'] = {"dfnID": "set-of-owned-text-nodes", "url": "#set-of-owned-text-nodes", "dfnText": "set of owned text nodes", "refSections": [{"refs": [{"id": "ref-for-set-of-owned-text-nodes"}, {"id": "ref-for-set-of-owned-text-nodes\u2460"}, {"id": "ref-for-set-of-owned-text-nodes\u2461"}, {"id": "ref-for-set-of-owned-text-nodes\u2462"}], "title": "3.2. Modifications to the CSS specification"}, {"refs": [{"id": "ref-for-set-of-owned-text-nodes\u2463"}], "title": "3.6. Report text Element Timing"}, {"refs": [{"id": "ref-for-set-of-owned-text-nodes\u2464"}], "title": "3.7. Element Timing processing"}], "external": false};
-window.dfnpanelData['images-pending-rendering'] = {"dfnID": "images-pending-rendering", "url": "#images-pending-rendering", "dfnText": "images pending rendering", "refSections": [{"refs": [{"id": "ref-for-images-pending-rendering"}], "title": "3.4. Process image that finished loading"}, {"refs": [{"id": "ref-for-images-pending-rendering\u2460"}, {"id": "ref-for-images-pending-rendering\u2461"}], "title": "3.7. Element Timing processing"}], "external": false};
-window.dfnpanelData['set-of-elements-with-rendered-text'] = {"dfnID": "set-of-elements-with-rendered-text", "url": "#set-of-elements-with-rendered-text", "dfnText": "set of elements with rendered text", "refSections": [{"refs": [{"id": "ref-for-set-of-elements-with-rendered-text"}, {"id": "ref-for-set-of-elements-with-rendered-text\u2460"}], "title": "3.7. Element Timing processing"}], "external": false};
-window.dfnpanelData['associated-background-image-requests'] = {"dfnID": "associated-background-image-requests", "url": "#associated-background-image-requests", "dfnText": "associated background image requests", "refSections": [{"refs": [{"id": "ref-for-associated-background-image-requests"}, {"id": "ref-for-associated-background-image-requests\u2460"}], "title": "3.2. Modifications to the CSS specification"}], "external": false};
-window.dfnpanelData['process-an-image-that-finished-loading'] = {"dfnID": "process-an-image-that-finished-loading", "url": "#process-an-image-that-finished-loading", "dfnText": "process an image that finished loading", "refSections": [{"refs": [{"id": "ref-for-process-an-image-that-finished-loading"}], "title": "3.1. Modifications to the DOM specification"}, {"refs": [{"id": "ref-for-process-an-image-that-finished-loading\u2460"}], "title": "3.2. Modifications to the CSS specification"}], "external": false};
-window.dfnpanelData['report-image-element-timing'] = {"dfnID": "report-image-element-timing", "url": "#report-image-element-timing", "dfnText": "report image element timing", "refSections": [{"refs": [{"id": "ref-for-report-image-element-timing"}], "title": "1.1. Elements exposed"}, {"refs": [{"id": "ref-for-report-image-element-timing\u2460"}], "title": "3.4. Process image that finished loading"}, {"refs": [{"id": "ref-for-report-image-element-timing\u2461"}], "title": "3.7. Element Timing processing"}], "external": false};
-window.dfnpanelData['report-text-element-timing'] = {"dfnID": "report-text-element-timing", "url": "#report-text-element-timing", "dfnText": "report text element timing", "refSections": [{"refs": [{"id": "ref-for-report-text-element-timing"}], "title": "1.1. Elements exposed"}, {"refs": [{"id": "ref-for-report-text-element-timing\u2460"}], "title": "3.7. Element Timing processing"}], "external": false};
-window.dfnpanelData['element-timing-processing'] = {"dfnID": "element-timing-processing", "url": "#element-timing-processing", "dfnText": "element timing processing", "refSections": [{"refs": [{"id": "ref-for-element-timing-processing"}], "title": "3.3. Modifications to the HTML specification"}, {"refs": [{"id": "ref-for-element-timing-processing\u2460"}], "title": "4. Security & privacy considerations"}], "external": false};
-window.dfnpanelData['get-an-element'] = {"dfnID": "get-an-element", "url": "#get-an-element", "dfnText": "get an element", "refSections": [{"refs": [{"id": "ref-for-get-an-element"}], "title": "2.1. PerformanceElementTiming interface"}, {"refs": [{"id": "ref-for-get-an-element\u2460"}], "title": "3.5. Report image Element Timing"}, {"refs": [{"id": "ref-for-get-an-element\u2461"}], "title": "3.6. Report text Element Timing"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -2468,34 +1988,503 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"08a90f22": {"dfnID":"08a90f22","dfnText":"entryType","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-performanceentry-entrytype"}],"title":"2.1. PerformanceElementTiming interface"}],"url":"https://w3c.github.io/performance-timeline/#dom-performanceentry-entrytype"},
+"09c54b53": {"dfnID":"09c54b53","dfnText":"name","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-performanceentry-name"}],"title":"2.1. PerformanceElementTiming interface"},{"refs":[{"id":"ref-for-dom-performanceentry-name\u2460"}],"title":"3.5. Report image Element Timing"},{"refs":[{"id":"ref-for-dom-performanceentry-name\u2461"}],"title":"3.6. Report text Element Timing"}],"url":"https://w3c.github.io/performance-timeline/#dom-performanceentry-name"},
+"0e3ba9f8": {"dfnID":"0e3ba9f8","dfnText":"fully active","external":true,"refSections":[{"refs":[{"id":"ref-for-fully-active"}],"title":"3.3. Modifications to the HTML specification"},{"refs":[{"id":"ref-for-fully-active\u2460"}],"title":"3.8. Get an element algorithm"}],"url":"https://html.spec.whatwg.org/multipage/document-sequences.html#fully-active"},
+"11a8832d": {"dfnID":"11a8832d","dfnText":"image","external":true,"refSections":[{"refs":[{"id":"ref-for-elementdef-image"}],"title":"1.1. Elements exposed"}],"url":"https://svgwg.org/svg2-draft/embedded.html#elementdef-image"},
+"12b24892": {"dfnID":"12b24892","dfnText":"intersection rect algorithm","external":true,"refSections":[{"refs":[{"id":"ref-for-calculate-intersection-rect-algo"}],"title":"3.5. Report image Element Timing"}],"url":"https://w3c.github.io/IntersectionObserver#calculate-intersection-rect-algo"},
+"28931d68": {"dfnID":"28931d68","dfnText":"potentially add a largestcontentfulpaint entry","external":true,"refSections":[{"refs":[{"id":"ref-for-potentially-add-a-largestcontentfulpaint-entry"}],"title":"3.5. Report image Element Timing"},{"refs":[{"id":"ref-for-potentially-add-a-largestcontentfulpaint-entry\u2460"}],"title":"3.6. Report text Element Timing"}],"url":"https://wicg.github.io/largest-contentful-paint/#potentially-add-a-largestcontentfulpaint-entry"},
+"296f3551": {"dfnID":"296f3551","dfnText":"Element","external":true,"refSections":[{"refs":[{"id":"ref-for-element"},{"id":"ref-for-element\u2460"}],"title":"2.1. PerformanceElementTiming interface"},{"refs":[{"id":"ref-for-element\u2462"},{"id":"ref-for-element\u2463"},{"id":"ref-for-element\u2464"},{"id":"ref-for-element\u2465"},{"id":"ref-for-element\u2466"},{"id":"ref-for-element\u2467"},{"id":"ref-for-element\u2468"},{"id":"ref-for-element\u2460\u24ea"}],"title":"3.1. Modifications to the DOM specification"},{"refs":[{"id":"ref-for-element\u2460\u2460"},{"id":"ref-for-element\u2460\u2461"},{"id":"ref-for-element\u2460\u2462"},{"id":"ref-for-element\u2460\u2463"},{"id":"ref-for-element\u2460\u2464"},{"id":"ref-for-element\u2460\u2465"},{"id":"ref-for-element\u2460\u2466"}],"title":"3.2. Modifications to the CSS specification"},{"refs":[{"id":"ref-for-element\u2460\u2467"}],"title":"3.4. Process image that finished loading"},{"refs":[{"id":"ref-for-element\u2461\u24ea"}],"title":"3.6. Report text Element Timing"},{"refs":[{"id":"ref-for-element\u2461\u2461"}],"title":"3.7. Element Timing processing"},{"refs":[{"id":"ref-for-element\u2461\u2462"}],"title":"3.8. Get an element algorithm"}],"url":"https://dom.spec.whatwg.org/#element"},
+"29e622ca": {"dfnID":"29e622ca","dfnText":"resolved url","external":true,"refSections":[{"refs":[{"id":"ref-for-resolve-a-url"}],"title":"2.1. PerformanceElementTiming interface"}],"url":"https://html.spec.whatwg.org/multipage/urls-and-fetching.html#resolve-a-url"},
+"2e117fc6": {"dfnID":"2e117fc6","dfnText":"timing allow check","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-timing-allow-check"}],"title":"3.4. Process image that finished loading"},{"refs":[{"id":"ref-for-dfn-timing-allow-check\u2460"},{"id":"ref-for-dfn-timing-allow-check\u2461"},{"id":"ref-for-dfn-timing-allow-check\u2462"}],"title":"4. Security & privacy considerations"}],"url":"https://w3c.github.io/resource-timing#dfn-timing-allow-check"},
+"33e96e84": {"dfnID":"33e96e84","dfnText":"list of available images","external":true,"refSections":[{"refs":[{"id":"ref-for-list-of-available-images"}],"title":"3.1. Modifications to the DOM specification"}],"url":"https://html.spec.whatwg.org/multipageimages.html#list-of-available-images"},
+"36672c76": {"dfnID":"36672c76","dfnText":"current high resolution time","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-current-high-resolution-time"}],"title":"3.4. Process image that finished loading"},{"refs":[{"id":"ref-for-dfn-current-high-resolution-time\u2460"}],"title":"4. Security & privacy considerations"}],"url":"https://w3c.github.io/hr-time#dfn-current-high-resolution-time"},
+"3a711be7": {"dfnID":"3a711be7","dfnText":"scheme","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-url-scheme"}],"title":"2.1. PerformanceElementTiming interface"},{"refs":[{"id":"ref-for-concept-url-scheme\u2460"}],"title":"3.1. Modifications to the DOM specification"}],"url":"https://url.spec.whatwg.org/#concept-url-scheme"},
+"3efa5dd7": {"dfnID":"3efa5dd7","dfnText":"queue the performanceentry","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-queue-a-performanceentry"}],"title":"3.5. Report image Element Timing"},{"refs":[{"id":"ref-for-dfn-queue-a-performanceentry\u2460"}],"title":"3.6. Report text Element Timing"}],"url":"https://w3c.github.io/performance-timeline/#dfn-queue-a-performanceentry"},
+"3f52e3d0": {"dfnID":"3f52e3d0","dfnText":"naturalHeight","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-img-naturalheight"}],"title":"3.5. Report image Element Timing"}],"url":"https://html.spec.whatwg.org/multipage#dom-img-naturalheight"},
+"402ed79d": {"dfnID":"402ed79d","dfnText":"CEReactions","external":true,"refSections":[{"refs":[{"id":"ref-for-cereactions"}],"title":"3.1. Modifications to the DOM specification"}],"url":"https://html.spec.whatwg.org/multipage/custom-elements.html#cereactions"},
+"4299a926": {"dfnID":"4299a926","dfnText":"svg","external":true,"refSections":[{"refs":[{"id":"ref-for-elementdef-svg"}],"title":"1.1. Elements exposed"}],"url":"https://svgwg.org/svg2-draft/struct.html#elementdef-svg"},
+"4cecaafa": {"dfnID":"4cecaafa","dfnText":"naturalWidth","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-img-naturalwidth"}],"title":"3.5. Report image Element Timing"}],"url":"https://html.spec.whatwg.org/multipage#dom-img-naturalwidth"},
+"51c2724d": {"dfnID":"51c2724d","dfnText":"SVGImageElement","external":true,"refSections":[{"refs":[{"id":"ref-for-InterfaceSVGImageElement"}],"title":"3.1. Modifications to the DOM specification"}],"url":"https://svgwg.org/svg2-draft/embedded.html#InterfaceSVGImageElement"},
+"53b3ac9d": {"dfnID":"53b3ac9d","dfnText":"IntersectionObserver","external":true,"refSections":[{"refs":[{"id":"ref-for-intersectionobserver"},{"id":"ref-for-intersectionobserver\u2460"}],"title":"4. Security & privacy considerations"}],"url":"https://w3c.github.io/IntersectionObserver#intersectionobserver"},
+"55641d29": {"dfnID":"55641d29","dfnText":"image request","external":true,"refSections":[{"refs":[{"id":"ref-for-image-request"},{"id":"ref-for-image-request\u2460"},{"id":"ref-for-image-request\u2461"}],"title":"3.1. Modifications to the DOM specification"},{"refs":[{"id":"ref-for-image-request\u2462"},{"id":"ref-for-image-request\u2463"},{"id":"ref-for-image-request\u2464"},{"id":"ref-for-image-request\u2465"},{"id":"ref-for-image-request\u2466"}],"title":"3.2. Modifications to the CSS specification"},{"refs":[{"id":"ref-for-image-request\u2467"}],"title":"3.7. Element Timing processing"}],"url":"https://html.spec.whatwg.org/multipage#image-request"},
+"597088f0": {"dfnID":"597088f0","dfnText":"Text","external":true,"refSections":[{"refs":[{"id":"ref-for-text"}],"title":"3.2. Modifications to the CSS specification"},{"refs":[{"id":"ref-for-text\u2460"}],"title":"3.6. Report text Element Timing"}],"url":"https://dom.spec.whatwg.org/#text"},
+"5991ccfb": {"dfnID":"5991ccfb","dfnText":"relevant realm","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-relevant-realm"}],"title":"3.6. Report text Element Timing"}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-realm"},
+"5b31c866": {"dfnID":"5b31c866","dfnText":"font block period","external":true,"refSections":[{"refs":[{"id":"ref-for-font-block-period"}],"title":"3.2. Modifications to the CSS specification"}],"url":"https://drafts.csswg.org/css-fonts-4/#font-block-period"},
+"5d7209e9": {"dfnID":"5d7209e9","dfnText":"Window","external":true,"refSections":[{"refs":[{"id":"ref-for-window"}],"title":"3. Processing model"}],"url":"https://html.spec.whatwg.org/multipage/nav-history-apis.html#window"},
+"692595fe": {"dfnID":"692595fe","dfnText":"ordered set","external":true,"refSections":[{"refs":[{"id":"ref-for-ordered-set"},{"id":"ref-for-ordered-set\u2460"}],"title":"3.1. Modifications to the DOM specification"}],"url":"https://infra.spec.whatwg.org/#ordered-set"},
+"80e0e9c9": {"dfnID":"80e0e9c9","dfnText":"PerformanceObserver","external":true,"refSections":[{"refs":[{"id":"ref-for-the-performanceobserver-interface"}],"title":"4. Security & privacy considerations"}],"url":"https://w3c.github.io/performance-timeline/#the-performanceobserver-interface"},
+"85394472": {"dfnID":"85394472","dfnText":"Document","external":true,"refSections":[{"refs":[{"id":"ref-for-document"}],"title":"2.1. PerformanceElementTiming interface"},{"refs":[{"id":"ref-for-document\u2460"},{"id":"ref-for-document\u2461"}],"title":"3.1. Modifications to the DOM specification"},{"refs":[{"id":"ref-for-document\u2462"},{"id":"ref-for-document\u2463"}],"title":"3.3. Modifications to the HTML specification"},{"refs":[{"id":"ref-for-document\u2464"}],"title":"3.4. Process image that finished loading"},{"refs":[{"id":"ref-for-document\u2465"}],"title":"3.5. Report image Element Timing"},{"refs":[{"id":"ref-for-document\u2466"}],"title":"3.6. Report text Element Timing"},{"refs":[{"id":"ref-for-document\u2467"}],"title":"3.7. Element Timing processing"},{"refs":[{"id":"ref-for-document\u2468"}],"title":"3.8. Get an element algorithm"}],"url":"https://dom.spec.whatwg.org/#document"},
+"874e26dc": {"dfnID":"874e26dc","dfnText":"background-image","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-background-image"}],"title":"1.1. Elements exposed"},{"refs":[{"id":"ref-for-propdef-background-image\u2460"},{"id":"ref-for-propdef-background-image\u2461"},{"id":"ref-for-propdef-background-image\u2462"}],"title":"3.2. Modifications to the CSS specification"}],"url":"https://drafts.csswg.org/css-backgrounds-3#propdef-background-image"},
+"8855a9aa": {"dfnID":"8855a9aa","dfnText":"DOMString","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-DOMString"},{"id":"ref-for-idl-DOMString\u2460"},{"id":"ref-for-idl-DOMString\u2461"},{"id":"ref-for-idl-DOMString\u2462"}],"title":"2.1. PerformanceElementTiming interface"},{"refs":[{"id":"ref-for-idl-DOMString\u2463"}],"title":"3.1. Modifications to the DOM specification"},{"refs":[{"id":"ref-for-idl-DOMString\u2464"}],"title":"3.5. Report image Element Timing"},{"refs":[{"id":"ref-for-idl-DOMString\u2465"}],"title":"3.6. Report text Element Timing"}],"url":"https://webidl.spec.whatwg.org/#idl-DOMString"},
+"889e932f": {"dfnID":"889e932f","dfnText":"Exposed","external":true,"refSections":[{"refs":[{"id":"ref-for-Exposed"}],"title":"2.1. PerformanceElementTiming interface"}],"url":"https://webidl.spec.whatwg.org/#Exposed"},
+"9638f92b": {"dfnID":"9638f92b","dfnText":"connected","external":true,"refSections":[{"refs":[{"id":"ref-for-connected"}],"title":"3.8. Get an element algorithm"}],"url":"https://dom.spec.whatwg.org/#connected"},
+"9c4c1e66": {"dfnID":"9c4c1e66","dfnText":"relevant settings object","external":true,"refSections":[{"refs":[{"id":"ref-for-relevant-settings-object"}],"title":"3.8. Get an element algorithm"}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object"},
+"a3b18719": {"dfnID":"a3b18719","dfnText":"append","external":true,"refSections":[{"refs":[{"id":"ref-for-set-append"},{"id":"ref-for-set-append\u2460"}],"title":"3.2. Modifications to the CSS specification"},{"refs":[{"id":"ref-for-set-append\u2461"}],"title":"3.7. Element Timing processing"}],"url":"https://infra.spec.whatwg.org/#set-append"},
+"a7bbaf9f": {"dfnID":"a7bbaf9f","dfnText":"div","external":true,"refSections":[{"refs":[{"id":"ref-for-the-div-element"},{"id":"ref-for-the-div-element\u2460"}],"title":"3.2. Modifications to the CSS specification"}],"url":"https://html.spec.whatwg.org/multipage/grouping-content.html#the-div-element"},
+"aa7bbf63": {"dfnID":"aa7bbf63","dfnText":"video","external":true,"refSections":[{"refs":[{"id":"ref-for-video"}],"title":"1.1. Elements exposed"}],"url":"https://html.spec.whatwg.org/multipage/media.html#video"},
+"associated-background-image-requests": {"dfnID":"associated-background-image-requests","dfnText":"associated background image requests","external":false,"refSections":[{"refs":[{"id":"ref-for-associated-background-image-requests"},{"id":"ref-for-associated-background-image-requests\u2460"}],"title":"3.2. Modifications to the CSS specification"}],"url":"#associated-background-image-requests"},
+"associated-image-request": {"dfnID":"associated-image-request","dfnText":"associated image request","external":false,"refSections":[{"refs":[{"id":"ref-for-associated-image-request"},{"id":"ref-for-associated-image-request\u2460"},{"id":"ref-for-associated-image-request\u2461"},{"id":"ref-for-associated-image-request\u2462"}],"title":"3.1. Modifications to the DOM specification"},{"refs":[{"id":"ref-for-associated-image-request\u2463"}],"title":"3.4. Process image that finished loading"}],"url":"#associated-image-request"},
+"b815f411": {"dfnID":"b815f411","dfnText":"update the rendering","external":true,"refSections":[{"refs":[{"id":"ref-for-update-the-rendering"}],"title":"3.3. Modifications to the HTML specification"},{"refs":[{"id":"ref-for-update-the-rendering\u2460"}],"title":"4. Security & privacy considerations"}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#update-the-rendering"},
+"c5891539": {"dfnID":"c5891539","dfnText":"HTMLImageElement","external":true,"refSections":[{"refs":[{"id":"ref-for-htmlimageelement"},{"id":"ref-for-htmlimageelement\u2460"}],"title":"3.1. Modifications to the DOM specification"}],"url":"https://html.spec.whatwg.org/multipage/embedded-content.html#htmlimageelement"},
+"cc7c9b78": {"dfnID":"cc7c9b78","dfnText":"startTime","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-performanceentry-starttime"}],"title":"2.1. PerformanceElementTiming interface"}],"url":"https://w3c.github.io/performance-timeline/#dom-performanceentry-starttime"},
+"d462b34f": {"dfnID":"d462b34f","dfnText":"node","external":true,"refSections":[{"refs":[{"id":"ref-for-boundary-point-node"}],"title":"3.6. Report text Element Timing"}],"url":"https://dom.spec.whatwg.org/#boundary-point-node"},
+"da8b8e0e": {"dfnID":"da8b8e0e","dfnText":"descendant","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-tree-descendant"}],"title":"2.1. PerformanceElementTiming interface"},{"refs":[{"id":"ref-for-concept-tree-descendant\u2460"}],"title":"3.7. Element Timing processing"}],"url":"https://dom.spec.whatwg.org/#concept-tree-descendant"},
+"de4bb79b": {"dfnID":"de4bb79b","dfnText":"supportedEntryTypes","external":true,"refSections":[{"refs":[{"id":"ref-for-supportedentrytypes-attribute"}],"title":"3. Processing model"}],"url":"https://w3c.github.io/performance-timeline/#supportedentrytypes-attribute"},
+"df79032a": {"dfnID":"df79032a","dfnText":"PerformanceEntry","external":true,"refSections":[{"refs":[{"id":"ref-for-the-performanceentry-interface"}],"title":"2.1. PerformanceElementTiming interface"}],"url":"https://w3c.github.io/performance-timeline/#the-performanceentry-interface"},
+"dom-element-elementtiming": {"dfnID":"dom-element-elementtiming","dfnText":"elementTiming","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-element-elementtiming"}],"title":"3.1. Modifications to the DOM specification"}],"url":"#dom-element-elementtiming"},
+"dom-performanceelementtiming-element": {"dfnID":"dom-performanceelementtiming-element","dfnText":"element","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-performanceelementtiming-element"},{"id":"ref-for-dom-performanceelementtiming-element\u2460"}],"title":"2.1. PerformanceElementTiming interface"}],"url":"#dom-performanceelementtiming-element"},
+"dom-performanceelementtiming-id": {"dfnID":"dom-performanceelementtiming-id","dfnText":"id","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-performanceelementtiming-id"}],"title":"2.1. PerformanceElementTiming interface"},{"refs":[{"id":"ref-for-dom-performanceelementtiming-id\u2460"}],"title":"3.5. Report image Element Timing"},{"refs":[{"id":"ref-for-dom-performanceelementtiming-id\u2461"}],"title":"3.6. Report text Element Timing"}],"url":"#dom-performanceelementtiming-id"},
+"dom-performanceelementtiming-identifier": {"dfnID":"dom-performanceelementtiming-identifier","dfnText":"identifier","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-performanceelementtiming-identifier"}],"title":"2.1. PerformanceElementTiming interface"},{"refs":[{"id":"ref-for-dom-performanceelementtiming-identifier\u2460"}],"title":"3.5. Report image Element Timing"},{"refs":[{"id":"ref-for-dom-performanceelementtiming-identifier\u2461"}],"title":"3.6. Report text Element Timing"}],"url":"#dom-performanceelementtiming-identifier"},
+"dom-performanceelementtiming-intersectionrect": {"dfnID":"dom-performanceelementtiming-intersectionrect","dfnText":"intersectionRect","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-performanceelementtiming-intersectionrect"}],"title":"2.1. PerformanceElementTiming interface"},{"refs":[{"id":"ref-for-dom-performanceelementtiming-intersectionrect\u2460"}],"title":"3.5. Report image Element Timing"},{"refs":[{"id":"ref-for-dom-performanceelementtiming-intersectionrect\u2461"}],"title":"3.6. Report text Element Timing"},{"refs":[{"id":"ref-for-dom-performanceelementtiming-intersectionrect\u2462"},{"id":"ref-for-dom-performanceelementtiming-intersectionrect\u2463"}],"title":"4. Security & privacy considerations"}],"url":"#dom-performanceelementtiming-intersectionrect"},
+"dom-performanceelementtiming-loadtime": {"dfnID":"dom-performanceelementtiming-loadtime","dfnText":"loadTime","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-performanceelementtiming-loadtime"},{"id":"ref-for-dom-performanceelementtiming-loadtime\u2460"}],"title":"2.1. PerformanceElementTiming interface"},{"refs":[{"id":"ref-for-dom-performanceelementtiming-loadtime\u2461"}],"title":"3.5. Report image Element Timing"},{"refs":[{"id":"ref-for-dom-performanceelementtiming-loadtime\u2462"}],"title":"3.6. Report text Element Timing"},{"refs":[{"id":"ref-for-dom-performanceelementtiming-loadtime\u2463"}],"title":"4. Security & privacy considerations"}],"url":"#dom-performanceelementtiming-loadtime"},
+"dom-performanceelementtiming-naturalheight": {"dfnID":"dom-performanceelementtiming-naturalheight","dfnText":"naturalHeight","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-performanceelementtiming-naturalheight"}],"title":"2.1. PerformanceElementTiming interface"},{"refs":[{"id":"ref-for-dom-performanceelementtiming-naturalheight\u2460"}],"title":"3.5. Report image Element Timing"},{"refs":[{"id":"ref-for-dom-performanceelementtiming-naturalheight\u2461"}],"title":"3.6. Report text Element Timing"}],"url":"#dom-performanceelementtiming-naturalheight"},
+"dom-performanceelementtiming-naturalwidth": {"dfnID":"dom-performanceelementtiming-naturalwidth","dfnText":"naturalWidth","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-performanceelementtiming-naturalwidth"}],"title":"2.1. PerformanceElementTiming interface"},{"refs":[{"id":"ref-for-dom-performanceelementtiming-naturalwidth\u2460"}],"title":"3.5. Report image Element Timing"},{"refs":[{"id":"ref-for-dom-performanceelementtiming-naturalwidth\u2461"}],"title":"3.6. Report text Element Timing"}],"url":"#dom-performanceelementtiming-naturalwidth"},
+"dom-performanceelementtiming-rendertime": {"dfnID":"dom-performanceelementtiming-rendertime","dfnText":"renderTime","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-performanceelementtiming-rendertime"},{"id":"ref-for-dom-performanceelementtiming-rendertime\u2460"}],"title":"2.1. PerformanceElementTiming interface"},{"refs":[{"id":"ref-for-dom-performanceelementtiming-rendertime\u2461"}],"title":"3.5. Report image Element Timing"},{"refs":[{"id":"ref-for-dom-performanceelementtiming-rendertime\u2462"}],"title":"3.6. Report text Element Timing"},{"refs":[{"id":"ref-for-dom-performanceelementtiming-rendertime\u2463"}],"title":"4. Security & privacy considerations"}],"url":"#dom-performanceelementtiming-rendertime"},
+"dom-performanceelementtiming-url": {"dfnID":"dom-performanceelementtiming-url","dfnText":"url","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-performanceelementtiming-url"}],"title":"2.1. PerformanceElementTiming interface"}],"url":"#dom-performanceelementtiming-url"},
+"e97a9688": {"dfnID":"e97a9688","dfnText":"unsigned long","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-unsigned-long"},{"id":"ref-for-idl-unsigned-long\u2460"}],"title":"2.1. PerformanceElementTiming interface"}],"url":"https://webidl.spec.whatwg.org/#idl-unsigned-long"},
+"e99bd18e": {"dfnID":"e99bd18e","dfnText":"relevant global object","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-relevant-global"}],"title":"3.4. Process image that finished loading"}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-global"},
+"ea663a43": {"dfnID":"ea663a43","dfnText":"containing block","external":true,"refSections":[{"refs":[{"id":"ref-for-containing-block"}],"title":"3.2. Modifications to the CSS specification"}],"url":"https://drafts.csswg.org/css-display-4/#containing-block"},
+"efd1ec5d": {"dfnID":"efd1ec5d","dfnText":"object","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-object"}],"title":"2.1. PerformanceElementTiming interface"}],"url":"https://webidl.spec.whatwg.org/#idl-object"},
+"element": {"dfnID":"element","dfnText":"element","external":false,"refSections":[{"refs":[{"id":"ref-for-element\u2461"}],"title":"2.1. PerformanceElementTiming interface"},{"refs":[{"id":"ref-for-element\u2460\u2468"}],"title":"3.5. Report image Element Timing"},{"refs":[{"id":"ref-for-element\u2461\u2460"}],"title":"3.6. Report text Element Timing"}],"url":"#element"},
+"element-timing-processing": {"dfnID":"element-timing-processing","dfnText":"element timing processing","external":false,"refSections":[{"refs":[{"id":"ref-for-element-timing-processing"}],"title":"3.3. Modifications to the HTML specification"},{"refs":[{"id":"ref-for-element-timing-processing\u2460"}],"title":"4. Security & privacy considerations"}],"url":"#element-timing-processing"},
+"f0811ff8": {"dfnID":"f0811ff8","dfnText":"img","external":true,"refSections":[{"refs":[{"id":"ref-for-the-img-element"}],"title":"1.1. Elements exposed"},{"refs":[{"id":"ref-for-the-img-element\u2460"}],"title":"3.5. Report image Element Timing"}],"url":"https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element"},
+"f4531911": {"dfnID":"f4531911","dfnText":"Default","external":true,"refSections":[{"refs":[{"id":"ref-for-Default"}],"title":"2.1. PerformanceElementTiming interface"}],"url":"https://webidl.spec.whatwg.org/#Default"},
+"f57f330b": {"dfnID":"f57f330b","dfnText":"HTMLVideoElement","external":true,"refSections":[{"refs":[{"id":"ref-for-htmlvideoelement"}],"title":"3.1. Modifications to the DOM specification"}],"url":"https://html.spec.whatwg.org/multipage/media.html#htmlvideoelement"},
+"f596a4ea": {"dfnID":"f596a4ea","dfnText":"completely available","external":true,"refSections":[{"refs":[{"id":"ref-for-img-all"}],"title":"3.1. Modifications to the DOM specification"},{"refs":[{"id":"ref-for-img-all\u2460"}],"title":"3.2. Modifications to the CSS specification"}],"url":"https://html.spec.whatwg.org/multipage/images.html#img-all"},
+"f7960529": {"dfnID":"f7960529","dfnText":"root","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-tree-root"}],"title":"3.4. Process image that finished loading"},{"refs":[{"id":"ref-for-concept-tree-root\u2460"}],"title":"3.8. Get an element algorithm"}],"url":"https://dom.spec.whatwg.org/#concept-tree-root"},
+"fabd3046": {"dfnID":"fabd3046","dfnText":"duration","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-performanceentry-duration"}],"title":"2.1. PerformanceElementTiming interface"}],"url":"https://w3c.github.io/performance-timeline/#dom-performanceentry-duration"},
+"fdd2dd4e": {"dfnID":"fdd2dd4e","dfnText":"DOMRectReadOnly","external":true,"refSections":[{"refs":[{"id":"ref-for-domrectreadonly"}],"title":"2.1. PerformanceElementTiming interface"}],"url":"https://drafts.fxtf.org/geometry-1/#domrectreadonly"},
+"fe0bd60a": {"dfnID":"fe0bd60a","dfnText":"DOMHighResTimeStamp","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-domhighrestimestamp"},{"id":"ref-for-dom-domhighrestimestamp\u2460"}],"title":"2.1. PerformanceElementTiming interface"}],"url":"https://w3c.github.io/hr-time#dom-domhighrestimestamp"},
+"ffc19957": {"dfnID":"ffc19957","dfnText":"painting order","external":true,"refSections":[{"refs":[{"id":"ref-for-painting-order"},{"id":"ref-for-painting-order\u2460"}],"title":"3.2. Modifications to the CSS specification"}],"url":"https://drafts.csswg.org/css2/zindex.html#painting-order"},
+"get-an-element": {"dfnID":"get-an-element","dfnText":"get an element","external":false,"refSections":[{"refs":[{"id":"ref-for-get-an-element"}],"title":"2.1. PerformanceElementTiming interface"},{"refs":[{"id":"ref-for-get-an-element\u2460"}],"title":"3.5. Report image Element Timing"},{"refs":[{"id":"ref-for-get-an-element\u2461"}],"title":"3.6. Report text Element Timing"}],"url":"#get-an-element"},
+"images-pending-rendering": {"dfnID":"images-pending-rendering","dfnText":"images pending rendering","external":false,"refSections":[{"refs":[{"id":"ref-for-images-pending-rendering"}],"title":"3.4. Process image that finished loading"},{"refs":[{"id":"ref-for-images-pending-rendering\u2460"},{"id":"ref-for-images-pending-rendering\u2461"}],"title":"3.7. Element Timing processing"}],"url":"#images-pending-rendering"},
+"performanceelementtiming": {"dfnID":"performanceelementtiming","dfnText":"PerformanceElementTiming","external":false,"refSections":[{"refs":[{"id":"ref-for-performanceelementtiming"},{"id":"ref-for-performanceelementtiming\u2460"},{"id":"ref-for-performanceelementtiming\u2461"},{"id":"ref-for-performanceelementtiming\u2462"}],"title":"2.1. PerformanceElementTiming interface"},{"refs":[{"id":"ref-for-performanceelementtiming\u2463"}],"title":"3.2. Modifications to the CSS specification"},{"refs":[{"id":"ref-for-performanceelementtiming\u2464"}],"title":"3.5. Report image Element Timing"},{"refs":[{"id":"ref-for-performanceelementtiming\u2465"}],"title":"3.6. Report text Element Timing"},{"refs":[{"id":"ref-for-performanceelementtiming\u2466"}],"title":"4. Security & privacy considerations"}],"url":"#performanceelementtiming"},
+"process-an-image-that-finished-loading": {"dfnID":"process-an-image-that-finished-loading","dfnText":"process an image that finished loading","external":false,"refSections":[{"refs":[{"id":"ref-for-process-an-image-that-finished-loading"}],"title":"3.1. Modifications to the DOM specification"},{"refs":[{"id":"ref-for-process-an-image-that-finished-loading\u2460"}],"title":"3.2. Modifications to the CSS specification"}],"url":"#process-an-image-that-finished-loading"},
+"report-image-element-timing": {"dfnID":"report-image-element-timing","dfnText":"report image element timing","external":false,"refSections":[{"refs":[{"id":"ref-for-report-image-element-timing"}],"title":"1.1. Elements exposed"},{"refs":[{"id":"ref-for-report-image-element-timing\u2460"}],"title":"3.4. Process image that finished loading"},{"refs":[{"id":"ref-for-report-image-element-timing\u2461"}],"title":"3.7. Element Timing processing"}],"url":"#report-image-element-timing"},
+"report-text-element-timing": {"dfnID":"report-text-element-timing","dfnText":"report text element timing","external":false,"refSections":[{"refs":[{"id":"ref-for-report-text-element-timing"}],"title":"1.1. Elements exposed"},{"refs":[{"id":"ref-for-report-text-element-timing\u2460"}],"title":"3.7. Element Timing processing"}],"url":"#report-text-element-timing"},
+"request": {"dfnID":"request","dfnText":"request","external":false,"refSections":[{"refs":[{"id":"ref-for-request"}],"title":"2.1. PerformanceElementTiming interface"},{"refs":[{"id":"ref-for-request\u2460"}],"title":"3.5. Report image Element Timing"}],"url":"#request"},
+"set-of-elements-with-rendered-text": {"dfnID":"set-of-elements-with-rendered-text","dfnText":"set of elements with rendered text","external":false,"refSections":[{"refs":[{"id":"ref-for-set-of-elements-with-rendered-text"},{"id":"ref-for-set-of-elements-with-rendered-text\u2460"}],"title":"3.7. Element Timing processing"}],"url":"#set-of-elements-with-rendered-text"},
+"set-of-owned-text-nodes": {"dfnID":"set-of-owned-text-nodes","dfnText":"set of owned text nodes","external":false,"refSections":[{"refs":[{"id":"ref-for-set-of-owned-text-nodes"},{"id":"ref-for-set-of-owned-text-nodes\u2460"},{"id":"ref-for-set-of-owned-text-nodes\u2461"},{"id":"ref-for-set-of-owned-text-nodes\u2462"}],"title":"3.2. Modifications to the CSS specification"},{"refs":[{"id":"ref-for-set-of-owned-text-nodes\u2463"}],"title":"3.6. Report text Element Timing"},{"refs":[{"id":"ref-for-set-of-owned-text-nodes\u2464"}],"title":"3.7. Element Timing processing"}],"url":"#set-of-owned-text-nodes"},
+};
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+});
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        dfn.panelData = panelData;
+        insertDfnPopupAction(dfn);
+    }
+}
+
+function genDfnPanel(dfn, { dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel on",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel({dfnPanel});
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.dfn = dfn;
+    dfn.dfnPanel = dfnPanel;
+    return dfnPanel;
+}
+
+
+
+function hideAllDfnPanels() {
+    // Delete the currently-active dfn panel.
+    queryAll(".dfn-panel").forEach(dfnPanel=>hideDfnPanel({dfnPanel}));
+}
+
+function showDfnPanel(dfn) {
+    hideAllDfnPanels(); // Only display one at a time.
+
+    dfn.setAttribute("aria-expanded", "true");
+
+    const dfnPanel = genDfnPanel(dfn, dfn.panelData);
+
+    // Give the dfn a unique tabindex, and then
+    // give all the tabbable panel bits successive indexes.
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+
+    append(document.body, dfnPanel);
+    positionDfnPanel(dfnPanel);
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.dfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }
+}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel({dfn, dfnPanel}) {
+    if(!dfnPanel) dfnPanel = dfn.dfnPanel;
+    if(!dfn) dfn = dfnPanel.dfn;
+    dfn.dfnPanel = undefined;
+    dfnPanel.dfn = undefined;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.remove()
+}
+
+function toggleDfnPanel(dfn) {
+    if(dfn.dfnPanel) {
+        hideDfnPanel(dfn);
+    } else {
+        showDfnPanel(dfn);
+    }
+}
+
+function insertDfnPopupAction(dfn) {
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        toggleDfnPanel(dfn);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+function needsFor(type) {
+    switch(type) {
+        case "descriptor":
+        case "value":
+        case "element-attr":
+        case "attr-value":
+        case "element-state":
+        case "method":
+        case "constructor":
+        case "argument":
+        case "attribute":
+        case "const":
+        case "dict-member":
+        case "event":
+        case "enum-value":
+        case "stringifier":
+        case "serializer":
+        case "iterator":
+        case "maplike":
+        case "setlike":
+        case "state":
+        case "mode":
+        case "context":
+        case "facet": return true;
+
+        default: return false;
+    }
+}
+function refusesFor(type) {
+    switch(type) {
+        case "property":
+        case "element":
+        case "interface":
+        case "namespace":
+        case "callback":
+        case "dictionary":
+        case "enum":
+        case "exception":
+        case "typedef":
+        case "http-header":
+        case "permission": return true;
+
+        default: return false;
+    }
+}
+function linkFormatterFromType(type) {
+    switch(type) {
+        case 'scheme':
+        case 'permission':
+        case 'dfn': return (text) => `[=${text}=]`;
+
+        case 'abstract-op': return (text) => `[\$${text}\$]`;
+
+        case 'function':
+        case 'at-rule':
+        case 'selector':
+        case 'value': return (text) => `''${text}''`;
+
+        case 'http-header': return (text) => `[:${text}:]`;
+
+        case 'interface':
+        case 'constructor':
+        case 'method':
+        case 'argument':
+        case 'attribute':
+        case 'callback':
+        case 'dictionary':
+        case 'dict-member':
+        case 'enum':
+        case 'enum-value':
+        case 'exception':
+        case 'const':
+        case 'typedef':
+        case 'stringifier':
+        case 'serializer':
+        case 'iterator':
+        case 'maplike':
+        case 'setlike':
+        case 'extended-attribute':
+        case 'event':
+        case 'idl': return (text) => `{{${text}}}`;
+
+        case 'element-state':
+        case 'element-attr':
+        case 'attr-value':
+        case 'element': return (element) => `<{${element}}>`;
+
+        case 'grammar': return (text) => `${text} (within a <pre class=prod>)`;
+
+        case 'type': return (text)=> `<<${text}>>`;
+
+        case 'descriptor':
+        case 'property': return (text) => `'${text}'`;
+
+        default: return;
+    };
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!needsFor(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!refusesFor(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
 }
 </script>
 <script>/* Boilerplate: script-position-annos */
 "use strict";
 {
-
 function repositionAnnoPanels(){
     const panels = [...document.querySelectorAll("[data-anno-for]")];
-    const main = document.querySelector("main");
-    let mainRect;
-    if(main) mainRect = main.getBoundingClientRect();
-    for(const panel of panels) {
-        const dfn = document.getElementById(panel.getAttribute("data-anno-for"));
-        if(!dfn) {
-            console.log("Can't find the annotation panel target:", panel);
-            continue;
-        }
-        const rect = dfn.getBoundingClientRect();
-        const top = window.scrollY + rect.top
-        panel.style.top = top + "px";
-        panel.top = top;
-        panel.height = rect.height;
-        panel.classList.remove("unpositioned");
-        const panelRect = panel.getBoundingClientRect()
-        if(main) {
-            panel.classList.toggle("overlapping-main", panelRect.left < mainRect.right)
-        }
-    }
+    hydratePanels(panels);
     let vSoFar = 0;
     for(const panel of panels.sort(cmpTops)) {
         if(panel.top < vSoFar) {
@@ -2503,6 +2492,39 @@ function repositionAnnoPanels(){
             panel.style.top = vSoFar + "px";
         }
         vSoFar = panel.top + panel.height + 15;
+    }
+}
+function hydratePanels(panels) {
+    const main = document.querySelector("main");
+    let mainRect;
+    if(main) mainRect = main.getBoundingClientRect();
+    // First display them all, if they're not already visible.
+    for(const panel of panels) {
+        panel.classList.remove("unpositioned");
+    }
+    // Measure them all
+    for(const panel of panels) {
+        const dfn = document.getElementById(panel.getAttribute("data-anno-for"));
+        if(!dfn) {
+            console.log("Can't find the annotation panel target:", panel);
+            continue;
+        }
+        panel.dfn = dfn;
+        panel.top = window.scrollY + dfn.getBoundingClientRect().top;
+        let panelRect = panel.getBoundingClientRect();
+        panel.height = panelRect.height;
+        if(main) {
+            panel.overlappingMain = panelRect.left < mainRect.right;
+        } else {
+            panel.overlappingMain = false;
+        }
+    }
+    // And finally position them
+    for(const panel of panels) {
+        const dfn = panel.dfn;
+        if(!dfn) continue;
+        panel.style.top = panel.top + "px";
+        panel.classList.toggle("overlapping-main", panel.overlappingMain);
     }
 }
 
@@ -2517,388 +2539,366 @@ window.addEventListener("resize", repositionAnnoPanels);
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
-                mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
+let refsData = {
+"#associated-background-image-requests": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"element-timing","spec":"element-timing-1","status":"local","text":"associated background image requests","type":"dfn","url":"#associated-background-image-requests"},
+"#associated-image-request": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"element-timing","spec":"element-timing-1","status":"local","text":"associated image request","type":"dfn","url":"#associated-image-request"},
+"#dom-element-elementtiming": {"export":true,"for_":["Element"],"level":"1","normative":true,"shortname":"element-timing","spec":"element-timing-1","status":"local","text":"elementTiming","type":"attribute","url":"#dom-element-elementtiming"},
+"#dom-performanceelementtiming-element": {"export":true,"for_":["PerformanceElementTiming"],"level":"1","normative":true,"shortname":"element-timing","spec":"element-timing-1","status":"local","text":"element","type":"attribute","url":"#dom-performanceelementtiming-element"},
+"#dom-performanceelementtiming-id": {"export":true,"for_":["PerformanceElementTiming"],"level":"1","normative":true,"shortname":"element-timing","spec":"element-timing-1","status":"local","text":"id","type":"attribute","url":"#dom-performanceelementtiming-id"},
+"#dom-performanceelementtiming-identifier": {"export":true,"for_":["PerformanceElementTiming"],"level":"1","normative":true,"shortname":"element-timing","spec":"element-timing-1","status":"local","text":"identifier","type":"attribute","url":"#dom-performanceelementtiming-identifier"},
+"#dom-performanceelementtiming-intersectionrect": {"export":true,"for_":["PerformanceElementTiming"],"level":"1","normative":true,"shortname":"element-timing","spec":"element-timing-1","status":"local","text":"intersectionRect","type":"attribute","url":"#dom-performanceelementtiming-intersectionrect"},
+"#dom-performanceelementtiming-loadtime": {"export":true,"for_":["PerformanceElementTiming"],"level":"1","normative":true,"shortname":"element-timing","spec":"element-timing-1","status":"local","text":"loadTime","type":"attribute","url":"#dom-performanceelementtiming-loadtime"},
+"#dom-performanceelementtiming-naturalheight": {"export":true,"for_":["PerformanceElementTiming"],"level":"1","normative":true,"shortname":"element-timing","spec":"element-timing-1","status":"local","text":"naturalHeight","type":"attribute","url":"#dom-performanceelementtiming-naturalheight"},
+"#dom-performanceelementtiming-naturalwidth": {"export":true,"for_":["PerformanceElementTiming"],"level":"1","normative":true,"shortname":"element-timing","spec":"element-timing-1","status":"local","text":"naturalWidth","type":"attribute","url":"#dom-performanceelementtiming-naturalwidth"},
+"#dom-performanceelementtiming-rendertime": {"export":true,"for_":["PerformanceElementTiming"],"level":"1","normative":true,"shortname":"element-timing","spec":"element-timing-1","status":"local","text":"renderTime","type":"attribute","url":"#dom-performanceelementtiming-rendertime"},
+"#dom-performanceelementtiming-url": {"export":true,"for_":["PerformanceElementTiming"],"level":"1","normative":true,"shortname":"element-timing","spec":"element-timing-1","status":"local","text":"url","type":"attribute","url":"#dom-performanceelementtiming-url"},
+"#element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"element-timing","spec":"element-timing-1","status":"local","text":"element","type":"dfn","url":"#element"},
+"#element-timing-processing": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"element-timing","spec":"element-timing-1","status":"local","text":"element timing processing","type":"dfn","url":"#element-timing-processing"},
+"#get-an-element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"element-timing","spec":"element-timing-1","status":"local","text":"get an element","type":"dfn","url":"#get-an-element"},
+"#images-pending-rendering": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"element-timing","spec":"element-timing-1","status":"local","text":"images pending rendering","type":"dfn","url":"#images-pending-rendering"},
+"#performanceelementtiming": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"element-timing","spec":"element-timing-1","status":"local","text":"PerformanceElementTiming","type":"interface","url":"#performanceelementtiming"},
+"#process-an-image-that-finished-loading": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"element-timing","spec":"element-timing-1","status":"local","text":"process an image that finished loading","type":"dfn","url":"#process-an-image-that-finished-loading"},
+"#report-image-element-timing": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"element-timing","spec":"element-timing-1","status":"local","text":"report image element timing","type":"dfn","url":"#report-image-element-timing"},
+"#report-text-element-timing": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"element-timing","spec":"element-timing-1","status":"local","text":"report text element timing","type":"dfn","url":"#report-text-element-timing"},
+"#request": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"element-timing","spec":"element-timing-1","status":"local","text":"request","type":"dfn","url":"#request"},
+"#set-of-elements-with-rendered-text": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"element-timing","spec":"element-timing-1","status":"local","text":"set of elements with rendered text","type":"dfn","url":"#set-of-elements-with-rendered-text"},
+"#set-of-owned-text-nodes": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"element-timing","spec":"element-timing-1","status":"local","text":"set of owned text nodes","type":"dfn","url":"#set-of-owned-text-nodes"},
+"https://dom.spec.whatwg.org/#boundary-point-node": {"export":true,"for_":["boundary point"],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"node","type":"dfn","url":"https://dom.spec.whatwg.org/#boundary-point-node"},
+"https://dom.spec.whatwg.org/#concept-tree-descendant": {"export":true,"for_":["tree"],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"descendant","type":"dfn","url":"https://dom.spec.whatwg.org/#concept-tree-descendant"},
+"https://dom.spec.whatwg.org/#concept-tree-root": {"export":true,"for_":["tree"],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"root","type":"dfn","url":"https://dom.spec.whatwg.org/#concept-tree-root"},
+"https://dom.spec.whatwg.org/#connected": {"export":true,"for_":[],"level":"","normative":true,"shortname":"dom","spec":"dom","status":"anchor-block","text":"connected","type":"dfn","url":"https://dom.spec.whatwg.org/#connected"},
+"https://dom.spec.whatwg.org/#document": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"Document","type":"interface","url":"https://dom.spec.whatwg.org/#document"},
+"https://dom.spec.whatwg.org/#element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"Element","type":"interface","url":"https://dom.spec.whatwg.org/#element"},
+"https://dom.spec.whatwg.org/#text": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"Text","type":"interface","url":"https://dom.spec.whatwg.org/#text"},
+"https://drafts.csswg.org/css-backgrounds-3#propdef-background-image": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"anchor-block","text":"background-image","type":"dfn","url":"https://drafts.csswg.org/css-backgrounds-3#propdef-background-image"},
+"https://drafts.csswg.org/css-display-4/#containing-block": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"containing block","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#containing-block"},
+"https://drafts.csswg.org/css-fonts-4/#font-block-period": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-fonts","spec":"css-fonts-4","status":"current","text":"font block period","type":"dfn","url":"https://drafts.csswg.org/css-fonts-4/#font-block-period"},
+"https://drafts.csswg.org/css2/zindex.html#painting-order": {"export":true,"for_":[],"level":"","normative":true,"shortname":"css","spec":"css","status":"anchor-block","text":"painting order","type":"dfn","url":"https://drafts.csswg.org/css2/zindex.html#painting-order"},
+"https://drafts.fxtf.org/geometry-1/#domrectreadonly": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"geometry","spec":"geometry-1","status":"current","text":"DOMRectReadOnly","type":"interface","url":"https://drafts.fxtf.org/geometry-1/#domrectreadonly"},
+"https://html.spec.whatwg.org/multipage#dom-img-naturalheight": {"export":true,"for_":["img"],"level":"","normative":true,"shortname":"html","spec":"html","status":"anchor-block","text":"naturalHeight","type":"attribute","url":"https://html.spec.whatwg.org/multipage#dom-img-naturalheight"},
+"https://html.spec.whatwg.org/multipage#dom-img-naturalwidth": {"export":true,"for_":["img"],"level":"","normative":true,"shortname":"html","spec":"html","status":"anchor-block","text":"naturalWidth","type":"attribute","url":"https://html.spec.whatwg.org/multipage#dom-img-naturalwidth"},
+"https://html.spec.whatwg.org/multipage#image-request": {"export":true,"for_":[],"level":"","normative":true,"shortname":"html","spec":"html","status":"anchor-block","text":"image request","type":"dfn","url":"https://html.spec.whatwg.org/multipage#image-request"},
+"https://html.spec.whatwg.org/multipage/custom-elements.html#cereactions": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"CEReactions","type":"extended-attribute","url":"https://html.spec.whatwg.org/multipage/custom-elements.html#cereactions"},
+"https://html.spec.whatwg.org/multipage/document-sequences.html#fully-active": {"export":true,"for_":["Document"],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"fully active","type":"dfn","url":"https://html.spec.whatwg.org/multipage/document-sequences.html#fully-active"},
+"https://html.spec.whatwg.org/multipage/embedded-content.html#htmlimageelement": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"HTMLImageElement","type":"interface","url":"https://html.spec.whatwg.org/multipage/embedded-content.html#htmlimageelement"},
+"https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"img","type":"element","url":"https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element"},
+"https://html.spec.whatwg.org/multipage/grouping-content.html#the-div-element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"div","type":"element","url":"https://html.spec.whatwg.org/multipage/grouping-content.html#the-div-element"},
+"https://html.spec.whatwg.org/multipage/images.html#img-all": {"export":true,"for_":[],"level":"","normative":true,"shortname":"html","spec":"html","status":"anchor-block","text":"completely available","type":"dfn","url":"https://html.spec.whatwg.org/multipage/images.html#img-all"},
+"https://html.spec.whatwg.org/multipage/media.html#htmlvideoelement": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"HTMLVideoElement","type":"interface","url":"https://html.spec.whatwg.org/multipage/media.html#htmlvideoelement"},
+"https://html.spec.whatwg.org/multipage/media.html#video": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"video","type":"element","url":"https://html.spec.whatwg.org/multipage/media.html#video"},
+"https://html.spec.whatwg.org/multipage/nav-history-apis.html#window": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"Window","type":"interface","url":"https://html.spec.whatwg.org/multipage/nav-history-apis.html#window"},
+"https://html.spec.whatwg.org/multipage/urls-and-fetching.html#resolve-a-url": {"export":true,"for_":[],"level":"","normative":true,"shortname":"html","spec":"html","status":"anchor-block","text":"resolved url","type":"dfn","url":"https://html.spec.whatwg.org/multipage/urls-and-fetching.html#resolve-a-url"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-global": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"relevant global object","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-global"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-realm": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"relevant realm","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-realm"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"relevant settings object","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#update-the-rendering": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"update the rendering","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#update-the-rendering"},
+"https://html.spec.whatwg.org/multipageimages.html#list-of-available-images": {"export":true,"for_":[],"level":"","normative":true,"shortname":"html","spec":"html","status":"anchor-block","text":"list of available images","type":"dfn","url":"https://html.spec.whatwg.org/multipageimages.html#list-of-available-images"},
+"https://infra.spec.whatwg.org/#ordered-set": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"ordered set","type":"dfn","url":"https://infra.spec.whatwg.org/#ordered-set"},
+"https://infra.spec.whatwg.org/#set-append": {"export":true,"for_":["set"],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"append","type":"dfn","url":"https://infra.spec.whatwg.org/#set-append"},
+"https://svgwg.org/svg2-draft/embedded.html#InterfaceSVGImageElement": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"SVGImageElement","type":"interface","url":"https://svgwg.org/svg2-draft/embedded.html#InterfaceSVGImageElement"},
+"https://svgwg.org/svg2-draft/embedded.html#elementdef-image": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"image","type":"element","url":"https://svgwg.org/svg2-draft/embedded.html#elementdef-image"},
+"https://svgwg.org/svg2-draft/struct.html#elementdef-svg": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"svg","type":"element","url":"https://svgwg.org/svg2-draft/struct.html#elementdef-svg"},
+"https://url.spec.whatwg.org/#concept-url-scheme": {"export":true,"for_":["url"],"level":"1","normative":true,"shortname":"url","spec":"url","status":"current","text":"scheme","type":"dfn","url":"https://url.spec.whatwg.org/#concept-url-scheme"},
+"https://w3c.github.io/IntersectionObserver#calculate-intersection-rect-algo": {"export":true,"for_":[],"level":"","normative":true,"shortname":"intersection-observer","spec":"intersection-observer","status":"anchor-block","text":"intersection rect algorithm","type":"dfn","url":"https://w3c.github.io/IntersectionObserver#calculate-intersection-rect-algo"},
+"https://w3c.github.io/IntersectionObserver#intersectionobserver": {"export":true,"for_":[],"level":"","normative":true,"shortname":"intersection-observer","spec":"intersection-observer","status":"anchor-block","text":"IntersectionObserver","type":"interface","url":"https://w3c.github.io/IntersectionObserver#intersectionobserver"},
+"https://w3c.github.io/hr-time#dfn-current-high-resolution-time": {"export":true,"for_":[],"level":"","normative":true,"shortname":"hr-time","spec":"hr-time","status":"anchor-block","text":"current high resolution time","type":"dfn","url":"https://w3c.github.io/hr-time#dfn-current-high-resolution-time"},
+"https://w3c.github.io/hr-time#dom-domhighrestimestamp": {"export":true,"for_":[],"level":"","normative":true,"shortname":"hr-time","spec":"hr-time","status":"anchor-block","text":"DOMHighResTimeStamp","type":"interface","url":"https://w3c.github.io/hr-time#dom-domhighrestimestamp"},
+"https://w3c.github.io/performance-timeline/#dfn-queue-a-performanceentry": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"performance-timeline","spec":"performance-timeline-2","status":"anchor-block","text":"queue the performanceentry","type":"dfn","url":"https://w3c.github.io/performance-timeline/#dfn-queue-a-performanceentry"},
+"https://w3c.github.io/performance-timeline/#dom-performanceentry-duration": {"export":true,"for_":["PerformanceEntry"],"level":"2","normative":true,"shortname":"performance-timeline","spec":"performance-timeline-2","status":"anchor-block","text":"duration","type":"attribute","url":"https://w3c.github.io/performance-timeline/#dom-performanceentry-duration"},
+"https://w3c.github.io/performance-timeline/#dom-performanceentry-entrytype": {"export":true,"for_":["PerformanceEntry"],"level":"2","normative":true,"shortname":"performance-timeline","spec":"performance-timeline-2","status":"anchor-block","text":"entryType","type":"attribute","url":"https://w3c.github.io/performance-timeline/#dom-performanceentry-entrytype"},
+"https://w3c.github.io/performance-timeline/#dom-performanceentry-name": {"export":true,"for_":["PerformanceEntry"],"level":"2","normative":true,"shortname":"performance-timeline","spec":"performance-timeline-2","status":"anchor-block","text":"name","type":"attribute","url":"https://w3c.github.io/performance-timeline/#dom-performanceentry-name"},
+"https://w3c.github.io/performance-timeline/#dom-performanceentry-starttime": {"export":true,"for_":["PerformanceEntry"],"level":"2","normative":true,"shortname":"performance-timeline","spec":"performance-timeline-2","status":"anchor-block","text":"startTime","type":"attribute","url":"https://w3c.github.io/performance-timeline/#dom-performanceentry-starttime"},
+"https://w3c.github.io/performance-timeline/#supportedentrytypes-attribute": {"export":true,"for_":["PerformanceObserver"],"level":"2","normative":true,"shortname":"performance-timeline","spec":"performance-timeline-2","status":"anchor-block","text":"supportedEntryTypes","type":"attribute","url":"https://w3c.github.io/performance-timeline/#supportedentrytypes-attribute"},
+"https://w3c.github.io/performance-timeline/#the-performanceentry-interface": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"performance-timeline","spec":"performance-timeline-2","status":"anchor-block","text":"PerformanceEntry","type":"interface","url":"https://w3c.github.io/performance-timeline/#the-performanceentry-interface"},
+"https://w3c.github.io/performance-timeline/#the-performanceobserver-interface": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"performance-timeline","spec":"performance-timeline-2","status":"anchor-block","text":"PerformanceObserver","type":"interface","url":"https://w3c.github.io/performance-timeline/#the-performanceobserver-interface"},
+"https://w3c.github.io/resource-timing#dfn-timing-allow-check": {"export":true,"for_":[],"level":"","normative":true,"shortname":"resource-timing","spec":"resource-timing","status":"anchor-block","text":"timing allow check","type":"dfn","url":"https://w3c.github.io/resource-timing#dfn-timing-allow-check"},
+"https://webidl.spec.whatwg.org/#Default": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"Default","type":"extended-attribute","url":"https://webidl.spec.whatwg.org/#Default"},
+"https://webidl.spec.whatwg.org/#Exposed": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"Exposed","type":"extended-attribute","url":"https://webidl.spec.whatwg.org/#Exposed"},
+"https://webidl.spec.whatwg.org/#idl-DOMString": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"DOMString","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-DOMString"},
+"https://webidl.spec.whatwg.org/#idl-object": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"object","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-object"},
+"https://webidl.spec.whatwg.org/#idl-unsigned-long": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"unsigned long","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-unsigned-long"},
+"https://wicg.github.io/largest-contentful-paint/#potentially-add-a-largestcontentfulpaint-entry": {"export":true,"for_":[],"level":"","normative":true,"shortname":"largest-contentful-paint","spec":"largest-contentful-paint","status":"anchor-block","text":"potentially add a largestcontentfulpaint entry","type":"dfn","url":"https://wicg.github.io/largest-contentful-paint/#potentially-add-a-largestcontentfulpaint-entry"},
+};
+
+function mkRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "Term: "),
+                mk.span({}, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    let forListElements;
+    if(forList.length == 0) {
+        forListElements = [];
+    } else if(forList.length == 1) {
+        forListElements = mk.li({},
+            mk.b({}, "For: "),
+            mk.span({}, forList[0]),
+        );
+    } else {
+        forListElements = mk.li({},
             mk.b({}, "For: "),
             mk.ul({},
                 ...forList.map(forItem =>
                     mk.li({},
-                        mk.span({}, `${forItem}`)
+                        mk.span({}, forItem)
                     ),
                 ),
             ),
         );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+    }
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    setupRefHintEventListeners(link, hintPanel);
+    return hintPanel;
+}
+
+function hideAllRefHints() {
+    queryAll(".ref-hint").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    if(refHint.teardownEventListeners) {
+        refHint.teardownEventListeners();
     }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+    refHint.remove();
+}
+
+function showRefHint(link) {
+    if(link.classList.contains("dfn-link")) return;
+    const url = link.getAttribute("href");
+    const ref = refsData[url];
+    if(!ref) return;
+
+    hideAllRefHints(); // Only display one at this time.
+
+    const refHint = mkRefHint(link, ref);
+    append(document.body, refHint);
+    link.setAttribute("aria-expanded", "true");
+    positionRefHint(refHint);
+}
+
+function setupRefHintEventListeners(link, refHint) {
+    if (refHint.teardownEventListeners) return;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
+
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
-
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
-    }
-
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
-        }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
-
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
-    }
-
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+document.addEventListener("DOMContentLoaded", () => {
+    document.body.addEventListener("mouseover", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
+    });
+    document.body.addEventListener("focus", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
     });
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
 </script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element'] = {"text": "img", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/embedded.html#elementdef-image'] = {"text": "image", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/embedded.html#elementdef-image", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/struct.html#elementdef-svg'] = {"text": "svg", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-svg", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/media.html#video'] = {"text": "video", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#video", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3#propdef-background-image'] = {"text": "background-image", "type": "dfn", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "anchor-block", "url": "https://drafts.csswg.org/css-backgrounds-3#propdef-background-image", "export": true, "normative": true, "for_": []};
-window.refsData['#report-image-element-timing'] = {"text": "report image element timing", "type": "dfn", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#report-image-element-timing", "export": true, "normative": true, "for_": []};
-window.refsData['#report-text-element-timing'] = {"text": "report text element timing", "type": "dfn", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#report-text-element-timing", "export": true, "normative": true, "for_": []};
-window.refsData['#performanceelementtiming'] = {"text": "PerformanceElementTiming", "type": "interface", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#performanceelementtiming", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/performance-timeline/#the-performanceentry-interface'] = {"text": "PerformanceEntry", "type": "interface", "spec": "performance-timeline-2", "shortname": "performance-timeline", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/performance-timeline/#the-performanceentry-interface", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/hr-time#dom-domhighrestimestamp'] = {"text": "DOMHighResTimeStamp", "type": "interface", "spec": "hr-time", "shortname": "hr-time", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/hr-time#dom-domhighrestimestamp", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.fxtf.org/geometry-1/#domrectreadonly'] = {"text": "DOMRectReadOnly", "type": "interface", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/geometry-1/#domrectreadonly", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-long'] = {"text": "unsigned long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-long", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#element'] = {"text": "Element", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#element", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#Default'] = {"text": "Default", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Default", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-object'] = {"text": "object", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-object", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/performance-timeline/#dom-performanceentry-entrytype'] = {"text": "entryType", "type": "attribute", "spec": "performance-timeline-2", "shortname": "performance-timeline", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/performance-timeline/#dom-performanceentry-entrytype", "export": true, "normative": true, "for_": ["PerformanceEntry"]};
-window.refsData['https://w3c.github.io/performance-timeline/#dom-performanceentry-name'] = {"text": "name", "type": "attribute", "spec": "performance-timeline-2", "shortname": "performance-timeline", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/performance-timeline/#dom-performanceentry-name", "export": true, "normative": true, "for_": ["PerformanceEntry"]};
-window.refsData['https://w3c.github.io/performance-timeline/#dom-performanceentry-starttime'] = {"text": "startTime", "type": "attribute", "spec": "performance-timeline-2", "shortname": "performance-timeline", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/performance-timeline/#dom-performanceentry-starttime", "export": true, "normative": true, "for_": ["PerformanceEntry"]};
-window.refsData['#dom-performanceelementtiming-rendertime'] = {"text": "renderTime", "type": "attribute", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#dom-performanceelementtiming-rendertime", "export": true, "normative": true, "for_": ["PerformanceElementTiming"]};
-window.refsData['#dom-performanceelementtiming-loadtime'] = {"text": "loadTime", "type": "attribute", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#dom-performanceelementtiming-loadtime", "export": true, "normative": true, "for_": ["PerformanceElementTiming"]};
-window.refsData['https://w3c.github.io/performance-timeline/#dom-performanceentry-duration'] = {"text": "duration", "type": "attribute", "spec": "performance-timeline-2", "shortname": "performance-timeline", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/performance-timeline/#dom-performanceentry-duration", "export": true, "normative": true, "for_": ["PerformanceEntry"]};
-window.refsData['#dom-performanceelementtiming-intersectionrect'] = {"text": "intersectionRect", "type": "attribute", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#dom-performanceelementtiming-intersectionrect", "export": true, "normative": true, "for_": ["PerformanceElementTiming"]};
-window.refsData['#dom-performanceelementtiming-identifier'] = {"text": "identifier", "type": "attribute", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#dom-performanceelementtiming-identifier", "export": true, "normative": true, "for_": ["PerformanceElementTiming"]};
-window.refsData['#dom-performanceelementtiming-naturalwidth'] = {"text": "naturalWidth", "type": "attribute", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#dom-performanceelementtiming-naturalwidth", "export": true, "normative": true, "for_": ["PerformanceElementTiming"]};
-window.refsData['#dom-performanceelementtiming-naturalheight'] = {"text": "naturalHeight", "type": "attribute", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#dom-performanceelementtiming-naturalheight", "export": true, "normative": true, "for_": ["PerformanceElementTiming"]};
-window.refsData['#dom-performanceelementtiming-id'] = {"text": "id", "type": "attribute", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#dom-performanceelementtiming-id", "export": true, "normative": true, "for_": ["PerformanceElementTiming"]};
-window.refsData['#dom-performanceelementtiming-element'] = {"text": "element", "type": "attribute", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#dom-performanceelementtiming-element", "export": true, "normative": true, "for_": ["PerformanceElementTiming"]};
-window.refsData['#get-an-element'] = {"text": "get an element", "type": "dfn", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#get-an-element", "export": true, "normative": true, "for_": []};
-window.refsData['#element'] = {"text": "element", "type": "dfn", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#element", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#concept-tree-descendant'] = {"text": "descendant", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-tree-descendant", "export": true, "normative": true, "for_": ["tree"]};
-window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-performanceelementtiming-url'] = {"text": "url", "type": "attribute", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#dom-performanceelementtiming-url", "export": true, "normative": true, "for_": ["PerformanceElementTiming"]};
-window.refsData['#request'] = {"text": "request", "type": "dfn", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#request", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/urls-and-fetching.html#resolve-a-url'] = {"text": "resolved url", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/urls-and-fetching.html#resolve-a-url", "export": true, "normative": true, "for_": []};
-window.refsData['https://url.spec.whatwg.org/#concept-url-scheme'] = {"text": "scheme", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-scheme", "export": true, "normative": true, "for_": ["url"]};
-window.refsData['https://w3c.github.io/performance-timeline/#supportedentrytypes-attribute'] = {"text": "supportedEntryTypes", "type": "attribute", "spec": "performance-timeline-2", "shortname": "performance-timeline", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/performance-timeline/#supportedentrytypes-attribute", "export": true, "normative": true, "for_": ["PerformanceObserver"]};
-window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#window'] = {"text": "Window", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/custom-elements.html#cereactions'] = {"text": "CEReactions", "type": "extended-attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/custom-elements.html#cereactions", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-element-elementtiming'] = {"text": "elementTiming", "type": "attribute", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#dom-element-elementtiming", "export": true, "normative": true, "for_": ["Element"]};
-window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#htmlimageelement'] = {"text": "HTMLImageElement", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#htmlimageelement", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/embedded.html#InterfaceSVGImageElement'] = {"text": "SVGImageElement", "type": "interface", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/embedded.html#InterfaceSVGImageElement", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/media.html#htmlvideoelement'] = {"text": "HTMLVideoElement", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#htmlvideoelement", "export": true, "normative": true, "for_": []};
-window.refsData['#associated-image-request'] = {"text": "associated image request", "type": "dfn", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#associated-image-request", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage#image-request'] = {"text": "image request", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage#image-request", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipageimages.html#list-of-available-images'] = {"text": "list of available images", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipageimages.html#list-of-available-images", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#ordered-set'] = {"text": "ordered set", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ordered-set", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/images.html#img-all'] = {"text": "completely available", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/images.html#img-all", "export": true, "normative": true, "for_": []};
-window.refsData['#process-an-image-that-finished-loading'] = {"text": "process an image that finished loading", "type": "dfn", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#process-an-image-that-finished-loading", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css2/zindex.html#painting-order'] = {"text": "painting order", "type": "dfn", "spec": "css", "shortname": "css", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/css2/zindex.html#painting-order", "export": true, "normative": true, "for_": []};
-window.refsData['#set-of-owned-text-nodes'] = {"text": "set of owned text nodes", "type": "dfn", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#set-of-owned-text-nodes", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#text'] = {"text": "Text", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#text", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-fonts-4/#font-block-period'] = {"text": "font block period", "type": "dfn", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#font-block-period", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#set-append'] = {"text": "append", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#set-append", "export": true, "normative": true, "for_": ["set"]};
-window.refsData['https://drafts.csswg.org/css-display-4/#containing-block'] = {"text": "containing block", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#containing-block", "export": true, "normative": true, "for_": []};
-window.refsData['#associated-background-image-requests'] = {"text": "associated background image requests", "type": "dfn", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#associated-background-image-requests", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/grouping-content.html#the-div-element'] = {"text": "div", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/grouping-content.html#the-div-element", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#update-the-rendering'] = {"text": "update the rendering", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#update-the-rendering", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#fully-active'] = {"text": "fully active", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#fully-active", "export": true, "normative": true, "for_": ["Document"]};
-window.refsData['#element-timing-processing'] = {"text": "element timing processing", "type": "dfn", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#element-timing-processing", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#concept-tree-root'] = {"text": "root", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-tree-root", "export": true, "normative": true, "for_": ["tree"]};
-window.refsData['https://w3c.github.io/hr-time#dfn-current-high-resolution-time'] = {"text": "current high resolution time", "type": "dfn", "spec": "hr-time", "shortname": "hr-time", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/hr-time#dfn-current-high-resolution-time", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-global'] = {"text": "relevant global object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-global", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/resource-timing#dfn-timing-allow-check'] = {"text": "timing allow check", "type": "dfn", "spec": "resource-timing", "shortname": "resource-timing", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/resource-timing#dfn-timing-allow-check", "export": true, "normative": true, "for_": []};
-window.refsData['#images-pending-rendering'] = {"text": "images pending rendering", "type": "dfn", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#images-pending-rendering", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/IntersectionObserver#calculate-intersection-rect-algo'] = {"text": "intersection rect algorithm", "type": "dfn", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/IntersectionObserver#calculate-intersection-rect-algo", "export": true, "normative": true, "for_": []};
-window.refsData['https://wicg.github.io/largest-contentful-paint/#potentially-add-a-largestcontentfulpaint-entry'] = {"text": "potentially add a largestcontentfulpaint entry", "type": "dfn", "spec": "largest-contentful-paint", "shortname": "largest-contentful-paint", "level": "", "status": "anchor-block", "url": "https://wicg.github.io/largest-contentful-paint/#potentially-add-a-largestcontentfulpaint-entry", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage#dom-img-naturalwidth'] = {"text": "naturalWidth", "type": "attribute", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage#dom-img-naturalwidth", "export": true, "normative": true, "for_": ["img"]};
-window.refsData['https://html.spec.whatwg.org/multipage#dom-img-naturalheight'] = {"text": "naturalHeight", "type": "attribute", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage#dom-img-naturalheight", "export": true, "normative": true, "for_": ["img"]};
-window.refsData['https://w3c.github.io/performance-timeline/#dfn-queue-a-performanceentry'] = {"text": "queue the performanceentry", "type": "dfn", "spec": "performance-timeline-2", "shortname": "performance-timeline", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/performance-timeline/#dfn-queue-a-performanceentry", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#boundary-point-node'] = {"text": "node", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#boundary-point-node", "export": true, "normative": true, "for_": ["boundary point"]};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-realm'] = {"text": "relevant realm", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-realm", "export": true, "normative": true, "for_": []};
-window.refsData['#set-of-elements-with-rendered-text'] = {"text": "set of elements with rendered text", "type": "dfn", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#set-of-elements-with-rendered-text", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#connected'] = {"text": "connected", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "", "status": "anchor-block", "url": "https://dom.spec.whatwg.org/#connected", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object'] = {"text": "relevant settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/IntersectionObserver#intersectionobserver'] = {"text": "IntersectionObserver", "type": "interface", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/IntersectionObserver#intersectionobserver", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/performance-timeline/#the-performanceobserver-interface'] = {"text": "PerformanceObserver", "type": "interface", "spec": "performance-timeline-2", "shortname": "performance-timeline", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/performance-timeline/#the-performanceobserver-interface", "export": true, "normative": true, "for_": []};
-</script>
 <script>/* Boilerplate: script-var-click-highlighting */
+"use strict";
+{
 /*
 Color-choosing design:
 
-Colors are ordered by goodness.
-Each color has a usage count (initially zero).
-Each variable has a last-used color.
-
-* If the var has a last-used color, and that color's usage is 0,
-    return that color.
-* Otherwise, return the lowest-indexed color with the lowest usage.
-    Increment the color's usage and set it as the last-used color
-    for that var.
-* On unclicking, decrement usage of the color.
+* Colors are ordered by goodness.
+* On clicking a var, give it the earliest color
+    with the lowest usage in the algorithm.
+* On re-clicking, re-use the var's most recent color
+    if that's not currently being used elsewhere.
 */
-"use strict";
-{
-    document.addEventListener("click", e=>{
-        if(e.target.nodeName == "VAR") {
-            highlightSameAlgoVars(e.target);
-        }
-    });
-    const indexCounts = new Map();
-    const indexNames = new Map();
-    function highlightSameAlgoVars(v) {
-        // Find the algorithm container.
-        let algoContainer = null;
-        let searchEl = v;
-        while(algoContainer == null && searchEl != document.body) {
-            searchEl = searchEl.parentNode;
-            if(searchEl.hasAttribute("data-algorithm")) {
-                algoContainer = searchEl;
-            }
-        }
 
-        // Not highlighting document-global vars,
-        // too likely to be unrelated.
-        if(algoContainer == null) return;
+const COLOR_COUNT = 7;
 
-        const algoName = algoContainer.getAttribute("data-algorithm");
-        const varName = getVarName(v);
-        const addClass = !v.classList.contains("selected");
-        let highlightClass = null;
-        if(addClass) {
-            const index = chooseHighlightIndex(algoName, varName);
-            indexCounts.get(algoName)[index] += 1;
-            indexNames.set(algoName+"///"+varName, index);
-            highlightClass = nameFromIndex(index);
-        } else {
-            const index = previousHighlightIndex(algoName, varName);
-            indexCounts.get(algoName)[index] -= 1;
-            highlightClass = nameFromIndex(index);
-        }
+document.addEventListener("click", e=>{
+    if(e.target.nodeName == "VAR") {
+        highlightSameAlgoVars(e.target);
+    }
+});
 
-        // Find all same-name vars, and toggle their class appropriately.
+function highlightSameAlgoVars(v) {
+    // Find the algorithm container.
+    let algoContainer = findAlgoContainer(v);
+
+    // Not highlighting document-global vars,
+    // too likely to be unrelated.
+    if(algoContainer == null) return;
+
+    const varName = nameFromVar(v);
+    if(!v.hasAttribute("data-var-color")) {
+        const newColor = chooseHighlightColor(algoContainer, v);
         for(const el of algoContainer.querySelectorAll("var")) {
-            if(getVarName(el) == varName) {
-                el.classList.toggle("selected", addClass);
-                el.classList.toggle(highlightClass, addClass);
+            if(nameFromVar(el) == varName) {
+                el.setAttribute("data-var-color", newColor);
+                el.setAttribute("data-var-last-color", newColor);
+            }
+        }
+    } else {
+        for(const el of algoContainer.querySelectorAll("var")) {
+            if(nameFromVar(el) == varName) {
+                el.removeAttribute("data-var-color");
             }
         }
     }
-    function getVarName(el) {
-        return el.textContent.replace(/(\s|\xa0)+/, " ").trim();
+}
+function findAlgoContainer(el) {
+    while(el != document.body) {
+        if(el.hasAttribute("data-algorithm")) return el;
+        el = el.parentNode;
     }
-    function chooseHighlightIndex(algoName, varName) {
-        let indexes = null;
-        if(indexCounts.has(algoName)) {
-            indexes = indexCounts.get(algoName);
-        } else {
-            // 7 classes right now
-            indexes = [0,0,0,0,0,0,0];
-            indexCounts.set(algoName, indexes);
-        }
+    return null;
+}
+function nameFromVar(el) {
+    return el.textContent.replace(/(\s|\xa0)+/, " ").trim();
+}
+function colorCountsFromContainer(container) {
+    const namesFromColor = Array.from({length:COLOR_COUNT}, x=>new Set());
+    for(let v of container.querySelectorAll("var[data-var-color]")) {
+        let color = +v.getAttribute("data-var-color");
+        namesFromColor[color].add(nameFromVar(v));
+    }
 
-        // If the element was recently unclicked,
-        // *and* that color is still unclaimed,
-        // give it back the same color.
-        const lastIndex = previousHighlightIndex(algoName, varName);
-        if(indexes[lastIndex] === 0) return lastIndex;
-
-        // Find the earliest index with the lowest count.
-        const minCount = Math.min.apply(null, indexes);
-        let index = null;
-        for(var i = 0; i < indexes.length; i++) {
-            if(indexes[i] == minCount) {
-                return i;
-            }
+    return namesFromColor.map(x=>x.size);
+}
+function leastUsedColor(colors) {
+    // Find the earliest color with the lowest count.
+    let minCount = Infinity;
+    let minColor = null;
+    for(var i = 0; i < colors.length; i++) {
+        if(colors[i] < minCount) {
+            minColor = i;
+            minCount = colors[i];
         }
     }
-    function previousHighlightIndex(algoName, varName) {
-        return indexNames.get(algoName+"///"+varName);
+    return minColor;
+}
+function chooseHighlightColor(container, v) {
+    const colorCounts = colorCountsFromContainer(container);
+    if(v.hasAttribute("data-var-last-color")) {
+        let color = +v.getAttribute("data-var-last-color");
+        if(colorCounts[color] == 0) return color;
     }
-    function nameFromIndex(index) {
-        return "selected" + index;
-    }
+    return leastUsedColor(colorCounts);
+}
 }
 </script>

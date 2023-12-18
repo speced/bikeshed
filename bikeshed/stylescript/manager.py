@@ -3,133 +3,230 @@ from __future__ import annotations
 import dataclasses
 import json
 import re
+from abc import ABCMeta, abstractmethod
+from pathlib import Path
 
 from .. import config, h, t
 from .. import messages as m
 
 
 @dataclasses.dataclass
-class ScriptManager:
-    scripts: list[Script] = dataclasses.field(default_factory=list)
+class JCManager:
+    styles: dict[str, Style] = dataclasses.field(default_factory=dict)
+    scripts: dict[str, Script] = dataclasses.field(default_factory=dict)
 
-    def set(self, name: str, text: str) -> None:
-        for sc in self.scripts:
-            if sc.name == name:
-                sc.text = text
-                return sc
-        script = Script(name, text, {})
-        self.scripts.append(script)
-        return script
+    def getStyles(self) -> list[Style]:
+        styles = {}
+        for style in self.styles.values():
+            if not style.insertable():
+                continue
+            styles[style.name] = style
+        for script in self.scripts.values():
+            if not script.insertable():
+                continue
+            if script.style:
+                styles[script.style.name] = script.style
+        return sorted(styles.values(), key=lambda x: x.name)
 
-    def setFile(self, name: str, localPath: str) -> None:
-        if not self.has(name):
-            with open(config.scriptPath(localPath), "r", encoding="utf-8") as fh:
-                self.set(name, fh.read())
-        return self.get(name)
+    def getScripts(self) -> list[Library | Script]:
+        libs = {}
+        scripts = {}
+        for style in self.styles.values():
+            if not style.insertable():
+                continue
+            if style.script:
+                scripts[style.script.name] = style.script
+        for script in self.scripts.values():
+            if not script.insertable():
+                continue
+            if script.libraries:
+                libs.update(script.libraries)
+            scripts[script.name] = script
+        return sorted(libs.values(), key=lambda x: x.name) + sorted(scripts.values(), key=lambda x: x.name)
 
-    def setDefault(self, name: str, text: str) -> Script:
-        if self.has(name):
-            return self.get(name)
-        script = Script(name, text, {})
-        self.scripts.append(script)
-        return script
+    def _addCSS(self, name: str, moduleName: str = "stylescript") -> Style:
+        if name not in self.styles:
+            self.styles[name] = Style(name, Path(config.scriptPath(f"{moduleName}/{name}.css")))
+        return self.styles[name]
 
-    def get(self, name: str) -> Script:
-        for x in self.scripts:
-            if x.name == name:
-                return x
-        raise KeyError
+    def _addJS(self, name: str, moduleName: str = "stylescript") -> Script:
+        if name not in self.scripts:
+            self.scripts[name] = Script(name, Path(config.scriptPath(f"{moduleName}/{name}.js")))
+        return self.scripts[name]
 
-    def getAll(self) -> list[Script]:
-        return sorted(self.scripts, key=lambda x: x.name)
+    def addColors(self) -> None:
+        self._addCSS("colors")
 
-    def has(self, name: str) -> bool:
-        return any(x.name == name for x in self.scripts)
+    def addMdLists(self) -> None:
+        self._addCSS("md-lists")
+
+    def addAutolinks(self) -> None:
+        self._addCSS("autolinks")
+
+    def addSelflinks(self) -> None:
+        self._addCSS("selflinks")
+
+    def addCounters(self) -> None:
+        self._addCSS("counters")
+
+    def addIssues(self) -> None:
+        self._addCSS("issues")
+
+    def addMdn(self) -> None:
+        style = self._addCSS("mdn-anno", "mdn")
+        if not style.script:
+            style.script = Script("position-annos", Path(config.scriptPath("stylescript/position-annos.js")))
+
+    def addCiu(self) -> None:
+        style = self._addCSS("caniuse-panel", "caniuse")
+        if not style.script:
+            style.script = Script("position-annos", Path(config.scriptPath("stylescript/position-annos.js")))
+
+    def addDomintro(self) -> None:
+        self._addCSS("domintro")
+
+    def addSyntaxHighlighting(self) -> None:
+        self._addCSS("syntax-highlighting", "highlight")
+
+    def addLineNumbers(self) -> None:
+        self._addCSS("line-numbers", "highlight")
+
+    def addLineHighlighting(self) -> None:
+        self._addCSS("line-highlighting", "highlight")
+
+    def addExpires(self) -> None:
+        self._addJS("expires")
+
+    def addHidedel(self) -> None:
+        self._addCSS("hidedel")
+
+    def addVarClickHighlighting(self) -> None:
+        script = self._addJS("var-click-highlighting")
+        if not script.style:
+            script.style = Style(
+                "var-click-highlighting",
+                Path(config.scriptPath("stylescript/var-click-highlighting.css")),
+            )
+
+    def addRefHints(self) -> t.JSONT:
+        script = self._addJS("ref-hints", "refs")
+        if not script.style:
+            script.style = Style("ref-hints", Path(config.scriptPath("refs/ref-hints.css")))
+        if "dom-helper" not in script.libraries:
+            script.libraries["dom-helper"] = Library("dom-helper", Path(config.scriptPath("stylescript/dom-helper.js")))
+        if not script.data:
+            script.data = ("refsData", {})
+        return script.data[1]
+
+    def addLinkTitles(self) -> t.JSONT:
+        script = self._addJS("link-titles")
+        if not script.data:
+            script.data = ("linkTitleData", {})
+        return script.data[1]
+
+    def addIDLHighlighting(self) -> None:
+        self._addCSS("idl-highlighting")
+
+    def addRailroad(self) -> None:
+        self._addCSS("railroad")
+
+    def addWptCSS(self) -> None:
+        self._addCSS("wpt", "wpt")
+
+    def addWpt(self, path: str | None) -> None:
+        script = self._addJS("wpt", "wpt")
+        if not script.style:
+            script.style = Style("wpt", Path(config.scriptPath("wpt/wpt.css")))
+        if "dom-helper" not in script.libraries:
+            script.libraries["dom-helper"] = Library("dom-helper", Path(config.scriptPath("stylescript/dom-helper.js")))
+        if not script.data:
+            if path is None:
+                path = "/"
+            if not path.startswith("/"):
+                path = "/" + path
+            if not path.endswith("/"):
+                path = path + "/"
+            script.data = ("wptData", {"path": path})
+
+    def addDfnPanels(self) -> t.JSONT:
+        script = self._addJS("dfn-panel", "dfnpanels")
+        if not script.style:
+            script.style = Style("dfn-panel", Path(config.scriptPath("dfnpanels/dfn-panel.css")))
+        if "dom-helper" not in script.libraries:
+            script.libraries["dom-helper"] = Library("dom-helper", Path(config.scriptPath("stylescript/dom-helper.js")))
+        if not script.data:
+            script.data = ("dfnPanelData", {})
+        return script.data[1]
 
 
 @dataclasses.dataclass
-class StyleManager:
-    styles: list[Style] = dataclasses.field(default_factory=list)
-
-    def set(self, name: str, text: str, dark: str | None = None) -> None:
-        for st in self.styles:
-            if st.name == name:
-                st.text = text
-                st.dark = dark
-                return
-        self.styles.append(Style(name, text, dark))
-
-    def setFile(self, name: str, localPath: str, darkPath: str | None = None) -> None:
-        with open(config.scriptPath(localPath), "r", encoding="utf-8") as fh:
-            text = fh.read()
-        if darkPath:
-            with open(config.scriptPath(darkPath), "r", encoding="utf-8") as fh:
-                dark = fh.read()
-        else:
-            dark = None
-        self.set(name, text, dark)
-
-    def setDefault(self, name: str, text: str, dark: str | None = None) -> Style:
-        if self.has(name):
-            return self.get(name)
-        style = Style(name, text, dark)
-        self.styles.append(style)
-        return style
-
-    def get(self, name: str) -> Style:
-        for x in self.styles:
-            if x.name == name:
-                return x
-        raise KeyError
-
-    def getAll(self) -> list[Style]:
-        return sorted(self.styles, key=lambda x: x.name)
-
-    def has(self, name: str) -> bool:
-        return any(x.name == name for x in self.styles)
-
-if t.TYPE_CHECKING:
-    ScriptDataT = t.TypeVar("ScriptDataT", bound=t.JSONT)
-
-@dataclasses.dataclass
-class Script:
+class JCResource(metaclass=ABCMeta):
     name: str
-    text: str
-    data: dict[str, t.JSONT] | None
 
-    def getData(self, dataName: str, default: ScriptDataT) -> ScriptDataT:
+    @abstractmethod
+    def insertable(self) -> bool:
+        pass
+
+    @abstractmethod
+    def toElement(self) -> t.ElementT:
+        pass
+
+
+@dataclasses.dataclass
+class Script(JCResource):
+    path: Path
+    libraries: dict[str, Library] = dataclasses.field(default_factory=dict)
+    style: Style | None = None
+    data: tuple[str, t.JSONT] | None = None
+
+    def insertable(self) -> bool:
         if self.data is None:
-            self.data = {}
-        if dataName not in self.data:
-            self.data[dataName] = default
-        return self.data[dataName]
+            return True
+        if self.data[1]:
+            return True
+        return False
 
     def toElement(self) -> t.ElementT:
-        text = f"/* Boilerplate: script-{self.name} */\n"
+        text = f'/* Boilerplate: script-{self.name} */\n"use strict";\n{{\n'
         if self.data:
-            for dataName, dataJSON in self.data.items():
-                text += f"let {dataName} = {json.dumps(dataJSON, sort_keys=True, indent=1)};\n"
-            text += "\n"
-        text += self.text
+            text += f"let {self.data[0]} = {{\n"
+            for key, val in sorted(self.data[1].items()):
+                text += f'"{key}": {json.dumps(val, sort_keys=True, separators=(",",":"))},\n'
+            text += "};\n\n"
+        with self.path.open("r", encoding="utf-8") as fh:
+            text += fh.read()
         if not text.endswith("\n"):
             text += "\n"
+        text += "}\n"
         return h.E.script(text)
 
 
 @dataclasses.dataclass
-class Style:
-    name: str
-    text: str
-    dark: str | None
+class Library(JCResource):
+    path: Path
 
-    def toElement(self, darkMode: bool) -> t.ElementT:
-        if darkMode:
-            sheet = self.text
-            if self.dark:
-                sheet += "\n" + self.dark
-        else:
-            # Remove darkmode styles from the stylesheets
-            sheet = removeInlineDarkStyles(self.name, self.text)
+    def insertable(self) -> bool:
+        return True
+
+    def toElement(self) -> t.ElementT:
+        with self.path.open("r", encoding="utf-8") as fh:
+            text = fh.read()
+        return h.E.script(f'/* Boilerplate: script-{self.name} */\n"use strict";\n{text}')
+
+
+@dataclasses.dataclass
+class Style(JCResource):
+    textPath: Path
+    script: Script | None = None
+
+    def insertable(self) -> bool:
+        return True
+
+    def toElement(self, darkMode: bool = True) -> t.ElementT:
+        with self.textPath.open("r", encoding="utf-8") as fh:
+            sheet = fh.read()
+        if not darkMode:
+            sheet = removeInlineDarkStyles(self.name, sheet)
         if not sheet.endswith("\n"):
             sheet += "\n"
         return h.E.style(f"/* Boilerplate: style-{self.name} */\n{sheet}")

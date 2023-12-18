@@ -1559,7 +1559,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -1933,6 +1932,11 @@ figcaption:not(.no-marker)::before {
     }
 }
 </style>
+<style>/* Boilerplate: style-idl-highlighting */
+pre.idl.highlight {
+    background: var(--borderedblock-bg, var(--def-bg));
+}
+</style>
 <style>/* Boilerplate: style-issues */
 a[href].issue-return {
     float: right;
@@ -1965,7 +1969,7 @@ a[href].issue-return {
 }
 
 .ref-hint {
-    display: none;
+    display: inline-block;
     position: absolute;
     z-index: 35;
     width: 20em;
@@ -1981,16 +1985,11 @@ a[href].issue-return {
     white-space: normal; /* in case it's moved into a pre */
 }
 
-.ref-hint.on {
-    display: inline-block;
-}
-
 .ref-hint * { margin: 0; padding: 0; text-indent: 0; }
 
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -2050,7 +2049,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -2107,7 +2105,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -2708,463 +2705,8 @@ set <var>sheet</var>’s <a data-link-type="dfn" href="https://drafts.csswg.org/
 };
 
 </pre>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['4e55d7fb'] = {"dfnID": "4e55d7fb", "url": "https://drafts.csswg.org/css-cascade-5/#at-ruledef-import", "dfnText": "@import", "refSections": [{"refs": [{"id": "ref-for-at-ruledef-import"}, {"id": "ref-for-at-ruledef-import\u2460"}, {"id": "ref-for-at-ruledef-import\u2461"}, {"id": "ref-for-at-ruledef-import\u2462"}, {"id": "ref-for-at-ruledef-import\u2463"}, {"id": "ref-for-at-ruledef-import\u2464"}, {"id": "ref-for-at-ruledef-import\u2465"}, {"id": "ref-for-at-ruledef-import\u2466"}], "title": "4. Modifying Constructed Stylesheets"}], "external": true};
-window.dfnpanelData['6ae9aa1a'] = {"dfnID": "6ae9aa1a", "url": "https://drafts.csswg.org/css-syntax-3/#parse-a-list-of-rules", "dfnText": "parse a list of rules", "refSections": [{"refs": [{"id": "ref-for-parse-a-list-of-rules"}, {"id": "ref-for-parse-a-list-of-rules\u2460"}], "title": "4. Modifying Constructed Stylesheets"}], "external": true};
-window.dfnpanelData['9bf5ff7b'] = {"dfnID": "9bf5ff7b", "url": "https://drafts.csswg.org/css-syntax-3/#parse-a-rule", "dfnText": "parse a rule", "refSections": [{"refs": [{"id": "ref-for-parse-a-rule"}], "title": "4. Modifying Constructed Stylesheets"}], "external": true};
-window.dfnpanelData['e6bfb41a'] = {"dfnID": "e6bfb41a", "url": "https://drafts.csswg.org/cssom-1/#cssstylesheet", "dfnText": "CSSStyleSheet", "refSections": [{"refs": [{"id": "ref-for-cssstylesheet"}], "title": "Unnumbered Section"}, {"refs": [{"id": "ref-for-cssstylesheet\u2460"}, {"id": "ref-for-cssstylesheet\u2461"}, {"id": "ref-for-cssstylesheet\u2462"}, {"id": "ref-for-cssstylesheet\u2463"}], "title": "3. Constructing Stylesheets"}, {"refs": [{"id": "ref-for-cssstylesheet\u2464"}, {"id": "ref-for-cssstylesheet\u2465"}, {"id": "ref-for-cssstylesheet\u2466"}, {"id": "ref-for-cssstylesheet\u2467"}], "title": "4. Modifying Constructed Stylesheets"}, {"refs": [{"id": "ref-for-cssstylesheet\u2468"}, {"id": "ref-for-cssstylesheet\u2460\u24ea"}], "title": "5. Using Constructed Stylesheets"}], "external": true};
-window.dfnpanelData['dbb1b5fa'] = {"dfnID": "dbb1b5fa", "url": "https://drafts.csswg.org/cssom-1/#medialist", "dfnText": "MediaList", "refSections": [{"refs": [{"id": "ref-for-medialist"}], "title": "3. Constructing Stylesheets"}], "external": true};
-window.dfnpanelData['7e107ca0'] = {"dfnID": "7e107ca0", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-alternate-flag", "dfnText": "alternate flag", "refSections": [{"refs": [{"id": "ref-for-concept-css-style-sheet-alternate-flag"}, {"id": "ref-for-concept-css-style-sheet-alternate-flag\u2460"}], "title": "3. Constructing Stylesheets"}], "external": true};
-window.dfnpanelData['6c425c37'] = {"dfnID": "6c425c37", "url": "https://drafts.csswg.org/cssom-1/#create-a-medialist-object", "dfnText": "create a medialist object", "refSections": [{"refs": [{"id": "ref-for-create-a-medialist-object"}, {"id": "ref-for-create-a-medialist-object\u2460"}], "title": "3. Constructing Stylesheets"}], "external": true};
-window.dfnpanelData['72e9b3e7'] = {"dfnID": "72e9b3e7", "url": "https://drafts.csswg.org/cssom-1/#css-rule", "dfnText": "css rule", "refSections": [{"refs": [{"id": "ref-for-css-rule"}, {"id": "ref-for-css-rule\u2460"}], "title": "4. Modifying Constructed Stylesheets"}], "external": true};
-window.dfnpanelData['a1d979ac'] = {"dfnID": "a1d979ac", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-disabled-flag", "dfnText": "disabled flag", "refSections": [{"refs": [{"id": "ref-for-concept-css-style-sheet-disabled-flag"}], "title": "3. Constructing Stylesheets"}], "external": true};
-window.dfnpanelData['4cd9ca96'] = {"dfnID": "4cd9ca96", "url": "https://drafts.csswg.org/cssom-1/#documentorshadowroot-document-or-shadow-root-css-style-sheets", "dfnText": "document or shadow root css style sheets", "refSections": [{"refs": [{"id": "ref-for-documentorshadowroot-document-or-shadow-root-css-style-sheets"}], "title": "5. Using Constructed Stylesheets"}], "external": true};
-window.dfnpanelData['bbc31c9d'] = {"dfnID": "bbc31c9d", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-location", "dfnText": "location", "refSections": [{"refs": [{"id": "ref-for-concept-css-style-sheet-location"}], "title": "3. Constructing Stylesheets"}], "external": true};
-window.dfnpanelData['512e0279'] = {"dfnID": "512e0279", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-media", "dfnText": "media", "refSections": [{"refs": [{"id": "ref-for-concept-css-style-sheet-media"}, {"id": "ref-for-concept-css-style-sheet-media\u2460"}], "title": "3. Constructing Stylesheets"}], "external": true};
-window.dfnpanelData['6b116b45'] = {"dfnID": "6b116b45", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-origin-clean-flag", "dfnText": "origin-clean flag", "refSections": [{"refs": [{"id": "ref-for-concept-css-style-sheet-origin-clean-flag"}], "title": "3. Constructing Stylesheets"}], "external": true};
-window.dfnpanelData['99e2a3d1'] = {"dfnID": "99e2a3d1", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-owner-css-rule", "dfnText": "owner css rule", "refSections": [{"refs": [{"id": "ref-for-concept-css-style-sheet-owner-css-rule"}], "title": "3. Constructing Stylesheets"}], "external": true};
-window.dfnpanelData['06f8d393'] = {"dfnID": "06f8d393", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-owner-node", "dfnText": "owner node", "refSections": [{"refs": [{"id": "ref-for-concept-css-style-sheet-owner-node"}], "title": "3. Constructing Stylesheets"}], "external": true};
-window.dfnpanelData['7d2a5d75'] = {"dfnID": "7d2a5d75", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-parent-css-style-sheet", "dfnText": "parent css style sheet", "refSections": [{"refs": [{"id": "ref-for-concept-css-style-sheet-parent-css-style-sheet"}], "title": "3. Constructing Stylesheets"}, {"refs": [{"id": "ref-for-concept-css-style-sheet-parent-css-style-sheet\u2460"}, {"id": "ref-for-concept-css-style-sheet-parent-css-style-sheet\u2461"}], "title": "4. Modifying Constructed Stylesheets"}], "external": true};
-window.dfnpanelData['9a79f3c4'] = {"dfnID": "9a79f3c4", "url": "https://drafts.csswg.org/cssom-1/#serialize-a-media-query-list", "dfnText": "serialize a media query list", "refSections": [{"refs": [{"id": "ref-for-serialize-a-media-query-list"}], "title": "3. Constructing Stylesheets"}], "external": true};
-window.dfnpanelData['39954eb0'] = {"dfnID": "39954eb0", "url": "https://drafts.csswg.org/cssom-1/#dom-documentorshadowroot-stylesheets", "dfnText": "styleSheets", "refSections": [{"refs": [{"id": "ref-for-dom-documentorshadowroot-stylesheets"}], "title": "5. Using Constructed Stylesheets"}], "external": true};
-window.dfnpanelData['4c791d15'] = {"dfnID": "4c791d15", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-title", "dfnText": "title", "refSections": [{"refs": [{"id": "ref-for-concept-css-style-sheet-title"}], "title": "3. Constructing Stylesheets"}], "external": true};
-window.dfnpanelData['85394472'] = {"dfnID": "85394472", "url": "https://dom.spec.whatwg.org/#document", "dfnText": "Document", "refSections": [{"refs": [{"id": "ref-for-document"}], "title": "3. Constructing Stylesheets"}], "external": true};
-window.dfnpanelData['9ac2aadf'] = {"dfnID": "9ac2aadf", "url": "https://dom.spec.whatwg.org/#documentorshadowroot", "dfnText": "DocumentOrShadowRoot", "refSections": [{"refs": [{"id": "ref-for-documentorshadowroot"}], "title": "Unnumbered Section"}, {"refs": [{"id": "ref-for-documentorshadowroot\u2460"}, {"id": "ref-for-documentorshadowroot\u2461"}, {"id": "ref-for-documentorshadowroot\u2462"}, {"id": "ref-for-documentorshadowroot\u2463"}, {"id": "ref-for-documentorshadowroot\u2464"}, {"id": "ref-for-documentorshadowroot\u2465"}], "title": "5. Using Constructed Stylesheets"}], "external": true};
-window.dfnpanelData['1cd7ff31'] = {"dfnID": "1cd7ff31", "url": "https://dom.spec.whatwg.org/#shadowroot", "dfnText": "ShadowRoot", "refSections": [{"refs": [{"id": "ref-for-shadowroot"}], "title": "5. Using Constructed Stylesheets"}], "external": true};
-window.dfnpanelData['a9910bde'] = {"dfnID": "a9910bde", "url": "https://dom.spec.whatwg.org/#concept-node-adopt-ext", "dfnText": "adopting steps", "refSections": [{"refs": [{"id": "ref-for-concept-node-adopt-ext"}], "title": "5. Using Constructed Stylesheets"}], "external": true};
-window.dfnpanelData['5216e1a0'] = {"dfnID": "5216e1a0", "url": "https://dom.spec.whatwg.org/#concept-node-document", "dfnText": "node document", "refSections": [{"refs": [{"id": "ref-for-concept-node-document"}], "title": "5. Using Constructed Stylesheets"}], "external": true};
-window.dfnpanelData['17a7ffc9'] = {"dfnID": "17a7ffc9", "url": "https://fetch.spec.whatwg.org/#concept-fetch-group", "dfnText": "fetch group", "refSections": [{"refs": [{"id": "ref-for-concept-fetch-group"}], "title": "4. Modifying Constructed Stylesheets"}], "external": true};
-window.dfnpanelData['3349d69f'] = {"dfnID": "3349d69f", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#concept-document-window", "dfnText": "associated document", "refSections": [{"refs": [{"id": "ref-for-concept-document-window"}, {"id": "ref-for-concept-document-window\u2460"}], "title": "3. Constructing Stylesheets"}], "external": true};
-window.dfnpanelData['95e60ae4'] = {"dfnID": "95e60ae4", "url": "https://html.spec.whatwg.org/multipage/semantics.html#link-options-base-url", "dfnText": "base url", "refSections": [{"refs": [{"id": "ref-for-link-options-base-url"}], "title": "3. Constructing Stylesheets"}], "external": true};
-window.dfnpanelData['ce3d2bbb'] = {"dfnID": "ce3d2bbb", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#current-global-object", "dfnText": "current global object", "refSections": [{"refs": [{"id": "ref-for-current-global-object"}, {"id": "ref-for-current-global-object\u2460"}], "title": "3. Constructing Stylesheets"}], "external": true};
-window.dfnpanelData['a72449dd'] = {"dfnID": "a72449dd", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel", "dfnText": "in parallel", "refSections": [{"refs": [{"id": "ref-for-in-parallel"}], "title": "4. Modifying Constructed Stylesheets"}], "external": true};
-window.dfnpanelData['b6ae4501'] = {"dfnID": "b6ae4501", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#networking-task-source", "dfnText": "networking task source", "refSections": [{"refs": [{"id": "ref-for-networking-task-source"}, {"id": "ref-for-networking-task-source\u2460"}], "title": "4. Modifying Constructed Stylesheets"}], "external": true};
-window.dfnpanelData['9a517a7d'] = {"dfnID": "9a517a7d", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task", "dfnText": "queue a task", "refSections": [{"refs": [{"id": "ref-for-queue-a-task"}, {"id": "ref-for-queue-a-task\u2460"}], "title": "4. Modifying Constructed Stylesheets"}], "external": true};
-window.dfnpanelData['9c4c1e66'] = {"dfnID": "9c4c1e66", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object", "dfnText": "relevant settings object", "refSections": [{"refs": [{"id": "ref-for-relevant-settings-object"}], "title": "4. Modifying Constructed Stylesheets"}], "external": true};
-window.dfnpanelData['dca2de17'] = {"dfnID": "dca2de17", "url": "https://webidl.spec.whatwg.org/#idl-DOMException", "dfnText": "DOMException", "refSections": [{"refs": [{"id": "ref-for-idl-DOMException"}, {"id": "ref-for-idl-DOMException\u2460"}, {"id": "ref-for-idl-DOMException\u2461"}, {"id": "ref-for-idl-DOMException\u2462"}, {"id": "ref-for-idl-DOMException\u2463"}, {"id": "ref-for-idl-DOMException\u2464"}, {"id": "ref-for-idl-DOMException\u2465"}], "title": "4. Modifying Constructed Stylesheets"}, {"refs": [{"id": "ref-for-idl-DOMException\u2466"}], "title": "5. Using Constructed Stylesheets"}], "external": true};
-window.dfnpanelData['8855a9aa'] = {"dfnID": "8855a9aa", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "dfnText": "DOMString", "refSections": [{"refs": [{"id": "ref-for-idl-DOMString"}, {"id": "ref-for-idl-DOMString\u2460"}], "title": "3. Constructing Stylesheets"}], "external": true};
-window.dfnpanelData['dcf5fafa'] = {"dfnID": "dcf5fafa", "url": "https://webidl.spec.whatwg.org/#idl-frozen-array", "dfnText": "FrozenArray", "refSections": [{"refs": [{"id": "ref-for-idl-frozen-array"}], "title": "5. Using Constructed Stylesheets"}], "external": true};
-window.dfnpanelData['c74f29b9'] = {"dfnID": "c74f29b9", "url": "https://webidl.spec.whatwg.org/#networkerror", "dfnText": "NetworkError", "refSections": [{"refs": [{"id": "ref-for-networkerror"}], "title": "4. Modifying Constructed Stylesheets"}], "external": true};
-window.dfnpanelData['ba556545'] = {"dfnID": "ba556545", "url": "https://webidl.spec.whatwg.org/#notallowederror", "dfnText": "NotAllowedError", "refSections": [{"refs": [{"id": "ref-for-notallowederror"}, {"id": "ref-for-notallowederror\u2460"}, {"id": "ref-for-notallowederror\u2461"}, {"id": "ref-for-notallowederror\u2462"}, {"id": "ref-for-notallowederror\u2463"}, {"id": "ref-for-notallowederror\u2464"}], "title": "4. Modifying Constructed Stylesheets"}, {"refs": [{"id": "ref-for-notallowederror\u2465"}], "title": "5. Using Constructed Stylesheets"}], "external": true};
-window.dfnpanelData['bdbd19d1'] = {"dfnID": "bdbd19d1", "url": "https://webidl.spec.whatwg.org/#idl-promise", "dfnText": "Promise", "refSections": [{"refs": [{"id": "ref-for-idl-promise"}], "title": "3. Constructing Stylesheets"}], "external": true};
-window.dfnpanelData['b0d7f3c3'] = {"dfnID": "b0d7f3c3", "url": "https://webidl.spec.whatwg.org/#idl-USVString", "dfnText": "USVString", "refSections": [{"refs": [{"id": "ref-for-idl-USVString"}, {"id": "ref-for-idl-USVString\u2460"}], "title": "3. Constructing Stylesheets"}], "external": true};
-window.dfnpanelData['5372cca8'] = {"dfnID": "5372cca8", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "dfnText": "boolean", "refSections": [{"refs": [{"id": "ref-for-idl-boolean"}, {"id": "ref-for-idl-boolean\u2460"}], "title": "3. Constructing Stylesheets"}], "external": true};
-window.dfnpanelData['5f90bbfb'] = {"dfnID": "5f90bbfb", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "dfnText": "undefined", "refSections": [{"refs": [{"id": "ref-for-idl-undefined"}], "title": "3. Constructing Stylesheets"}], "external": true};
-window.dfnpanelData['dictdef-cssstylesheetinit'] = {"dfnID": "dictdef-cssstylesheetinit", "url": "#dictdef-cssstylesheetinit", "dfnText": "CSSStyleSheetInit", "refSections": [{"refs": [{"id": "ref-for-dictdef-cssstylesheetinit"}], "title": "3. Constructing Stylesheets"}], "external": false};
-window.dfnpanelData['dom-cssstylesheetinit-media'] = {"dfnID": "dom-cssstylesheetinit-media", "url": "#dom-cssstylesheetinit-media", "dfnText": "media", "refSections": [{"refs": [{"id": "ref-for-dom-cssstylesheetinit-media"}], "title": "3. Constructing Stylesheets"}], "external": false};
-window.dfnpanelData['dom-cssstylesheetinit-title'] = {"dfnID": "dom-cssstylesheetinit-title", "url": "#dom-cssstylesheetinit-title", "dfnText": "title", "refSections": [{"refs": [{"id": "ref-for-dom-cssstylesheetinit-title"}], "title": "3. Constructing Stylesheets"}], "external": false};
-window.dfnpanelData['dom-cssstylesheetinit-alternate'] = {"dfnID": "dom-cssstylesheetinit-alternate", "url": "#dom-cssstylesheetinit-alternate", "dfnText": "alternate", "refSections": [{"refs": [{"id": "ref-for-dom-cssstylesheetinit-alternate"}], "title": "3. Constructing Stylesheets"}], "external": false};
-window.dfnpanelData['dom-cssstylesheetinit-disabled'] = {"dfnID": "dom-cssstylesheetinit-disabled", "url": "#dom-cssstylesheetinit-disabled", "dfnText": "disabled", "refSections": [{"refs": [{"id": "ref-for-dom-cssstylesheetinit-disabled"}], "title": "3. Constructing Stylesheets"}], "external": false};
-window.dfnpanelData['dom-cssstylesheet-cssstylesheet'] = {"dfnID": "dom-cssstylesheet-cssstylesheet", "url": "#dom-cssstylesheet-cssstylesheet", "dfnText": "CSSStyleSheet(options)", "refSections": [{"refs": [{"id": "ref-for-dom-cssstylesheet-cssstylesheet"}], "title": "3. Constructing Stylesheets"}], "external": false};
-window.dfnpanelData['cssstylesheet-constructed-flag'] = {"dfnID": "cssstylesheet-constructed-flag", "url": "#cssstylesheet-constructed-flag", "dfnText": "constructed flag", "refSections": [{"refs": [{"id": "ref-for-cssstylesheet-constructed-flag"}, {"id": "ref-for-cssstylesheet-constructed-flag\u2460"}], "title": "3. Constructing Stylesheets"}, {"refs": [{"id": "ref-for-cssstylesheet-constructed-flag\u2461"}, {"id": "ref-for-cssstylesheet-constructed-flag\u2462"}, {"id": "ref-for-cssstylesheet-constructed-flag\u2463"}, {"id": "ref-for-cssstylesheet-constructed-flag\u2464"}, {"id": "ref-for-cssstylesheet-constructed-flag\u2465"}, {"id": "ref-for-cssstylesheet-constructed-flag\u2466"}], "title": "4. Modifying Constructed Stylesheets"}, {"refs": [{"id": "ref-for-cssstylesheet-constructed-flag\u2467"}], "title": "5. Using Constructed Stylesheets"}], "external": false};
-window.dfnpanelData['cssstylesheet-disallow-modification-flag'] = {"dfnID": "cssstylesheet-disallow-modification-flag", "url": "#cssstylesheet-disallow-modification-flag", "dfnText": "disallow modification flag", "refSections": [{"refs": [{"id": "ref-for-cssstylesheet-disallow-modification-flag"}, {"id": "ref-for-cssstylesheet-disallow-modification-flag\u2460"}, {"id": "ref-for-cssstylesheet-disallow-modification-flag\u2461"}, {"id": "ref-for-cssstylesheet-disallow-modification-flag\u2462"}, {"id": "ref-for-cssstylesheet-disallow-modification-flag\u2463"}, {"id": "ref-for-cssstylesheet-disallow-modification-flag\u2464"}, {"id": "ref-for-cssstylesheet-disallow-modification-flag\u2465"}, {"id": "ref-for-cssstylesheet-disallow-modification-flag\u2466"}], "title": "4. Modifying Constructed Stylesheets"}], "external": false};
-window.dfnpanelData['cssstylesheet-constructor-document'] = {"dfnID": "cssstylesheet-constructor-document", "url": "#cssstylesheet-constructor-document", "dfnText": "constructor document", "refSections": [{"refs": [{"id": "ref-for-cssstylesheet-constructor-document"}], "title": "3. Constructing Stylesheets"}, {"refs": [{"id": "ref-for-cssstylesheet-constructor-document\u2460"}], "title": "4. Modifying Constructed Stylesheets"}, {"refs": [{"id": "ref-for-cssstylesheet-constructor-document\u2461"}], "title": "5. Using Constructed Stylesheets"}], "external": false};
-window.dfnpanelData['dom-cssstylesheet-insertrule'] = {"dfnID": "dom-cssstylesheet-insertrule", "url": "#dom-cssstylesheet-insertrule", "dfnText": "insertRule(rule, index)", "refSections": [{"refs": [{"id": "ref-for-dom-cssstylesheet-insertrule"}], "title": "4. Modifying Constructed Stylesheets"}], "external": false};
-window.dfnpanelData['dom-cssstylesheet-deleterule'] = {"dfnID": "dom-cssstylesheet-deleterule", "url": "#dom-cssstylesheet-deleterule", "dfnText": "deleteRule(index)", "refSections": [{"refs": [{"id": "ref-for-dom-cssstylesheet-deleterule"}], "title": "4. Modifying Constructed Stylesheets"}], "external": false};
-window.dfnpanelData['dom-cssstylesheet-replace'] = {"dfnID": "dom-cssstylesheet-replace", "url": "#dom-cssstylesheet-replace", "dfnText": "replace(text)", "refSections": [{"refs": [{"id": "ref-for-dom-cssstylesheet-replace"}], "title": "3. Constructing Stylesheets"}, {"refs": [{"id": "ref-for-dom-cssstylesheet-replace\u2460"}], "title": "4. Modifying Constructed Stylesheets"}], "external": false};
-window.dfnpanelData['dom-cssstylesheet-replacesync'] = {"dfnID": "dom-cssstylesheet-replacesync", "url": "#dom-cssstylesheet-replacesync", "dfnText": "replaceSync(text)", "refSections": [{"refs": [{"id": "ref-for-dom-cssstylesheet-replacesync"}], "title": "3. Constructing Stylesheets"}, {"refs": [{"id": "ref-for-dom-cssstylesheet-replacesync\u2460"}], "title": "4. Modifying Constructed Stylesheets"}], "external": false};
-window.dfnpanelData['dom-documentorshadowroot-adoptedstylesheets'] = {"dfnID": "dom-documentorshadowroot-adoptedstylesheets", "url": "#dom-documentorshadowroot-adoptedstylesheets", "dfnText": "adoptedStyleSheets", "refSections": [{"refs": [{"id": "ref-for-dom-documentorshadowroot-adoptedstylesheets"}, {"id": "ref-for-dom-documentorshadowroot-adoptedstylesheets\u2460"}, {"id": "ref-for-dom-documentorshadowroot-adoptedstylesheets\u2461"}, {"id": "ref-for-dom-documentorshadowroot-adoptedstylesheets\u2462"}], "title": "5. Using Constructed Stylesheets"}], "external": false};
-window.dfnpanelData['adopted-stylesheets'] = {"dfnID": "adopted-stylesheets", "url": "#adopted-stylesheets", "dfnText": "adopted stylesheets", "refSections": [{"refs": [{"id": "ref-for-adopted-stylesheets"}, {"id": "ref-for-adopted-stylesheets\u2460"}, {"id": "ref-for-adopted-stylesheets\u2461"}, {"id": "ref-for-adopted-stylesheets\u2462"}], "title": "5. Using Constructed Stylesheets"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -3358,273 +2900,729 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"06f8d393": {"dfnID":"06f8d393","dfnText":"owner node","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-css-style-sheet-owner-node"}],"title":"3. Constructing Stylesheets"}],"url":"https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-owner-node"},
+"17a7ffc9": {"dfnID":"17a7ffc9","dfnText":"fetch group","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-fetch-group"}],"title":"4. Modifying Constructed Stylesheets"}],"url":"https://fetch.spec.whatwg.org/#concept-fetch-group"},
+"1cd7ff31": {"dfnID":"1cd7ff31","dfnText":"ShadowRoot","external":true,"refSections":[{"refs":[{"id":"ref-for-shadowroot"}],"title":"5. Using Constructed Stylesheets"}],"url":"https://dom.spec.whatwg.org/#shadowroot"},
+"3349d69f": {"dfnID":"3349d69f","dfnText":"associated document","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-document-window"},{"id":"ref-for-concept-document-window\u2460"}],"title":"3. Constructing Stylesheets"}],"url":"https://html.spec.whatwg.org/multipage/nav-history-apis.html#concept-document-window"},
+"39954eb0": {"dfnID":"39954eb0","dfnText":"styleSheets","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-documentorshadowroot-stylesheets"}],"title":"5. Using Constructed Stylesheets"}],"url":"https://drafts.csswg.org/cssom-1/#dom-documentorshadowroot-stylesheets"},
+"4c791d15": {"dfnID":"4c791d15","dfnText":"title","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-css-style-sheet-title"}],"title":"3. Constructing Stylesheets"}],"url":"https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-title"},
+"4cd9ca96": {"dfnID":"4cd9ca96","dfnText":"document or shadow root css style sheets","external":true,"refSections":[{"refs":[{"id":"ref-for-documentorshadowroot-document-or-shadow-root-css-style-sheets"}],"title":"5. Using Constructed Stylesheets"}],"url":"https://drafts.csswg.org/cssom-1/#documentorshadowroot-document-or-shadow-root-css-style-sheets"},
+"4e55d7fb": {"dfnID":"4e55d7fb","dfnText":"@import","external":true,"refSections":[{"refs":[{"id":"ref-for-at-ruledef-import"},{"id":"ref-for-at-ruledef-import\u2460"},{"id":"ref-for-at-ruledef-import\u2461"},{"id":"ref-for-at-ruledef-import\u2462"},{"id":"ref-for-at-ruledef-import\u2463"},{"id":"ref-for-at-ruledef-import\u2464"},{"id":"ref-for-at-ruledef-import\u2465"},{"id":"ref-for-at-ruledef-import\u2466"}],"title":"4. Modifying Constructed Stylesheets"}],"url":"https://drafts.csswg.org/css-cascade-5/#at-ruledef-import"},
+"512e0279": {"dfnID":"512e0279","dfnText":"media","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-css-style-sheet-media"},{"id":"ref-for-concept-css-style-sheet-media\u2460"}],"title":"3. Constructing Stylesheets"}],"url":"https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-media"},
+"5216e1a0": {"dfnID":"5216e1a0","dfnText":"node document","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-node-document"}],"title":"5. Using Constructed Stylesheets"}],"url":"https://dom.spec.whatwg.org/#concept-node-document"},
+"5372cca8": {"dfnID":"5372cca8","dfnText":"boolean","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-boolean"},{"id":"ref-for-idl-boolean\u2460"}],"title":"3. Constructing Stylesheets"}],"url":"https://webidl.spec.whatwg.org/#idl-boolean"},
+"5f90bbfb": {"dfnID":"5f90bbfb","dfnText":"undefined","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-undefined"}],"title":"3. Constructing Stylesheets"}],"url":"https://webidl.spec.whatwg.org/#idl-undefined"},
+"6ae9aa1a": {"dfnID":"6ae9aa1a","dfnText":"parse a list of rules","external":true,"refSections":[{"refs":[{"id":"ref-for-parse-a-list-of-rules"},{"id":"ref-for-parse-a-list-of-rules\u2460"}],"title":"4. Modifying Constructed Stylesheets"}],"url":"https://drafts.csswg.org/css-syntax-3/#parse-a-list-of-rules"},
+"6b116b45": {"dfnID":"6b116b45","dfnText":"origin-clean flag","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-css-style-sheet-origin-clean-flag"}],"title":"3. Constructing Stylesheets"}],"url":"https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-origin-clean-flag"},
+"6c425c37": {"dfnID":"6c425c37","dfnText":"create a medialist object","external":true,"refSections":[{"refs":[{"id":"ref-for-create-a-medialist-object"},{"id":"ref-for-create-a-medialist-object\u2460"}],"title":"3. Constructing Stylesheets"}],"url":"https://drafts.csswg.org/cssom-1/#create-a-medialist-object"},
+"72e9b3e7": {"dfnID":"72e9b3e7","dfnText":"css rule","external":true,"refSections":[{"refs":[{"id":"ref-for-css-rule"},{"id":"ref-for-css-rule\u2460"}],"title":"4. Modifying Constructed Stylesheets"}],"url":"https://drafts.csswg.org/cssom-1/#css-rule"},
+"7d2a5d75": {"dfnID":"7d2a5d75","dfnText":"parent css style sheet","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-css-style-sheet-parent-css-style-sheet"}],"title":"3. Constructing Stylesheets"},{"refs":[{"id":"ref-for-concept-css-style-sheet-parent-css-style-sheet\u2460"},{"id":"ref-for-concept-css-style-sheet-parent-css-style-sheet\u2461"}],"title":"4. Modifying Constructed Stylesheets"}],"url":"https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-parent-css-style-sheet"},
+"7e107ca0": {"dfnID":"7e107ca0","dfnText":"alternate flag","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-css-style-sheet-alternate-flag"},{"id":"ref-for-concept-css-style-sheet-alternate-flag\u2460"}],"title":"3. Constructing Stylesheets"}],"url":"https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-alternate-flag"},
+"85394472": {"dfnID":"85394472","dfnText":"Document","external":true,"refSections":[{"refs":[{"id":"ref-for-document"}],"title":"3. Constructing Stylesheets"}],"url":"https://dom.spec.whatwg.org/#document"},
+"8855a9aa": {"dfnID":"8855a9aa","dfnText":"DOMString","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-DOMString"},{"id":"ref-for-idl-DOMString\u2460"}],"title":"3. Constructing Stylesheets"}],"url":"https://webidl.spec.whatwg.org/#idl-DOMString"},
+"95e60ae4": {"dfnID":"95e60ae4","dfnText":"base url","external":true,"refSections":[{"refs":[{"id":"ref-for-link-options-base-url"}],"title":"3. Constructing Stylesheets"}],"url":"https://html.spec.whatwg.org/multipage/semantics.html#link-options-base-url"},
+"99e2a3d1": {"dfnID":"99e2a3d1","dfnText":"owner css rule","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-css-style-sheet-owner-css-rule"}],"title":"3. Constructing Stylesheets"}],"url":"https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-owner-css-rule"},
+"9a517a7d": {"dfnID":"9a517a7d","dfnText":"queue a task","external":true,"refSections":[{"refs":[{"id":"ref-for-queue-a-task"},{"id":"ref-for-queue-a-task\u2460"}],"title":"4. Modifying Constructed Stylesheets"}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task"},
+"9a79f3c4": {"dfnID":"9a79f3c4","dfnText":"serialize a media query list","external":true,"refSections":[{"refs":[{"id":"ref-for-serialize-a-media-query-list"}],"title":"3. Constructing Stylesheets"}],"url":"https://drafts.csswg.org/cssom-1/#serialize-a-media-query-list"},
+"9ac2aadf": {"dfnID":"9ac2aadf","dfnText":"DocumentOrShadowRoot","external":true,"refSections":[{"refs":[{"id":"ref-for-documentorshadowroot"}],"title":"Unnumbered Section"},{"refs":[{"id":"ref-for-documentorshadowroot\u2460"},{"id":"ref-for-documentorshadowroot\u2461"},{"id":"ref-for-documentorshadowroot\u2462"},{"id":"ref-for-documentorshadowroot\u2463"},{"id":"ref-for-documentorshadowroot\u2464"},{"id":"ref-for-documentorshadowroot\u2465"}],"title":"5. Using Constructed Stylesheets"}],"url":"https://dom.spec.whatwg.org/#documentorshadowroot"},
+"9bf5ff7b": {"dfnID":"9bf5ff7b","dfnText":"parse a rule","external":true,"refSections":[{"refs":[{"id":"ref-for-parse-a-rule"}],"title":"4. Modifying Constructed Stylesheets"}],"url":"https://drafts.csswg.org/css-syntax-3/#parse-a-rule"},
+"9c4c1e66": {"dfnID":"9c4c1e66","dfnText":"relevant settings object","external":true,"refSections":[{"refs":[{"id":"ref-for-relevant-settings-object"}],"title":"4. Modifying Constructed Stylesheets"}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object"},
+"a1d979ac": {"dfnID":"a1d979ac","dfnText":"disabled flag","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-css-style-sheet-disabled-flag"}],"title":"3. Constructing Stylesheets"}],"url":"https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-disabled-flag"},
+"a72449dd": {"dfnID":"a72449dd","dfnText":"in parallel","external":true,"refSections":[{"refs":[{"id":"ref-for-in-parallel"}],"title":"4. Modifying Constructed Stylesheets"}],"url":"https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel"},
+"a9910bde": {"dfnID":"a9910bde","dfnText":"adopting steps","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-node-adopt-ext"}],"title":"5. Using Constructed Stylesheets"}],"url":"https://dom.spec.whatwg.org/#concept-node-adopt-ext"},
+"adopted-stylesheets": {"dfnID":"adopted-stylesheets","dfnText":"adopted stylesheets","external":false,"refSections":[{"refs":[{"id":"ref-for-adopted-stylesheets"},{"id":"ref-for-adopted-stylesheets\u2460"},{"id":"ref-for-adopted-stylesheets\u2461"},{"id":"ref-for-adopted-stylesheets\u2462"}],"title":"5. Using Constructed Stylesheets"}],"url":"#adopted-stylesheets"},
+"b0d7f3c3": {"dfnID":"b0d7f3c3","dfnText":"USVString","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-USVString"},{"id":"ref-for-idl-USVString\u2460"}],"title":"3. Constructing Stylesheets"}],"url":"https://webidl.spec.whatwg.org/#idl-USVString"},
+"b6ae4501": {"dfnID":"b6ae4501","dfnText":"networking task source","external":true,"refSections":[{"refs":[{"id":"ref-for-networking-task-source"},{"id":"ref-for-networking-task-source\u2460"}],"title":"4. Modifying Constructed Stylesheets"}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#networking-task-source"},
+"ba556545": {"dfnID":"ba556545","dfnText":"NotAllowedError","external":true,"refSections":[{"refs":[{"id":"ref-for-notallowederror"},{"id":"ref-for-notallowederror\u2460"},{"id":"ref-for-notallowederror\u2461"},{"id":"ref-for-notallowederror\u2462"},{"id":"ref-for-notallowederror\u2463"},{"id":"ref-for-notallowederror\u2464"}],"title":"4. Modifying Constructed Stylesheets"},{"refs":[{"id":"ref-for-notallowederror\u2465"}],"title":"5. Using Constructed Stylesheets"}],"url":"https://webidl.spec.whatwg.org/#notallowederror"},
+"bbc31c9d": {"dfnID":"bbc31c9d","dfnText":"location","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-css-style-sheet-location"}],"title":"3. Constructing Stylesheets"}],"url":"https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-location"},
+"bdbd19d1": {"dfnID":"bdbd19d1","dfnText":"Promise","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-promise"}],"title":"3. Constructing Stylesheets"}],"url":"https://webidl.spec.whatwg.org/#idl-promise"},
+"c74f29b9": {"dfnID":"c74f29b9","dfnText":"NetworkError","external":true,"refSections":[{"refs":[{"id":"ref-for-networkerror"}],"title":"4. Modifying Constructed Stylesheets"}],"url":"https://webidl.spec.whatwg.org/#networkerror"},
+"ce3d2bbb": {"dfnID":"ce3d2bbb","dfnText":"current global object","external":true,"refSections":[{"refs":[{"id":"ref-for-current-global-object"},{"id":"ref-for-current-global-object\u2460"}],"title":"3. Constructing Stylesheets"}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#current-global-object"},
+"cssstylesheet-constructed-flag": {"dfnID":"cssstylesheet-constructed-flag","dfnText":"constructed flag","external":false,"refSections":[{"refs":[{"id":"ref-for-cssstylesheet-constructed-flag"},{"id":"ref-for-cssstylesheet-constructed-flag\u2460"}],"title":"3. Constructing Stylesheets"},{"refs":[{"id":"ref-for-cssstylesheet-constructed-flag\u2461"},{"id":"ref-for-cssstylesheet-constructed-flag\u2462"},{"id":"ref-for-cssstylesheet-constructed-flag\u2463"},{"id":"ref-for-cssstylesheet-constructed-flag\u2464"},{"id":"ref-for-cssstylesheet-constructed-flag\u2465"},{"id":"ref-for-cssstylesheet-constructed-flag\u2466"}],"title":"4. Modifying Constructed Stylesheets"},{"refs":[{"id":"ref-for-cssstylesheet-constructed-flag\u2467"}],"title":"5. Using Constructed Stylesheets"}],"url":"#cssstylesheet-constructed-flag"},
+"cssstylesheet-constructor-document": {"dfnID":"cssstylesheet-constructor-document","dfnText":"constructor document","external":false,"refSections":[{"refs":[{"id":"ref-for-cssstylesheet-constructor-document"}],"title":"3. Constructing Stylesheets"},{"refs":[{"id":"ref-for-cssstylesheet-constructor-document\u2460"}],"title":"4. Modifying Constructed Stylesheets"},{"refs":[{"id":"ref-for-cssstylesheet-constructor-document\u2461"}],"title":"5. Using Constructed Stylesheets"}],"url":"#cssstylesheet-constructor-document"},
+"cssstylesheet-disallow-modification-flag": {"dfnID":"cssstylesheet-disallow-modification-flag","dfnText":"disallow modification flag","external":false,"refSections":[{"refs":[{"id":"ref-for-cssstylesheet-disallow-modification-flag"},{"id":"ref-for-cssstylesheet-disallow-modification-flag\u2460"},{"id":"ref-for-cssstylesheet-disallow-modification-flag\u2461"},{"id":"ref-for-cssstylesheet-disallow-modification-flag\u2462"},{"id":"ref-for-cssstylesheet-disallow-modification-flag\u2463"},{"id":"ref-for-cssstylesheet-disallow-modification-flag\u2464"},{"id":"ref-for-cssstylesheet-disallow-modification-flag\u2465"},{"id":"ref-for-cssstylesheet-disallow-modification-flag\u2466"}],"title":"4. Modifying Constructed Stylesheets"}],"url":"#cssstylesheet-disallow-modification-flag"},
+"dbb1b5fa": {"dfnID":"dbb1b5fa","dfnText":"MediaList","external":true,"refSections":[{"refs":[{"id":"ref-for-medialist"}],"title":"3. Constructing Stylesheets"}],"url":"https://drafts.csswg.org/cssom-1/#medialist"},
+"dca2de17": {"dfnID":"dca2de17","dfnText":"DOMException","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-DOMException"},{"id":"ref-for-idl-DOMException\u2460"},{"id":"ref-for-idl-DOMException\u2461"},{"id":"ref-for-idl-DOMException\u2462"},{"id":"ref-for-idl-DOMException\u2463"},{"id":"ref-for-idl-DOMException\u2464"},{"id":"ref-for-idl-DOMException\u2465"}],"title":"4. Modifying Constructed Stylesheets"},{"refs":[{"id":"ref-for-idl-DOMException\u2466"}],"title":"5. Using Constructed Stylesheets"}],"url":"https://webidl.spec.whatwg.org/#idl-DOMException"},
+"dcf5fafa": {"dfnID":"dcf5fafa","dfnText":"FrozenArray","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-frozen-array"}],"title":"5. Using Constructed Stylesheets"}],"url":"https://webidl.spec.whatwg.org/#idl-frozen-array"},
+"dictdef-cssstylesheetinit": {"dfnID":"dictdef-cssstylesheetinit","dfnText":"CSSStyleSheetInit","external":false,"refSections":[{"refs":[{"id":"ref-for-dictdef-cssstylesheetinit"}],"title":"3. Constructing Stylesheets"}],"url":"#dictdef-cssstylesheetinit"},
+"dom-cssstylesheet-cssstylesheet": {"dfnID":"dom-cssstylesheet-cssstylesheet","dfnText":"CSSStyleSheet(options)","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-cssstylesheet-cssstylesheet"}],"title":"3. Constructing Stylesheets"}],"url":"#dom-cssstylesheet-cssstylesheet"},
+"dom-cssstylesheet-deleterule": {"dfnID":"dom-cssstylesheet-deleterule","dfnText":"deleteRule(index)","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-cssstylesheet-deleterule"}],"title":"4. Modifying Constructed Stylesheets"}],"url":"#dom-cssstylesheet-deleterule"},
+"dom-cssstylesheet-insertrule": {"dfnID":"dom-cssstylesheet-insertrule","dfnText":"insertRule(rule, index)","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-cssstylesheet-insertrule"}],"title":"4. Modifying Constructed Stylesheets"}],"url":"#dom-cssstylesheet-insertrule"},
+"dom-cssstylesheet-replace": {"dfnID":"dom-cssstylesheet-replace","dfnText":"replace(text)","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-cssstylesheet-replace"}],"title":"3. Constructing Stylesheets"},{"refs":[{"id":"ref-for-dom-cssstylesheet-replace\u2460"}],"title":"4. Modifying Constructed Stylesheets"}],"url":"#dom-cssstylesheet-replace"},
+"dom-cssstylesheet-replacesync": {"dfnID":"dom-cssstylesheet-replacesync","dfnText":"replaceSync(text)","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-cssstylesheet-replacesync"}],"title":"3. Constructing Stylesheets"},{"refs":[{"id":"ref-for-dom-cssstylesheet-replacesync\u2460"}],"title":"4. Modifying Constructed Stylesheets"}],"url":"#dom-cssstylesheet-replacesync"},
+"dom-cssstylesheetinit-alternate": {"dfnID":"dom-cssstylesheetinit-alternate","dfnText":"alternate","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-cssstylesheetinit-alternate"}],"title":"3. Constructing Stylesheets"}],"url":"#dom-cssstylesheetinit-alternate"},
+"dom-cssstylesheetinit-disabled": {"dfnID":"dom-cssstylesheetinit-disabled","dfnText":"disabled","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-cssstylesheetinit-disabled"}],"title":"3. Constructing Stylesheets"}],"url":"#dom-cssstylesheetinit-disabled"},
+"dom-cssstylesheetinit-media": {"dfnID":"dom-cssstylesheetinit-media","dfnText":"media","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-cssstylesheetinit-media"}],"title":"3. Constructing Stylesheets"}],"url":"#dom-cssstylesheetinit-media"},
+"dom-cssstylesheetinit-title": {"dfnID":"dom-cssstylesheetinit-title","dfnText":"title","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-cssstylesheetinit-title"}],"title":"3. Constructing Stylesheets"}],"url":"#dom-cssstylesheetinit-title"},
+"dom-documentorshadowroot-adoptedstylesheets": {"dfnID":"dom-documentorshadowroot-adoptedstylesheets","dfnText":"adoptedStyleSheets","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-documentorshadowroot-adoptedstylesheets"},{"id":"ref-for-dom-documentorshadowroot-adoptedstylesheets\u2460"},{"id":"ref-for-dom-documentorshadowroot-adoptedstylesheets\u2461"},{"id":"ref-for-dom-documentorshadowroot-adoptedstylesheets\u2462"}],"title":"5. Using Constructed Stylesheets"}],"url":"#dom-documentorshadowroot-adoptedstylesheets"},
+"e6bfb41a": {"dfnID":"e6bfb41a","dfnText":"CSSStyleSheet","external":true,"refSections":[{"refs":[{"id":"ref-for-cssstylesheet"}],"title":"Unnumbered Section"},{"refs":[{"id":"ref-for-cssstylesheet\u2460"},{"id":"ref-for-cssstylesheet\u2461"},{"id":"ref-for-cssstylesheet\u2462"},{"id":"ref-for-cssstylesheet\u2463"}],"title":"3. Constructing Stylesheets"},{"refs":[{"id":"ref-for-cssstylesheet\u2464"},{"id":"ref-for-cssstylesheet\u2465"},{"id":"ref-for-cssstylesheet\u2466"},{"id":"ref-for-cssstylesheet\u2467"}],"title":"4. Modifying Constructed Stylesheets"},{"refs":[{"id":"ref-for-cssstylesheet\u2468"},{"id":"ref-for-cssstylesheet\u2460\u24ea"}],"title":"5. Using Constructed Stylesheets"}],"url":"https://drafts.csswg.org/cssom-1/#cssstylesheet"},
+};
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+});
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        dfn.panelData = panelData;
+        insertDfnPopupAction(dfn);
+    }
+}
+
+function genDfnPanel(dfn, { dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel on",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel({dfnPanel});
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.dfn = dfn;
+    dfn.dfnPanel = dfnPanel;
+    return dfnPanel;
+}
+
+
+
+function hideAllDfnPanels() {
+    // Delete the currently-active dfn panel.
+    queryAll(".dfn-panel").forEach(dfnPanel=>hideDfnPanel({dfnPanel}));
+}
+
+function showDfnPanel(dfn) {
+    hideAllDfnPanels(); // Only display one at a time.
+
+    dfn.setAttribute("aria-expanded", "true");
+
+    const dfnPanel = genDfnPanel(dfn, dfn.panelData);
+
+    // Give the dfn a unique tabindex, and then
+    // give all the tabbable panel bits successive indexes.
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+
+    append(document.body, dfnPanel);
+    positionDfnPanel(dfnPanel);
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.dfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }
+}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel({dfn, dfnPanel}) {
+    if(!dfnPanel) dfnPanel = dfn.dfnPanel;
+    if(!dfn) dfn = dfnPanel.dfn;
+    dfn.dfnPanel = undefined;
+    dfnPanel.dfn = undefined;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.remove()
+}
+
+function toggleDfnPanel(dfn) {
+    if(dfn.dfnPanel) {
+        hideDfnPanel(dfn);
+    } else {
+        showDfnPanel(dfn);
+    }
+}
+
+function insertDfnPopupAction(dfn) {
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        toggleDfnPanel(dfn);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+function needsFor(type) {
+    switch(type) {
+        case "descriptor":
+        case "value":
+        case "element-attr":
+        case "attr-value":
+        case "element-state":
+        case "method":
+        case "constructor":
+        case "argument":
+        case "attribute":
+        case "const":
+        case "dict-member":
+        case "event":
+        case "enum-value":
+        case "stringifier":
+        case "serializer":
+        case "iterator":
+        case "maplike":
+        case "setlike":
+        case "state":
+        case "mode":
+        case "context":
+        case "facet": return true;
+
+        default: return false;
+    }
+}
+function refusesFor(type) {
+    switch(type) {
+        case "property":
+        case "element":
+        case "interface":
+        case "namespace":
+        case "callback":
+        case "dictionary":
+        case "enum":
+        case "exception":
+        case "typedef":
+        case "http-header":
+        case "permission": return true;
+
+        default: return false;
+    }
+}
+function linkFormatterFromType(type) {
+    switch(type) {
+        case 'scheme':
+        case 'permission':
+        case 'dfn': return (text) => `[=${text}=]`;
+
+        case 'abstract-op': return (text) => `[\$${text}\$]`;
+
+        case 'function':
+        case 'at-rule':
+        case 'selector':
+        case 'value': return (text) => `''${text}''`;
+
+        case 'http-header': return (text) => `[:${text}:]`;
+
+        case 'interface':
+        case 'constructor':
+        case 'method':
+        case 'argument':
+        case 'attribute':
+        case 'callback':
+        case 'dictionary':
+        case 'dict-member':
+        case 'enum':
+        case 'enum-value':
+        case 'exception':
+        case 'const':
+        case 'typedef':
+        case 'stringifier':
+        case 'serializer':
+        case 'iterator':
+        case 'maplike':
+        case 'setlike':
+        case 'extended-attribute':
+        case 'event':
+        case 'idl': return (text) => `{{${text}}}`;
+
+        case 'element-state':
+        case 'element-attr':
+        case 'attr-value':
+        case 'element': return (element) => `<{${element}}>`;
+
+        case 'grammar': return (text) => `${text} (within a <pre class=prod>)`;
+
+        case 'type': return (text)=> `<<${text}>>`;
+
+        case 'descriptor':
+        case 'property': return (text) => `'${text}'`;
+
+        default: return;
+    };
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!needsFor(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!refusesFor(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
 }
 </script>
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
-                mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
+let refsData = {
+"#adopted-stylesheets": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"construct-stylesheets","spec":"construct-stylesheets-1","status":"local","text":"adopted stylesheets","type":"dfn","url":"#adopted-stylesheets"},
+"#cssstylesheet-constructed-flag": {"export":true,"for_":["CSSStyleSheet"],"level":"1","normative":true,"shortname":"construct-stylesheets","spec":"construct-stylesheets-1","status":"local","text":"constructed flag","type":"dfn","url":"#cssstylesheet-constructed-flag"},
+"#cssstylesheet-constructor-document": {"export":true,"for_":["CSSStyleSheet"],"level":"1","normative":true,"shortname":"construct-stylesheets","spec":"construct-stylesheets-1","status":"local","text":"constructor document","type":"dfn","url":"#cssstylesheet-constructor-document"},
+"#cssstylesheet-disallow-modification-flag": {"export":true,"for_":["CSSStyleSheet"],"level":"1","normative":true,"shortname":"construct-stylesheets","spec":"construct-stylesheets-1","status":"local","text":"disallow modification flag","type":"dfn","url":"#cssstylesheet-disallow-modification-flag"},
+"#dictdef-cssstylesheetinit": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"construct-stylesheets","spec":"construct-stylesheets-1","status":"local","text":"CSSStyleSheetInit","type":"dictionary","url":"#dictdef-cssstylesheetinit"},
+"#dom-cssstylesheet-cssstylesheet": {"export":true,"for_":["CSSStyleSheet"],"level":"1","normative":true,"shortname":"construct-stylesheets","spec":"construct-stylesheets-1","status":"local","text":"CSSStyleSheet(options)","type":"constructor","url":"#dom-cssstylesheet-cssstylesheet"},
+"#dom-cssstylesheet-deleterule": {"export":true,"for_":["CSSStyleSheet"],"level":"1","normative":true,"shortname":"construct-stylesheets","spec":"construct-stylesheets-1","status":"local","text":"deleteRule(index)","type":"method","url":"#dom-cssstylesheet-deleterule"},
+"#dom-cssstylesheet-insertrule": {"export":true,"for_":["CSSStyleSheet"],"level":"1","normative":true,"shortname":"construct-stylesheets","spec":"construct-stylesheets-1","status":"local","text":"insertRule(rule, index)","type":"method","url":"#dom-cssstylesheet-insertrule"},
+"#dom-cssstylesheet-replace": {"export":true,"for_":["CSSStyleSheet"],"level":"1","normative":true,"shortname":"construct-stylesheets","spec":"construct-stylesheets-1","status":"local","text":"replace(text)","type":"method","url":"#dom-cssstylesheet-replace"},
+"#dom-cssstylesheet-replacesync": {"export":true,"for_":["CSSStyleSheet"],"level":"1","normative":true,"shortname":"construct-stylesheets","spec":"construct-stylesheets-1","status":"local","text":"replaceSync(text)","type":"method","url":"#dom-cssstylesheet-replacesync"},
+"#dom-cssstylesheetinit-alternate": {"export":true,"for_":["CSSStyleSheetInit"],"level":"1","normative":true,"shortname":"construct-stylesheets","spec":"construct-stylesheets-1","status":"local","text":"alternate","type":"dict-member","url":"#dom-cssstylesheetinit-alternate"},
+"#dom-cssstylesheetinit-disabled": {"export":true,"for_":["CSSStyleSheetInit"],"level":"1","normative":true,"shortname":"construct-stylesheets","spec":"construct-stylesheets-1","status":"local","text":"disabled","type":"dict-member","url":"#dom-cssstylesheetinit-disabled"},
+"#dom-cssstylesheetinit-media": {"export":true,"for_":["CSSStyleSheetInit"],"level":"1","normative":true,"shortname":"construct-stylesheets","spec":"construct-stylesheets-1","status":"local","text":"media","type":"dict-member","url":"#dom-cssstylesheetinit-media"},
+"#dom-cssstylesheetinit-title": {"export":true,"for_":["CSSStyleSheetInit"],"level":"1","normative":true,"shortname":"construct-stylesheets","spec":"construct-stylesheets-1","status":"local","text":"title","type":"dict-member","url":"#dom-cssstylesheetinit-title"},
+"#dom-documentorshadowroot-adoptedstylesheets": {"export":true,"for_":["DocumentOrShadowRoot"],"level":"1","normative":true,"shortname":"construct-stylesheets","spec":"construct-stylesheets-1","status":"local","text":"adoptedStyleSheets","type":"attribute","url":"#dom-documentorshadowroot-adoptedstylesheets"},
+"https://dom.spec.whatwg.org/#concept-node-adopt-ext": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"adopting steps","type":"dfn","url":"https://dom.spec.whatwg.org/#concept-node-adopt-ext"},
+"https://dom.spec.whatwg.org/#concept-node-document": {"export":true,"for_":["Node"],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"node document","type":"dfn","url":"https://dom.spec.whatwg.org/#concept-node-document"},
+"https://dom.spec.whatwg.org/#document": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"Document","type":"interface","url":"https://dom.spec.whatwg.org/#document"},
+"https://dom.spec.whatwg.org/#documentorshadowroot": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"DocumentOrShadowRoot","type":"interface","url":"https://dom.spec.whatwg.org/#documentorshadowroot"},
+"https://dom.spec.whatwg.org/#shadowroot": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"ShadowRoot","type":"interface","url":"https://dom.spec.whatwg.org/#shadowroot"},
+"https://drafts.csswg.org/css-cascade-5/#at-ruledef-import": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-cascade","spec":"css-cascade-5","status":"current","text":"@import","type":"at-rule","url":"https://drafts.csswg.org/css-cascade-5/#at-ruledef-import"},
+"https://drafts.csswg.org/css-syntax-3/#parse-a-list-of-rules": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-syntax","spec":"css-syntax-3","status":"current","text":"parse a list of rules","type":"dfn","url":"https://drafts.csswg.org/css-syntax-3/#parse-a-list-of-rules"},
+"https://drafts.csswg.org/css-syntax-3/#parse-a-rule": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-syntax","spec":"css-syntax-3","status":"current","text":"parse a rule","type":"dfn","url":"https://drafts.csswg.org/css-syntax-3/#parse-a-rule"},
+"https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-alternate-flag": {"export":false,"for_":["CSSStyleSheet"],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"alternate flag","type":"dfn","url":"https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-alternate-flag"},
+"https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-disabled-flag": {"export":false,"for_":["CSSStyleSheet"],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"disabled flag","type":"dfn","url":"https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-disabled-flag"},
+"https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-location": {"export":false,"for_":["CSSStyleSheet"],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"location","type":"dfn","url":"https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-location"},
+"https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-media": {"export":false,"for_":["CSSStyleSheet"],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"media","type":"dfn","url":"https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-media"},
+"https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-origin-clean-flag": {"export":false,"for_":["CSSStyleSheet"],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"origin-clean flag","type":"dfn","url":"https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-origin-clean-flag"},
+"https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-owner-css-rule": {"export":false,"for_":["CSSStyleSheet"],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"owner css rule","type":"dfn","url":"https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-owner-css-rule"},
+"https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-owner-node": {"export":false,"for_":["CSSStyleSheet"],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"owner node","type":"dfn","url":"https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-owner-node"},
+"https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-parent-css-style-sheet": {"export":false,"for_":["CSSStyleSheet"],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"parent css style sheet","type":"dfn","url":"https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-parent-css-style-sheet"},
+"https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-title": {"export":false,"for_":["CSSStyleSheet"],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"title","type":"dfn","url":"https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-title"},
+"https://drafts.csswg.org/cssom-1/#create-a-medialist-object": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"create a medialist object","type":"dfn","url":"https://drafts.csswg.org/cssom-1/#create-a-medialist-object"},
+"https://drafts.csswg.org/cssom-1/#css-rule": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"css rule","type":"dfn","url":"https://drafts.csswg.org/cssom-1/#css-rule"},
+"https://drafts.csswg.org/cssom-1/#cssstylesheet": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"CSSStyleSheet","type":"interface","url":"https://drafts.csswg.org/cssom-1/#cssstylesheet"},
+"https://drafts.csswg.org/cssom-1/#documentorshadowroot-document-or-shadow-root-css-style-sheets": {"export":true,"for_":["DocumentOrShadowRoot"],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"document or shadow root css style sheets","type":"dfn","url":"https://drafts.csswg.org/cssom-1/#documentorshadowroot-document-or-shadow-root-css-style-sheets"},
+"https://drafts.csswg.org/cssom-1/#dom-documentorshadowroot-stylesheets": {"export":true,"for_":["DocumentOrShadowRoot"],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"styleSheets","type":"attribute","url":"https://drafts.csswg.org/cssom-1/#dom-documentorshadowroot-stylesheets"},
+"https://drafts.csswg.org/cssom-1/#medialist": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"MediaList","type":"interface","url":"https://drafts.csswg.org/cssom-1/#medialist"},
+"https://drafts.csswg.org/cssom-1/#serialize-a-media-query-list": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"serialize a media query list","type":"dfn","url":"https://drafts.csswg.org/cssom-1/#serialize-a-media-query-list"},
+"https://fetch.spec.whatwg.org/#concept-fetch-group": {"export":true,"for_":["fetch"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"fetch group","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-fetch-group"},
+"https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"in parallel","type":"dfn","url":"https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel"},
+"https://html.spec.whatwg.org/multipage/nav-history-apis.html#concept-document-window": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"associated document","type":"dfn","url":"https://html.spec.whatwg.org/multipage/nav-history-apis.html#concept-document-window"},
+"https://html.spec.whatwg.org/multipage/semantics.html#link-options-base-url": {"export":false,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"base url","type":"dfn","url":"https://html.spec.whatwg.org/multipage/semantics.html#link-options-base-url"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#current-global-object": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"current global object","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#current-global-object"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#networking-task-source": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"networking task source","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#networking-task-source"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"queue a task","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"relevant settings object","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object"},
+"https://webidl.spec.whatwg.org/#idl-DOMException": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"DOMException","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-DOMException"},
+"https://webidl.spec.whatwg.org/#idl-DOMString": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"DOMString","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-DOMString"},
+"https://webidl.spec.whatwg.org/#idl-USVString": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"USVString","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-USVString"},
+"https://webidl.spec.whatwg.org/#idl-boolean": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"boolean","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-boolean"},
+"https://webidl.spec.whatwg.org/#idl-frozen-array": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"FrozenArray","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-frozen-array"},
+"https://webidl.spec.whatwg.org/#idl-promise": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"Promise","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-promise"},
+"https://webidl.spec.whatwg.org/#idl-undefined": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"undefined","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-undefined"},
+"https://webidl.spec.whatwg.org/#networkerror": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"NetworkError","type":"exception","url":"https://webidl.spec.whatwg.org/#networkerror"},
+"https://webidl.spec.whatwg.org/#notallowederror": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"NotAllowedError","type":"exception","url":"https://webidl.spec.whatwg.org/#notallowederror"},
+};
+
+function mkRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "Term: "),
+                mk.span({}, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    let forListElements;
+    if(forList.length == 0) {
+        forListElements = [];
+    } else if(forList.length == 1) {
+        forListElements = mk.li({},
+            mk.b({}, "For: "),
+            mk.span({}, forList[0]),
+        );
+    } else {
+        forListElements = mk.li({},
             mk.b({}, "For: "),
             mk.ul({},
                 ...forList.map(forItem =>
                     mk.li({},
-                        mk.span({}, `${forItem}`)
+                        mk.span({}, forItem)
                     ),
                 ),
             ),
         );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+    }
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    setupRefHintEventListeners(link, hintPanel);
+    return hintPanel;
+}
+
+function hideAllRefHints() {
+    queryAll(".ref-hint").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    if(refHint.teardownEventListeners) {
+        refHint.teardownEventListeners();
     }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+    refHint.remove();
+}
+
+function showRefHint(link) {
+    if(link.classList.contains("dfn-link")) return;
+    const url = link.getAttribute("href");
+    const ref = refsData[url];
+    if(!ref) return;
+
+    hideAllRefHints(); // Only display one at this time.
+
+    const refHint = mkRefHint(link, ref);
+    append(document.body, refHint);
+    link.setAttribute("aria-expanded", "true");
+    positionRefHint(refHint);
+}
+
+function setupRefHintEventListeners(link, refHint) {
+    if (refHint.teardownEventListeners) return;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
+
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
-
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
-    }
-
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
-        }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
-
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
-    }
-
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+document.addEventListener("DOMContentLoaded", () => {
+    document.body.addEventListener("mouseover", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
+    });
+    document.body.addEventListener("focus", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
     });
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['https://drafts.csswg.org/cssom-1/#cssstylesheet'] = {"text": "CSSStyleSheet", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#cssstylesheet", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#documentorshadowroot'] = {"text": "DocumentOrShadowRoot", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#documentorshadowroot", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-cssstylesheet-cssstylesheet'] = {"text": "CSSStyleSheet(options)", "type": "constructor", "spec": "construct-stylesheets-1", "shortname": "construct-stylesheets", "level": "1", "status": "local", "url": "#dom-cssstylesheet-cssstylesheet", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
-window.refsData['#dictdef-cssstylesheetinit'] = {"text": "CSSStyleSheetInit", "type": "dictionary", "spec": "construct-stylesheets-1", "shortname": "construct-stylesheets", "level": "1", "status": "local", "url": "#dictdef-cssstylesheetinit", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-promise'] = {"text": "Promise", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-promise", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-cssstylesheet-replace'] = {"text": "replace(text)", "type": "method", "spec": "construct-stylesheets-1", "shortname": "construct-stylesheets", "level": "1", "status": "local", "url": "#dom-cssstylesheet-replace", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
-window.refsData['https://webidl.spec.whatwg.org/#idl-USVString'] = {"text": "USVString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-USVString", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-cssstylesheet-replacesync'] = {"text": "replaceSync(text)", "type": "method", "spec": "construct-stylesheets-1", "shortname": "construct-stylesheets", "level": "1", "status": "local", "url": "#dom-cssstylesheet-replacesync", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
-window.refsData['https://drafts.csswg.org/cssom-1/#medialist'] = {"text": "MediaList", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#medialist", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-location'] = {"text": "location", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-location", "export": false, "normative": true, "for_": ["CSSStyleSheet"]};
-window.refsData['https://html.spec.whatwg.org/multipage/semantics.html#link-options-base-url'] = {"text": "base url", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/semantics.html#link-options-base-url", "export": false, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#concept-document-window'] = {"text": "associated document", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#concept-document-window", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#current-global-object'] = {"text": "current global object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#current-global-object", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-parent-css-style-sheet'] = {"text": "parent css style sheet", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-parent-css-style-sheet", "export": false, "normative": true, "for_": ["CSSStyleSheet"]};
-window.refsData['https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-owner-node'] = {"text": "owner node", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-owner-node", "export": false, "normative": true, "for_": ["CSSStyleSheet"]};
-window.refsData['https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-owner-css-rule'] = {"text": "owner css rule", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-owner-css-rule", "export": false, "normative": true, "for_": ["CSSStyleSheet"]};
-window.refsData['https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-title'] = {"text": "title", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-title", "export": false, "normative": true, "for_": ["CSSStyleSheet"]};
-window.refsData['#dom-cssstylesheetinit-title'] = {"text": "title", "type": "dict-member", "spec": "construct-stylesheets-1", "shortname": "construct-stylesheets", "level": "1", "status": "local", "url": "#dom-cssstylesheetinit-title", "export": true, "normative": true, "for_": ["CSSStyleSheetInit"]};
-window.refsData['https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-alternate-flag'] = {"text": "alternate flag", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-alternate-flag", "export": false, "normative": true, "for_": ["CSSStyleSheet"]};
-window.refsData['#dom-cssstylesheetinit-alternate'] = {"text": "alternate", "type": "dict-member", "spec": "construct-stylesheets-1", "shortname": "construct-stylesheets", "level": "1", "status": "local", "url": "#dom-cssstylesheetinit-alternate", "export": true, "normative": true, "for_": ["CSSStyleSheetInit"]};
-window.refsData['https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-origin-clean-flag'] = {"text": "origin-clean flag", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-origin-clean-flag", "export": false, "normative": true, "for_": ["CSSStyleSheet"]};
-window.refsData['#cssstylesheet-constructed-flag'] = {"text": "constructed flag", "type": "dfn", "spec": "construct-stylesheets-1", "shortname": "construct-stylesheets", "level": "1", "status": "local", "url": "#cssstylesheet-constructed-flag", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
-window.refsData['#cssstylesheet-constructor-document'] = {"text": "constructor document", "type": "dfn", "spec": "construct-stylesheets-1", "shortname": "construct-stylesheets", "level": "1", "status": "local", "url": "#cssstylesheet-constructor-document", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
-window.refsData['#dom-cssstylesheetinit-media'] = {"text": "media", "type": "dict-member", "spec": "construct-stylesheets-1", "shortname": "construct-stylesheets", "level": "1", "status": "local", "url": "#dom-cssstylesheetinit-media", "export": true, "normative": true, "for_": ["CSSStyleSheetInit"]};
-window.refsData['https://drafts.csswg.org/cssom-1/#create-a-medialist-object'] = {"text": "create a medialist object", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#create-a-medialist-object", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-media'] = {"text": "media", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-media", "export": false, "normative": true, "for_": ["CSSStyleSheet"]};
-window.refsData['https://drafts.csswg.org/cssom-1/#serialize-a-media-query-list'] = {"text": "serialize a media query list", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#serialize-a-media-query-list", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-cssstylesheetinit-disabled'] = {"text": "disabled", "type": "dict-member", "spec": "construct-stylesheets-1", "shortname": "construct-stylesheets", "level": "1", "status": "local", "url": "#dom-cssstylesheetinit-disabled", "export": true, "normative": true, "for_": ["CSSStyleSheetInit"]};
-window.refsData['https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-disabled-flag'] = {"text": "disabled flag", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#concept-css-style-sheet-disabled-flag", "export": false, "normative": true, "for_": ["CSSStyleSheet"]};
-window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-cssstylesheet-insertrule'] = {"text": "insertRule(rule, index)", "type": "method", "spec": "construct-stylesheets-1", "shortname": "construct-stylesheets", "level": "1", "status": "local", "url": "#dom-cssstylesheet-insertrule", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
-window.refsData['#dom-cssstylesheet-deleterule'] = {"text": "deleteRule(index)", "type": "method", "spec": "construct-stylesheets-1", "shortname": "construct-stylesheets", "level": "1", "status": "local", "url": "#dom-cssstylesheet-deleterule", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
-window.refsData['#cssstylesheet-disallow-modification-flag'] = {"text": "disallow modification flag", "type": "dfn", "spec": "construct-stylesheets-1", "shortname": "construct-stylesheets", "level": "1", "status": "local", "url": "#cssstylesheet-disallow-modification-flag", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
-window.refsData['https://webidl.spec.whatwg.org/#notallowederror'] = {"text": "NotAllowedError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#notallowederror", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-DOMException'] = {"text": "DOMException", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMException", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-syntax-3/#parse-a-rule'] = {"text": "parse a rule", "type": "dfn", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#parse-a-rule", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-cascade-5/#at-ruledef-import'] = {"text": "@import", "type": "at-rule", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#at-ruledef-import", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel'] = {"text": "in parallel", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-syntax-3/#parse-a-list-of-rules'] = {"text": "parse a list of rules", "type": "dfn", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#parse-a-list-of-rules", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task'] = {"text": "queue a task", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#networking-task-source'] = {"text": "networking task source", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#networking-task-source", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#networkerror'] = {"text": "NetworkError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#networkerror", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/cssom-1/#css-rule'] = {"text": "css rule", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#css-rule", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#concept-fetch-group'] = {"text": "fetch group", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-fetch-group", "export": true, "normative": true, "for_": ["fetch"]};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object'] = {"text": "relevant settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-frozen-array'] = {"text": "FrozenArray", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-frozen-array", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-documentorshadowroot-adoptedstylesheets'] = {"text": "adoptedStyleSheets", "type": "attribute", "spec": "construct-stylesheets-1", "shortname": "construct-stylesheets", "level": "1", "status": "local", "url": "#dom-documentorshadowroot-adoptedstylesheets", "export": true, "normative": true, "for_": ["DocumentOrShadowRoot"]};
-window.refsData['#adopted-stylesheets'] = {"text": "adopted stylesheets", "type": "dfn", "spec": "construct-stylesheets-1", "shortname": "construct-stylesheets", "level": "1", "status": "local", "url": "#adopted-stylesheets", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#concept-node-document'] = {"text": "node document", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-node-document", "export": true, "normative": true, "for_": ["Node"]};
-window.refsData['https://drafts.csswg.org/cssom-1/#documentorshadowroot-document-or-shadow-root-css-style-sheets'] = {"text": "document or shadow root css style sheets", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#documentorshadowroot-document-or-shadow-root-css-style-sheets", "export": true, "normative": true, "for_": ["DocumentOrShadowRoot"]};
-window.refsData['https://drafts.csswg.org/cssom-1/#dom-documentorshadowroot-stylesheets'] = {"text": "styleSheets", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#dom-documentorshadowroot-stylesheets", "export": true, "normative": true, "for_": ["DocumentOrShadowRoot"]};
-window.refsData['https://dom.spec.whatwg.org/#concept-node-adopt-ext'] = {"text": "adopting steps", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-node-adopt-ext", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#shadowroot'] = {"text": "ShadowRoot", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#shadowroot", "export": true, "normative": true, "for_": []};
 </script>

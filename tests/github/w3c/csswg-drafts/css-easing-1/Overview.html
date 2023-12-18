@@ -79,7 +79,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -705,7 +704,7 @@ a[href].issue-return {
 }
 
 .ref-hint {
-    display: none;
+    display: inline-block;
     position: absolute;
     z-index: 35;
     width: 20em;
@@ -721,16 +720,11 @@ a[href].issue-return {
     white-space: normal; /* in case it's moved into a pre */
 }
 
-.ref-hint.on {
-    display: inline-block;
-}
-
 .ref-hint * { margin: 0; padding: 0; text-indent: 0; }
 
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -790,7 +784,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -847,7 +840,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -1664,440 +1656,8 @@ community for their feedback and contributions.</p>
     </div>
    </div>
   </details>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['9f9120ff'] = {"dfnID": "9f9120ff", "url": "https://drafts.csswg.org/css-values-4/#comb-comma", "dfnText": ",", "refSections": [{"refs": [{"id": "ref-for-comb-comma"}, {"id": "ref-for-comb-comma\u2460"}, {"id": "ref-for-comb-comma\u2461"}], "title": "2.2. Cubic\nB\u00e9zier easing functions:\nease, ease-in, ease-out, ease-in-out, cubic-bezier()"}, {"refs": [{"id": "ref-for-comb-comma\u2462"}], "title": "2.3. Step easing functions:\nstep-start, step-end, steps()"}], "external": true};
-window.dfnpanelData['70c9f859'] = {"dfnID": "70c9f859", "url": "https://drafts.csswg.org/css-values-4/#integer-value", "dfnText": "<integer>", "refSections": [{"refs": [{"id": "ref-for-integer-value"}], "title": "2.3. Step easing functions:\nstep-start, step-end, steps()"}], "external": true};
-window.dfnpanelData['16310992'] = {"dfnID": "16310992", "url": "https://drafts.csswg.org/css-values-4/#number-value", "dfnText": "<number>", "refSections": [{"refs": [{"id": "ref-for-number-value"}, {"id": "ref-for-number-value\u2460"}, {"id": "ref-for-number-value\u2461"}, {"id": "ref-for-number-value\u2462"}, {"id": "ref-for-number-value\u2463"}, {"id": "ref-for-number-value\u2464"}, {"id": "ref-for-number-value\u2465"}, {"id": "ref-for-number-value\u2466"}], "title": "2.2. Cubic\nB\u00e9zier easing functions:\nease, ease-in, ease-out, ease-in-out, cubic-bezier()"}], "external": true};
-window.dfnpanelData['537cf076'] = {"dfnID": "537cf076", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "dfnText": "?", "refSections": [{"refs": [{"id": "ref-for-mult-opt"}], "title": "2.3. Step easing functions:\nstep-start, step-end, steps()"}], "external": true};
-window.dfnpanelData['ad47bbf0'] = {"dfnID": "ad47bbf0", "url": "https://drafts.csswg.org/css-values-4/#css-bracketed-range-notation", "dfnText": "css bracketed range notation", "refSections": [{"refs": [{"id": "ref-for-css-bracketed-range-notation"}], "title": "4. Changes"}], "external": true};
-window.dfnpanelData['6ec67710'] = {"dfnID": "6ec67710", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "dfnText": "|", "refSections": [{"refs": [{"id": "ref-for-comb-one"}, {"id": "ref-for-comb-one\u2460"}], "title": "2. Easing functions"}, {"refs": [{"id": "ref-for-comb-one\u2461"}, {"id": "ref-for-comb-one\u2462"}, {"id": "ref-for-comb-one\u2463"}, {"id": "ref-for-comb-one\u2464"}], "title": "2.2. Cubic\nB\u00e9zier easing functions:\nease, ease-in, ease-out, ease-in-out, cubic-bezier()"}, {"refs": [{"id": "ref-for-comb-one\u2465"}, {"id": "ref-for-comb-one\u2466"}, {"id": "ref-for-comb-one\u2467"}, {"id": "ref-for-comb-one\u2468"}, {"id": "ref-for-comb-one\u2460\u24ea"}, {"id": "ref-for-comb-one\u2460\u2460"}, {"id": "ref-for-comb-one\u2460\u2461"}], "title": "2.3. Step easing functions:\nstep-start, step-end, steps()"}], "external": true};
-window.dfnpanelData['easing-function'] = {"dfnID": "easing-function", "url": "#easing-function", "dfnText": "easing function", "refSections": [{"refs": [{"id": "ref-for-easing-function"}], "title": "1. Introduction"}, {"refs": [{"id": "ref-for-easing-function\u2460"}, {"id": "ref-for-easing-function\u2461"}, {"id": "ref-for-easing-function\u2462"}], "title": "2. Easing functions"}, {"refs": [{"id": "ref-for-easing-function\u2463"}], "title": "2.2. Cubic\nB\u00e9zier easing functions:\nease, ease-in, ease-out, ease-in-out, cubic-bezier()"}, {"refs": [{"id": "ref-for-easing-function\u2464"}], "title": "2.3. Step easing functions:\nstep-start, step-end, steps()"}], "external": false};
-window.dfnpanelData['input-progress-value'] = {"dfnID": "input-progress-value", "url": "#input-progress-value", "dfnText": "input progress value", "refSections": [{"refs": [{"id": "ref-for-input-progress-value"}, {"id": "ref-for-input-progress-value\u2460"}], "title": "2. Easing functions"}, {"refs": [{"id": "ref-for-input-progress-value\u2461"}], "title": "2.1. The linear easing function: linear"}, {"refs": [{"id": "ref-for-input-progress-value\u2462"}, {"id": "ref-for-input-progress-value\u2463"}, {"id": "ref-for-input-progress-value\u2464"}, {"id": "ref-for-input-progress-value\u2465"}, {"id": "ref-for-input-progress-value\u2466"}, {"id": "ref-for-input-progress-value\u2467"}], "title": "2.2.1. Output of a cubic b\u00e9zier easing function"}, {"refs": [{"id": "ref-for-input-progress-value\u2468"}, {"id": "ref-for-input-progress-value\u2460\u24ea"}, {"id": "ref-for-input-progress-value\u2460\u2460"}, {"id": "ref-for-input-progress-value\u2460\u2461"}], "title": "2.3. Step easing functions:\nstep-start, step-end, steps()"}, {"refs": [{"id": "ref-for-input-progress-value\u2460\u2462"}, {"id": "ref-for-input-progress-value\u2460\u2463"}, {"id": "ref-for-input-progress-value\u2460\u2464"}, {"id": "ref-for-input-progress-value\u2460\u2465"}, {"id": "ref-for-input-progress-value\u2460\u2466"}, {"id": "ref-for-input-progress-value\u2460\u2467"}, {"id": "ref-for-input-progress-value\u2460\u2468"}, {"id": "ref-for-input-progress-value\u2461\u24ea"}, {"id": "ref-for-input-progress-value\u2461\u2460"}, {"id": "ref-for-input-progress-value\u2461\u2461"}], "title": "2.3.1. Output of\na step easing function"}, {"refs": [{"id": "ref-for-input-progress-value\u2461\u2462"}], "title": "3. Privacy and Security Considerations"}], "external": false};
-window.dfnpanelData['output-progress-value'] = {"dfnID": "output-progress-value", "url": "#output-progress-value", "dfnText": "output progress value", "refSections": [{"refs": [{"id": "ref-for-output-progress-value"}, {"id": "ref-for-output-progress-value\u2460"}], "title": "2. Easing functions"}, {"refs": [{"id": "ref-for-output-progress-value\u2461"}], "title": "2.1. The linear easing function: linear"}, {"refs": [{"id": "ref-for-output-progress-value\u2462"}, {"id": "ref-for-output-progress-value\u2463"}, {"id": "ref-for-output-progress-value\u2464"}], "title": "2.2.1. Output of a cubic b\u00e9zier easing function"}, {"refs": [{"id": "ref-for-output-progress-value\u2465"}, {"id": "ref-for-output-progress-value\u2466"}, {"id": "ref-for-output-progress-value\u2467"}, {"id": "ref-for-output-progress-value\u2468"}, {"id": "ref-for-output-progress-value\u2460\u24ea"}, {"id": "ref-for-output-progress-value\u2460\u2460"}], "title": "2.3.1. Output of\na step easing function"}, {"refs": [{"id": "ref-for-output-progress-value\u2460\u2461"}], "title": "3. Privacy and Security Considerations"}], "external": false};
-window.dfnpanelData['linear-easing-function'] = {"dfnID": "linear-easing-function", "url": "#linear-easing-function", "dfnText": "linear easing\nfunction", "refSections": [{"refs": [{"id": "ref-for-linear-easing-function"}], "title": "2.1. The linear easing function: linear"}], "external": false};
-window.dfnpanelData['valdef-easing-function-linear'] = {"dfnID": "valdef-easing-function-linear", "url": "#valdef-easing-function-linear", "dfnText": "linear", "refSections": [{"refs": [{"id": "ref-for-valdef-easing-function-linear"}], "title": "2. Easing functions"}, {"refs": [{"id": "ref-for-valdef-easing-function-linear\u2460"}], "title": "2.1. The linear easing function: linear"}, {"refs": [{"id": "ref-for-valdef-easing-function-linear\u2461"}], "title": "2.4. Serialization"}], "external": false};
-window.dfnpanelData['cubic-bzier-easing-function'] = {"dfnID": "cubic-bzier-easing-function", "url": "#cubic-bzier-easing-function", "dfnText": "cubic B\u00e9zier easing function", "refSections": [{"refs": [{"id": "ref-for-cubic-bzier-easing-function"}, {"id": "ref-for-cubic-bzier-easing-function\u2460"}], "title": "2.2. Cubic\nB\u00e9zier easing functions:\nease, ease-in, ease-out, ease-in-out, cubic-bezier()"}], "external": false};
-window.dfnpanelData['typedef-cubic-bezier-easing-function'] = {"dfnID": "typedef-cubic-bezier-easing-function", "url": "#typedef-cubic-bezier-easing-function", "dfnText": "<cubic-bezier-easing-function>", "refSections": [{"refs": [{"id": "ref-for-typedef-cubic-bezier-easing-function"}], "title": "2. Easing functions"}], "external": false};
-window.dfnpanelData['valdef-cubic-bezier-easing-function-ease'] = {"dfnID": "valdef-cubic-bezier-easing-function-ease", "url": "#valdef-cubic-bezier-easing-function-ease", "dfnText": "ease", "refSections": [{"refs": [{"id": "ref-for-valdef-cubic-bezier-easing-function-ease"}, {"id": "ref-for-valdef-cubic-bezier-easing-function-ease\u2460"}], "title": "2.2. Cubic\nB\u00e9zier easing functions:\nease, ease-in, ease-out, ease-in-out, cubic-bezier()"}, {"refs": [{"id": "ref-for-valdef-cubic-bezier-easing-function-ease\u2461"}], "title": "2.4. Serialization"}], "external": false};
-window.dfnpanelData['valdef-cubic-bezier-easing-function-ease-in'] = {"dfnID": "valdef-cubic-bezier-easing-function-ease-in", "url": "#valdef-cubic-bezier-easing-function-ease-in", "dfnText": "ease-in", "refSections": [{"refs": [{"id": "ref-for-valdef-cubic-bezier-easing-function-ease-in"}, {"id": "ref-for-valdef-cubic-bezier-easing-function-ease-in\u2460"}], "title": "2.2. Cubic\nB\u00e9zier easing functions:\nease, ease-in, ease-out, ease-in-out, cubic-bezier()"}, {"refs": [{"id": "ref-for-valdef-cubic-bezier-easing-function-ease-in\u2461"}], "title": "2.4. Serialization"}], "external": false};
-window.dfnpanelData['valdef-cubic-bezier-easing-function-ease-out'] = {"dfnID": "valdef-cubic-bezier-easing-function-ease-out", "url": "#valdef-cubic-bezier-easing-function-ease-out", "dfnText": "ease-out", "refSections": [{"refs": [{"id": "ref-for-valdef-cubic-bezier-easing-function-ease-out"}, {"id": "ref-for-valdef-cubic-bezier-easing-function-ease-out\u2460"}], "title": "2.2. Cubic\nB\u00e9zier easing functions:\nease, ease-in, ease-out, ease-in-out, cubic-bezier()"}, {"refs": [{"id": "ref-for-valdef-cubic-bezier-easing-function-ease-out\u2461"}], "title": "2.4. Serialization"}], "external": false};
-window.dfnpanelData['valdef-cubic-bezier-easing-function-ease-in-out'] = {"dfnID": "valdef-cubic-bezier-easing-function-ease-in-out", "url": "#valdef-cubic-bezier-easing-function-ease-in-out", "dfnText": "ease-in-out", "refSections": [{"refs": [{"id": "ref-for-valdef-cubic-bezier-easing-function-ease-in-out"}, {"id": "ref-for-valdef-cubic-bezier-easing-function-ease-in-out\u2460"}], "title": "2.2. Cubic\nB\u00e9zier easing functions:\nease, ease-in, ease-out, ease-in-out, cubic-bezier()"}, {"refs": [{"id": "ref-for-valdef-cubic-bezier-easing-function-ease-in-out\u2461"}], "title": "2.4. Serialization"}], "external": false};
-window.dfnpanelData['funcdef-cubic-bezier-easing-function-cubic-bezier'] = {"dfnID": "funcdef-cubic-bezier-easing-function-cubic-bezier", "url": "#funcdef-cubic-bezier-easing-function-cubic-bezier", "dfnText": "cubic-bezier(<number [0,1]>, <number>, <number [0,1]>, <number>)", "refSections": [{"refs": [{"id": "ref-for-funcdef-cubic-bezier-easing-function-cubic-bezier"}, {"id": "ref-for-funcdef-cubic-bezier-easing-function-cubic-bezier\u2460"}], "title": "2.2. Cubic\nB\u00e9zier easing functions:\nease, ease-in, ease-out, ease-in-out, cubic-bezier()"}, {"refs": [{"id": "ref-for-funcdef-cubic-bezier-easing-function-cubic-bezier\u2461"}], "title": "2.4. Serialization"}, {"refs": [{"id": "ref-for-funcdef-cubic-bezier-easing-function-cubic-bezier\u2462"}], "title": "4. Changes"}], "external": false};
-window.dfnpanelData['step-easing-function'] = {"dfnID": "step-easing-function", "url": "#step-easing-function", "dfnText": "step easing function", "refSections": [{"refs": [{"id": "ref-for-step-easing-function"}, {"id": "ref-for-step-easing-function\u2460"}], "title": "2.3.1. Output of\na step easing function"}], "external": false};
-window.dfnpanelData['steps'] = {"dfnID": "steps", "url": "#steps", "dfnText": "steps", "refSections": [{"refs": [{"id": "ref-for-steps"}, {"id": "ref-for-steps\u2460"}, {"id": "ref-for-steps\u2461"}, {"id": "ref-for-steps\u2462"}, {"id": "ref-for-steps\u2463"}, {"id": "ref-for-steps\u2464"}], "title": "2.3.1. Output of\na step easing function"}], "external": false};
-window.dfnpanelData['step-position'] = {"dfnID": "step-position", "url": "#step-position", "dfnText": "step position", "refSections": [{"refs": [{"id": "ref-for-step-position"}], "title": "2.3. Step easing functions:\nstep-start, step-end, steps()"}, {"refs": [{"id": "ref-for-step-position\u2460"}, {"id": "ref-for-step-position\u2461"}, {"id": "ref-for-step-position\u2462"}, {"id": "ref-for-step-position\u2463"}, {"id": "ref-for-step-position\u2464"}, {"id": "ref-for-step-position\u2465"}], "title": "2.3.1. Output of\na step easing function"}, {"refs": [{"id": "ref-for-step-position\u2466"}], "title": "2.4. Serialization"}], "external": false};
-window.dfnpanelData['typedef-step-easing-function'] = {"dfnID": "typedef-step-easing-function", "url": "#typedef-step-easing-function", "dfnText": "<step-easing-function>", "refSections": [{"refs": [{"id": "ref-for-typedef-step-easing-function"}], "title": "2. Easing functions"}], "external": false};
-window.dfnpanelData['typedef-step-position'] = {"dfnID": "typedef-step-position", "url": "#typedef-step-position", "dfnText": "<step-position>", "refSections": [{"refs": [{"id": "ref-for-typedef-step-position"}], "title": "2.3. Step easing functions:\nstep-start, step-end, steps()"}], "external": false};
-window.dfnpanelData['valdef-step-easing-function-step-start'] = {"dfnID": "valdef-step-easing-function-step-start", "url": "#valdef-step-easing-function-step-start", "dfnText": "step-start", "refSections": [{"refs": [{"id": "ref-for-valdef-step-easing-function-step-start"}, {"id": "ref-for-valdef-step-easing-function-step-start\u2460"}], "title": "2.3. Step easing functions:\nstep-start, step-end, steps()"}, {"refs": [{"id": "ref-for-valdef-step-easing-function-step-start\u2461"}], "title": "2.4. Serialization"}], "external": false};
-window.dfnpanelData['valdef-step-easing-function-step-end'] = {"dfnID": "valdef-step-easing-function-step-end", "url": "#valdef-step-easing-function-step-end", "dfnText": "step-end", "refSections": [{"refs": [{"id": "ref-for-valdef-step-easing-function-step-end"}, {"id": "ref-for-valdef-step-easing-function-step-end\u2460"}], "title": "2.3. Step easing functions:\nstep-start, step-end, steps()"}, {"refs": [{"id": "ref-for-valdef-step-easing-function-step-end\u2461"}], "title": "2.4. Serialization"}], "external": false};
-window.dfnpanelData['funcdef-step-easing-function-steps'] = {"dfnID": "funcdef-step-easing-function-steps", "url": "#funcdef-step-easing-function-steps", "dfnText": "steps(<integer>[, <step-position> ]?)", "refSections": [{"refs": [{"id": "ref-for-funcdef-step-easing-function-steps"}, {"id": "ref-for-funcdef-step-easing-function-steps\u2460"}], "title": "2.3. Step easing functions:\nstep-start, step-end, steps()"}, {"refs": [{"id": "ref-for-funcdef-step-easing-function-steps\u2461"}, {"id": "ref-for-funcdef-step-easing-function-steps\u2462"}, {"id": "ref-for-funcdef-step-easing-function-steps\u2463"}], "title": "2.4. Serialization"}], "external": false};
-window.dfnpanelData['valdef-steps-jump-start'] = {"dfnID": "valdef-steps-jump-start", "url": "#valdef-steps-jump-start", "dfnText": "jump-start", "refSections": [{"refs": [{"id": "ref-for-valdef-steps-jump-start"}, {"id": "ref-for-valdef-steps-jump-start\u2460"}], "title": "2.3. Step easing functions:\nstep-start, step-end, steps()"}, {"refs": [{"id": "ref-for-valdef-steps-jump-start\u2461"}, {"id": "ref-for-valdef-steps-jump-start\u2462"}, {"id": "ref-for-valdef-steps-jump-start\u2463"}, {"id": "ref-for-valdef-steps-jump-start\u2464"}, {"id": "ref-for-valdef-steps-jump-start\u2465"}], "title": "2.3.1. Output of\na step easing function"}], "external": false};
-window.dfnpanelData['valdef-steps-jump-end'] = {"dfnID": "valdef-steps-jump-end", "url": "#valdef-steps-jump-end", "dfnText": "jump-end", "refSections": [{"refs": [{"id": "ref-for-valdef-steps-jump-end"}, {"id": "ref-for-valdef-steps-jump-end\u2460"}], "title": "2.3. Step easing functions:\nstep-start, step-end, steps()"}, {"refs": [{"id": "ref-for-valdef-steps-jump-end\u2461"}, {"id": "ref-for-valdef-steps-jump-end\u2462"}, {"id": "ref-for-valdef-steps-jump-end\u2463"}], "title": "2.3.1. Output of\na step easing function"}, {"refs": [{"id": "ref-for-valdef-steps-jump-end\u2464"}], "title": "2.4. Serialization"}], "external": false};
-window.dfnpanelData['valdef-steps-jump-none'] = {"dfnID": "valdef-steps-jump-none", "url": "#valdef-steps-jump-none", "dfnText": "jump-none", "refSections": [{"refs": [{"id": "ref-for-valdef-steps-jump-none"}, {"id": "ref-for-valdef-steps-jump-none\u2460"}], "title": "2.3. Step easing functions:\nstep-start, step-end, steps()"}, {"refs": [{"id": "ref-for-valdef-steps-jump-none\u2461"}], "title": "2.3.1. Output of\na step easing function"}], "external": false};
-window.dfnpanelData['valdef-steps-jump-both'] = {"dfnID": "valdef-steps-jump-both", "url": "#valdef-steps-jump-both", "dfnText": "jump-both", "refSections": [{"refs": [{"id": "ref-for-valdef-steps-jump-both"}], "title": "2.3. Step easing functions:\nstep-start, step-end, steps()"}, {"refs": [{"id": "ref-for-valdef-steps-jump-both\u2460"}, {"id": "ref-for-valdef-steps-jump-both\u2461"}], "title": "2.3.1. Output of\na step easing function"}], "external": false};
-window.dfnpanelData['valdef-steps-start'] = {"dfnID": "valdef-steps-start", "url": "#valdef-steps-start", "dfnText": "start", "refSections": [{"refs": [{"id": "ref-for-valdef-steps-start"}], "title": "2.3. Step easing functions:\nstep-start, step-end, steps()"}, {"refs": [{"id": "ref-for-valdef-steps-start\u2460"}, {"id": "ref-for-valdef-steps-start\u2461"}, {"id": "ref-for-valdef-steps-start\u2462"}, {"id": "ref-for-valdef-steps-start\u2463"}], "title": "2.3.1. Output of\na step easing function"}], "external": false};
-window.dfnpanelData['valdef-steps-end'] = {"dfnID": "valdef-steps-end", "url": "#valdef-steps-end", "dfnText": "end", "refSections": [{"refs": [{"id": "ref-for-valdef-steps-end"}, {"id": "ref-for-valdef-steps-end\u2460"}], "title": "2.3. Step easing functions:\nstep-start, step-end, steps()"}, {"refs": [{"id": "ref-for-valdef-steps-end\u2461"}, {"id": "ref-for-valdef-steps-end\u2462"}], "title": "2.3.1. Output of\na step easing function"}, {"refs": [{"id": "ref-for-valdef-steps-end\u2463"}], "title": "2.4. Serialization"}], "external": false};
-window.dfnpanelData['before-flag'] = {"dfnID": "before-flag", "url": "#before-flag", "dfnText": "before flag", "refSections": [{"refs": [{"id": "ref-for-before-flag"}], "title": "2. Easing functions"}, {"refs": [{"id": "ref-for-before-flag\u2460"}, {"id": "ref-for-before-flag\u2461"}, {"id": "ref-for-before-flag\u2462"}, {"id": "ref-for-before-flag\u2463"}, {"id": "ref-for-before-flag\u2464"}], "title": "2.3.1. Output of\na step easing function"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -2291,12 +1851,458 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"16310992": {"dfnID":"16310992","dfnText":"<number>","external":true,"refSections":[{"refs":[{"id":"ref-for-number-value"},{"id":"ref-for-number-value\u2460"},{"id":"ref-for-number-value\u2461"},{"id":"ref-for-number-value\u2462"},{"id":"ref-for-number-value\u2463"},{"id":"ref-for-number-value\u2464"},{"id":"ref-for-number-value\u2465"},{"id":"ref-for-number-value\u2466"}],"title":"2.2. Cubic\nB\u00e9zier easing functions:\nease, ease-in, ease-out, ease-in-out, cubic-bezier()"}],"url":"https://drafts.csswg.org/css-values-4/#number-value"},
+"537cf076": {"dfnID":"537cf076","dfnText":"?","external":true,"refSections":[{"refs":[{"id":"ref-for-mult-opt"}],"title":"2.3. Step easing functions:\nstep-start, step-end, steps()"}],"url":"https://drafts.csswg.org/css-values-4/#mult-opt"},
+"6ec67710": {"dfnID":"6ec67710","dfnText":"|","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-one"},{"id":"ref-for-comb-one\u2460"}],"title":"2. Easing functions"},{"refs":[{"id":"ref-for-comb-one\u2461"},{"id":"ref-for-comb-one\u2462"},{"id":"ref-for-comb-one\u2463"},{"id":"ref-for-comb-one\u2464"}],"title":"2.2. Cubic\nB\u00e9zier easing functions:\nease, ease-in, ease-out, ease-in-out, cubic-bezier()"},{"refs":[{"id":"ref-for-comb-one\u2465"},{"id":"ref-for-comb-one\u2466"},{"id":"ref-for-comb-one\u2467"},{"id":"ref-for-comb-one\u2468"},{"id":"ref-for-comb-one\u2460\u24ea"},{"id":"ref-for-comb-one\u2460\u2460"},{"id":"ref-for-comb-one\u2460\u2461"}],"title":"2.3. Step easing functions:\nstep-start, step-end, steps()"}],"url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"70c9f859": {"dfnID":"70c9f859","dfnText":"<integer>","external":true,"refSections":[{"refs":[{"id":"ref-for-integer-value"}],"title":"2.3. Step easing functions:\nstep-start, step-end, steps()"}],"url":"https://drafts.csswg.org/css-values-4/#integer-value"},
+"9f9120ff": {"dfnID":"9f9120ff","dfnText":",","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-comma"},{"id":"ref-for-comb-comma\u2460"},{"id":"ref-for-comb-comma\u2461"}],"title":"2.2. Cubic\nB\u00e9zier easing functions:\nease, ease-in, ease-out, ease-in-out, cubic-bezier()"},{"refs":[{"id":"ref-for-comb-comma\u2462"}],"title":"2.3. Step easing functions:\nstep-start, step-end, steps()"}],"url":"https://drafts.csswg.org/css-values-4/#comb-comma"},
+"ad47bbf0": {"dfnID":"ad47bbf0","dfnText":"css bracketed range notation","external":true,"refSections":[{"refs":[{"id":"ref-for-css-bracketed-range-notation"}],"title":"4. Changes"}],"url":"https://drafts.csswg.org/css-values-4/#css-bracketed-range-notation"},
+"before-flag": {"dfnID":"before-flag","dfnText":"before flag","external":false,"refSections":[{"refs":[{"id":"ref-for-before-flag"}],"title":"2. Easing functions"},{"refs":[{"id":"ref-for-before-flag\u2460"},{"id":"ref-for-before-flag\u2461"},{"id":"ref-for-before-flag\u2462"},{"id":"ref-for-before-flag\u2463"},{"id":"ref-for-before-flag\u2464"}],"title":"2.3.1. Output of\na step easing function"}],"url":"#before-flag"},
+"cubic-bzier-easing-function": {"dfnID":"cubic-bzier-easing-function","dfnText":"cubic B\u00e9zier easing function","external":false,"refSections":[{"refs":[{"id":"ref-for-cubic-bzier-easing-function"},{"id":"ref-for-cubic-bzier-easing-function\u2460"}],"title":"2.2. Cubic\nB\u00e9zier easing functions:\nease, ease-in, ease-out, ease-in-out, cubic-bezier()"}],"url":"#cubic-bzier-easing-function"},
+"easing-function": {"dfnID":"easing-function","dfnText":"easing function","external":false,"refSections":[{"refs":[{"id":"ref-for-easing-function"}],"title":"1. Introduction"},{"refs":[{"id":"ref-for-easing-function\u2460"},{"id":"ref-for-easing-function\u2461"},{"id":"ref-for-easing-function\u2462"}],"title":"2. Easing functions"},{"refs":[{"id":"ref-for-easing-function\u2463"}],"title":"2.2. Cubic\nB\u00e9zier easing functions:\nease, ease-in, ease-out, ease-in-out, cubic-bezier()"},{"refs":[{"id":"ref-for-easing-function\u2464"}],"title":"2.3. Step easing functions:\nstep-start, step-end, steps()"}],"url":"#easing-function"},
+"funcdef-cubic-bezier-easing-function-cubic-bezier": {"dfnID":"funcdef-cubic-bezier-easing-function-cubic-bezier","dfnText":"cubic-bezier(<number [0,1]>, <number>, <number [0,1]>, <number>)","external":false,"refSections":[{"refs":[{"id":"ref-for-funcdef-cubic-bezier-easing-function-cubic-bezier"},{"id":"ref-for-funcdef-cubic-bezier-easing-function-cubic-bezier\u2460"}],"title":"2.2. Cubic\nB\u00e9zier easing functions:\nease, ease-in, ease-out, ease-in-out, cubic-bezier()"},{"refs":[{"id":"ref-for-funcdef-cubic-bezier-easing-function-cubic-bezier\u2461"}],"title":"2.4. Serialization"},{"refs":[{"id":"ref-for-funcdef-cubic-bezier-easing-function-cubic-bezier\u2462"}],"title":"4. Changes"}],"url":"#funcdef-cubic-bezier-easing-function-cubic-bezier"},
+"funcdef-step-easing-function-steps": {"dfnID":"funcdef-step-easing-function-steps","dfnText":"steps(<integer>[, <step-position> ]?)","external":false,"refSections":[{"refs":[{"id":"ref-for-funcdef-step-easing-function-steps"},{"id":"ref-for-funcdef-step-easing-function-steps\u2460"}],"title":"2.3. Step easing functions:\nstep-start, step-end, steps()"},{"refs":[{"id":"ref-for-funcdef-step-easing-function-steps\u2461"},{"id":"ref-for-funcdef-step-easing-function-steps\u2462"},{"id":"ref-for-funcdef-step-easing-function-steps\u2463"}],"title":"2.4. Serialization"}],"url":"#funcdef-step-easing-function-steps"},
+"input-progress-value": {"dfnID":"input-progress-value","dfnText":"input progress value","external":false,"refSections":[{"refs":[{"id":"ref-for-input-progress-value"},{"id":"ref-for-input-progress-value\u2460"}],"title":"2. Easing functions"},{"refs":[{"id":"ref-for-input-progress-value\u2461"}],"title":"2.1. The linear easing function: linear"},{"refs":[{"id":"ref-for-input-progress-value\u2462"},{"id":"ref-for-input-progress-value\u2463"},{"id":"ref-for-input-progress-value\u2464"},{"id":"ref-for-input-progress-value\u2465"},{"id":"ref-for-input-progress-value\u2466"},{"id":"ref-for-input-progress-value\u2467"}],"title":"2.2.1. Output of a cubic b\u00e9zier easing function"},{"refs":[{"id":"ref-for-input-progress-value\u2468"},{"id":"ref-for-input-progress-value\u2460\u24ea"},{"id":"ref-for-input-progress-value\u2460\u2460"},{"id":"ref-for-input-progress-value\u2460\u2461"}],"title":"2.3. Step easing functions:\nstep-start, step-end, steps()"},{"refs":[{"id":"ref-for-input-progress-value\u2460\u2462"},{"id":"ref-for-input-progress-value\u2460\u2463"},{"id":"ref-for-input-progress-value\u2460\u2464"},{"id":"ref-for-input-progress-value\u2460\u2465"},{"id":"ref-for-input-progress-value\u2460\u2466"},{"id":"ref-for-input-progress-value\u2460\u2467"},{"id":"ref-for-input-progress-value\u2460\u2468"},{"id":"ref-for-input-progress-value\u2461\u24ea"},{"id":"ref-for-input-progress-value\u2461\u2460"},{"id":"ref-for-input-progress-value\u2461\u2461"}],"title":"2.3.1. Output of\na step easing function"},{"refs":[{"id":"ref-for-input-progress-value\u2461\u2462"}],"title":"3. Privacy and Security Considerations"}],"url":"#input-progress-value"},
+"linear-easing-function": {"dfnID":"linear-easing-function","dfnText":"linear easing\nfunction","external":false,"refSections":[{"refs":[{"id":"ref-for-linear-easing-function"}],"title":"2.1. The linear easing function: linear"}],"url":"#linear-easing-function"},
+"output-progress-value": {"dfnID":"output-progress-value","dfnText":"output progress value","external":false,"refSections":[{"refs":[{"id":"ref-for-output-progress-value"},{"id":"ref-for-output-progress-value\u2460"}],"title":"2. Easing functions"},{"refs":[{"id":"ref-for-output-progress-value\u2461"}],"title":"2.1. The linear easing function: linear"},{"refs":[{"id":"ref-for-output-progress-value\u2462"},{"id":"ref-for-output-progress-value\u2463"},{"id":"ref-for-output-progress-value\u2464"}],"title":"2.2.1. Output of a cubic b\u00e9zier easing function"},{"refs":[{"id":"ref-for-output-progress-value\u2465"},{"id":"ref-for-output-progress-value\u2466"},{"id":"ref-for-output-progress-value\u2467"},{"id":"ref-for-output-progress-value\u2468"},{"id":"ref-for-output-progress-value\u2460\u24ea"},{"id":"ref-for-output-progress-value\u2460\u2460"}],"title":"2.3.1. Output of\na step easing function"},{"refs":[{"id":"ref-for-output-progress-value\u2460\u2461"}],"title":"3. Privacy and Security Considerations"}],"url":"#output-progress-value"},
+"step-easing-function": {"dfnID":"step-easing-function","dfnText":"step easing function","external":false,"refSections":[{"refs":[{"id":"ref-for-step-easing-function"},{"id":"ref-for-step-easing-function\u2460"}],"title":"2.3.1. Output of\na step easing function"}],"url":"#step-easing-function"},
+"step-position": {"dfnID":"step-position","dfnText":"step position","external":false,"refSections":[{"refs":[{"id":"ref-for-step-position"}],"title":"2.3. Step easing functions:\nstep-start, step-end, steps()"},{"refs":[{"id":"ref-for-step-position\u2460"},{"id":"ref-for-step-position\u2461"},{"id":"ref-for-step-position\u2462"},{"id":"ref-for-step-position\u2463"},{"id":"ref-for-step-position\u2464"},{"id":"ref-for-step-position\u2465"}],"title":"2.3.1. Output of\na step easing function"},{"refs":[{"id":"ref-for-step-position\u2466"}],"title":"2.4. Serialization"}],"url":"#step-position"},
+"steps": {"dfnID":"steps","dfnText":"steps","external":false,"refSections":[{"refs":[{"id":"ref-for-steps"},{"id":"ref-for-steps\u2460"},{"id":"ref-for-steps\u2461"},{"id":"ref-for-steps\u2462"},{"id":"ref-for-steps\u2463"},{"id":"ref-for-steps\u2464"}],"title":"2.3.1. Output of\na step easing function"}],"url":"#steps"},
+"typedef-cubic-bezier-easing-function": {"dfnID":"typedef-cubic-bezier-easing-function","dfnText":"<cubic-bezier-easing-function>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-cubic-bezier-easing-function"}],"title":"2. Easing functions"}],"url":"#typedef-cubic-bezier-easing-function"},
+"typedef-step-easing-function": {"dfnID":"typedef-step-easing-function","dfnText":"<step-easing-function>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-step-easing-function"}],"title":"2. Easing functions"}],"url":"#typedef-step-easing-function"},
+"typedef-step-position": {"dfnID":"typedef-step-position","dfnText":"<step-position>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-step-position"}],"title":"2.3. Step easing functions:\nstep-start, step-end, steps()"}],"url":"#typedef-step-position"},
+"valdef-cubic-bezier-easing-function-ease": {"dfnID":"valdef-cubic-bezier-easing-function-ease","dfnText":"ease","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-cubic-bezier-easing-function-ease"},{"id":"ref-for-valdef-cubic-bezier-easing-function-ease\u2460"}],"title":"2.2. Cubic\nB\u00e9zier easing functions:\nease, ease-in, ease-out, ease-in-out, cubic-bezier()"},{"refs":[{"id":"ref-for-valdef-cubic-bezier-easing-function-ease\u2461"}],"title":"2.4. Serialization"}],"url":"#valdef-cubic-bezier-easing-function-ease"},
+"valdef-cubic-bezier-easing-function-ease-in": {"dfnID":"valdef-cubic-bezier-easing-function-ease-in","dfnText":"ease-in","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-cubic-bezier-easing-function-ease-in"},{"id":"ref-for-valdef-cubic-bezier-easing-function-ease-in\u2460"}],"title":"2.2. Cubic\nB\u00e9zier easing functions:\nease, ease-in, ease-out, ease-in-out, cubic-bezier()"},{"refs":[{"id":"ref-for-valdef-cubic-bezier-easing-function-ease-in\u2461"}],"title":"2.4. Serialization"}],"url":"#valdef-cubic-bezier-easing-function-ease-in"},
+"valdef-cubic-bezier-easing-function-ease-in-out": {"dfnID":"valdef-cubic-bezier-easing-function-ease-in-out","dfnText":"ease-in-out","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-cubic-bezier-easing-function-ease-in-out"},{"id":"ref-for-valdef-cubic-bezier-easing-function-ease-in-out\u2460"}],"title":"2.2. Cubic\nB\u00e9zier easing functions:\nease, ease-in, ease-out, ease-in-out, cubic-bezier()"},{"refs":[{"id":"ref-for-valdef-cubic-bezier-easing-function-ease-in-out\u2461"}],"title":"2.4. Serialization"}],"url":"#valdef-cubic-bezier-easing-function-ease-in-out"},
+"valdef-cubic-bezier-easing-function-ease-out": {"dfnID":"valdef-cubic-bezier-easing-function-ease-out","dfnText":"ease-out","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-cubic-bezier-easing-function-ease-out"},{"id":"ref-for-valdef-cubic-bezier-easing-function-ease-out\u2460"}],"title":"2.2. Cubic\nB\u00e9zier easing functions:\nease, ease-in, ease-out, ease-in-out, cubic-bezier()"},{"refs":[{"id":"ref-for-valdef-cubic-bezier-easing-function-ease-out\u2461"}],"title":"2.4. Serialization"}],"url":"#valdef-cubic-bezier-easing-function-ease-out"},
+"valdef-easing-function-linear": {"dfnID":"valdef-easing-function-linear","dfnText":"linear","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-easing-function-linear"}],"title":"2. Easing functions"},{"refs":[{"id":"ref-for-valdef-easing-function-linear\u2460"}],"title":"2.1. The linear easing function: linear"},{"refs":[{"id":"ref-for-valdef-easing-function-linear\u2461"}],"title":"2.4. Serialization"}],"url":"#valdef-easing-function-linear"},
+"valdef-step-easing-function-step-end": {"dfnID":"valdef-step-easing-function-step-end","dfnText":"step-end","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-step-easing-function-step-end"},{"id":"ref-for-valdef-step-easing-function-step-end\u2460"}],"title":"2.3. Step easing functions:\nstep-start, step-end, steps()"},{"refs":[{"id":"ref-for-valdef-step-easing-function-step-end\u2461"}],"title":"2.4. Serialization"}],"url":"#valdef-step-easing-function-step-end"},
+"valdef-step-easing-function-step-start": {"dfnID":"valdef-step-easing-function-step-start","dfnText":"step-start","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-step-easing-function-step-start"},{"id":"ref-for-valdef-step-easing-function-step-start\u2460"}],"title":"2.3. Step easing functions:\nstep-start, step-end, steps()"},{"refs":[{"id":"ref-for-valdef-step-easing-function-step-start\u2461"}],"title":"2.4. Serialization"}],"url":"#valdef-step-easing-function-step-start"},
+"valdef-steps-end": {"dfnID":"valdef-steps-end","dfnText":"end","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-steps-end"},{"id":"ref-for-valdef-steps-end\u2460"}],"title":"2.3. Step easing functions:\nstep-start, step-end, steps()"},{"refs":[{"id":"ref-for-valdef-steps-end\u2461"},{"id":"ref-for-valdef-steps-end\u2462"}],"title":"2.3.1. Output of\na step easing function"},{"refs":[{"id":"ref-for-valdef-steps-end\u2463"}],"title":"2.4. Serialization"}],"url":"#valdef-steps-end"},
+"valdef-steps-jump-both": {"dfnID":"valdef-steps-jump-both","dfnText":"jump-both","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-steps-jump-both"}],"title":"2.3. Step easing functions:\nstep-start, step-end, steps()"},{"refs":[{"id":"ref-for-valdef-steps-jump-both\u2460"},{"id":"ref-for-valdef-steps-jump-both\u2461"}],"title":"2.3.1. Output of\na step easing function"}],"url":"#valdef-steps-jump-both"},
+"valdef-steps-jump-end": {"dfnID":"valdef-steps-jump-end","dfnText":"jump-end","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-steps-jump-end"},{"id":"ref-for-valdef-steps-jump-end\u2460"}],"title":"2.3. Step easing functions:\nstep-start, step-end, steps()"},{"refs":[{"id":"ref-for-valdef-steps-jump-end\u2461"},{"id":"ref-for-valdef-steps-jump-end\u2462"},{"id":"ref-for-valdef-steps-jump-end\u2463"}],"title":"2.3.1. Output of\na step easing function"},{"refs":[{"id":"ref-for-valdef-steps-jump-end\u2464"}],"title":"2.4. Serialization"}],"url":"#valdef-steps-jump-end"},
+"valdef-steps-jump-none": {"dfnID":"valdef-steps-jump-none","dfnText":"jump-none","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-steps-jump-none"},{"id":"ref-for-valdef-steps-jump-none\u2460"}],"title":"2.3. Step easing functions:\nstep-start, step-end, steps()"},{"refs":[{"id":"ref-for-valdef-steps-jump-none\u2461"}],"title":"2.3.1. Output of\na step easing function"}],"url":"#valdef-steps-jump-none"},
+"valdef-steps-jump-start": {"dfnID":"valdef-steps-jump-start","dfnText":"jump-start","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-steps-jump-start"},{"id":"ref-for-valdef-steps-jump-start\u2460"}],"title":"2.3. Step easing functions:\nstep-start, step-end, steps()"},{"refs":[{"id":"ref-for-valdef-steps-jump-start\u2461"},{"id":"ref-for-valdef-steps-jump-start\u2462"},{"id":"ref-for-valdef-steps-jump-start\u2463"},{"id":"ref-for-valdef-steps-jump-start\u2464"},{"id":"ref-for-valdef-steps-jump-start\u2465"}],"title":"2.3.1. Output of\na step easing function"}],"url":"#valdef-steps-jump-start"},
+"valdef-steps-start": {"dfnID":"valdef-steps-start","dfnText":"start","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-steps-start"}],"title":"2.3. Step easing functions:\nstep-start, step-end, steps()"},{"refs":[{"id":"ref-for-valdef-steps-start\u2460"},{"id":"ref-for-valdef-steps-start\u2461"},{"id":"ref-for-valdef-steps-start\u2462"},{"id":"ref-for-valdef-steps-start\u2463"}],"title":"2.3.1. Output of\na step easing function"}],"url":"#valdef-steps-start"},
+};
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+});
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        dfn.panelData = panelData;
+        insertDfnPopupAction(dfn);
+    }
+}
+
+function genDfnPanel(dfn, { dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel on",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel({dfnPanel});
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.dfn = dfn;
+    dfn.dfnPanel = dfnPanel;
+    return dfnPanel;
+}
+
+
+
+function hideAllDfnPanels() {
+    // Delete the currently-active dfn panel.
+    queryAll(".dfn-panel").forEach(dfnPanel=>hideDfnPanel({dfnPanel}));
+}
+
+function showDfnPanel(dfn) {
+    hideAllDfnPanels(); // Only display one at a time.
+
+    dfn.setAttribute("aria-expanded", "true");
+
+    const dfnPanel = genDfnPanel(dfn, dfn.panelData);
+
+    // Give the dfn a unique tabindex, and then
+    // give all the tabbable panel bits successive indexes.
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+
+    append(document.body, dfnPanel);
+    positionDfnPanel(dfnPanel);
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.dfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }
+}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel({dfn, dfnPanel}) {
+    if(!dfnPanel) dfnPanel = dfn.dfnPanel;
+    if(!dfn) dfn = dfnPanel.dfn;
+    dfn.dfnPanel = undefined;
+    dfnPanel.dfn = undefined;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.remove()
+}
+
+function toggleDfnPanel(dfn) {
+    if(dfn.dfnPanel) {
+        hideDfnPanel(dfn);
+    } else {
+        showDfnPanel(dfn);
+    }
+}
+
+function insertDfnPopupAction(dfn) {
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        toggleDfnPanel(dfn);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+function needsFor(type) {
+    switch(type) {
+        case "descriptor":
+        case "value":
+        case "element-attr":
+        case "attr-value":
+        case "element-state":
+        case "method":
+        case "constructor":
+        case "argument":
+        case "attribute":
+        case "const":
+        case "dict-member":
+        case "event":
+        case "enum-value":
+        case "stringifier":
+        case "serializer":
+        case "iterator":
+        case "maplike":
+        case "setlike":
+        case "state":
+        case "mode":
+        case "context":
+        case "facet": return true;
+
+        default: return false;
+    }
+}
+function refusesFor(type) {
+    switch(type) {
+        case "property":
+        case "element":
+        case "interface":
+        case "namespace":
+        case "callback":
+        case "dictionary":
+        case "enum":
+        case "exception":
+        case "typedef":
+        case "http-header":
+        case "permission": return true;
+
+        default: return false;
+    }
+}
+function linkFormatterFromType(type) {
+    switch(type) {
+        case 'scheme':
+        case 'permission':
+        case 'dfn': return (text) => `[=${text}=]`;
+
+        case 'abstract-op': return (text) => `[\$${text}\$]`;
+
+        case 'function':
+        case 'at-rule':
+        case 'selector':
+        case 'value': return (text) => `''${text}''`;
+
+        case 'http-header': return (text) => `[:${text}:]`;
+
+        case 'interface':
+        case 'constructor':
+        case 'method':
+        case 'argument':
+        case 'attribute':
+        case 'callback':
+        case 'dictionary':
+        case 'dict-member':
+        case 'enum':
+        case 'enum-value':
+        case 'exception':
+        case 'const':
+        case 'typedef':
+        case 'stringifier':
+        case 'serializer':
+        case 'iterator':
+        case 'maplike':
+        case 'setlike':
+        case 'extended-attribute':
+        case 'event':
+        case 'idl': return (text) => `{{${text}}}`;
+
+        case 'element-state':
+        case 'element-attr':
+        case 'attr-value':
+        case 'element': return (element) => `<{${element}}>`;
+
+        case 'grammar': return (text) => `${text} (within a <pre class=prod>)`;
+
+        case 'type': return (text)=> `<<${text}>>`;
+
+        case 'descriptor':
+        case 'property': return (text) => `'${text}'`;
+
+        default: return;
+    };
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!needsFor(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!refusesFor(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
 }
 </script>
 <script>/* Boilerplate: script-link-titles */
+"use strict";
+{
 let linkTitleData = {
- "#typedef-cubic-bezier-easing-function": "Expands to: cubic-bezier() | ease | ease-in | ease-in-out | ease-out",
- "#typedef-step-easing-function": "Expands to: step-end | step-start | steps()"
+"#typedef-cubic-bezier-easing-function": "Expands to: cubic-bezier() | ease | ease-in | ease-in-out | ease-out",
+"#typedef-step-easing-function": "Expands to: step-end | step-start | steps()",
 };
 
 function setTypeTitles() {
@@ -2308,33 +2314,14 @@ function setTypeTitles() {
 }
 
 document.addEventListener("DOMContentLoaded", setTypeTitles);
+}
 </script>
 <script>/* Boilerplate: script-position-annos */
 "use strict";
 {
-
 function repositionAnnoPanels(){
     const panels = [...document.querySelectorAll("[data-anno-for]")];
-    const main = document.querySelector("main");
-    let mainRect;
-    if(main) mainRect = main.getBoundingClientRect();
-    for(const panel of panels) {
-        const dfn = document.getElementById(panel.getAttribute("data-anno-for"));
-        if(!dfn) {
-            console.log("Can't find the annotation panel target:", panel);
-            continue;
-        }
-        const rect = dfn.getBoundingClientRect();
-        const top = window.scrollY + rect.top
-        panel.style.top = top + "px";
-        panel.top = top;
-        panel.height = rect.height;
-        panel.classList.remove("unpositioned");
-        const panelRect = panel.getBoundingClientRect()
-        if(main) {
-            panel.classList.toggle("overlapping-main", panelRect.left < mainRect.right)
-        }
-    }
+    hydratePanels(panels);
     let vSoFar = 0;
     for(const panel of panels.sort(cmpTops)) {
         if(panel.top < vSoFar) {
@@ -2342,6 +2329,39 @@ function repositionAnnoPanels(){
             panel.style.top = vSoFar + "px";
         }
         vSoFar = panel.top + panel.height + 15;
+    }
+}
+function hydratePanels(panels) {
+    const main = document.querySelector("main");
+    let mainRect;
+    if(main) mainRect = main.getBoundingClientRect();
+    // First display them all, if they're not already visible.
+    for(const panel of panels) {
+        panel.classList.remove("unpositioned");
+    }
+    // Measure them all
+    for(const panel of panels) {
+        const dfn = document.getElementById(panel.getAttribute("data-anno-for"));
+        if(!dfn) {
+            console.log("Can't find the annotation panel target:", panel);
+            continue;
+        }
+        panel.dfn = dfn;
+        panel.top = window.scrollY + dfn.getBoundingClientRect().top;
+        let panelRect = panel.getBoundingClientRect();
+        panel.height = panelRect.height;
+        if(main) {
+            panel.overlappingMain = panelRect.left < mainRect.right;
+        } else {
+            panel.overlappingMain = false;
+        }
+    }
+    // And finally position them
+    for(const panel of panels) {
+        const dfn = panel.dfn;
+        if(!dfn) continue;
+        panel.style.top = panel.top + "px";
+        panel.classList.toggle("overlapping-main", panel.overlappingMain);
     }
 }
 
@@ -2356,245 +2376,234 @@ window.addEventListener("resize", repositionAnnoPanels);
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
-                mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
+let refsData = {
+"#before-flag": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-easing","spec":"css-easing-1","status":"local","text":"before flag","type":"dfn","url":"#before-flag"},
+"#cubic-bzier-easing-function": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-easing","spec":"css-easing-1","status":"local","text":"cubic b\u00e9zier easing function","type":"dfn","url":"#cubic-bzier-easing-function"},
+"#easing-function": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-easing","spec":"css-easing-1","status":"local","text":"easing function","type":"dfn","url":"#easing-function"},
+"#funcdef-cubic-bezier-easing-function-cubic-bezier": {"export":true,"for_":["<cubic-bezier-easing-function>","cubic-bezier-easing-function"],"level":"1","normative":true,"shortname":"css-easing","spec":"css-easing-1","status":"local","text":"cubic-bezier()","type":"function","url":"#funcdef-cubic-bezier-easing-function-cubic-bezier"},
+"#funcdef-step-easing-function-steps": {"export":true,"for_":["<step-easing-function>","step-easing-function"],"level":"1","normative":true,"shortname":"css-easing","spec":"css-easing-1","status":"local","text":"steps()","type":"function","url":"#funcdef-step-easing-function-steps"},
+"#input-progress-value": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-easing","spec":"css-easing-1","status":"local","text":"input progress value","type":"dfn","url":"#input-progress-value"},
+"#linear-easing-function": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-easing","spec":"css-easing-1","status":"local","text":"linear easing function","type":"dfn","url":"#linear-easing-function"},
+"#output-progress-value": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-easing","spec":"css-easing-1","status":"local","text":"output progress value","type":"dfn","url":"#output-progress-value"},
+"#step-easing-function": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-easing","spec":"css-easing-1","status":"local","text":"step easing function","type":"dfn","url":"#step-easing-function"},
+"#step-position": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-easing","spec":"css-easing-1","status":"local","text":"step position","type":"dfn","url":"#step-position"},
+"#steps": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-easing","spec":"css-easing-1","status":"local","text":"steps","type":"dfn","url":"#steps"},
+"#typedef-cubic-bezier-easing-function": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-easing","spec":"css-easing-1","status":"local","text":"<cubic-bezier-easing-function>","type":"type","url":"#typedef-cubic-bezier-easing-function"},
+"#typedef-step-easing-function": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-easing","spec":"css-easing-1","status":"local","text":"<step-easing-function>","type":"type","url":"#typedef-step-easing-function"},
+"#typedef-step-position": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-easing","spec":"css-easing-1","status":"local","text":"<step-position>","type":"type","url":"#typedef-step-position"},
+"#valdef-cubic-bezier-easing-function-ease": {"export":true,"for_":["<cubic-bezier-easing-function>","cubic-bezier-easing-function"],"level":"1","normative":true,"shortname":"css-easing","spec":"css-easing-1","status":"local","text":"ease","type":"value","url":"#valdef-cubic-bezier-easing-function-ease"},
+"#valdef-cubic-bezier-easing-function-ease-in": {"export":true,"for_":["<cubic-bezier-easing-function>","cubic-bezier-easing-function"],"level":"1","normative":true,"shortname":"css-easing","spec":"css-easing-1","status":"local","text":"ease-in","type":"value","url":"#valdef-cubic-bezier-easing-function-ease-in"},
+"#valdef-cubic-bezier-easing-function-ease-in-out": {"export":true,"for_":["<cubic-bezier-easing-function>","cubic-bezier-easing-function"],"level":"1","normative":true,"shortname":"css-easing","spec":"css-easing-1","status":"local","text":"ease-in-out","type":"value","url":"#valdef-cubic-bezier-easing-function-ease-in-out"},
+"#valdef-cubic-bezier-easing-function-ease-out": {"export":true,"for_":["<cubic-bezier-easing-function>","cubic-bezier-easing-function"],"level":"1","normative":true,"shortname":"css-easing","spec":"css-easing-1","status":"local","text":"ease-out","type":"value","url":"#valdef-cubic-bezier-easing-function-ease-out"},
+"#valdef-easing-function-linear": {"export":true,"for_":["easing-function"],"level":"1","normative":true,"shortname":"css-easing","spec":"css-easing-1","status":"local","text":"linear","type":"value","url":"#valdef-easing-function-linear"},
+"#valdef-step-easing-function-step-end": {"export":true,"for_":["<step-easing-function>","step-easing-function"],"level":"1","normative":true,"shortname":"css-easing","spec":"css-easing-1","status":"local","text":"step-end","type":"value","url":"#valdef-step-easing-function-step-end"},
+"#valdef-step-easing-function-step-start": {"export":true,"for_":["<step-easing-function>","step-easing-function"],"level":"1","normative":true,"shortname":"css-easing","spec":"css-easing-1","status":"local","text":"step-start","type":"value","url":"#valdef-step-easing-function-step-start"},
+"#valdef-steps-end": {"export":true,"for_":["steps()"],"level":"1","normative":true,"shortname":"css-easing","spec":"css-easing-1","status":"local","text":"end","type":"value","url":"#valdef-steps-end"},
+"#valdef-steps-jump-both": {"export":true,"for_":["steps()"],"level":"1","normative":true,"shortname":"css-easing","spec":"css-easing-1","status":"local","text":"jump-both","type":"value","url":"#valdef-steps-jump-both"},
+"#valdef-steps-jump-end": {"export":true,"for_":["steps()"],"level":"1","normative":true,"shortname":"css-easing","spec":"css-easing-1","status":"local","text":"jump-end","type":"value","url":"#valdef-steps-jump-end"},
+"#valdef-steps-jump-none": {"export":true,"for_":["steps()"],"level":"1","normative":true,"shortname":"css-easing","spec":"css-easing-1","status":"local","text":"jump-none","type":"value","url":"#valdef-steps-jump-none"},
+"#valdef-steps-jump-start": {"export":true,"for_":["steps()"],"level":"1","normative":true,"shortname":"css-easing","spec":"css-easing-1","status":"local","text":"jump-start","type":"value","url":"#valdef-steps-jump-start"},
+"#valdef-steps-start": {"export":true,"for_":["steps()"],"level":"1","normative":true,"shortname":"css-easing","spec":"css-easing-1","status":"local","text":"start","type":"value","url":"#valdef-steps-start"},
+"https://drafts.csswg.org/css-values-4/#comb-comma": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":",","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-comma"},
+"https://drafts.csswg.org/css-values-4/#comb-one": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"|","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"https://drafts.csswg.org/css-values-4/#css-bracketed-range-notation": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"css bracketed range notation","type":"dfn","url":"https://drafts.csswg.org/css-values-4/#css-bracketed-range-notation"},
+"https://drafts.csswg.org/css-values-4/#integer-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<integer>","type":"type","url":"https://drafts.csswg.org/css-values-4/#integer-value"},
+"https://drafts.csswg.org/css-values-4/#mult-opt": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"?","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#mult-opt"},
+"https://drafts.csswg.org/css-values-4/#number-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<number>","type":"type","url":"https://drafts.csswg.org/css-values-4/#number-value"},
+};
+
+function mkRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "Term: "),
+                mk.span({}, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    let forListElements;
+    if(forList.length == 0) {
+        forListElements = [];
+    } else if(forList.length == 1) {
+        forListElements = mk.li({},
+            mk.b({}, "For: "),
+            mk.span({}, forList[0]),
+        );
+    } else {
+        forListElements = mk.li({},
             mk.b({}, "For: "),
             mk.ul({},
                 ...forList.map(forItem =>
                     mk.li({},
-                        mk.span({}, `${forItem}`)
+                        mk.span({}, forItem)
                     ),
                 ),
             ),
         );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+    }
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    setupRefHintEventListeners(link, hintPanel);
+    return hintPanel;
+}
+
+function hideAllRefHints() {
+    queryAll(".ref-hint").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    if(refHint.teardownEventListeners) {
+        refHint.teardownEventListeners();
     }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+    refHint.remove();
+}
+
+function showRefHint(link) {
+    if(link.classList.contains("dfn-link")) return;
+    const url = link.getAttribute("href");
+    const ref = refsData[url];
+    if(!ref) return;
+
+    hideAllRefHints(); // Only display one at this time.
+
+    const refHint = mkRefHint(link, ref);
+    append(document.body, refHint);
+    link.setAttribute("aria-expanded", "true");
+    positionRefHint(refHint);
+}
+
+function setupRefHintEventListeners(link, refHint) {
+    if (refHint.teardownEventListeners) return;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
+
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
-
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
-    }
-
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
-        }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
-
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
-    }
-
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+document.addEventListener("DOMContentLoaded", () => {
+    document.body.addEventListener("mouseover", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
+    });
+    document.body.addEventListener("focus", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
     });
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['#easing-function'] = {"text": "easing function", "type": "dfn", "spec": "css-easing-1", "shortname": "css-easing", "level": "1", "status": "local", "url": "#easing-function", "export": true, "normative": true, "for_": []};
-window.refsData['#input-progress-value'] = {"text": "input progress value", "type": "dfn", "spec": "css-easing-1", "shortname": "css-easing", "level": "1", "status": "local", "url": "#input-progress-value", "export": true, "normative": true, "for_": []};
-window.refsData['#output-progress-value'] = {"text": "output progress value", "type": "dfn", "spec": "css-easing-1", "shortname": "css-easing", "level": "1", "status": "local", "url": "#output-progress-value", "export": true, "normative": true, "for_": []};
-window.refsData['#before-flag'] = {"text": "before flag", "type": "dfn", "spec": "css-easing-1", "shortname": "css-easing", "level": "1", "status": "local", "url": "#before-flag", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-easing-function-linear'] = {"text": "linear", "type": "value", "spec": "css-easing-1", "shortname": "css-easing", "level": "1", "status": "local", "url": "#valdef-easing-function-linear", "export": true, "normative": true, "for_": ["easing-function"]};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-cubic-bezier-easing-function'] = {"text": "<cubic-bezier-easing-function>", "type": "type", "spec": "css-easing-1", "shortname": "css-easing", "level": "1", "status": "local", "url": "#typedef-cubic-bezier-easing-function", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-step-easing-function'] = {"text": "<step-easing-function>", "type": "type", "spec": "css-easing-1", "shortname": "css-easing", "level": "1", "status": "local", "url": "#typedef-step-easing-function", "export": true, "normative": true, "for_": []};
-window.refsData['#linear-easing-function'] = {"text": "linear easing function", "type": "dfn", "spec": "css-easing-1", "shortname": "css-easing", "level": "1", "status": "local", "url": "#linear-easing-function", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-cubic-bezier-easing-function-ease'] = {"text": "ease", "type": "value", "spec": "css-easing-1", "shortname": "css-easing", "level": "1", "status": "local", "url": "#valdef-cubic-bezier-easing-function-ease", "export": true, "normative": true, "for_": ["<cubic-bezier-easing-function>", "cubic-bezier-easing-function"]};
-window.refsData['#valdef-cubic-bezier-easing-function-ease-in'] = {"text": "ease-in", "type": "value", "spec": "css-easing-1", "shortname": "css-easing", "level": "1", "status": "local", "url": "#valdef-cubic-bezier-easing-function-ease-in", "export": true, "normative": true, "for_": ["<cubic-bezier-easing-function>", "cubic-bezier-easing-function"]};
-window.refsData['#valdef-cubic-bezier-easing-function-ease-out'] = {"text": "ease-out", "type": "value", "spec": "css-easing-1", "shortname": "css-easing", "level": "1", "status": "local", "url": "#valdef-cubic-bezier-easing-function-ease-out", "export": true, "normative": true, "for_": ["<cubic-bezier-easing-function>", "cubic-bezier-easing-function"]};
-window.refsData['#valdef-cubic-bezier-easing-function-ease-in-out'] = {"text": "ease-in-out", "type": "value", "spec": "css-easing-1", "shortname": "css-easing", "level": "1", "status": "local", "url": "#valdef-cubic-bezier-easing-function-ease-in-out", "export": true, "normative": true, "for_": ["<cubic-bezier-easing-function>", "cubic-bezier-easing-function"]};
-window.refsData['#funcdef-cubic-bezier-easing-function-cubic-bezier'] = {"text": "cubic-bezier()", "type": "function", "spec": "css-easing-1", "shortname": "css-easing", "level": "1", "status": "local", "url": "#funcdef-cubic-bezier-easing-function-cubic-bezier", "export": true, "normative": true, "for_": ["<cubic-bezier-easing-function>", "cubic-bezier-easing-function"]};
-window.refsData['#cubic-bzier-easing-function'] = {"text": "cubic b\u00e9zier easing function", "type": "dfn", "spec": "css-easing-1", "shortname": "css-easing", "level": "1", "status": "local", "url": "#cubic-bzier-easing-function", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#number-value'] = {"text": "<number>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#number-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-comma'] = {"text": ",", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-comma", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-step-easing-function-step-start'] = {"text": "step-start", "type": "value", "spec": "css-easing-1", "shortname": "css-easing", "level": "1", "status": "local", "url": "#valdef-step-easing-function-step-start", "export": true, "normative": true, "for_": ["<step-easing-function>", "step-easing-function"]};
-window.refsData['#valdef-step-easing-function-step-end'] = {"text": "step-end", "type": "value", "spec": "css-easing-1", "shortname": "css-easing", "level": "1", "status": "local", "url": "#valdef-step-easing-function-step-end", "export": true, "normative": true, "for_": ["<step-easing-function>", "step-easing-function"]};
-window.refsData['#funcdef-step-easing-function-steps'] = {"text": "steps()", "type": "function", "spec": "css-easing-1", "shortname": "css-easing", "level": "1", "status": "local", "url": "#funcdef-step-easing-function-steps", "export": true, "normative": true, "for_": ["<step-easing-function>", "step-easing-function"]};
-window.refsData['https://drafts.csswg.org/css-values-4/#integer-value'] = {"text": "<integer>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#integer-value", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-step-position'] = {"text": "<step-position>", "type": "type", "spec": "css-easing-1", "shortname": "css-easing", "level": "1", "status": "local", "url": "#typedef-step-position", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#mult-opt'] = {"text": "?", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-steps-jump-start'] = {"text": "jump-start", "type": "value", "spec": "css-easing-1", "shortname": "css-easing", "level": "1", "status": "local", "url": "#valdef-steps-jump-start", "export": true, "normative": true, "for_": ["steps()"]};
-window.refsData['#valdef-steps-jump-end'] = {"text": "jump-end", "type": "value", "spec": "css-easing-1", "shortname": "css-easing", "level": "1", "status": "local", "url": "#valdef-steps-jump-end", "export": true, "normative": true, "for_": ["steps()"]};
-window.refsData['#valdef-steps-jump-none'] = {"text": "jump-none", "type": "value", "spec": "css-easing-1", "shortname": "css-easing", "level": "1", "status": "local", "url": "#valdef-steps-jump-none", "export": true, "normative": true, "for_": ["steps()"]};
-window.refsData['#valdef-steps-jump-both'] = {"text": "jump-both", "type": "value", "spec": "css-easing-1", "shortname": "css-easing", "level": "1", "status": "local", "url": "#valdef-steps-jump-both", "export": true, "normative": true, "for_": ["steps()"]};
-window.refsData['#valdef-steps-start'] = {"text": "start", "type": "value", "spec": "css-easing-1", "shortname": "css-easing", "level": "1", "status": "local", "url": "#valdef-steps-start", "export": true, "normative": true, "for_": ["steps()"]};
-window.refsData['#valdef-steps-end'] = {"text": "end", "type": "value", "spec": "css-easing-1", "shortname": "css-easing", "level": "1", "status": "local", "url": "#valdef-steps-end", "export": true, "normative": true, "for_": ["steps()"]};
-window.refsData['#step-position'] = {"text": "step position", "type": "dfn", "spec": "css-easing-1", "shortname": "css-easing", "level": "1", "status": "local", "url": "#step-position", "export": true, "normative": true, "for_": []};
-window.refsData['#step-easing-function'] = {"text": "step easing function", "type": "dfn", "spec": "css-easing-1", "shortname": "css-easing", "level": "1", "status": "local", "url": "#step-easing-function", "export": true, "normative": true, "for_": []};
-window.refsData['#steps'] = {"text": "steps", "type": "dfn", "spec": "css-easing-1", "shortname": "css-easing", "level": "1", "status": "local", "url": "#steps", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#css-bracketed-range-notation'] = {"text": "css bracketed range notation", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-bracketed-range-notation", "export": true, "normative": true, "for_": []};
 </script>

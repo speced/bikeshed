@@ -623,46 +623,7 @@ def transformRailroad(lines: list[str], tagName: str, firstLine: str, lineNum: i
     from . import railroadparser
 
     ret = ["<div class='railroad'>"]
-    doc.extraStyles.set(
-        "railroad",
-        """
-    :root {
-        --railroad-bg: hsl(30, 20%, 95%);
-        --railroad-stroke: black;
-        --railroad-fill: hsl(120,100%,90%);
-    }
-    svg.railroad-diagram {
-        background-color: var(--railroad-bg);
-    }
-    svg.railroad-diagram path {
-        stroke-width:3px;
-        stroke: var(--railroad-stroke);
-        fill:transparent;
-    }
-    svg.railroad-diagram text {
-        font: bold 14px monospace;
-        fill: var(--text, currentcolor);
-        text-anchor:middle;
-    }
-    svg.railroad-diagram text.label {
-        text-anchor:start;
-    }
-    svg.railroad-diagram text.comment {
-        font:italic 12px monospace;
-    }
-    svg.railroad-diagram rect {
-        stroke-width:3px;
-        stroke: var(--railroad-stroke);
-        fill: var(--railroad-fill);
-    }""",
-        dark="""@media (prefers-color-scheme: dark) {
-        :root {
-            --railroad-bg: rgba(255, 255, 255, .05);
-            --railroad-stroke: #bbb;
-            --railroad-fill: hsla(240deg, 20%, 15%);
-        }
-    }""",
-    )
+    doc.extraJC.addRailroad()
     code = "".join(lines)
     diagram = railroadparser.parse(code)
     if diagram:

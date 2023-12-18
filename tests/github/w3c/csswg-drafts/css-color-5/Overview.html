@@ -80,7 +80,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -706,7 +705,7 @@ a[href].issue-return {
 }
 
 .ref-hint {
-    display: none;
+    display: inline-block;
     position: absolute;
     z-index: 35;
     width: 20em;
@@ -722,16 +721,11 @@ a[href].issue-return {
     white-space: normal; /* in case it's moved into a pre */
 }
 
-.ref-hint.on {
-    display: inline-block;
-}
-
 .ref-hint * { margin: 0; padding: 0; text-indent: 0; }
 
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -791,7 +785,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -848,7 +841,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -1974,445 +1966,8 @@ will be chosen to produce a single eventual solution. <a href="https://github.co
     </div>
    </div>
   </details>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['e10c8e34'] = {"dfnID": "e10c8e34", "url": "https://drafts.csswg.org/css-color-4/#typedef-hue", "dfnText": "<hue>", "refSections": [{"refs": [{"id": "ref-for-typedef-hue"}], "title": "5.2.2. Relative HSL colors"}, {"refs": [{"id": "ref-for-typedef-hue\u2460"}], "title": "5.2.3. Relative HWB colors"}, {"refs": [{"id": "ref-for-typedef-hue\u2461"}], "title": "5.2.5. Relative LCH colors"}], "external": true};
-window.dfnpanelData['f17eedd8'] = {"dfnID": "f17eedd8", "url": "https://drafts.csswg.org/css-color-4/#valdef-color-blue", "dfnText": "blue", "refSections": [{"refs": [{"id": "ref-for-valdef-color-blue"}], "title": "5.2. Relative color syntax"}], "external": true};
-window.dfnpanelData['c9ce3bd4'] = {"dfnID": "c9ce3bd4", "url": "https://drafts.csswg.org/css-color-4/#color-space", "dfnText": "color space", "refSections": [{"refs": [{"id": "ref-for-color-space"}], "title": "2. color spaces {#color spaces-section}"}, {"refs": [{"id": "ref-for-color-space\u2460"}, {"id": "ref-for-color-space\u2461"}], "title": "3. Mixing colors: the color-mix() function"}, {"refs": [{"id": "ref-for-color-space\u2462"}, {"id": "ref-for-color-space\u2463"}, {"id": "ref-for-color-space\u2464"}], "title": "5.1. Adjusting colors: the color-adjust function"}], "external": true};
-window.dfnpanelData['6416d648'] = {"dfnID": "6416d648", "url": "https://drafts.csswg.org/css-color-4/#valdef-color-darkolivegreen", "dfnText": "darkolivegreen", "refSections": [{"refs": [{"id": "ref-for-valdef-color-darkolivegreen"}], "title": "5.2. Relative color syntax"}], "external": true};
-window.dfnpanelData['b06bf874'] = {"dfnID": "b06bf874", "url": "https://drafts.csswg.org/css-color-4/#valdef-color-green", "dfnText": "green", "refSections": [{"refs": [{"id": "ref-for-valdef-color-green"}], "title": "5.2. Relative color syntax"}], "external": true};
-window.dfnpanelData['b673431e'] = {"dfnID": "b673431e", "url": "https://drafts.csswg.org/css-color-4/#valdef-lch-lch", "dfnText": "lch", "refSections": [{"refs": [{"id": "ref-for-valdef-lch-lch"}], "title": "2. color spaces {#color spaces-section}"}, {"refs": [{"id": "ref-for-valdef-lch-lch\u2460"}], "title": "3. Mixing colors: the color-mix() function"}, {"refs": [{"id": "ref-for-valdef-lch-lch\u2461"}], "title": "5.1. Adjusting colors: the color-adjust function"}], "external": true};
-window.dfnpanelData['82ed5c4b'] = {"dfnID": "82ed5c4b", "url": "https://drafts.csswg.org/css-color-4/#valdef-color-red", "dfnText": "red", "refSections": [{"refs": [{"id": "ref-for-valdef-color-red"}], "title": "5.2. Relative color syntax"}], "external": true};
-window.dfnpanelData['4f9cf36a'] = {"dfnID": "4f9cf36a", "url": "https://drafts.csswg.org/css-color-5/#typedef-alpha-value", "dfnText": "<alpha-value>", "refSections": [{"refs": [{"id": "ref-for-typedef-alpha-value"}, {"id": "ref-for-typedef-alpha-value\u2460"}, {"id": "ref-for-typedef-alpha-value\u2461"}], "title": "5.2.1. Relative RGB colors"}, {"refs": [{"id": "ref-for-typedef-alpha-value\u2462"}], "title": "5.2.2. Relative HSL colors"}, {"refs": [{"id": "ref-for-typedef-alpha-value\u2463"}], "title": "5.2.3. Relative HWB colors"}, {"refs": [{"id": "ref-for-typedef-alpha-value\u2464"}], "title": "5.2.4. Relative Lab colors"}, {"refs": [{"id": "ref-for-typedef-alpha-value\u2465"}], "title": "5.2.5. Relative LCH colors"}], "external": true};
-window.dfnpanelData['1548047a'] = {"dfnID": "1548047a", "url": "https://drafts.csswg.org/css-color-5/#typedef-color", "dfnText": "<color>", "refSections": [{"refs": [{"id": "ref-for-typedef-color"}, {"id": "ref-for-typedef-color\u2460"}], "title": "3. Mixing colors: the color-mix() function"}, {"refs": [{"id": "ref-for-typedef-color\u2461"}, {"id": "ref-for-typedef-color\u2462"}], "title": "4. Selecting the most contrasting color: the color-contrast() function"}, {"refs": [{"id": "ref-for-typedef-color\u2463"}, {"id": "ref-for-typedef-color\u2464"}], "title": "5.1. Adjusting colors: the color-adjust function"}, {"refs": [{"id": "ref-for-typedef-color\u2465"}], "title": "5.2.1. Relative RGB colors"}, {"refs": [{"id": "ref-for-typedef-color\u2466"}], "title": "5.2.2. Relative HSL colors"}, {"refs": [{"id": "ref-for-typedef-color\u2467"}], "title": "5.2.3. Relative HWB colors"}, {"refs": [{"id": "ref-for-typedef-color\u2468"}], "title": "5.2.4. Relative Lab colors"}, {"refs": [{"id": "ref-for-typedef-color\u2460\u24ea"}], "title": "5.2.5. Relative LCH colors"}], "external": true};
-window.dfnpanelData['03eee7b4'] = {"dfnID": "03eee7b4", "url": "https://drafts.csswg.org/css-color-5/#funcdef-color", "dfnText": "color()", "refSections": [{"refs": [{"id": "ref-for-funcdef-color"}], "title": "5.2. Relative color syntax"}], "external": true};
-window.dfnpanelData['68487d22'] = {"dfnID": "68487d22", "url": "https://drafts.csswg.org/css-values-4/#mult-comma", "dfnText": "#", "refSections": [{"refs": [{"id": "ref-for-mult-comma"}], "title": "3. Mixing colors: the color-mix() function"}, {"refs": [{"id": "ref-for-mult-comma\u2460"}], "title": "4. Selecting the most contrasting color: the color-contrast() function"}], "external": true};
-window.dfnpanelData['f0809abc'] = {"dfnID": "f0809abc", "url": "https://drafts.csswg.org/css-values-4/#comb-all", "dfnText": "&&", "refSections": [{"refs": [{"id": "ref-for-comb-all"}], "title": "3. Mixing colors: the color-mix() function"}, {"refs": [{"id": "ref-for-comb-all\u2460"}], "title": "5.1. Adjusting colors: the color-adjust function"}], "external": true};
-window.dfnpanelData['9f9120ff'] = {"dfnID": "9f9120ff", "url": "https://drafts.csswg.org/css-values-4/#comb-comma", "dfnText": ",", "refSections": [{"refs": [{"id": "ref-for-comb-comma"}], "title": "3. Mixing colors: the color-mix() function"}], "external": true};
-window.dfnpanelData['3559c926'] = {"dfnID": "3559c926", "url": "https://drafts.csswg.org/css-values-4/#angle-value", "dfnText": "<angle>", "refSections": [{"refs": [{"id": "ref-for-angle-value"}], "title": "5.2.2. Relative HSL colors"}, {"refs": [{"id": "ref-for-angle-value\u2460"}], "title": "5.2.3. Relative HWB colors"}, {"refs": [{"id": "ref-for-angle-value\u2461"}], "title": "5.2.5. Relative LCH colors"}], "external": true};
-window.dfnpanelData['16310992'] = {"dfnID": "16310992", "url": "https://drafts.csswg.org/css-values-4/#number-value", "dfnText": "<number>", "refSections": [{"refs": [{"id": "ref-for-number-value"}], "title": "4. Selecting the most contrasting color: the color-contrast() function"}, {"refs": [{"id": "ref-for-number-value\u2460"}, {"id": "ref-for-number-value\u2461"}], "title": "5.2.1. Relative RGB colors"}, {"refs": [{"id": "ref-for-number-value\u2462"}, {"id": "ref-for-number-value\u2463"}, {"id": "ref-for-number-value\u2464"}], "title": "5.2.4. Relative Lab colors"}, {"refs": [{"id": "ref-for-number-value\u2465"}, {"id": "ref-for-number-value\u2466"}], "title": "5.2.5. Relative LCH colors"}], "external": true};
-window.dfnpanelData['15f5b381'] = {"dfnID": "15f5b381", "url": "https://drafts.csswg.org/css-values-4/#percentage-value", "dfnText": "<percentage>", "refSections": [{"refs": [{"id": "ref-for-percentage-value"}], "title": "3. Mixing colors: the color-mix() function"}, {"refs": [{"id": "ref-for-percentage-value\u2460"}], "title": "5.1. Adjusting colors: the color-adjust function"}, {"refs": [{"id": "ref-for-percentage-value\u2461"}, {"id": "ref-for-percentage-value\u2462"}, {"id": "ref-for-percentage-value\u2463"}, {"id": "ref-for-percentage-value\u2464"}], "title": "5.2.1. Relative RGB colors"}, {"refs": [{"id": "ref-for-percentage-value\u2465"}, {"id": "ref-for-percentage-value\u2466"}, {"id": "ref-for-percentage-value\u2467"}, {"id": "ref-for-percentage-value\u2468"}], "title": "5.2.2. Relative HSL colors"}, {"refs": [{"id": "ref-for-percentage-value\u2460\u24ea"}, {"id": "ref-for-percentage-value\u2460\u2460"}, {"id": "ref-for-percentage-value\u2460\u2461"}, {"id": "ref-for-percentage-value\u2460\u2462"}], "title": "5.2.3. Relative HWB colors"}, {"refs": [{"id": "ref-for-percentage-value\u2460\u2463"}, {"id": "ref-for-percentage-value\u2460\u2464"}, {"id": "ref-for-percentage-value\u2460\u2465"}], "title": "5.2.4. Relative Lab colors"}, {"refs": [{"id": "ref-for-percentage-value\u2460\u2466"}, {"id": "ref-for-percentage-value\u2460\u2467"}, {"id": "ref-for-percentage-value\u2460\u2468"}], "title": "5.2.5. Relative LCH colors"}], "external": true};
-window.dfnpanelData['537cf076'] = {"dfnID": "537cf076", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "dfnText": "?", "refSections": [{"refs": [{"id": "ref-for-mult-opt"}], "title": "3. Mixing colors: the color-mix() function"}, {"refs": [{"id": "ref-for-mult-opt\u2460"}], "title": "4. Selecting the most contrasting color: the color-contrast() function"}, {"refs": [{"id": "ref-for-mult-opt\u2461"}, {"id": "ref-for-mult-opt\u2462"}, {"id": "ref-for-mult-opt\u2463"}, {"id": "ref-for-mult-opt\u2464"}], "title": "5.1. Adjusting colors: the color-adjust function"}, {"refs": [{"id": "ref-for-mult-opt\u2465"}, {"id": "ref-for-mult-opt\u2466"}, {"id": "ref-for-mult-opt\u2467"}, {"id": "ref-for-mult-opt\u2468"}], "title": "5.2.1. Relative RGB colors"}, {"refs": [{"id": "ref-for-mult-opt\u2460\u24ea"}, {"id": "ref-for-mult-opt\u2460\u2460"}], "title": "5.2.2. Relative HSL colors"}, {"refs": [{"id": "ref-for-mult-opt\u2460\u2461"}, {"id": "ref-for-mult-opt\u2460\u2462"}], "title": "5.2.3. Relative HWB colors"}, {"refs": [{"id": "ref-for-mult-opt\u2460\u2463"}, {"id": "ref-for-mult-opt\u2460\u2464"}], "title": "5.2.4. Relative Lab colors"}, {"refs": [{"id": "ref-for-mult-opt\u2460\u2465"}, {"id": "ref-for-mult-opt\u2460\u2466"}], "title": "5.2.5. Relative LCH colors"}], "external": true};
-window.dfnpanelData['2a26d53d'] = {"dfnID": "2a26d53d", "url": "https://drafts.csswg.org/css-values-4/#math-function", "dfnText": "math function", "refSections": [{"refs": [{"id": "ref-for-math-function"}, {"id": "ref-for-math-function\u2460"}, {"id": "ref-for-math-function\u2461"}], "title": "5.2. Relative color syntax"}], "external": true};
-window.dfnpanelData['b0d8ebd9'] = {"dfnID": "b0d8ebd9", "url": "https://drafts.csswg.org/css-values-4/#mult-num", "dfnText": "{a}", "refSections": [{"refs": [{"id": "ref-for-mult-num"}, {"id": "ref-for-mult-num\u2460"}, {"id": "ref-for-mult-num\u2461"}], "title": "5.2.1. Relative RGB colors"}], "external": true};
-window.dfnpanelData['6ec67710'] = {"dfnID": "6ec67710", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "dfnText": "|", "refSections": [{"refs": [{"id": "ref-for-comb-one"}, {"id": "ref-for-comb-one\u2460"}, {"id": "ref-for-comb-one\u2461"}, {"id": "ref-for-comb-one\u2462"}, {"id": "ref-for-comb-one\u2463"}], "title": "2. color spaces {#color spaces-section}"}, {"refs": [{"id": "ref-for-comb-one\u2464"}, {"id": "ref-for-comb-one\u2465"}], "title": "4. Selecting the most contrasting color: the color-contrast() function"}, {"refs": [{"id": "ref-for-comb-one\u2466"}, {"id": "ref-for-comb-one\u2467"}, {"id": "ref-for-comb-one\u2468"}, {"id": "ref-for-comb-one\u2460\u24ea"}, {"id": "ref-for-comb-one\u2460\u2460"}, {"id": "ref-for-comb-one\u2460\u2461"}, {"id": "ref-for-comb-one\u2460\u2462"}, {"id": "ref-for-comb-one\u2460\u2463"}, {"id": "ref-for-comb-one\u2460\u2464"}, {"id": "ref-for-comb-one\u2460\u2465"}, {"id": "ref-for-comb-one\u2460\u2466"}, {"id": "ref-for-comb-one\u2460\u2467"}, {"id": "ref-for-comb-one\u2460\u2468"}, {"id": "ref-for-comb-one\u2461\u24ea"}, {"id": "ref-for-comb-one\u2461\u2460"}, {"id": "ref-for-comb-one\u2461\u2461"}, {"id": "ref-for-comb-one\u2461\u2462"}, {"id": "ref-for-comb-one\u2461\u2463"}, {"id": "ref-for-comb-one\u2461\u2464"}, {"id": "ref-for-comb-one\u2461\u2465"}, {"id": "ref-for-comb-one\u2461\u2466"}, {"id": "ref-for-comb-one\u2461\u2467"}], "title": "5.1. Adjusting colors: the color-adjust function"}, {"refs": [{"id": "ref-for-comb-one\u2461\u2468"}, {"id": "ref-for-comb-one\u2462\u24ea"}, {"id": "ref-for-comb-one\u2462\u2460"}], "title": "5.2.1. Relative RGB colors"}], "external": true};
-window.dfnpanelData['funcdef-color-mix'] = {"dfnID": "funcdef-color-mix", "url": "#funcdef-color-mix", "dfnText": "color-mix()", "refSections": [{"refs": [{"id": "ref-for-funcdef-color-mix"}], "title": "1. Introduction"}, {"refs": [{"id": "ref-for-funcdef-color-mix\u2460"}], "title": "3. Mixing colors: the color-mix() function"}], "external": false};
-window.dfnpanelData['funcdef-color-contrast'] = {"dfnID": "funcdef-color-contrast", "url": "#funcdef-color-contrast", "dfnText": "color-contrast()", "refSections": [{"refs": [{"id": "ref-for-funcdef-color-contrast"}], "title": "1. Introduction"}, {"refs": [{"id": "ref-for-funcdef-color-contrast\u2460"}], "title": "4. Selecting the most contrasting color: the color-contrast() function"}], "external": false};
-window.dfnpanelData['typedef-color-adjuster'] = {"dfnID": "typedef-color-adjuster", "url": "#typedef-color-adjuster", "dfnText": "<color-adjuster>", "refSections": [{"refs": [{"id": "ref-for-typedef-color-adjuster"}], "title": "5.1. Adjusting colors: the color-adjust function"}], "external": false};
-window.dfnpanelData['typedef-srgb-adjuster'] = {"dfnID": "typedef-srgb-adjuster", "url": "#typedef-srgb-adjuster", "dfnText": "<srgb-adjuster>", "refSections": [{"refs": [{"id": "ref-for-typedef-srgb-adjuster"}], "title": "5.1. Adjusting colors: the color-adjust function"}], "external": false};
-window.dfnpanelData['typedef-hsl-adjuster'] = {"dfnID": "typedef-hsl-adjuster", "url": "#typedef-hsl-adjuster", "dfnText": "<hsl-adjuster>", "refSections": [{"refs": [{"id": "ref-for-typedef-hsl-adjuster"}], "title": "5.1. Adjusting colors: the color-adjust function"}], "external": false};
-window.dfnpanelData['typedef-hwb-adjuster'] = {"dfnID": "typedef-hwb-adjuster", "url": "#typedef-hwb-adjuster", "dfnText": "<hwb-adjuster>", "refSections": [{"refs": [{"id": "ref-for-typedef-hwb-adjuster"}], "title": "5.1. Adjusting colors: the color-adjust function"}], "external": false};
-window.dfnpanelData['typedef-xyz-adjuster'] = {"dfnID": "typedef-xyz-adjuster", "url": "#typedef-xyz-adjuster", "dfnText": "<xyz-adjuster>", "refSections": [{"refs": [{"id": "ref-for-typedef-xyz-adjuster"}], "title": "5.1. Adjusting colors: the color-adjust function"}], "external": false};
-window.dfnpanelData['typedef-lab-adjuster'] = {"dfnID": "typedef-lab-adjuster", "url": "#typedef-lab-adjuster", "dfnText": "<lab-adjuster>", "refSections": [{"refs": [{"id": "ref-for-typedef-lab-adjuster"}], "title": "5.1. Adjusting colors: the color-adjust function"}], "external": false};
-window.dfnpanelData['typedef-lch-adjuster'] = {"dfnID": "typedef-lch-adjuster", "url": "#typedef-lch-adjuster", "dfnText": "<lch-adjuster>", "refSections": [{"refs": [{"id": "ref-for-typedef-lch-adjuster"}], "title": "5.1. Adjusting colors: the color-adjust function"}], "external": false};
-window.dfnpanelData['typedef-hue-adjuster'] = {"dfnID": "typedef-hue-adjuster", "url": "#typedef-hue-adjuster", "dfnText": "<hue-adjuster>", "refSections": [{"refs": [{"id": "ref-for-typedef-hue-adjuster"}, {"id": "ref-for-typedef-hue-adjuster\u2460"}, {"id": "ref-for-typedef-hue-adjuster\u2461"}], "title": "5.1. Adjusting colors: the color-adjust function"}], "external": false};
-window.dfnpanelData['relative-color'] = {"dfnID": "relative-color", "url": "#relative-color", "dfnText": "relative color", "refSections": [{"refs": [{"id": "ref-for-relative-color"}, {"id": "ref-for-relative-color\u2460"}, {"id": "ref-for-relative-color\u2461"}], "title": "5.2. Relative color syntax"}, {"refs": [{"id": "ref-for-relative-color\u2462"}], "title": "5.2.1. Relative RGB colors"}, {"refs": [{"id": "ref-for-relative-color\u2463"}], "title": "5.2.2. Relative HSL colors"}, {"refs": [{"id": "ref-for-relative-color\u2464"}], "title": "5.2.3. Relative HWB colors"}, {"refs": [{"id": "ref-for-relative-color\u2465"}], "title": "5.2.4. Relative Lab colors"}, {"refs": [{"id": "ref-for-relative-color\u2466"}], "title": "5.2.5. Relative LCH colors"}], "external": false};
-window.dfnpanelData['origin-color'] = {"dfnID": "origin-color", "url": "#origin-color", "dfnText": "origin color", "refSections": [{"refs": [{"id": "ref-for-origin-color"}, {"id": "ref-for-origin-color\u2460"}, {"id": "ref-for-origin-color\u2461"}, {"id": "ref-for-origin-color\u2462"}, {"id": "ref-for-origin-color\u2463"}, {"id": "ref-for-origin-color\u2464"}, {"id": "ref-for-origin-color\u2465"}, {"id": "ref-for-origin-color\u2466"}, {"id": "ref-for-origin-color\u2467"}, {"id": "ref-for-origin-color\u2468"}, {"id": "ref-for-origin-color\u2460\u24ea"}, {"id": "ref-for-origin-color\u2460\u2460"}], "title": "5.2. Relative color syntax"}, {"refs": [{"id": "ref-for-origin-color\u2460\u2461"}, {"id": "ref-for-origin-color\u2460\u2462"}], "title": "5.2.1. Relative RGB colors"}, {"refs": [{"id": "ref-for-origin-color\u2460\u2463"}, {"id": "ref-for-origin-color\u2460\u2464"}, {"id": "ref-for-origin-color\u2460\u2465"}], "title": "5.2.2. Relative HSL colors"}, {"refs": [{"id": "ref-for-origin-color\u2460\u2466"}, {"id": "ref-for-origin-color\u2460\u2467"}, {"id": "ref-for-origin-color\u2460\u2468"}], "title": "5.2.3. Relative HWB colors"}, {"refs": [{"id": "ref-for-origin-color\u2461\u24ea"}, {"id": "ref-for-origin-color\u2461\u2460"}, {"id": "ref-for-origin-color\u2461\u2461"}], "title": "5.2.4. Relative Lab colors"}, {"refs": [{"id": "ref-for-origin-color\u2461\u2462"}, {"id": "ref-for-origin-color\u2461\u2463"}, {"id": "ref-for-origin-color\u2461\u2464"}, {"id": "ref-for-origin-color\u2461\u2465"}], "title": "5.2.5. Relative LCH colors"}], "external": false};
-window.dfnpanelData['channel-keyword'] = {"dfnID": "channel-keyword", "url": "#channel-keyword", "dfnText": "channel keyword", "refSections": [{"refs": [{"id": "ref-for-channel-keyword"}, {"id": "ref-for-channel-keyword\u2460"}], "title": "5.2. Relative color syntax"}, {"refs": [{"id": "ref-for-channel-keyword\u2461"}], "title": "5.2.1. Relative RGB colors"}, {"refs": [{"id": "ref-for-channel-keyword\u2462"}], "title": "5.2.2. Relative HSL colors"}, {"refs": [{"id": "ref-for-channel-keyword\u2463"}], "title": "5.2.3. Relative HWB colors"}, {"refs": [{"id": "ref-for-channel-keyword\u2464"}], "title": "5.2.4. Relative Lab colors"}, {"refs": [{"id": "ref-for-channel-keyword\u2465"}], "title": "5.2.5. Relative LCH colors"}], "external": false};
-window.dfnpanelData['funcdef-rgb'] = {"dfnID": "funcdef-rgb", "url": "#funcdef-rgb", "dfnText": "rgb()", "refSections": [{"refs": [{"id": "ref-for-funcdef-rgb"}, {"id": "ref-for-funcdef-rgb\u2460"}], "title": "5.2.1. Relative RGB colors"}], "external": false};
-window.dfnpanelData['funcdef-hsl'] = {"dfnID": "funcdef-hsl", "url": "#funcdef-hsl", "dfnText": "hsl()", "refSections": [{"refs": [{"id": "ref-for-funcdef-hsl"}, {"id": "ref-for-funcdef-hsl\u2460"}], "title": "5.2.2. Relative HSL colors"}], "external": false};
-window.dfnpanelData['funcdef-hwb'] = {"dfnID": "funcdef-hwb", "url": "#funcdef-hwb", "dfnText": "hwb()", "refSections": [{"refs": [{"id": "ref-for-funcdef-hwb"}, {"id": "ref-for-funcdef-hwb\u2460"}], "title": "5.2.3. Relative HWB colors"}], "external": false};
-window.dfnpanelData['funcdef-lab'] = {"dfnID": "funcdef-lab", "url": "#funcdef-lab", "dfnText": "lab()", "refSections": [{"refs": [{"id": "ref-for-funcdef-lab"}, {"id": "ref-for-funcdef-lab\u2460"}], "title": "5.2.4. Relative Lab colors"}], "external": false};
-window.dfnpanelData['funcdef-lch'] = {"dfnID": "funcdef-lch", "url": "#funcdef-lch", "dfnText": "lch()", "refSections": [{"refs": [{"id": "ref-for-funcdef-lch"}], "title": "3. Mixing colors: the color-mix() function"}, {"refs": [{"id": "ref-for-funcdef-lch\u2460"}], "title": "5.1. Adjusting colors: the color-adjust function"}, {"refs": [{"id": "ref-for-funcdef-lch\u2461"}, {"id": "ref-for-funcdef-lch\u2462"}], "title": "5.2. Relative color syntax"}, {"refs": [{"id": "ref-for-funcdef-lch\u2463"}, {"id": "ref-for-funcdef-lch\u2464"}], "title": "5.2.5. Relative LCH colors"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -2606,11 +2161,462 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"03eee7b4": {"dfnID":"03eee7b4","dfnText":"color()","external":true,"refSections":[{"refs":[{"id":"ref-for-funcdef-color"}],"title":"5.2. Relative color syntax"}],"url":"https://drafts.csswg.org/css-color-5/#funcdef-color"},
+"1548047a": {"dfnID":"1548047a","dfnText":"<color>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-color"},{"id":"ref-for-typedef-color\u2460"}],"title":"3. Mixing colors: the color-mix() function"},{"refs":[{"id":"ref-for-typedef-color\u2461"},{"id":"ref-for-typedef-color\u2462"}],"title":"4. Selecting the most contrasting color: the color-contrast() function"},{"refs":[{"id":"ref-for-typedef-color\u2463"},{"id":"ref-for-typedef-color\u2464"}],"title":"5.1. Adjusting colors: the color-adjust function"},{"refs":[{"id":"ref-for-typedef-color\u2465"}],"title":"5.2.1. Relative RGB colors"},{"refs":[{"id":"ref-for-typedef-color\u2466"}],"title":"5.2.2. Relative HSL colors"},{"refs":[{"id":"ref-for-typedef-color\u2467"}],"title":"5.2.3. Relative HWB colors"},{"refs":[{"id":"ref-for-typedef-color\u2468"}],"title":"5.2.4. Relative Lab colors"},{"refs":[{"id":"ref-for-typedef-color\u2460\u24ea"}],"title":"5.2.5. Relative LCH colors"}],"url":"https://drafts.csswg.org/css-color-5/#typedef-color"},
+"15f5b381": {"dfnID":"15f5b381","dfnText":"<percentage>","external":true,"refSections":[{"refs":[{"id":"ref-for-percentage-value"}],"title":"3. Mixing colors: the color-mix() function"},{"refs":[{"id":"ref-for-percentage-value\u2460"}],"title":"5.1. Adjusting colors: the color-adjust function"},{"refs":[{"id":"ref-for-percentage-value\u2461"},{"id":"ref-for-percentage-value\u2462"},{"id":"ref-for-percentage-value\u2463"},{"id":"ref-for-percentage-value\u2464"}],"title":"5.2.1. Relative RGB colors"},{"refs":[{"id":"ref-for-percentage-value\u2465"},{"id":"ref-for-percentage-value\u2466"},{"id":"ref-for-percentage-value\u2467"},{"id":"ref-for-percentage-value\u2468"}],"title":"5.2.2. Relative HSL colors"},{"refs":[{"id":"ref-for-percentage-value\u2460\u24ea"},{"id":"ref-for-percentage-value\u2460\u2460"},{"id":"ref-for-percentage-value\u2460\u2461"},{"id":"ref-for-percentage-value\u2460\u2462"}],"title":"5.2.3. Relative HWB colors"},{"refs":[{"id":"ref-for-percentage-value\u2460\u2463"},{"id":"ref-for-percentage-value\u2460\u2464"},{"id":"ref-for-percentage-value\u2460\u2465"}],"title":"5.2.4. Relative Lab colors"},{"refs":[{"id":"ref-for-percentage-value\u2460\u2466"},{"id":"ref-for-percentage-value\u2460\u2467"},{"id":"ref-for-percentage-value\u2460\u2468"}],"title":"5.2.5. Relative LCH colors"}],"url":"https://drafts.csswg.org/css-values-4/#percentage-value"},
+"16310992": {"dfnID":"16310992","dfnText":"<number>","external":true,"refSections":[{"refs":[{"id":"ref-for-number-value"}],"title":"4. Selecting the most contrasting color: the color-contrast() function"},{"refs":[{"id":"ref-for-number-value\u2460"},{"id":"ref-for-number-value\u2461"}],"title":"5.2.1. Relative RGB colors"},{"refs":[{"id":"ref-for-number-value\u2462"},{"id":"ref-for-number-value\u2463"},{"id":"ref-for-number-value\u2464"}],"title":"5.2.4. Relative Lab colors"},{"refs":[{"id":"ref-for-number-value\u2465"},{"id":"ref-for-number-value\u2466"}],"title":"5.2.5. Relative LCH colors"}],"url":"https://drafts.csswg.org/css-values-4/#number-value"},
+"2a26d53d": {"dfnID":"2a26d53d","dfnText":"math function","external":true,"refSections":[{"refs":[{"id":"ref-for-math-function"},{"id":"ref-for-math-function\u2460"},{"id":"ref-for-math-function\u2461"}],"title":"5.2. Relative color syntax"}],"url":"https://drafts.csswg.org/css-values-4/#math-function"},
+"3559c926": {"dfnID":"3559c926","dfnText":"<angle>","external":true,"refSections":[{"refs":[{"id":"ref-for-angle-value"}],"title":"5.2.2. Relative HSL colors"},{"refs":[{"id":"ref-for-angle-value\u2460"}],"title":"5.2.3. Relative HWB colors"},{"refs":[{"id":"ref-for-angle-value\u2461"}],"title":"5.2.5. Relative LCH colors"}],"url":"https://drafts.csswg.org/css-values-4/#angle-value"},
+"4f9cf36a": {"dfnID":"4f9cf36a","dfnText":"<alpha-value>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-alpha-value"},{"id":"ref-for-typedef-alpha-value\u2460"},{"id":"ref-for-typedef-alpha-value\u2461"}],"title":"5.2.1. Relative RGB colors"},{"refs":[{"id":"ref-for-typedef-alpha-value\u2462"}],"title":"5.2.2. Relative HSL colors"},{"refs":[{"id":"ref-for-typedef-alpha-value\u2463"}],"title":"5.2.3. Relative HWB colors"},{"refs":[{"id":"ref-for-typedef-alpha-value\u2464"}],"title":"5.2.4. Relative Lab colors"},{"refs":[{"id":"ref-for-typedef-alpha-value\u2465"}],"title":"5.2.5. Relative LCH colors"}],"url":"https://drafts.csswg.org/css-color-5/#typedef-alpha-value"},
+"537cf076": {"dfnID":"537cf076","dfnText":"?","external":true,"refSections":[{"refs":[{"id":"ref-for-mult-opt"}],"title":"3. Mixing colors: the color-mix() function"},{"refs":[{"id":"ref-for-mult-opt\u2460"}],"title":"4. Selecting the most contrasting color: the color-contrast() function"},{"refs":[{"id":"ref-for-mult-opt\u2461"},{"id":"ref-for-mult-opt\u2462"},{"id":"ref-for-mult-opt\u2463"},{"id":"ref-for-mult-opt\u2464"}],"title":"5.1. Adjusting colors: the color-adjust function"},{"refs":[{"id":"ref-for-mult-opt\u2465"},{"id":"ref-for-mult-opt\u2466"},{"id":"ref-for-mult-opt\u2467"},{"id":"ref-for-mult-opt\u2468"}],"title":"5.2.1. Relative RGB colors"},{"refs":[{"id":"ref-for-mult-opt\u2460\u24ea"},{"id":"ref-for-mult-opt\u2460\u2460"}],"title":"5.2.2. Relative HSL colors"},{"refs":[{"id":"ref-for-mult-opt\u2460\u2461"},{"id":"ref-for-mult-opt\u2460\u2462"}],"title":"5.2.3. Relative HWB colors"},{"refs":[{"id":"ref-for-mult-opt\u2460\u2463"},{"id":"ref-for-mult-opt\u2460\u2464"}],"title":"5.2.4. Relative Lab colors"},{"refs":[{"id":"ref-for-mult-opt\u2460\u2465"},{"id":"ref-for-mult-opt\u2460\u2466"}],"title":"5.2.5. Relative LCH colors"}],"url":"https://drafts.csswg.org/css-values-4/#mult-opt"},
+"6416d648": {"dfnID":"6416d648","dfnText":"darkolivegreen","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-color-darkolivegreen"}],"title":"5.2. Relative color syntax"}],"url":"https://drafts.csswg.org/css-color-4/#valdef-color-darkolivegreen"},
+"68487d22": {"dfnID":"68487d22","dfnText":"#","external":true,"refSections":[{"refs":[{"id":"ref-for-mult-comma"}],"title":"3. Mixing colors: the color-mix() function"},{"refs":[{"id":"ref-for-mult-comma\u2460"}],"title":"4. Selecting the most contrasting color: the color-contrast() function"}],"url":"https://drafts.csswg.org/css-values-4/#mult-comma"},
+"6ec67710": {"dfnID":"6ec67710","dfnText":"|","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-one"},{"id":"ref-for-comb-one\u2460"},{"id":"ref-for-comb-one\u2461"},{"id":"ref-for-comb-one\u2462"},{"id":"ref-for-comb-one\u2463"}],"title":"2. color spaces {#color spaces-section}"},{"refs":[{"id":"ref-for-comb-one\u2464"},{"id":"ref-for-comb-one\u2465"}],"title":"4. Selecting the most contrasting color: the color-contrast() function"},{"refs":[{"id":"ref-for-comb-one\u2466"},{"id":"ref-for-comb-one\u2467"},{"id":"ref-for-comb-one\u2468"},{"id":"ref-for-comb-one\u2460\u24ea"},{"id":"ref-for-comb-one\u2460\u2460"},{"id":"ref-for-comb-one\u2460\u2461"},{"id":"ref-for-comb-one\u2460\u2462"},{"id":"ref-for-comb-one\u2460\u2463"},{"id":"ref-for-comb-one\u2460\u2464"},{"id":"ref-for-comb-one\u2460\u2465"},{"id":"ref-for-comb-one\u2460\u2466"},{"id":"ref-for-comb-one\u2460\u2467"},{"id":"ref-for-comb-one\u2460\u2468"},{"id":"ref-for-comb-one\u2461\u24ea"},{"id":"ref-for-comb-one\u2461\u2460"},{"id":"ref-for-comb-one\u2461\u2461"},{"id":"ref-for-comb-one\u2461\u2462"},{"id":"ref-for-comb-one\u2461\u2463"},{"id":"ref-for-comb-one\u2461\u2464"},{"id":"ref-for-comb-one\u2461\u2465"},{"id":"ref-for-comb-one\u2461\u2466"},{"id":"ref-for-comb-one\u2461\u2467"}],"title":"5.1. Adjusting colors: the color-adjust function"},{"refs":[{"id":"ref-for-comb-one\u2461\u2468"},{"id":"ref-for-comb-one\u2462\u24ea"},{"id":"ref-for-comb-one\u2462\u2460"}],"title":"5.2.1. Relative RGB colors"}],"url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"82ed5c4b": {"dfnID":"82ed5c4b","dfnText":"red","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-color-red"}],"title":"5.2. Relative color syntax"}],"url":"https://drafts.csswg.org/css-color-4/#valdef-color-red"},
+"9f9120ff": {"dfnID":"9f9120ff","dfnText":",","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-comma"}],"title":"3. Mixing colors: the color-mix() function"}],"url":"https://drafts.csswg.org/css-values-4/#comb-comma"},
+"b06bf874": {"dfnID":"b06bf874","dfnText":"green","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-color-green"}],"title":"5.2. Relative color syntax"}],"url":"https://drafts.csswg.org/css-color-4/#valdef-color-green"},
+"b0d8ebd9": {"dfnID":"b0d8ebd9","dfnText":"{a}","external":true,"refSections":[{"refs":[{"id":"ref-for-mult-num"},{"id":"ref-for-mult-num\u2460"},{"id":"ref-for-mult-num\u2461"}],"title":"5.2.1. Relative RGB colors"}],"url":"https://drafts.csswg.org/css-values-4/#mult-num"},
+"b673431e": {"dfnID":"b673431e","dfnText":"lch","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-lch-lch"}],"title":"2. color spaces {#color spaces-section}"},{"refs":[{"id":"ref-for-valdef-lch-lch\u2460"}],"title":"3. Mixing colors: the color-mix() function"},{"refs":[{"id":"ref-for-valdef-lch-lch\u2461"}],"title":"5.1. Adjusting colors: the color-adjust function"}],"url":"https://drafts.csswg.org/css-color-4/#valdef-lch-lch"},
+"c9ce3bd4": {"dfnID":"c9ce3bd4","dfnText":"color space","external":true,"refSections":[{"refs":[{"id":"ref-for-color-space"}],"title":"2. color spaces {#color spaces-section}"},{"refs":[{"id":"ref-for-color-space\u2460"},{"id":"ref-for-color-space\u2461"}],"title":"3. Mixing colors: the color-mix() function"},{"refs":[{"id":"ref-for-color-space\u2462"},{"id":"ref-for-color-space\u2463"},{"id":"ref-for-color-space\u2464"}],"title":"5.1. Adjusting colors: the color-adjust function"}],"url":"https://drafts.csswg.org/css-color-4/#color-space"},
+"channel-keyword": {"dfnID":"channel-keyword","dfnText":"channel keyword","external":false,"refSections":[{"refs":[{"id":"ref-for-channel-keyword"},{"id":"ref-for-channel-keyword\u2460"}],"title":"5.2. Relative color syntax"},{"refs":[{"id":"ref-for-channel-keyword\u2461"}],"title":"5.2.1. Relative RGB colors"},{"refs":[{"id":"ref-for-channel-keyword\u2462"}],"title":"5.2.2. Relative HSL colors"},{"refs":[{"id":"ref-for-channel-keyword\u2463"}],"title":"5.2.3. Relative HWB colors"},{"refs":[{"id":"ref-for-channel-keyword\u2464"}],"title":"5.2.4. Relative Lab colors"},{"refs":[{"id":"ref-for-channel-keyword\u2465"}],"title":"5.2.5. Relative LCH colors"}],"url":"#channel-keyword"},
+"e10c8e34": {"dfnID":"e10c8e34","dfnText":"<hue>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-hue"}],"title":"5.2.2. Relative HSL colors"},{"refs":[{"id":"ref-for-typedef-hue\u2460"}],"title":"5.2.3. Relative HWB colors"},{"refs":[{"id":"ref-for-typedef-hue\u2461"}],"title":"5.2.5. Relative LCH colors"}],"url":"https://drafts.csswg.org/css-color-4/#typedef-hue"},
+"f0809abc": {"dfnID":"f0809abc","dfnText":"&&","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-all"}],"title":"3. Mixing colors: the color-mix() function"},{"refs":[{"id":"ref-for-comb-all\u2460"}],"title":"5.1. Adjusting colors: the color-adjust function"}],"url":"https://drafts.csswg.org/css-values-4/#comb-all"},
+"f17eedd8": {"dfnID":"f17eedd8","dfnText":"blue","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-color-blue"}],"title":"5.2. Relative color syntax"}],"url":"https://drafts.csswg.org/css-color-4/#valdef-color-blue"},
+"funcdef-color-contrast": {"dfnID":"funcdef-color-contrast","dfnText":"color-contrast()","external":false,"refSections":[{"refs":[{"id":"ref-for-funcdef-color-contrast"}],"title":"1. Introduction"},{"refs":[{"id":"ref-for-funcdef-color-contrast\u2460"}],"title":"4. Selecting the most contrasting color: the color-contrast() function"}],"url":"#funcdef-color-contrast"},
+"funcdef-color-mix": {"dfnID":"funcdef-color-mix","dfnText":"color-mix()","external":false,"refSections":[{"refs":[{"id":"ref-for-funcdef-color-mix"}],"title":"1. Introduction"},{"refs":[{"id":"ref-for-funcdef-color-mix\u2460"}],"title":"3. Mixing colors: the color-mix() function"}],"url":"#funcdef-color-mix"},
+"funcdef-hsl": {"dfnID":"funcdef-hsl","dfnText":"hsl()","external":false,"refSections":[{"refs":[{"id":"ref-for-funcdef-hsl"},{"id":"ref-for-funcdef-hsl\u2460"}],"title":"5.2.2. Relative HSL colors"}],"url":"#funcdef-hsl"},
+"funcdef-hwb": {"dfnID":"funcdef-hwb","dfnText":"hwb()","external":false,"refSections":[{"refs":[{"id":"ref-for-funcdef-hwb"},{"id":"ref-for-funcdef-hwb\u2460"}],"title":"5.2.3. Relative HWB colors"}],"url":"#funcdef-hwb"},
+"funcdef-lab": {"dfnID":"funcdef-lab","dfnText":"lab()","external":false,"refSections":[{"refs":[{"id":"ref-for-funcdef-lab"},{"id":"ref-for-funcdef-lab\u2460"}],"title":"5.2.4. Relative Lab colors"}],"url":"#funcdef-lab"},
+"funcdef-lch": {"dfnID":"funcdef-lch","dfnText":"lch()","external":false,"refSections":[{"refs":[{"id":"ref-for-funcdef-lch"}],"title":"3. Mixing colors: the color-mix() function"},{"refs":[{"id":"ref-for-funcdef-lch\u2460"}],"title":"5.1. Adjusting colors: the color-adjust function"},{"refs":[{"id":"ref-for-funcdef-lch\u2461"},{"id":"ref-for-funcdef-lch\u2462"}],"title":"5.2. Relative color syntax"},{"refs":[{"id":"ref-for-funcdef-lch\u2463"},{"id":"ref-for-funcdef-lch\u2464"}],"title":"5.2.5. Relative LCH colors"}],"url":"#funcdef-lch"},
+"funcdef-rgb": {"dfnID":"funcdef-rgb","dfnText":"rgb()","external":false,"refSections":[{"refs":[{"id":"ref-for-funcdef-rgb"},{"id":"ref-for-funcdef-rgb\u2460"}],"title":"5.2.1. Relative RGB colors"}],"url":"#funcdef-rgb"},
+"origin-color": {"dfnID":"origin-color","dfnText":"origin color","external":false,"refSections":[{"refs":[{"id":"ref-for-origin-color"},{"id":"ref-for-origin-color\u2460"},{"id":"ref-for-origin-color\u2461"},{"id":"ref-for-origin-color\u2462"},{"id":"ref-for-origin-color\u2463"},{"id":"ref-for-origin-color\u2464"},{"id":"ref-for-origin-color\u2465"},{"id":"ref-for-origin-color\u2466"},{"id":"ref-for-origin-color\u2467"},{"id":"ref-for-origin-color\u2468"},{"id":"ref-for-origin-color\u2460\u24ea"},{"id":"ref-for-origin-color\u2460\u2460"}],"title":"5.2. Relative color syntax"},{"refs":[{"id":"ref-for-origin-color\u2460\u2461"},{"id":"ref-for-origin-color\u2460\u2462"}],"title":"5.2.1. Relative RGB colors"},{"refs":[{"id":"ref-for-origin-color\u2460\u2463"},{"id":"ref-for-origin-color\u2460\u2464"},{"id":"ref-for-origin-color\u2460\u2465"}],"title":"5.2.2. Relative HSL colors"},{"refs":[{"id":"ref-for-origin-color\u2460\u2466"},{"id":"ref-for-origin-color\u2460\u2467"},{"id":"ref-for-origin-color\u2460\u2468"}],"title":"5.2.3. Relative HWB colors"},{"refs":[{"id":"ref-for-origin-color\u2461\u24ea"},{"id":"ref-for-origin-color\u2461\u2460"},{"id":"ref-for-origin-color\u2461\u2461"}],"title":"5.2.4. Relative Lab colors"},{"refs":[{"id":"ref-for-origin-color\u2461\u2462"},{"id":"ref-for-origin-color\u2461\u2463"},{"id":"ref-for-origin-color\u2461\u2464"},{"id":"ref-for-origin-color\u2461\u2465"}],"title":"5.2.5. Relative LCH colors"}],"url":"#origin-color"},
+"relative-color": {"dfnID":"relative-color","dfnText":"relative color","external":false,"refSections":[{"refs":[{"id":"ref-for-relative-color"},{"id":"ref-for-relative-color\u2460"},{"id":"ref-for-relative-color\u2461"}],"title":"5.2. Relative color syntax"},{"refs":[{"id":"ref-for-relative-color\u2462"}],"title":"5.2.1. Relative RGB colors"},{"refs":[{"id":"ref-for-relative-color\u2463"}],"title":"5.2.2. Relative HSL colors"},{"refs":[{"id":"ref-for-relative-color\u2464"}],"title":"5.2.3. Relative HWB colors"},{"refs":[{"id":"ref-for-relative-color\u2465"}],"title":"5.2.4. Relative Lab colors"},{"refs":[{"id":"ref-for-relative-color\u2466"}],"title":"5.2.5. Relative LCH colors"}],"url":"#relative-color"},
+"typedef-color-adjuster": {"dfnID":"typedef-color-adjuster","dfnText":"<color-adjuster>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-color-adjuster"}],"title":"5.1. Adjusting colors: the color-adjust function"}],"url":"#typedef-color-adjuster"},
+"typedef-hsl-adjuster": {"dfnID":"typedef-hsl-adjuster","dfnText":"<hsl-adjuster>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-hsl-adjuster"}],"title":"5.1. Adjusting colors: the color-adjust function"}],"url":"#typedef-hsl-adjuster"},
+"typedef-hue-adjuster": {"dfnID":"typedef-hue-adjuster","dfnText":"<hue-adjuster>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-hue-adjuster"},{"id":"ref-for-typedef-hue-adjuster\u2460"},{"id":"ref-for-typedef-hue-adjuster\u2461"}],"title":"5.1. Adjusting colors: the color-adjust function"}],"url":"#typedef-hue-adjuster"},
+"typedef-hwb-adjuster": {"dfnID":"typedef-hwb-adjuster","dfnText":"<hwb-adjuster>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-hwb-adjuster"}],"title":"5.1. Adjusting colors: the color-adjust function"}],"url":"#typedef-hwb-adjuster"},
+"typedef-lab-adjuster": {"dfnID":"typedef-lab-adjuster","dfnText":"<lab-adjuster>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-lab-adjuster"}],"title":"5.1. Adjusting colors: the color-adjust function"}],"url":"#typedef-lab-adjuster"},
+"typedef-lch-adjuster": {"dfnID":"typedef-lch-adjuster","dfnText":"<lch-adjuster>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-lch-adjuster"}],"title":"5.1. Adjusting colors: the color-adjust function"}],"url":"#typedef-lch-adjuster"},
+"typedef-srgb-adjuster": {"dfnID":"typedef-srgb-adjuster","dfnText":"<srgb-adjuster>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-srgb-adjuster"}],"title":"5.1. Adjusting colors: the color-adjust function"}],"url":"#typedef-srgb-adjuster"},
+"typedef-xyz-adjuster": {"dfnID":"typedef-xyz-adjuster","dfnText":"<xyz-adjuster>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-xyz-adjuster"}],"title":"5.1. Adjusting colors: the color-adjust function"}],"url":"#typedef-xyz-adjuster"},
+};
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+});
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        dfn.panelData = panelData;
+        insertDfnPopupAction(dfn);
+    }
+}
+
+function genDfnPanel(dfn, { dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel on",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel({dfnPanel});
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.dfn = dfn;
+    dfn.dfnPanel = dfnPanel;
+    return dfnPanel;
+}
+
+
+
+function hideAllDfnPanels() {
+    // Delete the currently-active dfn panel.
+    queryAll(".dfn-panel").forEach(dfnPanel=>hideDfnPanel({dfnPanel}));
+}
+
+function showDfnPanel(dfn) {
+    hideAllDfnPanels(); // Only display one at a time.
+
+    dfn.setAttribute("aria-expanded", "true");
+
+    const dfnPanel = genDfnPanel(dfn, dfn.panelData);
+
+    // Give the dfn a unique tabindex, and then
+    // give all the tabbable panel bits successive indexes.
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+
+    append(document.body, dfnPanel);
+    positionDfnPanel(dfnPanel);
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.dfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }
+}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel({dfn, dfnPanel}) {
+    if(!dfnPanel) dfnPanel = dfn.dfnPanel;
+    if(!dfn) dfn = dfnPanel.dfn;
+    dfn.dfnPanel = undefined;
+    dfnPanel.dfn = undefined;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.remove()
+}
+
+function toggleDfnPanel(dfn) {
+    if(dfn.dfnPanel) {
+        hideDfnPanel(dfn);
+    } else {
+        showDfnPanel(dfn);
+    }
+}
+
+function insertDfnPopupAction(dfn) {
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        toggleDfnPanel(dfn);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+function needsFor(type) {
+    switch(type) {
+        case "descriptor":
+        case "value":
+        case "element-attr":
+        case "attr-value":
+        case "element-state":
+        case "method":
+        case "constructor":
+        case "argument":
+        case "attribute":
+        case "const":
+        case "dict-member":
+        case "event":
+        case "enum-value":
+        case "stringifier":
+        case "serializer":
+        case "iterator":
+        case "maplike":
+        case "setlike":
+        case "state":
+        case "mode":
+        case "context":
+        case "facet": return true;
+
+        default: return false;
+    }
+}
+function refusesFor(type) {
+    switch(type) {
+        case "property":
+        case "element":
+        case "interface":
+        case "namespace":
+        case "callback":
+        case "dictionary":
+        case "enum":
+        case "exception":
+        case "typedef":
+        case "http-header":
+        case "permission": return true;
+
+        default: return false;
+    }
+}
+function linkFormatterFromType(type) {
+    switch(type) {
+        case 'scheme':
+        case 'permission':
+        case 'dfn': return (text) => `[=${text}=]`;
+
+        case 'abstract-op': return (text) => `[\$${text}\$]`;
+
+        case 'function':
+        case 'at-rule':
+        case 'selector':
+        case 'value': return (text) => `''${text}''`;
+
+        case 'http-header': return (text) => `[:${text}:]`;
+
+        case 'interface':
+        case 'constructor':
+        case 'method':
+        case 'argument':
+        case 'attribute':
+        case 'callback':
+        case 'dictionary':
+        case 'dict-member':
+        case 'enum':
+        case 'enum-value':
+        case 'exception':
+        case 'const':
+        case 'typedef':
+        case 'stringifier':
+        case 'serializer':
+        case 'iterator':
+        case 'maplike':
+        case 'setlike':
+        case 'extended-attribute':
+        case 'event':
+        case 'idl': return (text) => `{{${text}}}`;
+
+        case 'element-state':
+        case 'element-attr':
+        case 'attr-value':
+        case 'element': return (element) => `<{${element}}>`;
+
+        case 'grammar': return (text) => `${text} (within a <pre class=prod>)`;
+
+        case 'type': return (text)=> `<<${text}>>`;
+
+        case 'descriptor':
+        case 'property': return (text) => `'${text}'`;
+
+        default: return;
+    };
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!needsFor(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!refusesFor(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
 }
 </script>
 <script>/* Boilerplate: script-link-titles */
+"use strict";
+{
 let linkTitleData = {
- "https://drafts.csswg.org/css-values-4/#angle-value": "Expands to: deg | grad | rad | turn"
+"https://drafts.csswg.org/css-values-4/#angle-value": "Expands to: deg | grad | rad | turn",
 };
 
 function setTypeTitles() {
@@ -2622,33 +2628,14 @@ function setTypeTitles() {
 }
 
 document.addEventListener("DOMContentLoaded", setTypeTitles);
+}
 </script>
 <script>/* Boilerplate: script-position-annos */
 "use strict";
 {
-
 function repositionAnnoPanels(){
     const panels = [...document.querySelectorAll("[data-anno-for]")];
-    const main = document.querySelector("main");
-    let mainRect;
-    if(main) mainRect = main.getBoundingClientRect();
-    for(const panel of panels) {
-        const dfn = document.getElementById(panel.getAttribute("data-anno-for"));
-        if(!dfn) {
-            console.log("Can't find the annotation panel target:", panel);
-            continue;
-        }
-        const rect = dfn.getBoundingClientRect();
-        const top = window.scrollY + rect.top
-        panel.style.top = top + "px";
-        panel.top = top;
-        panel.height = rect.height;
-        panel.classList.remove("unpositioned");
-        const panelRect = panel.getBoundingClientRect()
-        if(main) {
-            panel.classList.toggle("overlapping-main", panelRect.left < mainRect.right)
-        }
-    }
+    hydratePanels(panels);
     let vSoFar = 0;
     for(const panel of panels.sort(cmpTops)) {
         if(panel.top < vSoFar) {
@@ -2656,6 +2643,39 @@ function repositionAnnoPanels(){
             panel.style.top = vSoFar + "px";
         }
         vSoFar = panel.top + panel.height + 15;
+    }
+}
+function hydratePanels(panels) {
+    const main = document.querySelector("main");
+    let mainRect;
+    if(main) mainRect = main.getBoundingClientRect();
+    // First display them all, if they're not already visible.
+    for(const panel of panels) {
+        panel.classList.remove("unpositioned");
+    }
+    // Measure them all
+    for(const panel of panels) {
+        const dfn = document.getElementById(panel.getAttribute("data-anno-for"));
+        if(!dfn) {
+            console.log("Can't find the annotation panel target:", panel);
+            continue;
+        }
+        panel.dfn = dfn;
+        panel.top = window.scrollY + dfn.getBoundingClientRect().top;
+        let panelRect = panel.getBoundingClientRect();
+        panel.height = panelRect.height;
+        if(main) {
+            panel.overlappingMain = panelRect.left < mainRect.right;
+        } else {
+            panel.overlappingMain = false;
+        }
+    }
+    // And finally position them
+    for(const panel of panels) {
+        const dfn = panel.dfn;
+        if(!dfn) continue;
+        panel.style.top = panel.top + "px";
+        panel.classList.toggle("overlapping-main", panel.overlappingMain);
     }
 }
 
@@ -2670,250 +2690,239 @@ window.addEventListener("resize", repositionAnnoPanels);
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
-                mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
+let refsData = {
+"#channel-keyword": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-color","spec":"css-color-5","status":"local","text":"channel keyword","type":"dfn","url":"#channel-keyword"},
+"#funcdef-color-contrast": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-color","spec":"css-color-5","status":"local","text":"color-contrast()","type":"function","url":"#funcdef-color-contrast"},
+"#funcdef-color-mix": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-color","spec":"css-color-5","status":"local","text":"color-mix()","type":"function","url":"#funcdef-color-mix"},
+"#funcdef-hsl": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-color","spec":"css-color-5","status":"local","text":"hsl()","type":"function","url":"#funcdef-hsl"},
+"#funcdef-hwb": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-color","spec":"css-color-5","status":"local","text":"hwb()","type":"function","url":"#funcdef-hwb"},
+"#funcdef-lab": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-color","spec":"css-color-5","status":"local","text":"lab()","type":"function","url":"#funcdef-lab"},
+"#funcdef-lch": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-color","spec":"css-color-5","status":"local","text":"lch()","type":"function","url":"#funcdef-lch"},
+"#funcdef-rgb": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-color","spec":"css-color-5","status":"local","text":"rgb()","type":"function","url":"#funcdef-rgb"},
+"#origin-color": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-color","spec":"css-color-5","status":"local","text":"origin color","type":"dfn","url":"#origin-color"},
+"#relative-color": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-color","spec":"css-color-5","status":"local","text":"relative color","type":"dfn","url":"#relative-color"},
+"#typedef-color-adjuster": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-color","spec":"css-color-5","status":"local","text":"<color-adjuster>","type":"type","url":"#typedef-color-adjuster"},
+"#typedef-hsl-adjuster": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-color","spec":"css-color-5","status":"local","text":"<hsl-adjuster>","type":"type","url":"#typedef-hsl-adjuster"},
+"#typedef-hue-adjuster": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-color","spec":"css-color-5","status":"local","text":"<hue-adjuster>","type":"type","url":"#typedef-hue-adjuster"},
+"#typedef-hwb-adjuster": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-color","spec":"css-color-5","status":"local","text":"<hwb-adjuster>","type":"type","url":"#typedef-hwb-adjuster"},
+"#typedef-lab-adjuster": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-color","spec":"css-color-5","status":"local","text":"<lab-adjuster>","type":"type","url":"#typedef-lab-adjuster"},
+"#typedef-lch-adjuster": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-color","spec":"css-color-5","status":"local","text":"<lch-adjuster>","type":"type","url":"#typedef-lch-adjuster"},
+"#typedef-srgb-adjuster": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-color","spec":"css-color-5","status":"local","text":"<srgb-adjuster>","type":"type","url":"#typedef-srgb-adjuster"},
+"#typedef-xyz-adjuster": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-color","spec":"css-color-5","status":"local","text":"<xyz-adjuster>","type":"type","url":"#typedef-xyz-adjuster"},
+"https://drafts.csswg.org/css-color-4/#color-space": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-color","spec":"css-color-4","status":"current","text":"color space","type":"dfn","url":"https://drafts.csswg.org/css-color-4/#color-space"},
+"https://drafts.csswg.org/css-color-4/#typedef-hue": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-color","spec":"css-color-4","status":"current","text":"<hue>","type":"type","url":"https://drafts.csswg.org/css-color-4/#typedef-hue"},
+"https://drafts.csswg.org/css-color-4/#valdef-color-blue": {"export":true,"for_":["<color>"],"level":"4","normative":true,"shortname":"css-color","spec":"css-color-4","status":"current","text":"blue","type":"value","url":"https://drafts.csswg.org/css-color-4/#valdef-color-blue"},
+"https://drafts.csswg.org/css-color-4/#valdef-color-darkolivegreen": {"export":true,"for_":["<color>"],"level":"4","normative":true,"shortname":"css-color","spec":"css-color-4","status":"current","text":"darkolivegreen","type":"value","url":"https://drafts.csswg.org/css-color-4/#valdef-color-darkolivegreen"},
+"https://drafts.csswg.org/css-color-4/#valdef-color-green": {"export":true,"for_":["<color>"],"level":"4","normative":true,"shortname":"css-color","spec":"css-color-4","status":"current","text":"green","type":"value","url":"https://drafts.csswg.org/css-color-4/#valdef-color-green"},
+"https://drafts.csswg.org/css-color-4/#valdef-color-red": {"export":true,"for_":["<color>"],"level":"4","normative":true,"shortname":"css-color","spec":"css-color-4","status":"current","text":"red","type":"value","url":"https://drafts.csswg.org/css-color-4/#valdef-color-red"},
+"https://drafts.csswg.org/css-color-4/#valdef-lch-lch": {"export":true,"for_":["lch()"],"level":"4","normative":true,"shortname":"css-color","spec":"css-color-4","status":"current","text":"lch","type":"value","url":"https://drafts.csswg.org/css-color-4/#valdef-lch-lch"},
+"https://drafts.csswg.org/css-color-5/#funcdef-color": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-color","spec":"css-color-5","status":"current","text":"color()","type":"function","url":"https://drafts.csswg.org/css-color-5/#funcdef-color"},
+"https://drafts.csswg.org/css-color-5/#typedef-alpha-value": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-color","spec":"css-color-5","status":"current","text":"<alpha-value>","type":"type","url":"https://drafts.csswg.org/css-color-5/#typedef-alpha-value"},
+"https://drafts.csswg.org/css-color-5/#typedef-color": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-color","spec":"css-color-5","status":"current","text":"<color>","type":"type","url":"https://drafts.csswg.org/css-color-5/#typedef-color"},
+"https://drafts.csswg.org/css-values-4/#angle-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<angle>","type":"type","url":"https://drafts.csswg.org/css-values-4/#angle-value"},
+"https://drafts.csswg.org/css-values-4/#comb-all": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"&&","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-all"},
+"https://drafts.csswg.org/css-values-4/#comb-comma": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":",","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-comma"},
+"https://drafts.csswg.org/css-values-4/#comb-one": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"|","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"https://drafts.csswg.org/css-values-4/#math-function": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"math function","type":"dfn","url":"https://drafts.csswg.org/css-values-4/#math-function"},
+"https://drafts.csswg.org/css-values-4/#mult-comma": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"#","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#mult-comma"},
+"https://drafts.csswg.org/css-values-4/#mult-num": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"{a}","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#mult-num"},
+"https://drafts.csswg.org/css-values-4/#mult-opt": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"?","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#mult-opt"},
+"https://drafts.csswg.org/css-values-4/#number-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<number>","type":"type","url":"https://drafts.csswg.org/css-values-4/#number-value"},
+"https://drafts.csswg.org/css-values-4/#percentage-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<percentage>","type":"type","url":"https://drafts.csswg.org/css-values-4/#percentage-value"},
+};
+
+function mkRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "Term: "),
+                mk.span({}, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    let forListElements;
+    if(forList.length == 0) {
+        forListElements = [];
+    } else if(forList.length == 1) {
+        forListElements = mk.li({},
+            mk.b({}, "For: "),
+            mk.span({}, forList[0]),
+        );
+    } else {
+        forListElements = mk.li({},
             mk.b({}, "For: "),
             mk.ul({},
                 ...forList.map(forItem =>
                     mk.li({},
-                        mk.span({}, `${forItem}`)
+                        mk.span({}, forItem)
                     ),
                 ),
             ),
         );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+    }
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    setupRefHintEventListeners(link, hintPanel);
+    return hintPanel;
+}
+
+function hideAllRefHints() {
+    queryAll(".ref-hint").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    if(refHint.teardownEventListeners) {
+        refHint.teardownEventListeners();
     }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+    refHint.remove();
+}
+
+function showRefHint(link) {
+    if(link.classList.contains("dfn-link")) return;
+    const url = link.getAttribute("href");
+    const ref = refsData[url];
+    if(!ref) return;
+
+    hideAllRefHints(); // Only display one at this time.
+
+    const refHint = mkRefHint(link, ref);
+    append(document.body, refHint);
+    link.setAttribute("aria-expanded", "true");
+    positionRefHint(refHint);
+}
+
+function setupRefHintEventListeners(link, refHint) {
+    if (refHint.teardownEventListeners) return;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
+
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
-
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
-    }
-
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
-        }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
-
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
-    }
-
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+document.addEventListener("DOMContentLoaded", () => {
+    document.body.addEventListener("mouseover", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
+    });
+    document.body.addEventListener("focus", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
     });
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['#funcdef-color-mix'] = {"text": "color-mix()", "type": "function", "spec": "css-color-5", "shortname": "css-color", "level": "5", "status": "local", "url": "#funcdef-color-mix", "export": true, "normative": true, "for_": []};
-window.refsData['#funcdef-color-contrast'] = {"text": "color-contrast()", "type": "function", "spec": "css-color-5", "shortname": "css-color", "level": "5", "status": "local", "url": "#funcdef-color-contrast", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-color-4/#color-space'] = {"text": "color space", "type": "dfn", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-color-4/#color-space", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-color-4/#valdef-lch-lch'] = {"text": "lch", "type": "value", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-color-4/#valdef-lch-lch", "export": true, "normative": true, "for_": ["lch()"]};
-window.refsData['https://drafts.csswg.org/css-color-5/#typedef-color'] = {"text": "<color>", "type": "type", "spec": "css-color-5", "shortname": "css-color", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-color-5/#typedef-color", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-comma'] = {"text": ",", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-comma", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-all'] = {"text": "&&", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-all", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#percentage-value'] = {"text": "<percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#percentage-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#mult-opt'] = {"text": "?", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#mult-comma'] = {"text": "#", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-comma", "export": true, "normative": true, "for_": []};
-window.refsData['#funcdef-lch'] = {"text": "lch()", "type": "function", "spec": "css-color-5", "shortname": "css-color", "level": "5", "status": "local", "url": "#funcdef-lch", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#number-value'] = {"text": "<number>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#number-value", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-color-adjuster'] = {"text": "<color-adjuster>", "type": "type", "spec": "css-color-5", "shortname": "css-color", "level": "5", "status": "local", "url": "#typedef-color-adjuster", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-srgb-adjuster'] = {"text": "<srgb-adjuster>", "type": "type", "spec": "css-color-5", "shortname": "css-color", "level": "5", "status": "local", "url": "#typedef-srgb-adjuster", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-hsl-adjuster'] = {"text": "<hsl-adjuster>", "type": "type", "spec": "css-color-5", "shortname": "css-color", "level": "5", "status": "local", "url": "#typedef-hsl-adjuster", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-hwb-adjuster'] = {"text": "<hwb-adjuster>", "type": "type", "spec": "css-color-5", "shortname": "css-color", "level": "5", "status": "local", "url": "#typedef-hwb-adjuster", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-xyz-adjuster'] = {"text": "<xyz-adjuster>", "type": "type", "spec": "css-color-5", "shortname": "css-color", "level": "5", "status": "local", "url": "#typedef-xyz-adjuster", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-lab-adjuster'] = {"text": "<lab-adjuster>", "type": "type", "spec": "css-color-5", "shortname": "css-color", "level": "5", "status": "local", "url": "#typedef-lab-adjuster", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-lch-adjuster'] = {"text": "<lch-adjuster>", "type": "type", "spec": "css-color-5", "shortname": "css-color", "level": "5", "status": "local", "url": "#typedef-lch-adjuster", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-hue-adjuster'] = {"text": "<hue-adjuster>", "type": "type", "spec": "css-color-5", "shortname": "css-color", "level": "5", "status": "local", "url": "#typedef-hue-adjuster", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#math-function'] = {"text": "math function", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#math-function", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-color-5/#funcdef-color'] = {"text": "color()", "type": "function", "spec": "css-color-5", "shortname": "css-color", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-color-5/#funcdef-color", "export": true, "normative": true, "for_": []};
-window.refsData['#relative-color'] = {"text": "relative color", "type": "dfn", "spec": "css-color-5", "shortname": "css-color", "level": "5", "status": "local", "url": "#relative-color", "export": true, "normative": true, "for_": []};
-window.refsData['#origin-color'] = {"text": "origin color", "type": "dfn", "spec": "css-color-5", "shortname": "css-color", "level": "5", "status": "local", "url": "#origin-color", "export": true, "normative": true, "for_": []};
-window.refsData['#channel-keyword'] = {"text": "channel keyword", "type": "dfn", "spec": "css-color-5", "shortname": "css-color", "level": "5", "status": "local", "url": "#channel-keyword", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-color-4/#valdef-color-red'] = {"text": "red", "type": "value", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-color-4/#valdef-color-red", "export": true, "normative": true, "for_": ["<color>"]};
-window.refsData['https://drafts.csswg.org/css-color-4/#valdef-color-green'] = {"text": "green", "type": "value", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-color-4/#valdef-color-green", "export": true, "normative": true, "for_": ["<color>"]};
-window.refsData['https://drafts.csswg.org/css-color-4/#valdef-color-blue'] = {"text": "blue", "type": "value", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-color-4/#valdef-color-blue", "export": true, "normative": true, "for_": ["<color>"]};
-window.refsData['https://drafts.csswg.org/css-color-4/#valdef-color-darkolivegreen'] = {"text": "darkolivegreen", "type": "value", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-color-4/#valdef-color-darkolivegreen", "export": true, "normative": true, "for_": ["<color>"]};
-window.refsData['#funcdef-rgb'] = {"text": "rgb()", "type": "function", "spec": "css-color-5", "shortname": "css-color", "level": "5", "status": "local", "url": "#funcdef-rgb", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#mult-num'] = {"text": "{a}", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-num", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-color-5/#typedef-alpha-value'] = {"text": "<alpha-value>", "type": "type", "spec": "css-color-5", "shortname": "css-color", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-color-5/#typedef-alpha-value", "export": true, "normative": true, "for_": []};
-window.refsData['#funcdef-hsl'] = {"text": "hsl()", "type": "function", "spec": "css-color-5", "shortname": "css-color", "level": "5", "status": "local", "url": "#funcdef-hsl", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-color-4/#typedef-hue'] = {"text": "<hue>", "type": "type", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-color-4/#typedef-hue", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#angle-value'] = {"text": "<angle>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#angle-value", "export": true, "normative": true, "for_": []};
-window.refsData['#funcdef-hwb'] = {"text": "hwb()", "type": "function", "spec": "css-color-5", "shortname": "css-color", "level": "5", "status": "local", "url": "#funcdef-hwb", "export": true, "normative": true, "for_": []};
-window.refsData['#funcdef-lab'] = {"text": "lab()", "type": "function", "spec": "css-color-5", "shortname": "css-color", "level": "5", "status": "local", "url": "#funcdef-lab", "export": true, "normative": true, "for_": []};
 </script>

@@ -1614,7 +1614,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -1988,6 +1987,11 @@ figcaption:not(.no-marker)::before {
     }
 }
 </style>
+<style>/* Boilerplate: style-idl-highlighting */
+pre.idl.highlight {
+    background: var(--borderedblock-bg, var(--def-bg));
+}
+</style>
 <style>/* Boilerplate: style-issues */
 a[href].issue-return {
     float: right;
@@ -2020,7 +2024,7 @@ a[href].issue-return {
 }
 
 .ref-hint {
-    display: none;
+    display: inline-block;
     position: absolute;
     z-index: 35;
     width: 20em;
@@ -2036,16 +2040,11 @@ a[href].issue-return {
     white-space: normal; /* in case it's moved into a pre */
 }
 
-.ref-hint.on {
-    display: inline-block;
-}
-
 .ref-hint * { margin: 0; padding: 0; text-indent: 0; }
 
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -2105,7 +2104,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -2162,7 +2160,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -2699,424 +2696,8 @@ A UA MUST ask permission from the user during session creation before meshing da
    <div class="issue"> should the mesh data persist per browser session or per xr session? <a class="issue-return" href="#issue-ffb06508" title="Jump to section">↵</a></div>
    <div class="issue"> clarify this section <a class="issue-return" href="#issue-22eb3e63" title="Jump to section">↵</a></div>
   </div>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['8855a9aa'] = {"dfnID": "8855a9aa", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "dfnText": "DOMString", "refSections": [{"refs": [{"id": "ref-for-idl-DOMString"}], "title": "3.1. XRMesh structures"}], "external": true};
-window.dfnpanelData['0a296dfe'] = {"dfnID": "0a296dfe", "url": "https://webidl.spec.whatwg.org/#idl-Float32Array", "dfnText": "Float32Array", "refSections": [{"refs": [{"id": "ref-for-idl-Float32Array"}, {"id": "ref-for-idl-Float32Array\u2460"}], "title": "3.1. XRMesh structures"}], "external": true};
-window.dfnpanelData['49f6acb5'] = {"dfnID": "49f6acb5", "url": "https://webidl.spec.whatwg.org/#idl-Uint16Array", "dfnText": "Uint16Array", "refSections": [{"refs": [{"id": "ref-for-idl-Uint16Array"}], "title": "3.1. XRMesh structures"}], "external": true};
-window.dfnpanelData['8c800cdf'] = {"dfnID": "8c800cdf", "url": "https://webidl.spec.whatwg.org/#idl-double", "dfnText": "double", "refSections": [{"refs": [{"id": "ref-for-idl-double"}, {"id": "ref-for-idl-double\u2460"}, {"id": "ref-for-idl-double\u2461"}], "title": "2.2. XRWorldMeshFeature"}], "external": true};
-window.dfnpanelData['7a030114'] = {"dfnID": "7a030114", "url": "https://immersive-web.github.io/webxr/#xrframe", "dfnText": "XRFrame", "refSections": [{"refs": [{"id": "ref-for-xrframe"}], "title": "3.2. XRFrame"}], "external": true};
-window.dfnpanelData['b23556e5'] = {"dfnID": "b23556e5", "url": "https://immersive-web.github.io/webxr/#xrsession", "dfnText": "XRSession", "refSections": [{"refs": [{"id": "ref-for-xrsession"}], "title": "2.2. XRWorldMeshFeature"}, {"refs": [{"id": "ref-for-xrsession\u2460"}], "title": "2.3. XRNearMeshFeature"}], "external": true};
-window.dfnpanelData['8d7f1334'] = {"dfnID": "8d7f1334", "url": "https://immersive-web.github.io/webxr/#dom-xrsessionmode-immersive-ar", "dfnText": "immersive-ar", "refSections": [{"refs": [{"id": "ref-for-dom-xrsessionmode-immersive-ar"}], "title": "2.2. XRWorldMeshFeature"}, {"refs": [{"id": "ref-for-dom-xrsessionmode-immersive-ar\u2460"}], "title": "2.3. XRNearMeshFeature"}], "external": true};
-window.dfnpanelData['enumdef-xrmeshquality'] = {"dfnID": "enumdef-xrmeshquality", "url": "#enumdef-xrmeshquality", "dfnText": "XRMeshQuality", "refSections": [{"refs": [{"id": "ref-for-enumdef-xrmeshquality"}], "title": "2.1. XRMeshQuality"}, {"refs": [{"id": "ref-for-enumdef-xrmeshquality\u2460"}], "title": "2.2. XRWorldMeshFeature"}, {"refs": [{"id": "ref-for-enumdef-xrmeshquality\u2461"}], "title": "2.3. XRNearMeshFeature"}], "external": false};
-window.dfnpanelData['dictdef-xrmeshblock'] = {"dfnID": "dictdef-xrmeshblock", "url": "#dictdef-xrmeshblock", "dfnText": "XRMeshBlock", "refSections": [{"refs": [{"id": "ref-for-dictdef-xrmeshblock"}, {"id": "ref-for-dictdef-xrmeshblock\u2460"}, {"id": "ref-for-dictdef-xrmeshblock\u2461"}, {"id": "ref-for-dictdef-xrmeshblock\u2462"}], "title": "3.1. XRMesh structures"}], "external": false};
-window.dfnpanelData['dom-xrmeshblock-vertices'] = {"dfnID": "dom-xrmeshblock-vertices", "url": "#dom-xrmeshblock-vertices", "dfnText": "vertices", "refSections": [{"refs": [{"id": "ref-for-dom-xrmeshblock-vertices"}, {"id": "ref-for-dom-xrmeshblock-vertices\u2460"}, {"id": "ref-for-dom-xrmeshblock-vertices\u2461"}], "title": "3.1. XRMesh structures"}], "external": false};
-window.dfnpanelData['dom-xrmeshblock-indices'] = {"dfnID": "dom-xrmeshblock-indices", "url": "#dom-xrmeshblock-indices", "dfnText": "indices", "refSections": [{"refs": [{"id": "ref-for-dom-xrmeshblock-indices"}], "title": "3.1. XRMesh structures"}], "external": false};
-window.dfnpanelData['dom-xrmeshblock-normals'] = {"dfnID": "dom-xrmeshblock-normals", "url": "#dom-xrmeshblock-normals", "dfnText": "normals", "refSections": [{"refs": [{"id": "ref-for-dom-xrmeshblock-normals"}, {"id": "ref-for-dom-xrmeshblock-normals\u2460"}], "title": "3.1. XRMesh structures"}], "external": false};
-window.dfnpanelData['xrnearmesh'] = {"dfnID": "xrnearmesh", "url": "#xrnearmesh", "dfnText": "XRNearMesh", "refSections": [{"refs": [{"id": "ref-for-xrnearmesh"}], "title": "3.1. XRMesh structures"}], "external": false};
-window.dfnpanelData['xrworldmesh'] = {"dfnID": "xrworldmesh", "url": "#xrworldmesh", "dfnText": "XRWorldMesh", "refSections": [{"refs": [{"id": "ref-for-xrworldmesh"}], "title": "3.1. XRMesh structures"}], "external": false};
-window.dfnpanelData['dictdef-xrmetadata'] = {"dfnID": "dictdef-xrmetadata", "url": "#dictdef-xrmetadata", "dfnText": "XRMetadata", "refSections": [{"refs": [{"id": "ref-for-dictdef-xrmetadata"}], "title": "3.2. XRFrame"}], "external": false};
-window.dfnpanelData['dom-xrmetadata-worldmesh'] = {"dfnID": "dom-xrmetadata-worldmesh", "url": "#dom-xrmetadata-worldmesh", "dfnText": "worldMesh", "refSections": [{"refs": [{"id": "ref-for-dom-xrmetadata-worldmesh"}], "title": "3.1. XRMesh structures"}], "external": false};
-window.dfnpanelData['dom-xrmetadata-nearmesh'] = {"dfnID": "dom-xrmetadata-nearmesh", "url": "#dom-xrmetadata-nearmesh", "dfnText": "nearMesh", "refSections": [{"refs": [{"id": "ref-for-dom-xrmetadata-nearmesh"}], "title": "3.1. XRMesh structures"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -3310,234 +2891,651 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"0a296dfe": {"dfnID":"0a296dfe","dfnText":"Float32Array","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-Float32Array"},{"id":"ref-for-idl-Float32Array\u2460"}],"title":"3.1. XRMesh structures"}],"url":"https://webidl.spec.whatwg.org/#idl-Float32Array"},
+"49f6acb5": {"dfnID":"49f6acb5","dfnText":"Uint16Array","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-Uint16Array"}],"title":"3.1. XRMesh structures"}],"url":"https://webidl.spec.whatwg.org/#idl-Uint16Array"},
+"7a030114": {"dfnID":"7a030114","dfnText":"XRFrame","external":true,"refSections":[{"refs":[{"id":"ref-for-xrframe"}],"title":"3.2. XRFrame"}],"url":"https://immersive-web.github.io/webxr/#xrframe"},
+"8855a9aa": {"dfnID":"8855a9aa","dfnText":"DOMString","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-DOMString"}],"title":"3.1. XRMesh structures"}],"url":"https://webidl.spec.whatwg.org/#idl-DOMString"},
+"8c800cdf": {"dfnID":"8c800cdf","dfnText":"double","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-double"},{"id":"ref-for-idl-double\u2460"},{"id":"ref-for-idl-double\u2461"}],"title":"2.2. XRWorldMeshFeature"}],"url":"https://webidl.spec.whatwg.org/#idl-double"},
+"8d7f1334": {"dfnID":"8d7f1334","dfnText":"immersive-ar","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-xrsessionmode-immersive-ar"}],"title":"2.2. XRWorldMeshFeature"},{"refs":[{"id":"ref-for-dom-xrsessionmode-immersive-ar\u2460"}],"title":"2.3. XRNearMeshFeature"}],"url":"https://immersive-web.github.io/webxr/#dom-xrsessionmode-immersive-ar"},
+"b23556e5": {"dfnID":"b23556e5","dfnText":"XRSession","external":true,"refSections":[{"refs":[{"id":"ref-for-xrsession"}],"title":"2.2. XRWorldMeshFeature"},{"refs":[{"id":"ref-for-xrsession\u2460"}],"title":"2.3. XRNearMeshFeature"}],"url":"https://immersive-web.github.io/webxr/#xrsession"},
+"dictdef-xrmeshblock": {"dfnID":"dictdef-xrmeshblock","dfnText":"XRMeshBlock","external":false,"refSections":[{"refs":[{"id":"ref-for-dictdef-xrmeshblock"},{"id":"ref-for-dictdef-xrmeshblock\u2460"},{"id":"ref-for-dictdef-xrmeshblock\u2461"},{"id":"ref-for-dictdef-xrmeshblock\u2462"}],"title":"3.1. XRMesh structures"}],"url":"#dictdef-xrmeshblock"},
+"dictdef-xrmetadata": {"dfnID":"dictdef-xrmetadata","dfnText":"XRMetadata","external":false,"refSections":[{"refs":[{"id":"ref-for-dictdef-xrmetadata"}],"title":"3.2. XRFrame"}],"url":"#dictdef-xrmetadata"},
+"dom-xrmeshblock-indices": {"dfnID":"dom-xrmeshblock-indices","dfnText":"indices","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-xrmeshblock-indices"}],"title":"3.1. XRMesh structures"}],"url":"#dom-xrmeshblock-indices"},
+"dom-xrmeshblock-normals": {"dfnID":"dom-xrmeshblock-normals","dfnText":"normals","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-xrmeshblock-normals"},{"id":"ref-for-dom-xrmeshblock-normals\u2460"}],"title":"3.1. XRMesh structures"}],"url":"#dom-xrmeshblock-normals"},
+"dom-xrmeshblock-vertices": {"dfnID":"dom-xrmeshblock-vertices","dfnText":"vertices","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-xrmeshblock-vertices"},{"id":"ref-for-dom-xrmeshblock-vertices\u2460"},{"id":"ref-for-dom-xrmeshblock-vertices\u2461"}],"title":"3.1. XRMesh structures"}],"url":"#dom-xrmeshblock-vertices"},
+"dom-xrmetadata-nearmesh": {"dfnID":"dom-xrmetadata-nearmesh","dfnText":"nearMesh","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-xrmetadata-nearmesh"}],"title":"3.1. XRMesh structures"}],"url":"#dom-xrmetadata-nearmesh"},
+"dom-xrmetadata-worldmesh": {"dfnID":"dom-xrmetadata-worldmesh","dfnText":"worldMesh","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-xrmetadata-worldmesh"}],"title":"3.1. XRMesh structures"}],"url":"#dom-xrmetadata-worldmesh"},
+"enumdef-xrmeshquality": {"dfnID":"enumdef-xrmeshquality","dfnText":"XRMeshQuality","external":false,"refSections":[{"refs":[{"id":"ref-for-enumdef-xrmeshquality"}],"title":"2.1. XRMeshQuality"},{"refs":[{"id":"ref-for-enumdef-xrmeshquality\u2460"}],"title":"2.2. XRWorldMeshFeature"},{"refs":[{"id":"ref-for-enumdef-xrmeshquality\u2461"}],"title":"2.3. XRNearMeshFeature"}],"url":"#enumdef-xrmeshquality"},
+"xrnearmesh": {"dfnID":"xrnearmesh","dfnText":"XRNearMesh","external":false,"refSections":[{"refs":[{"id":"ref-for-xrnearmesh"}],"title":"3.1. XRMesh structures"}],"url":"#xrnearmesh"},
+"xrworldmesh": {"dfnID":"xrworldmesh","dfnText":"XRWorldMesh","external":false,"refSections":[{"refs":[{"id":"ref-for-xrworldmesh"}],"title":"3.1. XRMesh structures"}],"url":"#xrworldmesh"},
+};
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+});
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        dfn.panelData = panelData;
+        insertDfnPopupAction(dfn);
+    }
+}
+
+function genDfnPanel(dfn, { dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel on",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel({dfnPanel});
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.dfn = dfn;
+    dfn.dfnPanel = dfnPanel;
+    return dfnPanel;
+}
+
+
+
+function hideAllDfnPanels() {
+    // Delete the currently-active dfn panel.
+    queryAll(".dfn-panel").forEach(dfnPanel=>hideDfnPanel({dfnPanel}));
+}
+
+function showDfnPanel(dfn) {
+    hideAllDfnPanels(); // Only display one at a time.
+
+    dfn.setAttribute("aria-expanded", "true");
+
+    const dfnPanel = genDfnPanel(dfn, dfn.panelData);
+
+    // Give the dfn a unique tabindex, and then
+    // give all the tabbable panel bits successive indexes.
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+
+    append(document.body, dfnPanel);
+    positionDfnPanel(dfnPanel);
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.dfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }
+}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel({dfn, dfnPanel}) {
+    if(!dfnPanel) dfnPanel = dfn.dfnPanel;
+    if(!dfn) dfn = dfnPanel.dfn;
+    dfn.dfnPanel = undefined;
+    dfnPanel.dfn = undefined;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.remove()
+}
+
+function toggleDfnPanel(dfn) {
+    if(dfn.dfnPanel) {
+        hideDfnPanel(dfn);
+    } else {
+        showDfnPanel(dfn);
+    }
+}
+
+function insertDfnPopupAction(dfn) {
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        toggleDfnPanel(dfn);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+function needsFor(type) {
+    switch(type) {
+        case "descriptor":
+        case "value":
+        case "element-attr":
+        case "attr-value":
+        case "element-state":
+        case "method":
+        case "constructor":
+        case "argument":
+        case "attribute":
+        case "const":
+        case "dict-member":
+        case "event":
+        case "enum-value":
+        case "stringifier":
+        case "serializer":
+        case "iterator":
+        case "maplike":
+        case "setlike":
+        case "state":
+        case "mode":
+        case "context":
+        case "facet": return true;
+
+        default: return false;
+    }
+}
+function refusesFor(type) {
+    switch(type) {
+        case "property":
+        case "element":
+        case "interface":
+        case "namespace":
+        case "callback":
+        case "dictionary":
+        case "enum":
+        case "exception":
+        case "typedef":
+        case "http-header":
+        case "permission": return true;
+
+        default: return false;
+    }
+}
+function linkFormatterFromType(type) {
+    switch(type) {
+        case 'scheme':
+        case 'permission':
+        case 'dfn': return (text) => `[=${text}=]`;
+
+        case 'abstract-op': return (text) => `[\$${text}\$]`;
+
+        case 'function':
+        case 'at-rule':
+        case 'selector':
+        case 'value': return (text) => `''${text}''`;
+
+        case 'http-header': return (text) => `[:${text}:]`;
+
+        case 'interface':
+        case 'constructor':
+        case 'method':
+        case 'argument':
+        case 'attribute':
+        case 'callback':
+        case 'dictionary':
+        case 'dict-member':
+        case 'enum':
+        case 'enum-value':
+        case 'exception':
+        case 'const':
+        case 'typedef':
+        case 'stringifier':
+        case 'serializer':
+        case 'iterator':
+        case 'maplike':
+        case 'setlike':
+        case 'extended-attribute':
+        case 'event':
+        case 'idl': return (text) => `{{${text}}}`;
+
+        case 'element-state':
+        case 'element-attr':
+        case 'attr-value':
+        case 'element': return (element) => `<{${element}}>`;
+
+        case 'grammar': return (text) => `${text} (within a <pre class=prod>)`;
+
+        case 'type': return (text)=> `<<${text}>>`;
+
+        case 'descriptor':
+        case 'property': return (text) => `'${text}'`;
+
+        default: return;
+    };
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!needsFor(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!refusesFor(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
 }
 </script>
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
-                mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
+let refsData = {
+"#dictdef-xrmeshblock": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webxrmeshing-1","spec":"webxrmeshing-1-1","status":"local","text":"XRMeshBlock","type":"dictionary","url":"#dictdef-xrmeshblock"},
+"#dictdef-xrmetadata": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webxrmeshing-1","spec":"webxrmeshing-1-1","status":"local","text":"XRMetadata","type":"dictionary","url":"#dictdef-xrmetadata"},
+"#dom-xrmeshblock-indices": {"export":true,"for_":["XRMeshBlock"],"level":"1","normative":true,"shortname":"webxrmeshing-1","spec":"webxrmeshing-1-1","status":"local","text":"indices","type":"dict-member","url":"#dom-xrmeshblock-indices"},
+"#dom-xrmeshblock-normals": {"export":true,"for_":["XRMeshBlock"],"level":"1","normative":true,"shortname":"webxrmeshing-1","spec":"webxrmeshing-1-1","status":"local","text":"normals","type":"dict-member","url":"#dom-xrmeshblock-normals"},
+"#dom-xrmeshblock-vertices": {"export":true,"for_":["XRMeshBlock"],"level":"1","normative":true,"shortname":"webxrmeshing-1","spec":"webxrmeshing-1-1","status":"local","text":"vertices","type":"dict-member","url":"#dom-xrmeshblock-vertices"},
+"#dom-xrmetadata-nearmesh": {"export":true,"for_":["XRMetadata"],"level":"1","normative":true,"shortname":"webxrmeshing-1","spec":"webxrmeshing-1-1","status":"local","text":"nearMesh","type":"dict-member","url":"#dom-xrmetadata-nearmesh"},
+"#dom-xrmetadata-worldmesh": {"export":true,"for_":["XRMetadata"],"level":"1","normative":true,"shortname":"webxrmeshing-1","spec":"webxrmeshing-1-1","status":"local","text":"worldMesh","type":"dict-member","url":"#dom-xrmetadata-worldmesh"},
+"#enumdef-xrmeshquality": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webxrmeshing-1","spec":"webxrmeshing-1-1","status":"local","text":"XRMeshQuality","type":"enum","url":"#enumdef-xrmeshquality"},
+"#xrnearmesh": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webxrmeshing-1","spec":"webxrmeshing-1-1","status":"local","text":"XRNearMesh","type":"interface","url":"#xrnearmesh"},
+"#xrworldmesh": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webxrmeshing-1","spec":"webxrmeshing-1-1","status":"local","text":"XRWorldMesh","type":"interface","url":"#xrworldmesh"},
+"https://immersive-web.github.io/webxr/#dom-xrsessionmode-immersive-ar": {"export":true,"for_":["XRSessionMode"],"level":"1","normative":true,"shortname":"webxr","spec":"webxr","status":"current","text":"immersive-ar","type":"enum-value","url":"https://immersive-web.github.io/webxr/#dom-xrsessionmode-immersive-ar"},
+"https://immersive-web.github.io/webxr/#xrframe": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webxr","spec":"webxr","status":"current","text":"XRFrame","type":"interface","url":"https://immersive-web.github.io/webxr/#xrframe"},
+"https://immersive-web.github.io/webxr/#xrsession": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webxr","spec":"webxr","status":"current","text":"XRSession","type":"interface","url":"https://immersive-web.github.io/webxr/#xrsession"},
+"https://webidl.spec.whatwg.org/#idl-DOMString": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"DOMString","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-DOMString"},
+"https://webidl.spec.whatwg.org/#idl-Float32Array": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"Float32Array","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-Float32Array"},
+"https://webidl.spec.whatwg.org/#idl-Uint16Array": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"Uint16Array","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-Uint16Array"},
+"https://webidl.spec.whatwg.org/#idl-double": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"double","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-double"},
+};
+
+function mkRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "Term: "),
+                mk.span({}, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    let forListElements;
+    if(forList.length == 0) {
+        forListElements = [];
+    } else if(forList.length == 1) {
+        forListElements = mk.li({},
+            mk.b({}, "For: "),
+            mk.span({}, forList[0]),
+        );
+    } else {
+        forListElements = mk.li({},
             mk.b({}, "For: "),
             mk.ul({},
                 ...forList.map(forItem =>
                     mk.li({},
-                        mk.span({}, `${forItem}`)
+                        mk.span({}, forItem)
                     ),
                 ),
             ),
         );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+    }
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    setupRefHintEventListeners(link, hintPanel);
+    return hintPanel;
+}
+
+function hideAllRefHints() {
+    queryAll(".ref-hint").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    if(refHint.teardownEventListeners) {
+        refHint.teardownEventListeners();
     }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+    refHint.remove();
+}
+
+function showRefHint(link) {
+    if(link.classList.contains("dfn-link")) return;
+    const url = link.getAttribute("href");
+    const ref = refsData[url];
+    if(!ref) return;
+
+    hideAllRefHints(); // Only display one at this time.
+
+    const refHint = mkRefHint(link, ref);
+    append(document.body, refHint);
+    link.setAttribute("aria-expanded", "true");
+    positionRefHint(refHint);
+}
+
+function setupRefHintEventListeners(link, refHint) {
+    if (refHint.teardownEventListeners) return;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
+
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
-
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
-    }
-
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
-        }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
-
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
-    }
-
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+document.addEventListener("DOMContentLoaded", () => {
+    document.body.addEventListener("mouseover", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
+    });
+    document.body.addEventListener("focus", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
     });
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['#enumdef-xrmeshquality'] = {"text": "XRMeshQuality", "type": "enum", "spec": "webxrmeshing-1-1", "shortname": "webxrmeshing-1", "level": "1", "status": "local", "url": "#enumdef-xrmeshquality", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-double'] = {"text": "double", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-double", "export": true, "normative": true, "for_": []};
-window.refsData['https://immersive-web.github.io/webxr/#dom-xrsessionmode-immersive-ar'] = {"text": "immersive-ar", "type": "enum-value", "spec": "webxr", "shortname": "webxr", "level": "1", "status": "current", "url": "https://immersive-web.github.io/webxr/#dom-xrsessionmode-immersive-ar", "export": true, "normative": true, "for_": ["XRSessionMode"]};
-window.refsData['https://immersive-web.github.io/webxr/#xrsession'] = {"text": "XRSession", "type": "interface", "spec": "webxr", "shortname": "webxr", "level": "1", "status": "current", "url": "https://immersive-web.github.io/webxr/#xrsession", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-Float32Array'] = {"text": "Float32Array", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-Float32Array", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-Uint16Array'] = {"text": "Uint16Array", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-Uint16Array", "export": true, "normative": true, "for_": []};
-window.refsData['#dictdef-xrmeshblock'] = {"text": "XRMeshBlock", "type": "dictionary", "spec": "webxrmeshing-1-1", "shortname": "webxrmeshing-1", "level": "1", "status": "local", "url": "#dictdef-xrmeshblock", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-xrmeshblock-vertices'] = {"text": "vertices", "type": "dict-member", "spec": "webxrmeshing-1-1", "shortname": "webxrmeshing-1", "level": "1", "status": "local", "url": "#dom-xrmeshblock-vertices", "export": true, "normative": true, "for_": ["XRMeshBlock"]};
-window.refsData['#dom-xrmeshblock-indices'] = {"text": "indices", "type": "dict-member", "spec": "webxrmeshing-1-1", "shortname": "webxrmeshing-1", "level": "1", "status": "local", "url": "#dom-xrmeshblock-indices", "export": true, "normative": true, "for_": ["XRMeshBlock"]};
-window.refsData['#dom-xrmeshblock-normals'] = {"text": "normals", "type": "dict-member", "spec": "webxrmeshing-1-1", "shortname": "webxrmeshing-1", "level": "1", "status": "local", "url": "#dom-xrmeshblock-normals", "export": true, "normative": true, "for_": ["XRMeshBlock"]};
-window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
-window.refsData['#xrworldmesh'] = {"text": "XRWorldMesh", "type": "interface", "spec": "webxrmeshing-1-1", "shortname": "webxrmeshing-1", "level": "1", "status": "local", "url": "#xrworldmesh", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-xrmetadata-worldmesh'] = {"text": "worldMesh", "type": "dict-member", "spec": "webxrmeshing-1-1", "shortname": "webxrmeshing-1", "level": "1", "status": "local", "url": "#dom-xrmetadata-worldmesh", "export": true, "normative": true, "for_": ["XRMetadata"]};
-window.refsData['#xrnearmesh'] = {"text": "XRNearMesh", "type": "interface", "spec": "webxrmeshing-1-1", "shortname": "webxrmeshing-1", "level": "1", "status": "local", "url": "#xrnearmesh", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-xrmetadata-nearmesh'] = {"text": "nearMesh", "type": "dict-member", "spec": "webxrmeshing-1-1", "shortname": "webxrmeshing-1", "level": "1", "status": "local", "url": "#dom-xrmetadata-nearmesh", "export": true, "normative": true, "for_": ["XRMetadata"]};
-window.refsData['https://immersive-web.github.io/webxr/#xrframe'] = {"text": "XRFrame", "type": "interface", "spec": "webxr", "shortname": "webxr", "level": "1", "status": "current", "url": "https://immersive-web.github.io/webxr/#xrframe", "export": true, "normative": true, "for_": []};
-window.refsData['#dictdef-xrmetadata'] = {"text": "XRMetadata", "type": "dictionary", "spec": "webxrmeshing-1-1", "shortname": "webxrmeshing-1", "level": "1", "status": "local", "url": "#dictdef-xrmetadata", "export": true, "normative": true, "for_": []};
 </script>

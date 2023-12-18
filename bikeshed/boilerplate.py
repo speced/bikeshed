@@ -192,19 +192,7 @@ def addExpiryNotice(doc: t.SpecT) -> None:
         boilerplate = "warning-expired"
     else:
         boilerplate = "warning-expires"
-        doc.extraScripts.set(
-            "expires",
-            """
-            const warning = document.querySelector('#expiry-notice');
-            const expiresOn = warning.dataset.expires;
-            const today = new Date().toISOString();
-            if(expires < today) {
-                warning.setAttribute("open", "");
-                for(const swap of warning.querySelectorAll("[data-after-expiry]")) {
-                    swap.textContent = swap.dataset.afterExpiry;
-                }
-            }""",
-        )
+        doc.extraJC.addExpires()
     loadBoilerplate(doc, boilerplate, "warning")
     h.addClass(doc, doc.body, boilerplate)
 
@@ -256,7 +244,7 @@ def w3cStylesheetInUse(doc: t.SpecT) -> bool:
 
 
 def addBikeshedBoilerplate(doc: t.SpecT) -> None:
-    for style in doc.extraStyles.getAll():
+    for style in doc.extraJC.getStyles():
         if "style-" + style.name not in doc.md.boilerplate:
             continue
         container = getFillContainer("style-" + style.name, doc)
@@ -264,7 +252,7 @@ def addBikeshedBoilerplate(doc: t.SpecT) -> None:
             container = getFillContainer("bs-styles", doc, default=True)
         if container is not None:
             h.appendChild(container, style.toElement(darkMode=doc.md.darkMode))
-    for script in doc.extraScripts.getAll():
+    for script in doc.extraJC.getScripts():
         if "script-" + script.name not in doc.md.boilerplate:
             continue
         container = getFillContainer("script-" + script.name, doc)
@@ -523,7 +511,6 @@ def addIndexOfExternallyDefinedTerms(doc: t.SpecT, container: t.ElementT) -> Non
 
     ul = h.E.ul({"class": "index"})
 
-    atLeastOnePanel = False
     for specName, specData in doc.externalRefsUsed.sorted():
         # Skip entries that are *solely* a biblio entry.
         if not specData.refs:
@@ -562,9 +549,6 @@ def addIndexOfExternallyDefinedTerms(doc: t.SpecT, container: t.ElementT) -> Non
                         entry = makeEntry(ref, refText)
                     h.appendChild(termsUl, h.E.li(entry))
                     dfnpanels.addExternalDfnPanel(entry, ref, doc)
-            atLeastOnePanel = True
-    if atLeastOnePanel:
-        dfnpanels.addExternalDfnPanelStyles(doc)
     h.appendChild(
         container,
         h.E.h3(
@@ -1025,14 +1009,7 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
                 },
             ),
         )
-        doc.extraStyles.set(
-            "hidedel",
-            """
-            #hidedel:checked ~ del, #hidedel:checked ~ * del { display:none; }
-            #hidedel ~ #hidedel-label::before, #hidedel ~ * #hidedel-label::before { content: "☐ "; }
-            #hidedel:checked ~ #hidedel-label::before, #hidedel:checked ~ * #hidedel-label::before { content: "☑ "; }
-        """,
-        )
+        doc.extraJC.addHidedel()
 
     # Merge "custom" metadata into non-custom, when they match up
     # and upgrade html-text values into real elements

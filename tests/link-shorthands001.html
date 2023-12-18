@@ -80,7 +80,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -486,7 +485,7 @@ a[href].issue-return {
 }
 
 .ref-hint {
-    display: none;
+    display: inline-block;
     position: absolute;
     z-index: 35;
     width: 20em;
@@ -502,16 +501,11 @@ a[href].issue-return {
     white-space: normal; /* in case it's moved into a pre */
 }
 
-.ref-hint.on {
-    display: inline-block;
-}
-
 .ref-hint * { margin: 0; padding: 0; text-indent: 0; }
 
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -748,436 +742,8 @@ dfn > a.self-link::before      { content: "#"; }
     </ul>
    <li><a href="#attr-valuedef-element-attribute-val-with-spaces">val with spaces</a><span>, in § 1</span>
   </ul>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['propdef-property'] = {"dfnID": "propdef-property", "url": "#propdef-property", "dfnText": "property", "refSections": [{"refs": [{"id": "ref-for-propdef-property"}, {"id": "ref-for-propdef-property\u2460"}, {"id": "ref-for-propdef-property\u2461"}, {"id": "ref-for-propdef-property\u2462"}, {"id": "ref-for-propdef-property\u2463"}], "title": "1. Test"}], "external": false};
-window.dfnpanelData['descdef-at-rule-descriptor'] = {"dfnID": "descdef-at-rule-descriptor", "url": "#descdef-at-rule-descriptor", "dfnText": "descriptor", "refSections": [{"refs": [{"id": "ref-for-descdef-at-rule-descriptor"}, {"id": "ref-for-descdef-at-rule-descriptor\u2460"}, {"id": "ref-for-descdef-at-rule-descriptor\u2461"}, {"id": "ref-for-descdef-at-rule-descriptor\u2462"}], "title": "1. Test"}], "external": false};
-window.dfnpanelData['at-ruledef-at-rule'] = {"dfnID": "at-ruledef-at-rule", "url": "#at-ruledef-at-rule", "dfnText": "@at-rule", "refSections": [{"refs": [{"id": "ref-for-at-ruledef-at-rule"}, {"id": "ref-for-at-ruledef-at-rule\u2460"}, {"id": "ref-for-at-ruledef-at-rule\u2461"}], "title": "1. Test"}], "external": false};
-window.dfnpanelData['typedef-type'] = {"dfnID": "typedef-type", "url": "#typedef-type", "dfnText": "<type>", "refSections": [{"refs": [{"id": "ref-for-typedef-type"}, {"id": "ref-for-typedef-type\u2460"}], "title": "1. Test"}], "external": false};
-window.dfnpanelData['funcdef-function'] = {"dfnID": "funcdef-function", "url": "#funcdef-function", "dfnText": "function(foo)", "refSections": [{"refs": [{"id": "ref-for-funcdef-function"}, {"id": "ref-for-funcdef-function\u2460"}, {"id": "ref-for-funcdef-function\u2461"}], "title": "1. Test"}], "external": false};
-window.dfnpanelData['property-value'] = {"dfnID": "property-value", "url": "#property-value", "dfnText": "value for property", "refSections": [{"refs": [{"id": "ref-for-property-value"}, {"id": "ref-for-property-value\u2460"}, {"id": "ref-for-property-value\u2461"}], "title": "1. Test"}], "external": false};
-window.dfnpanelData['descriptor-value'] = {"dfnID": "descriptor-value", "url": "#descriptor-value", "dfnText": "value for descriptor", "refSections": [{"refs": [{"id": "ref-for-descriptor-value"}, {"id": "ref-for-descriptor-value\u2460"}], "title": "1. Test"}], "external": false};
-window.dfnpanelData['type-value'] = {"dfnID": "type-value", "url": "#type-value", "dfnText": "value for <type>", "refSections": [{"refs": [{"id": "ref-for-type-value"}], "title": "1. Test"}], "external": false};
-window.dfnpanelData['valdef-property-property'] = {"dfnID": "valdef-property-property", "url": "#valdef-property-property", "dfnText": "value named \"property\"", "refSections": [{"refs": [{"id": "ref-for-valdef-property-property"}], "title": "1. Test"}], "external": false};
-window.dfnpanelData['valdef-property-different-value'] = {"dfnID": "valdef-property-different-value", "url": "#valdef-property-different-value", "dfnText": "different-value", "refSections": [{"refs": [{"id": "ref-for-valdef-property-different-value"}], "title": "1. Test"}], "external": false};
-window.dfnpanelData['valdef-property-bang'] = {"dfnID": "valdef-property-bang", "url": "#valdef-property-bang", "dfnText": "!bang", "refSections": [{"refs": [{"id": "ref-for-valdef-property-bang"}], "title": "1. Test"}], "external": false};
-window.dfnpanelData['valdef-property-double-bang'] = {"dfnID": "valdef-property-double-bang", "url": "#valdef-property-double-bang", "dfnText": "!!double-bang", "refSections": [{"refs": [{"id": "ref-for-valdef-property-double-bang"}], "title": "1. Test"}], "external": false};
-window.dfnpanelData['interface'] = {"dfnID": "interface", "url": "#interface", "dfnText": "Interface", "refSections": [{"refs": [{"id": "ref-for-interface"}], "title": "1. Test"}], "external": false};
-window.dfnpanelData['dom-interface-attribute'] = {"dfnID": "dom-interface-attribute", "url": "#dom-interface-attribute", "dfnText": "attribute", "refSections": [{"refs": [{"id": "ref-for-dom-interface-attribute"}, {"id": "ref-for-dom-interface-attribute\u2460"}, {"id": "ref-for-dom-interface-attribute\u2461"}, {"id": "ref-for-dom-interface-attribute\u2462"}], "title": "1. Test"}], "external": false};
-window.dfnpanelData['dom-interface-method'] = {"dfnID": "dom-interface-method", "url": "#dom-interface-method", "dfnText": "method()", "refSections": [{"refs": [{"id": "ref-for-dom-interface-method"}, {"id": "ref-for-dom-interface-method\u2460"}], "title": "1. Test"}], "external": false};
-window.dfnpanelData['dictdef-dictionary'] = {"dfnID": "dictdef-dictionary", "url": "#dictdef-dictionary", "dfnText": "Dictionary", "refSections": [{"refs": [{"id": "ref-for-dictdef-dictionary"}], "title": "1. Test"}], "external": false};
-window.dfnpanelData['interface-attr'] = {"dfnID": "interface-attr", "url": "#interface-attr", "dfnText": "attribute for Interface", "refSections": [{"refs": [{"id": "ref-for-interface-attr"}, {"id": "ref-for-interface-attr\u2460"}], "title": "1. Test"}], "external": false};
-window.dfnpanelData['dict-attr'] = {"dfnID": "dict-attr", "url": "#dict-attr", "dfnText": "attribute for Dictionary", "refSections": [{"refs": [{"id": "ref-for-dict-attr"}, {"id": "ref-for-dict-attr\u2460"}], "title": "1. Test"}], "external": false};
-window.dfnpanelData['elementdef-element'] = {"dfnID": "elementdef-element", "url": "#elementdef-element", "dfnText": "element", "refSections": [{"refs": [{"id": "ref-for-elementdef-element"}, {"id": "ref-for-elementdef-element\u2460"}], "title": "1. Test"}], "external": false};
-window.dfnpanelData['element-attrdef-element-attribute'] = {"dfnID": "element-attrdef-element-attribute", "url": "#element-attrdef-element-attribute", "dfnText": "attribute", "refSections": [{"refs": [{"id": "ref-for-element-attrdef-element-attribute"}, {"id": "ref-for-element-attrdef-element-attribute\u2460"}], "title": "1. Test"}], "external": false};
-window.dfnpanelData['elementdef-elements-can-have-dashes-too'] = {"dfnID": "elementdef-elements-can-have-dashes-too", "url": "#elementdef-elements-can-have-dashes-too", "dfnText": "elements-can-have-dashes-too", "refSections": [{"refs": [{"id": "ref-for-elementdef-elements-can-have-dashes-too"}], "title": "1. Test"}], "external": false};
-window.dfnpanelData['element-attrdef-element-attribute-with-dashes-because-attributes-can-have-dashes'] = {"dfnID": "element-attrdef-element-attribute-with-dashes-because-attributes-can-have-dashes", "url": "#element-attrdef-element-attribute-with-dashes-because-attributes-can-have-dashes", "dfnText": "attribute-with-dashes-because-attributes-can-have-dashes", "refSections": [{"refs": [{"id": "ref-for-element-attrdef-element-attribute-with-dashes-because-attributes-can-have-dashes"}], "title": "1. Test"}], "external": false};
-window.dfnpanelData['attr-valuedef-element-attribute-value'] = {"dfnID": "attr-valuedef-element-attribute-value", "url": "#attr-valuedef-element-attribute-value", "dfnText": "value", "refSections": [{"refs": [{"id": "ref-for-attr-valuedef-element-attribute-value"}, {"id": "ref-for-attr-valuedef-element-attribute-value\u2460"}], "title": "1. Test"}], "external": false};
-window.dfnpanelData['attr-valuedef-element-attribute-val-with-spaces'] = {"dfnID": "attr-valuedef-element-attribute-val-with-spaces", "url": "#attr-valuedef-element-attribute-val-with-spaces", "dfnText": "val with spaces", "refSections": [{"refs": [{"id": "ref-for-attr-valuedef-element-attribute-val-with-spaces"}], "title": "1. Test"}], "external": false};
-window.dfnpanelData['attr-valuedef-elements-can-have-dashes-too-attribute-with-dashes-because-attributes-can-have-dashes-another-value'] = {"dfnID": "attr-valuedef-elements-can-have-dashes-too-attribute-with-dashes-because-attributes-can-have-dashes-another-value", "url": "#attr-valuedef-elements-can-have-dashes-too-attribute-with-dashes-because-attributes-can-have-dashes-another-value", "dfnText": "another value", "refSections": [{"refs": [{"id": "ref-for-attr-valuedef-elements-can-have-dashes-too-attribute-with-dashes-because-attributes-can-have-dashes-another-value"}], "title": "1. Test"}], "external": false};
-window.dfnpanelData['dfn'] = {"dfnID": "dfn", "url": "#dfn", "dfnText": "dfn", "refSections": [{"refs": [{"id": "ref-for-dfn"}], "title": "1. Test"}], "external": false};
-window.dfnpanelData['abstract-opdef-abstractop'] = {"dfnID": "abstract-opdef-abstractop", "url": "#abstract-opdef-abstractop", "dfnText": "AbstractOp", "refSections": [{"refs": [{"id": "ref-for-abstract-opdef-abstractop"}], "title": "1. Test"}], "external": false};
-window.dfnpanelData['http-headerdef-header'] = {"dfnID": "http-headerdef-header", "url": "#http-headerdef-header", "dfnText": "header", "refSections": [{"refs": [{"id": "ref-for-http-headerdef-header"}, {"id": "ref-for-http-headerdef-header\u2460"}], "title": "1. Test"}], "external": false};
-window.dfnpanelData['http-headerdef-pseudo-header'] = {"dfnID": "http-headerdef-pseudo-header", "url": "#http-headerdef-pseudo-header", "dfnText": ":pseudo-header", "refSections": [{"refs": [{"id": "ref-for-http-headerdef-pseudo-header"}, {"id": "ref-for-http-headerdef-pseudo-header\u2460"}], "title": "1. Test"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -1371,11 +937,453 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"abstract-opdef-abstractop": {"dfnID":"abstract-opdef-abstractop","dfnText":"AbstractOp","external":false,"refSections":[{"refs":[{"id":"ref-for-abstract-opdef-abstractop"}],"title":"1. Test"}],"url":"#abstract-opdef-abstractop"},
+"at-ruledef-at-rule": {"dfnID":"at-ruledef-at-rule","dfnText":"@at-rule","external":false,"refSections":[{"refs":[{"id":"ref-for-at-ruledef-at-rule"},{"id":"ref-for-at-ruledef-at-rule\u2460"},{"id":"ref-for-at-ruledef-at-rule\u2461"}],"title":"1. Test"}],"url":"#at-ruledef-at-rule"},
+"attr-valuedef-element-attribute-val-with-spaces": {"dfnID":"attr-valuedef-element-attribute-val-with-spaces","dfnText":"val with spaces","external":false,"refSections":[{"refs":[{"id":"ref-for-attr-valuedef-element-attribute-val-with-spaces"}],"title":"1. Test"}],"url":"#attr-valuedef-element-attribute-val-with-spaces"},
+"attr-valuedef-element-attribute-value": {"dfnID":"attr-valuedef-element-attribute-value","dfnText":"value","external":false,"refSections":[{"refs":[{"id":"ref-for-attr-valuedef-element-attribute-value"},{"id":"ref-for-attr-valuedef-element-attribute-value\u2460"}],"title":"1. Test"}],"url":"#attr-valuedef-element-attribute-value"},
+"attr-valuedef-elements-can-have-dashes-too-attribute-with-dashes-because-attributes-can-have-dashes-another-value": {"dfnID":"attr-valuedef-elements-can-have-dashes-too-attribute-with-dashes-because-attributes-can-have-dashes-another-value","dfnText":"another value","external":false,"refSections":[{"refs":[{"id":"ref-for-attr-valuedef-elements-can-have-dashes-too-attribute-with-dashes-because-attributes-can-have-dashes-another-value"}],"title":"1. Test"}],"url":"#attr-valuedef-elements-can-have-dashes-too-attribute-with-dashes-because-attributes-can-have-dashes-another-value"},
+"descdef-at-rule-descriptor": {"dfnID":"descdef-at-rule-descriptor","dfnText":"descriptor","external":false,"refSections":[{"refs":[{"id":"ref-for-descdef-at-rule-descriptor"},{"id":"ref-for-descdef-at-rule-descriptor\u2460"},{"id":"ref-for-descdef-at-rule-descriptor\u2461"},{"id":"ref-for-descdef-at-rule-descriptor\u2462"}],"title":"1. Test"}],"url":"#descdef-at-rule-descriptor"},
+"descriptor-value": {"dfnID":"descriptor-value","dfnText":"value for descriptor","external":false,"refSections":[{"refs":[{"id":"ref-for-descriptor-value"},{"id":"ref-for-descriptor-value\u2460"}],"title":"1. Test"}],"url":"#descriptor-value"},
+"dfn": {"dfnID":"dfn","dfnText":"dfn","external":false,"refSections":[{"refs":[{"id":"ref-for-dfn"}],"title":"1. Test"}],"url":"#dfn"},
+"dict-attr": {"dfnID":"dict-attr","dfnText":"attribute for Dictionary","external":false,"refSections":[{"refs":[{"id":"ref-for-dict-attr"},{"id":"ref-for-dict-attr\u2460"}],"title":"1. Test"}],"url":"#dict-attr"},
+"dictdef-dictionary": {"dfnID":"dictdef-dictionary","dfnText":"Dictionary","external":false,"refSections":[{"refs":[{"id":"ref-for-dictdef-dictionary"}],"title":"1. Test"}],"url":"#dictdef-dictionary"},
+"dom-interface-attribute": {"dfnID":"dom-interface-attribute","dfnText":"attribute","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-interface-attribute"},{"id":"ref-for-dom-interface-attribute\u2460"},{"id":"ref-for-dom-interface-attribute\u2461"},{"id":"ref-for-dom-interface-attribute\u2462"}],"title":"1. Test"}],"url":"#dom-interface-attribute"},
+"dom-interface-method": {"dfnID":"dom-interface-method","dfnText":"method()","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-interface-method"},{"id":"ref-for-dom-interface-method\u2460"}],"title":"1. Test"}],"url":"#dom-interface-method"},
+"element-attrdef-element-attribute": {"dfnID":"element-attrdef-element-attribute","dfnText":"attribute","external":false,"refSections":[{"refs":[{"id":"ref-for-element-attrdef-element-attribute"},{"id":"ref-for-element-attrdef-element-attribute\u2460"}],"title":"1. Test"}],"url":"#element-attrdef-element-attribute"},
+"element-attrdef-element-attribute-with-dashes-because-attributes-can-have-dashes": {"dfnID":"element-attrdef-element-attribute-with-dashes-because-attributes-can-have-dashes","dfnText":"attribute-with-dashes-because-attributes-can-have-dashes","external":false,"refSections":[{"refs":[{"id":"ref-for-element-attrdef-element-attribute-with-dashes-because-attributes-can-have-dashes"}],"title":"1. Test"}],"url":"#element-attrdef-element-attribute-with-dashes-because-attributes-can-have-dashes"},
+"elementdef-element": {"dfnID":"elementdef-element","dfnText":"element","external":false,"refSections":[{"refs":[{"id":"ref-for-elementdef-element"},{"id":"ref-for-elementdef-element\u2460"}],"title":"1. Test"}],"url":"#elementdef-element"},
+"elementdef-elements-can-have-dashes-too": {"dfnID":"elementdef-elements-can-have-dashes-too","dfnText":"elements-can-have-dashes-too","external":false,"refSections":[{"refs":[{"id":"ref-for-elementdef-elements-can-have-dashes-too"}],"title":"1. Test"}],"url":"#elementdef-elements-can-have-dashes-too"},
+"funcdef-function": {"dfnID":"funcdef-function","dfnText":"function(foo)","external":false,"refSections":[{"refs":[{"id":"ref-for-funcdef-function"},{"id":"ref-for-funcdef-function\u2460"},{"id":"ref-for-funcdef-function\u2461"}],"title":"1. Test"}],"url":"#funcdef-function"},
+"http-headerdef-header": {"dfnID":"http-headerdef-header","dfnText":"header","external":false,"refSections":[{"refs":[{"id":"ref-for-http-headerdef-header"},{"id":"ref-for-http-headerdef-header\u2460"}],"title":"1. Test"}],"url":"#http-headerdef-header"},
+"http-headerdef-pseudo-header": {"dfnID":"http-headerdef-pseudo-header","dfnText":":pseudo-header","external":false,"refSections":[{"refs":[{"id":"ref-for-http-headerdef-pseudo-header"},{"id":"ref-for-http-headerdef-pseudo-header\u2460"}],"title":"1. Test"}],"url":"#http-headerdef-pseudo-header"},
+"interface": {"dfnID":"interface","dfnText":"Interface","external":false,"refSections":[{"refs":[{"id":"ref-for-interface"}],"title":"1. Test"}],"url":"#interface"},
+"interface-attr": {"dfnID":"interface-attr","dfnText":"attribute for Interface","external":false,"refSections":[{"refs":[{"id":"ref-for-interface-attr"},{"id":"ref-for-interface-attr\u2460"}],"title":"1. Test"}],"url":"#interface-attr"},
+"propdef-property": {"dfnID":"propdef-property","dfnText":"property","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-property"},{"id":"ref-for-propdef-property\u2460"},{"id":"ref-for-propdef-property\u2461"},{"id":"ref-for-propdef-property\u2462"},{"id":"ref-for-propdef-property\u2463"}],"title":"1. Test"}],"url":"#propdef-property"},
+"property-value": {"dfnID":"property-value","dfnText":"value for property","external":false,"refSections":[{"refs":[{"id":"ref-for-property-value"},{"id":"ref-for-property-value\u2460"},{"id":"ref-for-property-value\u2461"}],"title":"1. Test"}],"url":"#property-value"},
+"type-value": {"dfnID":"type-value","dfnText":"value for <type>","external":false,"refSections":[{"refs":[{"id":"ref-for-type-value"}],"title":"1. Test"}],"url":"#type-value"},
+"typedef-type": {"dfnID":"typedef-type","dfnText":"<type>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-type"},{"id":"ref-for-typedef-type\u2460"}],"title":"1. Test"}],"url":"#typedef-type"},
+"valdef-property-bang": {"dfnID":"valdef-property-bang","dfnText":"!bang","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-property-bang"}],"title":"1. Test"}],"url":"#valdef-property-bang"},
+"valdef-property-different-value": {"dfnID":"valdef-property-different-value","dfnText":"different-value","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-property-different-value"}],"title":"1. Test"}],"url":"#valdef-property-different-value"},
+"valdef-property-double-bang": {"dfnID":"valdef-property-double-bang","dfnText":"!!double-bang","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-property-double-bang"}],"title":"1. Test"}],"url":"#valdef-property-double-bang"},
+"valdef-property-property": {"dfnID":"valdef-property-property","dfnText":"value named \"property\"","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-property-property"}],"title":"1. Test"}],"url":"#valdef-property-property"},
+};
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+});
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        dfn.panelData = panelData;
+        insertDfnPopupAction(dfn);
+    }
+}
+
+function genDfnPanel(dfn, { dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel on",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel({dfnPanel});
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.dfn = dfn;
+    dfn.dfnPanel = dfnPanel;
+    return dfnPanel;
+}
+
+
+
+function hideAllDfnPanels() {
+    // Delete the currently-active dfn panel.
+    queryAll(".dfn-panel").forEach(dfnPanel=>hideDfnPanel({dfnPanel}));
+}
+
+function showDfnPanel(dfn) {
+    hideAllDfnPanels(); // Only display one at a time.
+
+    dfn.setAttribute("aria-expanded", "true");
+
+    const dfnPanel = genDfnPanel(dfn, dfn.panelData);
+
+    // Give the dfn a unique tabindex, and then
+    // give all the tabbable panel bits successive indexes.
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+
+    append(document.body, dfnPanel);
+    positionDfnPanel(dfnPanel);
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.dfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }
+}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel({dfn, dfnPanel}) {
+    if(!dfnPanel) dfnPanel = dfn.dfnPanel;
+    if(!dfn) dfn = dfnPanel.dfn;
+    dfn.dfnPanel = undefined;
+    dfnPanel.dfn = undefined;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.remove()
+}
+
+function toggleDfnPanel(dfn) {
+    if(dfn.dfnPanel) {
+        hideDfnPanel(dfn);
+    } else {
+        showDfnPanel(dfn);
+    }
+}
+
+function insertDfnPopupAction(dfn) {
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        toggleDfnPanel(dfn);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+function needsFor(type) {
+    switch(type) {
+        case "descriptor":
+        case "value":
+        case "element-attr":
+        case "attr-value":
+        case "element-state":
+        case "method":
+        case "constructor":
+        case "argument":
+        case "attribute":
+        case "const":
+        case "dict-member":
+        case "event":
+        case "enum-value":
+        case "stringifier":
+        case "serializer":
+        case "iterator":
+        case "maplike":
+        case "setlike":
+        case "state":
+        case "mode":
+        case "context":
+        case "facet": return true;
+
+        default: return false;
+    }
+}
+function refusesFor(type) {
+    switch(type) {
+        case "property":
+        case "element":
+        case "interface":
+        case "namespace":
+        case "callback":
+        case "dictionary":
+        case "enum":
+        case "exception":
+        case "typedef":
+        case "http-header":
+        case "permission": return true;
+
+        default: return false;
+    }
+}
+function linkFormatterFromType(type) {
+    switch(type) {
+        case 'scheme':
+        case 'permission':
+        case 'dfn': return (text) => `[=${text}=]`;
+
+        case 'abstract-op': return (text) => `[\$${text}\$]`;
+
+        case 'function':
+        case 'at-rule':
+        case 'selector':
+        case 'value': return (text) => `''${text}''`;
+
+        case 'http-header': return (text) => `[:${text}:]`;
+
+        case 'interface':
+        case 'constructor':
+        case 'method':
+        case 'argument':
+        case 'attribute':
+        case 'callback':
+        case 'dictionary':
+        case 'dict-member':
+        case 'enum':
+        case 'enum-value':
+        case 'exception':
+        case 'const':
+        case 'typedef':
+        case 'stringifier':
+        case 'serializer':
+        case 'iterator':
+        case 'maplike':
+        case 'setlike':
+        case 'extended-attribute':
+        case 'event':
+        case 'idl': return (text) => `{{${text}}}`;
+
+        case 'element-state':
+        case 'element-attr':
+        case 'attr-value':
+        case 'element': return (element) => `<{${element}}>`;
+
+        case 'grammar': return (text) => `${text} (within a <pre class=prod>)`;
+
+        case 'type': return (text)=> `<<${text}>>`;
+
+        case 'descriptor':
+        case 'property': return (text) => `'${text}'`;
+
+        default: return;
+    };
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!needsFor(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!refusesFor(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
 }
 </script>
 <script>/* Boilerplate: script-link-titles */
+"use strict";
+{
 let linkTitleData = {
- "#typedef-type": "Expands to: value"
+"#typedef-type": "Expands to: value",
 };
 
 function setTypeTitles() {
@@ -1387,245 +1395,235 @@ function setTypeTitles() {
 }
 
 document.addEventListener("DOMContentLoaded", setTypeTitles);
+}
 </script>
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
-                mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
+let refsData = {
+"#abstract-opdef-abstractop": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"foo","spec":"foo-1","status":"local","text":"AbstractOp","type":"abstract-op","url":"#abstract-opdef-abstractop"},
+"#at-ruledef-at-rule": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"foo","spec":"foo-1","status":"local","text":"@at-rule","type":"at-rule","url":"#at-ruledef-at-rule"},
+"#attr-valuedef-element-attribute-val-with-spaces": {"export":true,"for_":["element/attribute"],"level":"1","normative":true,"shortname":"foo","spec":"foo-1","status":"local","text":"val with spaces","type":"attr-value","url":"#attr-valuedef-element-attribute-val-with-spaces"},
+"#attr-valuedef-element-attribute-value": {"export":true,"for_":["element/attribute"],"level":"1","normative":true,"shortname":"foo","spec":"foo-1","status":"local","text":"value","type":"attr-value","url":"#attr-valuedef-element-attribute-value"},
+"#attr-valuedef-elements-can-have-dashes-too-attribute-with-dashes-because-attributes-can-have-dashes-another-value": {"export":true,"for_":["elements-can-have-dashes-too/attribute-with-dashes-because-attributes-can-have-dashes"],"level":"1","normative":true,"shortname":"foo","spec":"foo-1","status":"local","text":"another value","type":"attr-value","url":"#attr-valuedef-elements-can-have-dashes-too-attribute-with-dashes-because-attributes-can-have-dashes-another-value"},
+"#descdef-at-rule-descriptor": {"export":true,"for_":["@at-rule"],"level":"1","normative":true,"shortname":"foo","spec":"foo-1","status":"local","text":"descriptor","type":"descriptor","url":"#descdef-at-rule-descriptor"},
+"#descriptor-value": {"export":true,"for_":["@at-rule/descriptor","descriptor"],"level":"1","normative":true,"shortname":"foo","spec":"foo-1","status":"local","text":"value","type":"value","url":"#descriptor-value"},
+"#dfn": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"foo","spec":"foo-1","status":"local","text":"dfn","type":"dfn","url":"#dfn"},
+"#dict-attr": {"export":true,"for_":["Dictionary"],"level":"1","normative":true,"shortname":"foo","spec":"foo-1","status":"local","text":"ambiguous-attr","type":"dict-member","url":"#dict-attr"},
+"#dictdef-dictionary": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"foo","spec":"foo-1","status":"local","text":"Dictionary","type":"dictionary","url":"#dictdef-dictionary"},
+"#dom-interface-attribute": {"export":true,"for_":["Interface"],"level":"1","normative":true,"shortname":"foo","spec":"foo-1","status":"local","text":"attribute","type":"attribute","url":"#dom-interface-attribute"},
+"#dom-interface-method": {"export":true,"for_":["Interface"],"level":"1","normative":true,"shortname":"foo","spec":"foo-1","status":"local","text":"method()","type":"method","url":"#dom-interface-method"},
+"#element-attrdef-element-attribute": {"export":true,"for_":["element"],"level":"1","normative":true,"shortname":"foo","spec":"foo-1","status":"local","text":"attribute","type":"element-attr","url":"#element-attrdef-element-attribute"},
+"#element-attrdef-element-attribute-with-dashes-because-attributes-can-have-dashes": {"export":true,"for_":["element"],"level":"1","normative":true,"shortname":"foo","spec":"foo-1","status":"local","text":"attribute-with-dashes-because-attributes-can-have-dashes","type":"element-attr","url":"#element-attrdef-element-attribute-with-dashes-because-attributes-can-have-dashes"},
+"#elementdef-element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"foo","spec":"foo-1","status":"local","text":"element","type":"element","url":"#elementdef-element"},
+"#elementdef-elements-can-have-dashes-too": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"foo","spec":"foo-1","status":"local","text":"elements-can-have-dashes-too","type":"element","url":"#elementdef-elements-can-have-dashes-too"},
+"#funcdef-function": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"foo","spec":"foo-1","status":"local","text":"function()","type":"function","url":"#funcdef-function"},
+"#http-headerdef-header": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"foo","spec":"foo-1","status":"local","text":"header","type":"http-header","url":"#http-headerdef-header"},
+"#http-headerdef-pseudo-header": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"foo","spec":"foo-1","status":"local","text":":pseudo-header","type":"http-header","url":"#http-headerdef-pseudo-header"},
+"#interface": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"foo","spec":"foo-1","status":"local","text":"Interface","type":"interface","url":"#interface"},
+"#interface-attr": {"export":true,"for_":["Interface"],"level":"1","normative":true,"shortname":"foo","spec":"foo-1","status":"local","text":"ambiguous-attr","type":"attribute","url":"#interface-attr"},
+"#propdef-property": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"foo","spec":"foo-1","status":"local","text":"property","type":"property","url":"#propdef-property"},
+"#property-value": {"export":true,"for_":["property"],"level":"1","normative":true,"shortname":"foo","spec":"foo-1","status":"local","text":"value","type":"value","url":"#property-value"},
+"#type-value": {"export":true,"for_":["<type>"],"level":"1","normative":true,"shortname":"foo","spec":"foo-1","status":"local","text":"value","type":"value","url":"#type-value"},
+"#typedef-type": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"foo","spec":"foo-1","status":"local","text":"<type>","type":"type","url":"#typedef-type"},
+"#valdef-property-bang": {"export":true,"for_":["property"],"level":"1","normative":true,"shortname":"foo","spec":"foo-1","status":"local","text":"!bang","type":"value","url":"#valdef-property-bang"},
+"#valdef-property-different-value": {"export":true,"for_":["property"],"level":"1","normative":true,"shortname":"foo","spec":"foo-1","status":"local","text":"different-value","type":"value","url":"#valdef-property-different-value"},
+"#valdef-property-double-bang": {"export":true,"for_":["property"],"level":"1","normative":true,"shortname":"foo","spec":"foo-1","status":"local","text":"!!double-bang","type":"value","url":"#valdef-property-double-bang"},
+"#valdef-property-property": {"export":true,"for_":["property"],"level":"1","normative":true,"shortname":"foo","spec":"foo-1","status":"local","text":"property","type":"value","url":"#valdef-property-property"},
+};
+
+function mkRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "Term: "),
+                mk.span({}, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    let forListElements;
+    if(forList.length == 0) {
+        forListElements = [];
+    } else if(forList.length == 1) {
+        forListElements = mk.li({},
+            mk.b({}, "For: "),
+            mk.span({}, forList[0]),
+        );
+    } else {
+        forListElements = mk.li({},
             mk.b({}, "For: "),
             mk.ul({},
                 ...forList.map(forItem =>
                     mk.li({},
-                        mk.span({}, `${forItem}`)
+                        mk.span({}, forItem)
                     ),
                 ),
             ),
         );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+    }
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    setupRefHintEventListeners(link, hintPanel);
+    return hintPanel;
+}
+
+function hideAllRefHints() {
+    queryAll(".ref-hint").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    if(refHint.teardownEventListeners) {
+        refHint.teardownEventListeners();
     }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+    refHint.remove();
+}
+
+function showRefHint(link) {
+    if(link.classList.contains("dfn-link")) return;
+    const url = link.getAttribute("href");
+    const ref = refsData[url];
+    if(!ref) return;
+
+    hideAllRefHints(); // Only display one at this time.
+
+    const refHint = mkRefHint(link, ref);
+    append(document.body, refHint);
+    link.setAttribute("aria-expanded", "true");
+    positionRefHint(refHint);
+}
+
+function setupRefHintEventListeners(link, refHint) {
+    if (refHint.teardownEventListeners) return;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
+
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
-
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
-    }
-
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
-        }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
-
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
-    }
-
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+document.addEventListener("DOMContentLoaded", () => {
+    document.body.addEventListener("mouseover", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
+    });
+    document.body.addEventListener("focus", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
     });
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['#propdef-property'] = {"text": "property", "type": "property", "spec": "foo-1", "shortname": "foo", "level": "1", "status": "local", "url": "#propdef-property", "export": true, "normative": true, "for_": []};
-window.refsData['#descdef-at-rule-descriptor'] = {"text": "descriptor", "type": "descriptor", "spec": "foo-1", "shortname": "foo", "level": "1", "status": "local", "url": "#descdef-at-rule-descriptor", "export": true, "normative": true, "for_": ["@at-rule"]};
-window.refsData['#at-ruledef-at-rule'] = {"text": "@at-rule", "type": "at-rule", "spec": "foo-1", "shortname": "foo", "level": "1", "status": "local", "url": "#at-ruledef-at-rule", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-type'] = {"text": "<type>", "type": "type", "spec": "foo-1", "shortname": "foo", "level": "1", "status": "local", "url": "#typedef-type", "export": true, "normative": true, "for_": []};
-window.refsData['#funcdef-function'] = {"text": "function()", "type": "function", "spec": "foo-1", "shortname": "foo", "level": "1", "status": "local", "url": "#funcdef-function", "export": true, "normative": true, "for_": []};
-window.refsData['#property-value'] = {"text": "value", "type": "value", "spec": "foo-1", "shortname": "foo", "level": "1", "status": "local", "url": "#property-value", "export": true, "normative": true, "for_": ["property"]};
-window.refsData['#descriptor-value'] = {"text": "value", "type": "value", "spec": "foo-1", "shortname": "foo", "level": "1", "status": "local", "url": "#descriptor-value", "export": true, "normative": true, "for_": ["@at-rule/descriptor", "descriptor"]};
-window.refsData['#valdef-property-property'] = {"text": "property", "type": "value", "spec": "foo-1", "shortname": "foo", "level": "1", "status": "local", "url": "#valdef-property-property", "export": true, "normative": true, "for_": ["property"]};
-window.refsData['#type-value'] = {"text": "value", "type": "value", "spec": "foo-1", "shortname": "foo", "level": "1", "status": "local", "url": "#type-value", "export": true, "normative": true, "for_": ["<type>"]};
-window.refsData['#valdef-property-different-value'] = {"text": "different-value", "type": "value", "spec": "foo-1", "shortname": "foo", "level": "1", "status": "local", "url": "#valdef-property-different-value", "export": true, "normative": true, "for_": ["property"]};
-window.refsData['#valdef-property-bang'] = {"text": "!bang", "type": "value", "spec": "foo-1", "shortname": "foo", "level": "1", "status": "local", "url": "#valdef-property-bang", "export": true, "normative": true, "for_": ["property"]};
-window.refsData['#valdef-property-double-bang'] = {"text": "!!double-bang", "type": "value", "spec": "foo-1", "shortname": "foo", "level": "1", "status": "local", "url": "#valdef-property-double-bang", "export": true, "normative": true, "for_": ["property"]};
-window.refsData['#interface'] = {"text": "Interface", "type": "interface", "spec": "foo-1", "shortname": "foo", "level": "1", "status": "local", "url": "#interface", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-interface-attribute'] = {"text": "attribute", "type": "attribute", "spec": "foo-1", "shortname": "foo", "level": "1", "status": "local", "url": "#dom-interface-attribute", "export": true, "normative": true, "for_": ["Interface"]};
-window.refsData['#dom-interface-method'] = {"text": "method()", "type": "method", "spec": "foo-1", "shortname": "foo", "level": "1", "status": "local", "url": "#dom-interface-method", "export": true, "normative": true, "for_": ["Interface"]};
-window.refsData['#dictdef-dictionary'] = {"text": "Dictionary", "type": "dictionary", "spec": "foo-1", "shortname": "foo", "level": "1", "status": "local", "url": "#dictdef-dictionary", "export": true, "normative": true, "for_": []};
-window.refsData['#interface-attr'] = {"text": "ambiguous-attr", "type": "attribute", "spec": "foo-1", "shortname": "foo", "level": "1", "status": "local", "url": "#interface-attr", "export": true, "normative": true, "for_": ["Interface"]};
-window.refsData['#dict-attr'] = {"text": "ambiguous-attr", "type": "dict-member", "spec": "foo-1", "shortname": "foo", "level": "1", "status": "local", "url": "#dict-attr", "export": true, "normative": true, "for_": ["Dictionary"]};
-window.refsData['#elementdef-element'] = {"text": "element", "type": "element", "spec": "foo-1", "shortname": "foo", "level": "1", "status": "local", "url": "#elementdef-element", "export": true, "normative": true, "for_": []};
-window.refsData['#element-attrdef-element-attribute'] = {"text": "attribute", "type": "element-attr", "spec": "foo-1", "shortname": "foo", "level": "1", "status": "local", "url": "#element-attrdef-element-attribute", "export": true, "normative": true, "for_": ["element"]};
-window.refsData['#element-attrdef-element-attribute-with-dashes-because-attributes-can-have-dashes'] = {"text": "attribute-with-dashes-because-attributes-can-have-dashes", "type": "element-attr", "spec": "foo-1", "shortname": "foo", "level": "1", "status": "local", "url": "#element-attrdef-element-attribute-with-dashes-because-attributes-can-have-dashes", "export": true, "normative": true, "for_": ["element"]};
-window.refsData['#elementdef-elements-can-have-dashes-too'] = {"text": "elements-can-have-dashes-too", "type": "element", "spec": "foo-1", "shortname": "foo", "level": "1", "status": "local", "url": "#elementdef-elements-can-have-dashes-too", "export": true, "normative": true, "for_": []};
-window.refsData['#attr-valuedef-element-attribute-value'] = {"text": "value", "type": "attr-value", "spec": "foo-1", "shortname": "foo", "level": "1", "status": "local", "url": "#attr-valuedef-element-attribute-value", "export": true, "normative": true, "for_": ["element/attribute"]};
-window.refsData['#attr-valuedef-element-attribute-val-with-spaces'] = {"text": "val with spaces", "type": "attr-value", "spec": "foo-1", "shortname": "foo", "level": "1", "status": "local", "url": "#attr-valuedef-element-attribute-val-with-spaces", "export": true, "normative": true, "for_": ["element/attribute"]};
-window.refsData['#attr-valuedef-elements-can-have-dashes-too-attribute-with-dashes-because-attributes-can-have-dashes-another-value'] = {"text": "another value", "type": "attr-value", "spec": "foo-1", "shortname": "foo", "level": "1", "status": "local", "url": "#attr-valuedef-elements-can-have-dashes-too-attribute-with-dashes-because-attributes-can-have-dashes-another-value", "export": true, "normative": true, "for_": ["elements-can-have-dashes-too/attribute-with-dashes-because-attributes-can-have-dashes"]};
-window.refsData['#dfn'] = {"text": "dfn", "type": "dfn", "spec": "foo-1", "shortname": "foo", "level": "1", "status": "local", "url": "#dfn", "export": true, "normative": true, "for_": []};
-window.refsData['#abstract-opdef-abstractop'] = {"text": "AbstractOp", "type": "abstract-op", "spec": "foo-1", "shortname": "foo", "level": "1", "status": "local", "url": "#abstract-opdef-abstractop", "export": true, "normative": true, "for_": []};
-window.refsData['#http-headerdef-header'] = {"text": "header", "type": "http-header", "spec": "foo-1", "shortname": "foo", "level": "1", "status": "local", "url": "#http-headerdef-header", "export": true, "normative": true, "for_": []};
-window.refsData['#http-headerdef-pseudo-header'] = {"text": ":pseudo-header", "type": "http-header", "spec": "foo-1", "shortname": "foo", "level": "1", "status": "local", "url": "#http-headerdef-pseudo-header", "export": true, "normative": true, "for_": []};
 </script>

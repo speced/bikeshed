@@ -1,0 +1,1 @@
+Put css/js files here when they don't otherwise have a module home to live in. (They don't belong at the top level, that's cluttered enough already.)

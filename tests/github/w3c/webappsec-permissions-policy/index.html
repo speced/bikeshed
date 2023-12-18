@@ -94,7 +94,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -468,6 +467,11 @@ figcaption:not(.no-marker)::before {
     }
 }
 </style>
+<style>/* Boilerplate: style-idl-highlighting */
+pre.idl.highlight {
+    background: var(--borderedblock-bg, var(--def-bg));
+}
+</style>
 <style>/* Boilerplate: style-issues */
 a[href].issue-return {
     float: right;
@@ -720,7 +724,7 @@ a[href].issue-return {
 }
 
 .ref-hint {
-    display: none;
+    display: inline-block;
     position: absolute;
     z-index: 35;
     width: 20em;
@@ -736,16 +740,11 @@ a[href].issue-return {
     white-space: normal; /* in case it's moved into a pre */
 }
 
-.ref-hint.on {
-    display: inline-block;
-}
-
 .ref-hint * { margin: 0; padding: 0; text-indent: 0; }
 
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -805,7 +804,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -862,7 +860,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -939,14 +936,14 @@ D50 2deg illuminant, L in [0,100], a and b in [-128, 128]
 5 = lab(85,-10,-50)
 6 = lab(85,35,-15)
 */
-var { cursor: pointer; }
-var.selected0 { background-color: #F4D200; box-shadow: 0 0 0 2px #F4D200; }
-var.selected1 { background-color: #FF87A2; box-shadow: 0 0 0 2px #FF87A2; }
-var.selected2 { background-color: #96E885; box-shadow: 0 0 0 2px #96E885; }
-var.selected3 { background-color: #3EEED2; box-shadow: 0 0 0 2px #3EEED2; }
-var.selected4 { background-color: #EACFB6; box-shadow: 0 0 0 2px #EACFB6; }
-var.selected5 { background-color: #82DDFF; box-shadow: 0 0 0 2px #82DDFF; }
-var.selected6 { background-color: #FFBCF2; box-shadow: 0 0 0 2px #FFBCF2; }
+[data-algorithm] var { cursor: pointer; }
+var[data-var-color="0"] { background-color: #F4D200; box-shadow: 0 0 0 2px #F4D200; }
+var[data-var-color="1"] { background-color: #FF87A2; box-shadow: 0 0 0 2px #FF87A2; }
+var[data-var-color="2"] { background-color: #96E885; box-shadow: 0 0 0 2px #96E885; }
+var[data-var-color="3"] { background-color: #3EEED2; box-shadow: 0 0 0 2px #3EEED2; }
+var[data-var-color="4"] { background-color: #EACFB6; box-shadow: 0 0 0 2px #EACFB6; }
+var[data-var-color="5"] { background-color: #82DDFF; box-shadow: 0 0 0 2px #82DDFF; }
+var[data-var-color="6"] { background-color: #FFBCF2; box-shadow: 0 0 0 2px #FFBCF2; }
 </style>
  <body class="h-entry">
   <div class="head">
@@ -2583,502 +2580,8 @@ set <var>body</var>’s <a data-link-type="dfn" href="#permissionspolicyviolatio
     </div>
    </div>
   </details>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['8ea172e9'] = {"dfnID": "8ea172e9", "url": "https://w3c.github.io/webappsec-csp/#sandbox", "dfnText": "sandbox", "refSections": [{"refs": [{"id": "ref-for-sandbox"}], "title": "3. Other and related mechanisms"}], "external": true};
-window.dfnpanelData['85394472'] = {"dfnID": "85394472", "url": "https://dom.spec.whatwg.org/#document", "dfnText": "Document", "refSections": [{"refs": [{"id": "ref-for-document"}, {"id": "ref-for-document\u2460"}], "title": "4.3. Inherited policies"}, {"refs": [{"id": "ref-for-document\u2461"}, {"id": "ref-for-document\u2462"}, {"id": "ref-for-document\u2463"}, {"id": "ref-for-document\u2464"}, {"id": "ref-for-document\u2465"}, {"id": "ref-for-document\u2466"}, {"id": "ref-for-document\u2467"}], "title": "7.2. The permissionsPolicy object"}, {"refs": [{"id": "ref-for-document\u2468"}], "title": "9.9. Is feature enabled in document for origin?"}], "external": true};
-window.dfnpanelData['296f3551'] = {"dfnID": "296f3551", "url": "https://dom.spec.whatwg.org/#element", "dfnText": "Element", "refSections": [{"refs": [{"id": "ref-for-element"}, {"id": "ref-for-element\u2460"}], "title": "7.2. The permissionsPolicy object"}], "external": true};
-window.dfnpanelData['96c16e60'] = {"dfnID": "96c16e60", "url": "https://dom.spec.whatwg.org/#node", "dfnText": "Node", "refSections": [{"refs": [{"id": "ref-for-node"}], "title": "7.2. The permissionsPolicy object"}], "external": true};
-window.dfnpanelData['a973e0fe'] = {"dfnID": "a973e0fe", "url": "https://dom.spec.whatwg.org/#concept-document", "dfnText": "document", "refSections": [{"refs": [{"id": "ref-for-concept-document"}], "title": "8. Reporting"}], "external": true};
-window.dfnpanelData['5216e1a0'] = {"dfnID": "5216e1a0", "url": "https://dom.spec.whatwg.org/#concept-node-document", "dfnText": "node document", "refSections": [{"refs": [{"id": "ref-for-concept-node-document"}, {"id": "ref-for-concept-node-document\u2460"}, {"id": "ref-for-concept-node-document\u2461"}, {"id": "ref-for-concept-node-document\u2462"}], "title": "7.2. The permissionsPolicy object"}, {"refs": [{"id": "ref-for-concept-node-document\u2463"}, {"id": "ref-for-concept-node-document\u2464"}], "title": "9.8. Define an inherited policy for feature in container at origin"}], "external": true};
-window.dfnpanelData['5c66de35'] = {"dfnID": "5c66de35", "url": "https://fetch.spec.whatwg.org/#concept-header-list-get-structured-header", "dfnText": "get a structured field value", "refSections": [{"refs": [{"id": "ref-for-concept-header-list-get-structured-header"}], "title": "9.1. Process response policy"}], "external": true};
-window.dfnpanelData['f78d5b5c'] = {"dfnID": "f78d5b5c", "url": "https://fetch.spec.whatwg.org/#concept-request-origin", "dfnText": "origin", "refSections": [{"refs": [{"id": "ref-for-concept-request-origin"}], "title": "9.11. Should request be allowed to use feature?"}], "external": true};
-window.dfnpanelData['55213b5b'] = {"dfnID": "55213b5b", "url": "https://fetch.spec.whatwg.org/#concept-request", "dfnText": "request", "refSections": [{"refs": [{"id": "ref-for-concept-request"}], "title": "9.11. Should request be allowed to use feature?"}], "external": true};
-window.dfnpanelData['e3201629'] = {"dfnID": "e3201629", "url": "https://fetch.spec.whatwg.org/#concept-response-response", "dfnText": "response", "refSections": [{"refs": [{"id": "ref-for-concept-response-response"}], "title": "6.1. Permissions-Policy HTTP Header\n    Field"}, {"refs": [{"id": "ref-for-concept-response-response\u2460"}], "title": "9.1. Process response policy"}, {"refs": [{"id": "ref-for-concept-response-response\u2461"}], "title": "9.6. Create a Permissions Policy for a browsing context from response"}], "external": true};
-window.dfnpanelData['1ab127d6'] = {"dfnID": "1ab127d6", "url": "https://fetch.spec.whatwg.org/#concept-request-window", "dfnText": "window", "refSections": [{"refs": [{"id": "ref-for-concept-request-window"}], "title": "9.11. Should request be allowed to use feature?"}], "external": true};
-window.dfnpanelData['bcdb6841'] = {"dfnID": "bcdb6841", "url": "https://fullscreen.spec.whatwg.org/#dom-element-requestfullscreen", "dfnText": "requestFullscreen()", "refSections": [{"refs": [{"id": "ref-for-dom-element-requestfullscreen"}], "title": "6.3.1. allowfullscreen"}], "external": true};
-window.dfnpanelData['0234d42b'] = {"dfnID": "0234d42b", "url": "https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#dictionary", "dfnText": "sh-dictionary", "refSections": [{"refs": [{"id": "ref-for-dictionary"}], "title": "4.7. Policy directives"}, {"refs": [{"id": "ref-for-dictionary\u2460"}], "title": "6.1. Permissions-Policy HTTP Header\n    Field"}], "external": true};
-window.dfnpanelData['10e25f42'] = {"dfnID": "10e25f42", "url": "https://html.spec.whatwg.org/multipage/iframe-embed-object.html#htmliframeelement", "dfnText": "HTMLIFrameElement", "refSections": [{"refs": [{"id": "ref-for-htmliframeelement"}], "title": "7.2. The permissionsPolicy object"}], "external": true};
-window.dfnpanelData['5d7209e9'] = {"dfnID": "5d7209e9", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window", "dfnText": "Window", "refSections": [{"refs": [{"id": "ref-for-window"}], "title": "9.11. Should request be allowed to use feature?"}], "external": true};
-window.dfnpanelData['83c59a3a'] = {"dfnID": "83c59a3a", "url": "https://html.spec.whatwg.org/multipage/workers.html#workerglobalscope", "dfnText": "WorkerGlobalScope", "refSections": [{"refs": [{"id": "ref-for-workerglobalscope"}], "title": "9.11. Should request be allowed to use feature?"}], "external": true};
-window.dfnpanelData['0c9b0d3c'] = {"dfnID": "0c9b0d3c", "url": "https://html.spec.whatwg.org/multipage/worklets.html#workletglobalscope", "dfnText": "WorkletGlobalScope", "refSections": [{"refs": [{"id": "ref-for-workletglobalscope"}], "title": "9.11. Should request be allowed to use feature?"}], "external": true};
-window.dfnpanelData['3349d69f'] = {"dfnID": "3349d69f", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#concept-document-window", "dfnText": "associated document", "refSections": [{"refs": [{"id": "ref-for-concept-document-window"}], "title": "9.11. Should request be allowed to use feature?"}], "external": true};
-window.dfnpanelData['0d0390b4'] = {"dfnID": "0d0390b4", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#browsing-context", "dfnText": "browsing context", "refSections": [{"refs": [{"id": "ref-for-browsing-context"}], "title": "9.5. Create a Permissions Policy for a browsing context"}, {"refs": [{"id": "ref-for-browsing-context\u2460"}], "title": "9.6. Create a Permissions Policy for a browsing context from response"}, {"refs": [{"id": "ref-for-browsing-context\u2461"}], "title": "9.7. Define an inherited policy for feature in browsing context"}], "external": true};
-window.dfnpanelData['3e12e042'] = {"dfnID": "3e12e042", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object", "dfnText": "environment settings object", "refSections": [{"refs": [{"id": "ref-for-environment-settings-object"}], "title": "9.10. Generate report for violation of permissions policy on settings"}], "external": true};
-window.dfnpanelData['87fcd40c'] = {"dfnID": "87fcd40c", "url": "https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element", "dfnText": "iframe", "refSections": [{"refs": [{"id": "ref-for-the-iframe-element"}], "title": "3. Other and related mechanisms"}, {"refs": [{"id": "ref-for-the-iframe-element\u2460"}, {"id": "ref-for-the-iframe-element\u2461"}], "title": "6.2. The allow attribute of the\n    iframe element"}, {"refs": [{"id": "ref-for-the-iframe-element\u2462"}], "title": "6.3.1. allowfullscreen"}, {"refs": [{"id": "ref-for-the-iframe-element\u2463"}, {"id": "ref-for-the-iframe-element\u2464"}, {"id": "ref-for-the-iframe-element\u2465"}], "title": "7.2. The permissionsPolicy object"}, {"refs": [{"id": "ref-for-the-iframe-element\u2466"}], "title": "9.4. Process permissions policy attributes"}], "external": true};
-window.dfnpanelData['086e3aff'] = {"dfnID": "086e3aff", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-origin", "dfnText": "origin", "refSections": [{"refs": [{"id": "ref-for-concept-origin"}, {"id": "ref-for-concept-origin\u2460"}], "title": "4.8. Allowlists"}, {"refs": [{"id": "ref-for-concept-origin\u2461"}, {"id": "ref-for-concept-origin\u2462"}], "title": "7.2. The permissionsPolicy object"}, {"refs": [{"id": "ref-for-concept-origin\u2463"}], "title": "9.1. Process response policy"}, {"refs": [{"id": "ref-for-concept-origin\u2464"}], "title": "9.2. Construct policy from dictionary and origin"}, {"refs": [{"id": "ref-for-concept-origin\u2465"}, {"id": "ref-for-concept-origin\u2466"}], "title": "9.3. Parse policy directive"}, {"refs": [{"id": "ref-for-concept-origin\u2467"}], "title": "9.5. Create a Permissions Policy for a browsing context"}, {"refs": [{"id": "ref-for-concept-origin\u2468"}], "title": "9.6. Create a Permissions Policy for a browsing context from response"}, {"refs": [{"id": "ref-for-concept-origin\u2460\u24ea"}], "title": "9.7. Define an inherited policy for feature in browsing context"}, {"refs": [{"id": "ref-for-concept-origin\u2460\u2460"}], "title": "9.8. Define an inherited policy for feature in container at origin"}, {"refs": [{"id": "ref-for-concept-origin\u2460\u2461"}], "title": "9.9. Is feature enabled in document for origin?"}], "external": true};
-window.dfnpanelData['7393da89'] = {"dfnID": "7393da89", "url": "https://html.spec.whatwg.org/multipage/browsers.html#same-origin", "dfnText": "same origin", "refSections": [{"refs": [{"id": "ref-for-same-origin"}], "title": "9.8. Define an inherited policy for feature in container at origin"}, {"refs": [{"id": "ref-for-same-origin\u2460"}], "title": "9.9. Is feature enabled in document for origin?"}], "external": true};
-window.dfnpanelData['521818b9'] = {"dfnID": "521818b9", "url": "https://html.spec.whatwg.org/multipage/browsers.html#same-origin-domain", "dfnText": "same origin-domain", "refSections": [{"refs": [{"id": "ref-for-same-origin-domain"}], "title": "4.8. Allowlists"}], "external": true};
-window.dfnpanelData['5c35dd47'] = {"dfnID": "5c35dd47", "url": "https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-sandbox", "dfnText": "sandbox", "refSections": [{"refs": [{"id": "ref-for-attr-iframe-sandbox"}], "title": "3. Other and related mechanisms"}, {"refs": [{"id": "ref-for-attr-iframe-sandbox\u2460"}], "title": "7.2. The permissionsPolicy object"}, {"refs": [{"id": "ref-for-attr-iframe-sandbox\u2461"}], "title": "11. Privacy and Security"}], "external": true};
-window.dfnpanelData['da63e480'] = {"dfnID": "da63e480", "url": "https://html.spec.whatwg.org/multipage/browsers.html#sandboxed-origin-browsing-context-flag", "dfnText": "sandboxed origin browsing context flag", "refSections": [{"refs": [{"id": "ref-for-sandboxed-origin-browsing-context-flag"}], "title": "7.2. The permissionsPolicy object"}], "external": true};
-window.dfnpanelData['dae0bfde'] = {"dfnID": "dae0bfde", "url": "https://html.spec.whatwg.org/multipage/browsers.html#ascii-serialisation-of-an-origin", "dfnText": "serialization of an origin", "refSections": [{"refs": [{"id": "ref-for-ascii-serialisation-of-an-origin"}], "title": "5.1. HTML attribute serialization"}, {"refs": [{"id": "ref-for-ascii-serialisation-of-an-origin\u2460"}], "title": "5.2. Structured header serialization"}, {"refs": [{"id": "ref-for-ascii-serialisation-of-an-origin\u2461"}], "title": "7.2. The permissionsPolicy object"}], "external": true};
-window.dfnpanelData['deddc6fc'] = {"dfnID": "deddc6fc", "url": "https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-src", "dfnText": "src", "refSections": [{"refs": [{"id": "ref-for-attr-iframe-src"}], "title": "6.2. The allow attribute of the\n    iframe element"}, {"refs": [{"id": "ref-for-attr-iframe-src\u2460"}], "title": "7.2. The permissionsPolicy object"}], "external": true};
-window.dfnpanelData['72ee2843'] = {"dfnID": "72ee2843", "url": "https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-srcdoc", "dfnText": "srcdoc", "refSections": [{"refs": [{"id": "ref-for-attr-iframe-srcdoc"}], "title": "7.2. The permissionsPolicy object"}], "external": true};
-window.dfnpanelData['ae2a6342'] = {"dfnID": "ae2a6342", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context", "dfnText": "top-level browsing context", "refSections": [{"refs": [{"id": "ref-for-top-level-browsing-context"}], "title": "4.3. Inherited policies"}], "external": true};
-window.dfnpanelData['7f9469b5'] = {"dfnID": "7f9469b5", "url": "https://infra.spec.whatwg.org/#ascii-case-insensitive", "dfnText": "ascii case-insensitive", "refSections": [{"refs": [{"id": "ref-for-ascii-case-insensitive"}, {"id": "ref-for-ascii-case-insensitive\u2460"}], "title": "9.3. Parse policy directive"}], "external": true};
-window.dfnpanelData['84b454ff'] = {"dfnID": "84b454ff", "url": "https://infra.spec.whatwg.org/#ordered-map", "dfnText": "ordered map", "refSections": [{"refs": [{"id": "ref-for-ordered-map"}], "title": "9.2. Construct policy from dictionary and origin"}], "external": true};
-window.dfnpanelData['692595fe'] = {"dfnID": "692595fe", "url": "https://infra.spec.whatwg.org/#ordered-set", "dfnText": "ordered set", "refSections": [{"refs": [{"id": "ref-for-ordered-set"}], "title": "4.8. Allowlists"}, {"refs": [{"id": "ref-for-ordered-set\u2460"}], "title": "9.2. Construct policy from dictionary and origin"}, {"refs": [{"id": "ref-for-ordered-set\u2461"}], "title": "9.3. Parse policy directive"}], "external": true};
-window.dfnpanelData['a682cc44'] = {"dfnID": "a682cc44", "url": "https://infra.spec.whatwg.org/#split-on-ascii-whitespace", "dfnText": "split on ascii whitespace", "refSections": [{"refs": [{"id": "ref-for-split-on-ascii-whitespace"}], "title": "9.3. Parse policy directive"}], "external": true};
-window.dfnpanelData['e5fc5b88'] = {"dfnID": "e5fc5b88", "url": "https://infra.spec.whatwg.org/#strictly-split", "dfnText": "strictly split", "refSections": [{"refs": [{"id": "ref-for-strictly-split"}], "title": "9.3. Parse policy directive"}], "external": true};
-window.dfnpanelData['ef20e900'] = {"dfnID": "ef20e900", "url": "https://w3c.github.io/permissions/#dfn-powerful-feature", "dfnText": "feature", "refSections": [{"refs": [{"id": "ref-for-dfn-powerful-feature"}], "title": "5.2. Structured header serialization"}], "external": true};
-window.dfnpanelData['188c6617'] = {"dfnID": "188c6617", "url": "https://w3c.github.io/reporting/#reportbody", "dfnText": "ReportBody", "refSections": [{"refs": [{"id": "ref-for-reportbody"}], "title": "8. Reporting"}], "external": true};
-window.dfnpanelData['cf363990'] = {"dfnID": "cf363990", "url": "https://w3c.github.io/reporting/#report-body", "dfnText": "body", "refSections": [{"refs": [{"id": "ref-for-report-body"}], "title": "8. Reporting"}], "external": true};
-window.dfnpanelData['9fe8836b'] = {"dfnID": "9fe8836b", "url": "https://w3c.github.io/reporting/#report", "dfnText": "report", "refSections": [{"refs": [{"id": "ref-for-report"}], "title": "9.10. Generate report for violation of permissions policy on settings"}], "external": true};
-window.dfnpanelData['4d5cebba'] = {"dfnID": "4d5cebba", "url": "https://w3c.github.io/reporting/#report-type", "dfnText": "report type", "refSections": [{"refs": [{"id": "ref-for-report-type"}], "title": "8. Reporting"}], "external": true};
-window.dfnpanelData['3c4b330a'] = {"dfnID": "3c4b330a", "url": "https://w3c.github.io/reporting/#visible-to-reportingobservers", "dfnText": "visible to reportingobservers", "refSections": [{"refs": [{"id": "ref-for-visible-to-reportingobservers"}], "title": "8. Reporting"}], "external": true};
-window.dfnpanelData['ca3ca4ae'] = {"dfnID": "ca3ca4ae", "url": "https://url.spec.whatwg.org/#concept-url-parser", "dfnText": "url parser", "refSections": [{"refs": [{"id": "ref-for-concept-url-parser"}], "title": "9.2. Construct policy from dictionary and origin"}, {"refs": [{"id": "ref-for-concept-url-parser\u2460"}], "title": "9.3. Parse policy directive"}], "external": true};
-window.dfnpanelData['8855a9aa'] = {"dfnID": "8855a9aa", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "dfnText": "DOMString", "refSections": [{"refs": [{"id": "ref-for-idl-DOMString"}, {"id": "ref-for-idl-DOMString\u2460"}, {"id": "ref-for-idl-DOMString\u2461"}, {"id": "ref-for-idl-DOMString\u2462"}, {"id": "ref-for-idl-DOMString\u2463"}, {"id": "ref-for-idl-DOMString\u2464"}], "title": "7.2. The permissionsPolicy object"}, {"refs": [{"id": "ref-for-idl-DOMString\u2465"}, {"id": "ref-for-idl-DOMString\u2466"}, {"id": "ref-for-idl-DOMString\u2467"}], "title": "8. Reporting"}], "external": true};
-window.dfnpanelData['889e932f'] = {"dfnID": "889e932f", "url": "https://webidl.spec.whatwg.org/#Exposed", "dfnText": "Exposed", "refSections": [{"refs": [{"id": "ref-for-Exposed"}], "title": "7.2. The permissionsPolicy object"}, {"refs": [{"id": "ref-for-Exposed\u2460"}], "title": "8. Reporting"}], "external": true};
-window.dfnpanelData['a5c91173'] = {"dfnID": "a5c91173", "url": "https://webidl.spec.whatwg.org/#SameObject", "dfnText": "SameObject", "refSections": [{"refs": [{"id": "ref-for-SameObject"}, {"id": "ref-for-SameObject\u2460"}], "title": "7.2. The permissionsPolicy object"}], "external": true};
-window.dfnpanelData['5372cca8'] = {"dfnID": "5372cca8", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "dfnText": "boolean", "refSections": [{"refs": [{"id": "ref-for-idl-boolean"}], "title": "7.2. The permissionsPolicy object"}], "external": true};
-window.dfnpanelData['f8de33a3'] = {"dfnID": "f8de33a3", "url": "https://webidl.spec.whatwg.org/#idl-long", "dfnText": "long", "refSections": [{"refs": [{"id": "ref-for-idl-long"}, {"id": "ref-for-idl-long\u2460"}], "title": "8. Reporting"}], "external": true};
-window.dfnpanelData['9cce47fd'] = {"dfnID": "9cce47fd", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "dfnText": "sequence", "refSections": [{"refs": [{"id": "ref-for-idl-sequence"}, {"id": "ref-for-idl-sequence\u2460"}, {"id": "ref-for-idl-sequence\u2461"}], "title": "7.2. The permissionsPolicy object"}], "external": true};
-window.dfnpanelData['policy-controlled-feature'] = {"dfnID": "policy-controlled-feature", "url": "#policy-controlled-feature", "dfnText": "policy-controlled feature", "refSections": [{"refs": [{"id": "ref-for-policy-controlled-feature"}, {"id": "ref-for-policy-controlled-feature\u2460"}, {"id": "ref-for-policy-controlled-feature\u2461"}, {"id": "ref-for-policy-controlled-feature\u2462"}, {"id": "ref-for-policy-controlled-feature\u2463"}, {"id": "ref-for-policy-controlled-feature\u2464"}], "title": "4.1. Policy-controlled Features"}, {"refs": [{"id": "ref-for-policy-controlled-feature\u2465"}, {"id": "ref-for-policy-controlled-feature\u2466"}], "title": "4.3. Inherited policies"}, {"refs": [{"id": "ref-for-policy-controlled-feature\u2467"}], "title": "4.4. Declared policies"}, {"refs": [{"id": "ref-for-policy-controlled-feature\u2468"}], "title": "4.7. Policy directives"}, {"refs": [{"id": "ref-for-policy-controlled-feature\u2460\u24ea"}, {"id": "ref-for-policy-controlled-feature\u2460\u2460"}], "title": "4.9. Default Allowlists"}, {"refs": [{"id": "ref-for-policy-controlled-feature\u2460\u2461"}], "title": "6.2. The allow attribute of the\n    iframe element"}, {"refs": [{"id": "ref-for-policy-controlled-feature\u2460\u2462"}], "title": "6.3. Additional attributes to support legacy\n    features"}, {"refs": [{"id": "ref-for-policy-controlled-feature\u2460\u2463"}], "title": "8. Reporting"}, {"refs": [{"id": "ref-for-policy-controlled-feature\u2460\u2464"}, {"id": "ref-for-policy-controlled-feature\u2460\u2465"}], "title": "9.2. Construct policy from dictionary and origin"}, {"refs": [{"id": "ref-for-policy-controlled-feature\u2460\u2466"}, {"id": "ref-for-policy-controlled-feature\u2460\u2467"}], "title": "9.3. Parse policy directive"}], "external": false};
-window.dfnpanelData['supported-features'] = {"dfnID": "supported-features", "url": "#supported-features", "dfnText": "supported features", "refSections": [{"refs": [{"id": "ref-for-supported-features"}], "title": "4.2. Policies"}, {"refs": [{"id": "ref-for-supported-features\u2460"}], "title": "4.3. Inherited policies"}, {"refs": [{"id": "ref-for-supported-features\u2461"}, {"id": "ref-for-supported-features\u2462"}, {"id": "ref-for-supported-features\u2463"}], "title": "7.2. The permissionsPolicy object"}], "external": false};
-window.dfnpanelData['permissions-policy'] = {"dfnID": "permissions-policy", "url": "#permissions-policy", "dfnText": "permissions policy", "refSections": [{"refs": [{"id": "ref-for-permissions-policy"}], "title": "4.1. Policy-controlled Features"}, {"refs": [{"id": "ref-for-permissions-policy\u2460"}], "title": "4.2. Policies"}, {"refs": [{"id": "ref-for-permissions-policy\u2461"}], "title": "4.3. Inherited policies"}, {"refs": [{"id": "ref-for-permissions-policy\u2462"}], "title": "4.5. Header policies"}, {"refs": [{"id": "ref-for-permissions-policy\u2463"}], "title": "6.1. Permissions-Policy HTTP Header\n    Field"}, {"refs": [{"id": "ref-for-permissions-policy\u2464"}, {"id": "ref-for-permissions-policy\u2465"}], "title": "7.2. The permissionsPolicy object"}, {"refs": [{"id": "ref-for-permissions-policy\u2466"}, {"id": "ref-for-permissions-policy\u2467"}], "title": "9.5. Create a Permissions Policy for a browsing context"}, {"refs": [{"id": "ref-for-permissions-policy\u2468"}], "title": "9.6. Create a Permissions Policy for a browsing context from response"}, {"refs": [{"id": "ref-for-permissions-policy\u2460\u24ea"}], "title": "9.8. Define an inherited policy for feature in container at origin"}, {"refs": [{"id": "ref-for-permissions-policy\u2460\u2460"}], "title": "9.9. Is feature enabled in document for origin?"}], "external": false};
-window.dfnpanelData['inherited-policy'] = {"dfnID": "inherited-policy", "url": "#inherited-policy", "dfnText": "inherited\n    policy", "refSections": [{"refs": [{"id": "ref-for-inherited-policy"}, {"id": "ref-for-inherited-policy\u2460"}], "title": "4.2. Policies"}, {"refs": [{"id": "ref-for-inherited-policy\u2461"}, {"id": "ref-for-inherited-policy\u2462"}], "title": "4.3. Inherited policies"}, {"refs": [{"id": "ref-for-inherited-policy\u2463"}], "title": "4.6. Container policies"}, {"refs": [{"id": "ref-for-inherited-policy\u2464"}], "title": "9.6. Create a Permissions Policy for a browsing context from response"}, {"refs": [{"id": "ref-for-inherited-policy\u2465"}], "title": "9.7. Define an inherited policy for feature in browsing context"}, {"refs": [{"id": "ref-for-inherited-policy\u2466"}, {"id": "ref-for-inherited-policy\u2467"}], "title": "9.8. Define an inherited policy for feature in container at origin"}, {"refs": [{"id": "ref-for-inherited-policy\u2468"}], "title": "9.9. Is feature enabled in document for origin?"}], "external": false};
-window.dfnpanelData['declared-policy'] = {"dfnID": "declared-policy", "url": "#declared-policy", "dfnText": "declared\n    policy", "refSections": [{"refs": [{"id": "ref-for-declared-policy"}, {"id": "ref-for-declared-policy\u2460"}], "title": "4.2. Policies"}, {"refs": [{"id": "ref-for-declared-policy\u2461"}], "title": "4.3. Inherited policies"}, {"refs": [{"id": "ref-for-declared-policy\u2462"}], "title": "4.5. Header policies"}, {"refs": [{"id": "ref-for-declared-policy\u2463"}], "title": "9.1. Process response policy"}, {"refs": [{"id": "ref-for-declared-policy\u2464"}], "title": "9.2. Construct policy from dictionary and origin"}, {"refs": [{"id": "ref-for-declared-policy\u2465"}], "title": "9.6. Create a Permissions Policy for a browsing context from response"}, {"refs": [{"id": "ref-for-declared-policy\u2466"}, {"id": "ref-for-declared-policy\u2467"}], "title": "9.8. Define an inherited policy for feature in container at origin"}, {"refs": [{"id": "ref-for-declared-policy\u2468"}, {"id": "ref-for-declared-policy\u2460\u24ea"}], "title": "9.9. Is feature enabled in document for origin?"}], "external": false};
-window.dfnpanelData['header-policy'] = {"dfnID": "header-policy", "url": "#header-policy", "dfnText": "header policy", "refSections": [{"refs": [{"id": "ref-for-header-policy"}], "title": "4.6. Container policies"}], "external": false};
-window.dfnpanelData['container-policy'] = {"dfnID": "container-policy", "url": "#container-policy", "dfnText": "container policy", "refSections": [{"refs": [{"id": "ref-for-container-policy"}], "title": "4.3. Inherited policies"}, {"refs": [{"id": "ref-for-container-policy\u2460"}, {"id": "ref-for-container-policy\u2461"}, {"id": "ref-for-container-policy\u2462"}, {"id": "ref-for-container-policy\u2463"}], "title": "4.6. Container policies"}, {"refs": [{"id": "ref-for-container-policy\u2464"}], "title": "6.2. The allow attribute of the\n    iframe element"}, {"refs": [{"id": "ref-for-container-policy\u2465"}], "title": "6.3.1. allowfullscreen"}, {"refs": [{"id": "ref-for-container-policy\u2466"}], "title": "9.4. Process permissions policy attributes"}], "external": false};
-window.dfnpanelData['policy-directive'] = {"dfnID": "policy-directive", "url": "#policy-directive", "dfnText": "policy\n    directive", "refSections": [{"refs": [{"id": "ref-for-policy-directive"}], "title": "4.1. Policy-controlled Features"}, {"refs": [{"id": "ref-for-policy-directive\u2460"}], "title": "4.5. Header policies"}, {"refs": [{"id": "ref-for-policy-directive\u2461"}], "title": "4.6. Container policies"}, {"refs": [{"id": "ref-for-policy-directive\u2462"}], "title": "4.7. Policy directives"}, {"refs": [{"id": "ref-for-policy-directive\u2463"}], "title": "5.1. HTML attribute serialization"}, {"refs": [{"id": "ref-for-policy-directive\u2464"}, {"id": "ref-for-policy-directive\u2465"}], "title": "5.2. Structured header serialization"}, {"refs": [{"id": "ref-for-policy-directive\u2466"}], "title": "9.3. Parse policy directive"}], "external": false};
-window.dfnpanelData['allowlist'] = {"dfnID": "allowlist", "url": "#allowlist", "dfnText": "allowlist", "refSections": [{"refs": [{"id": "ref-for-allowlist"}], "title": "2. Examples"}, {"refs": [{"id": "ref-for-allowlist\u2460"}], "title": "4.4. Declared policies"}, {"refs": [{"id": "ref-for-allowlist\u2461"}], "title": "4.7. Policy directives"}, {"refs": [{"id": "ref-for-allowlist\u2462"}, {"id": "ref-for-allowlist\u2463"}, {"id": "ref-for-allowlist\u2464"}, {"id": "ref-for-allowlist\u2465"}], "title": "4.8. Allowlists"}, {"refs": [{"id": "ref-for-allowlist\u2466"}, {"id": "ref-for-allowlist\u2467"}], "title": "5.2. Structured header serialization"}, {"refs": [{"id": "ref-for-allowlist\u2468"}], "title": "6.2. The allow attribute of the\n    iframe element"}, {"refs": [{"id": "ref-for-allowlist\u2460\u24ea"}], "title": "6.3.1. allowfullscreen"}, {"refs": [{"id": "ref-for-allowlist\u2460\u2460"}], "title": "9.2. Construct policy from dictionary and origin"}, {"refs": [{"id": "ref-for-allowlist\u2460\u2461"}], "title": "9.3. Parse policy directive"}, {"refs": [{"id": "ref-for-allowlist\u2460\u2462"}, {"id": "ref-for-allowlist\u2460\u2463"}], "title": "9.8. Define an inherited policy for feature in container at origin"}, {"refs": [{"id": "ref-for-allowlist\u2460\u2464"}], "title": "9.9. Is feature enabled in document for origin?"}], "external": false};
-window.dfnpanelData['the-special-value'] = {"dfnID": "the-special-value", "url": "#the-special-value", "dfnText": "The special value *", "refSections": [{"refs": [{"id": "ref-for-the-special-value"}], "title": "4.8. Allowlists"}, {"refs": [{"id": "ref-for-the-special-value\u2460"}], "title": "9.2. Construct policy from dictionary and origin"}, {"refs": [{"id": "ref-for-the-special-value\u2461"}], "title": "9.3. Parse policy directive"}, {"refs": [{"id": "ref-for-the-special-value\u2462"}], "title": "9.4. Process permissions policy attributes"}], "external": false};
-window.dfnpanelData['matches'] = {"dfnID": "matches", "url": "#matches", "dfnText": "matches", "refSections": [{"refs": [{"id": "ref-for-matches"}, {"id": "ref-for-matches\u2460"}], "title": "9.8. Define an inherited policy for feature in container at origin"}, {"refs": [{"id": "ref-for-matches\u2461"}], "title": "9.9. Is feature enabled in document for origin?"}], "external": false};
-window.dfnpanelData['default-allowlist'] = {"dfnID": "default-allowlist", "url": "#default-allowlist", "dfnText": "default allowlist", "refSections": [{"refs": [{"id": "ref-for-default-allowlist"}], "title": "4.1. Policy-controlled Features"}, {"refs": [{"id": "ref-for-default-allowlist\u2460"}, {"id": "ref-for-default-allowlist\u2461"}], "title": "4.9. Default Allowlists"}, {"refs": [{"id": "ref-for-default-allowlist\u2462"}, {"id": "ref-for-default-allowlist\u2463"}], "title": "9.8. Define an inherited policy for feature in container at origin"}, {"refs": [{"id": "ref-for-default-allowlist\u2464"}, {"id": "ref-for-default-allowlist\u2465"}], "title": "9.9. Is feature enabled in document for origin?"}], "external": false};
-window.dfnpanelData['serialized-policy-directive'] = {"dfnID": "serialized-policy-directive", "url": "#serialized-policy-directive", "dfnText": "serialized-policy-directive", "refSections": [{"refs": [{"id": "ref-for-serialized-policy-directive"}, {"id": "ref-for-serialized-policy-directive\u2460"}], "title": "5.1. HTML attribute serialization"}, {"refs": [{"id": "ref-for-serialized-policy-directive"}], "title": "6.2. The allow attribute of the\n    iframe element"}], "external": false};
-window.dfnpanelData['feature-identifier'] = {"dfnID": "feature-identifier", "url": "#feature-identifier", "dfnText": "feature-identifier", "refSections": [{"refs": [{"id": "ref-for-feature-identifier"}], "title": "5.1. HTML attribute serialization"}], "external": false};
-window.dfnpanelData['allow-list'] = {"dfnID": "allow-list", "url": "#allow-list", "dfnText": "allow-list", "refSections": [{"refs": [{"id": "ref-for-allow-list"}], "title": "5.1. HTML attribute serialization"}], "external": false};
-window.dfnpanelData['allow-list-value'] = {"dfnID": "allow-list-value", "url": "#allow-list-value", "dfnText": "allow-list-value", "refSections": [{"refs": [{"id": "ref-for-allow-list-value"}, {"id": "ref-for-allow-list-value\u2460"}], "title": "5.1. HTML attribute serialization"}], "external": false};
-window.dfnpanelData['serialized-origin'] = {"dfnID": "serialized-origin", "url": "#serialized-origin", "dfnText": "serialized-origin", "refSections": [{"refs": [{"id": "ref-for-serialized-origin"}], "title": "5.1. HTML attribute serialization"}], "external": false};
-window.dfnpanelData['permissions-policy-header'] = {"dfnID": "permissions-policy-header", "url": "#permissions-policy-header", "dfnText": "Permissions-Policy", "refSections": [{"refs": [{"id": "ref-for-permissions-policy-header"}, {"id": "ref-for-permissions-policy-header\u2460"}], "title": "2. Examples"}], "external": false};
-window.dfnpanelData['permissionspolicy'] = {"dfnID": "permissionspolicy", "url": "#permissionspolicy", "dfnText": "PermissionsPolicy", "refSections": [{"refs": [{"id": "ref-for-permissionspolicy"}], "title": "7.1. Overview"}, {"refs": [{"id": "ref-for-permissionspolicy\u2460"}], "title": "7.1.1. Document policies"}, {"refs": [{"id": "ref-for-permissionspolicy\u2461"}, {"id": "ref-for-permissionspolicy\u2462"}, {"id": "ref-for-permissionspolicy\u2463"}, {"id": "ref-for-permissionspolicy\u2464"}, {"id": "ref-for-permissionspolicy\u2465"}, {"id": "ref-for-permissionspolicy\u2466"}, {"id": "ref-for-permissionspolicy\u2467"}, {"id": "ref-for-permissionspolicy\u2468"}, {"id": "ref-for-permissionspolicy\u2460\u24ea"}, {"id": "ref-for-permissionspolicy\u2460\u2460"}, {"id": "ref-for-permissionspolicy\u2460\u2461"}, {"id": "ref-for-permissionspolicy\u2460\u2462"}, {"id": "ref-for-permissionspolicy\u2460\u2463"}, {"id": "ref-for-permissionspolicy\u2460\u2464"}, {"id": "ref-for-permissionspolicy\u2460\u2465"}, {"id": "ref-for-permissionspolicy\u2460\u2466"}], "title": "7.2. The permissionsPolicy object"}], "external": false};
-window.dfnpanelData['dom-permissionspolicy-allowsfeature'] = {"dfnID": "dom-permissionspolicy-allowsfeature", "url": "#dom-permissionspolicy-allowsfeature", "dfnText": "allowsFeature", "refSections": [{"refs": [{"id": "ref-for-dom-permissionspolicy-allowsfeature"}], "title": "7.2. The permissionsPolicy object"}], "external": false};
-window.dfnpanelData['dom-permissionspolicy-features'] = {"dfnID": "dom-permissionspolicy-features", "url": "#dom-permissionspolicy-features", "dfnText": "features", "refSections": [{"refs": [{"id": "ref-for-dom-permissionspolicy-features"}], "title": "7.2. The permissionsPolicy object"}], "external": false};
-window.dfnpanelData['dom-permissionspolicy-allowedfeatures'] = {"dfnID": "dom-permissionspolicy-allowedfeatures", "url": "#dom-permissionspolicy-allowedfeatures", "dfnText": "allowedFeatures", "refSections": [{"refs": [{"id": "ref-for-dom-permissionspolicy-allowedfeatures"}], "title": "7.2. The permissionsPolicy object"}], "external": false};
-window.dfnpanelData['dom-permissionspolicy-getallowlistforfeature'] = {"dfnID": "dom-permissionspolicy-getallowlistforfeature", "url": "#dom-permissionspolicy-getallowlistforfeature", "dfnText": "getAllowlistForFeature", "refSections": [{"refs": [{"id": "ref-for-dom-permissionspolicy-getallowlistforfeature"}], "title": "7.2. The permissionsPolicy object"}], "external": false};
-window.dfnpanelData['dom-document-permissionspolicy'] = {"dfnID": "dom-document-permissionspolicy", "url": "#dom-document-permissionspolicy", "dfnText": "permissionsPolicy", "refSections": [{"refs": [{"id": "ref-for-dom-document-permissionspolicy"}], "title": "7.2. The permissionsPolicy object"}], "external": false};
-window.dfnpanelData['dom-htmliframeelement-permissionspolicy'] = {"dfnID": "dom-htmliframeelement-permissionspolicy", "url": "#dom-htmliframeelement-permissionspolicy", "dfnText": "permissionsPolicy", "refSections": [{"refs": [{"id": "ref-for-dom-htmliframeelement-permissionspolicy"}], "title": "7.2. The permissionsPolicy object"}], "external": false};
-window.dfnpanelData['associated-node'] = {"dfnID": "associated-node", "url": "#associated-node", "dfnText": "associated node", "refSections": [{"refs": [{"id": "ref-for-associated-node"}, {"id": "ref-for-associated-node\u2460"}, {"id": "ref-for-associated-node\u2461"}, {"id": "ref-for-associated-node\u2462"}, {"id": "ref-for-associated-node\u2463"}, {"id": "ref-for-associated-node\u2464"}, {"id": "ref-for-associated-node\u2465"}, {"id": "ref-for-associated-node\u2466"}, {"id": "ref-for-associated-node\u2467"}], "title": "7.2. The permissionsPolicy object"}], "external": false};
-window.dfnpanelData['default-origin'] = {"dfnID": "default-origin", "url": "#default-origin", "dfnText": "default origin", "refSections": [{"refs": [{"id": "ref-for-default-origin"}, {"id": "ref-for-default-origin\u2460"}, {"id": "ref-for-default-origin\u2461"}, {"id": "ref-for-default-origin\u2462"}, {"id": "ref-for-default-origin\u2463"}], "title": "7.2. The permissionsPolicy object"}], "external": false};
-window.dfnpanelData['document-policy-object'] = {"dfnID": "document-policy-object", "url": "#document-policy-object", "dfnText": "policy object", "refSections": [{"refs": [{"id": "ref-for-document-policy-object"}], "title": "7.2. The permissionsPolicy object"}], "external": false};
-window.dfnpanelData['iframe-policy-object'] = {"dfnID": "iframe-policy-object", "url": "#iframe-policy-object", "dfnText": "policy object", "refSections": [{"refs": [{"id": "ref-for-iframe-policy-object"}], "title": "7.2. The permissionsPolicy object"}], "external": false};
-window.dfnpanelData['observable-policy'] = {"dfnID": "observable-policy", "url": "#observable-policy", "dfnText": "observable policy", "refSections": [{"refs": [{"id": "ref-for-observable-policy"}, {"id": "ref-for-observable-policy\u2460"}], "title": "7.1.2. Frame policies"}, {"refs": [{"id": "ref-for-observable-policy\u2461"}, {"id": "ref-for-observable-policy\u2462"}, {"id": "ref-for-observable-policy\u2463"}, {"id": "ref-for-observable-policy\u2464"}, {"id": "ref-for-observable-policy\u2465"}], "title": "7.2. The permissionsPolicy object"}, {"refs": [{"id": "ref-for-observable-policy\u2466"}, {"id": "ref-for-observable-policy\u2467"}], "title": "11.1. Exposure of cross-origin behavior"}], "external": false};
-window.dfnpanelData['declared-origin'] = {"dfnID": "declared-origin", "url": "#declared-origin", "dfnText": "declared origin", "refSections": [{"refs": [{"id": "ref-for-declared-origin"}, {"id": "ref-for-declared-origin\u2460"}, {"id": "ref-for-declared-origin\u2461"}], "title": "7.2. The permissionsPolicy object"}, {"refs": [{"id": "ref-for-declared-origin\u2462"}], "title": "9.4. Process permissions policy attributes"}], "external": false};
-window.dfnpanelData['permissions-policy-violation-reports'] = {"dfnID": "permissions-policy-violation-reports", "url": "#permissions-policy-violation-reports", "dfnText": "Permissions policy violation reports", "refSections": [{"refs": [{"id": "ref-for-permissions-policy-violation-reports"}, {"id": "ref-for-permissions-policy-violation-reports\u2460"}, {"id": "ref-for-permissions-policy-violation-reports\u2461"}], "title": "8. Reporting"}], "external": false};
-window.dfnpanelData['violate'] = {"dfnID": "violate", "url": "#violate", "dfnText": "violate", "refSections": [{"refs": [{"id": "ref-for-violate"}, {"id": "ref-for-violate\u2460"}, {"id": "ref-for-violate\u2461"}, {"id": "ref-for-violate\u2462"}, {"id": "ref-for-violate\u2463"}, {"id": "ref-for-violate\u2464"}, {"id": "ref-for-violate\u2465"}], "title": "8. Reporting"}, {"refs": [{"id": "ref-for-violate\u2466"}, {"id": "ref-for-violate\u2467"}], "title": "9.10. Generate report for violation of permissions policy on settings"}, {"refs": [{"id": "ref-for-violate\u2468"}], "title": "11.1. Exposure of cross-origin behavior"}], "external": false};
-window.dfnpanelData['permissionspolicyviolationreportbody'] = {"dfnID": "permissionspolicyviolationreportbody", "url": "#permissionspolicyviolationreportbody", "dfnText": "PermissionsPolicyViolationReportBody", "refSections": [{"refs": [{"id": "ref-for-permissionspolicyviolationreportbody"}], "title": "8. Reporting"}, {"refs": [{"id": "ref-for-permissionspolicyviolationreportbody\u2460"}], "title": "9.10. Generate report for violation of permissions policy on settings"}], "external": false};
-window.dfnpanelData['permissionspolicyviolationreportbody-featureid'] = {"dfnID": "permissionspolicyviolationreportbody-featureid", "url": "#permissionspolicyviolationreportbody-featureid", "dfnText": "featureId", "refSections": [{"refs": [{"id": "ref-for-permissionspolicyviolationreportbody-featureid"}], "title": "9.10. Generate report for violation of permissions policy on settings"}], "external": false};
-window.dfnpanelData['permissionspolicyviolationreportbody-sourcefile'] = {"dfnID": "permissionspolicyviolationreportbody-sourcefile", "url": "#permissionspolicyviolationreportbody-sourcefile", "dfnText": "sourceFile", "refSections": [{"refs": [{"id": "ref-for-permissionspolicyviolationreportbody-sourcefile"}, {"id": "ref-for-permissionspolicyviolationreportbody-sourcefile\u2460"}], "title": "8. Reporting"}, {"refs": [{"id": "ref-for-permissionspolicyviolationreportbody-sourcefile\u2461"}, {"id": "ref-for-permissionspolicyviolationreportbody-sourcefile\u2462"}], "title": "9.10. Generate report for violation of permissions policy on settings"}], "external": false};
-window.dfnpanelData['permissionspolicyviolationreportbody-linenumber'] = {"dfnID": "permissionspolicyviolationreportbody-linenumber", "url": "#permissionspolicyviolationreportbody-linenumber", "dfnText": "lineNumber", "refSections": [{"refs": [{"id": "ref-for-permissionspolicyviolationreportbody-linenumber"}, {"id": "ref-for-permissionspolicyviolationreportbody-linenumber\u2460"}], "title": "9.10. Generate report for violation of permissions policy on settings"}], "external": false};
-window.dfnpanelData['permissionspolicyviolationreportbody-columnnumber'] = {"dfnID": "permissionspolicyviolationreportbody-columnnumber", "url": "#permissionspolicyviolationreportbody-columnnumber", "dfnText": "columnNumber", "refSections": [{"refs": [{"id": "ref-for-permissionspolicyviolationreportbody-columnnumber"}, {"id": "ref-for-permissionspolicyviolationreportbody-columnnumber\u2460"}], "title": "9.10. Generate report for violation of permissions policy on settings"}], "external": false};
-window.dfnpanelData['permissionspolicyviolationreportbody-disposition'] = {"dfnID": "permissionspolicyviolationreportbody-disposition", "url": "#permissionspolicyviolationreportbody-disposition", "dfnText": "disposition", "refSections": [{"refs": [{"id": "ref-for-permissionspolicyviolationreportbody-disposition"}, {"id": "ref-for-permissionspolicyviolationreportbody-disposition\u2460"}], "title": "8. Reporting"}, {"refs": [{"id": "ref-for-permissionspolicyviolationreportbody-disposition\u2461"}], "title": "9.10. Generate report for violation of permissions policy on settings"}], "external": false};
-window.dfnpanelData['process-response-policy'] = {"dfnID": "process-response-policy", "url": "#process-response-policy", "dfnText": "Process response policy", "refSections": [{"refs": [{"id": "ref-for-process-response-policy"}], "title": "9.6. Create a Permissions Policy for a browsing context from response"}], "external": false};
-window.dfnpanelData['construct-policy-from-dictionary-and-origin'] = {"dfnID": "construct-policy-from-dictionary-and-origin", "url": "#construct-policy-from-dictionary-and-origin", "dfnText": "Construct policy from dictionary and origin", "refSections": [{"refs": [{"id": "ref-for-construct-policy-from-dictionary-and-origin"}], "title": "9.1. Process response policy"}], "external": false};
-window.dfnpanelData['parse-policy-directive'] = {"dfnID": "parse-policy-directive", "url": "#parse-policy-directive", "dfnText": "Parse policy directive", "refSections": [{"refs": [{"id": "ref-for-parse-policy-directive"}], "title": "9.4. Process permissions policy attributes"}], "external": false};
-window.dfnpanelData['process-permissions-policy-attributes'] = {"dfnID": "process-permissions-policy-attributes", "url": "#process-permissions-policy-attributes", "dfnText": "Process permissions policy attributes", "refSections": [{"refs": [{"id": "ref-for-process-permissions-policy-attributes"}], "title": "9.8. Define an inherited policy for feature in container at origin"}], "external": false};
-window.dfnpanelData['create-for-browsingcontext'] = {"dfnID": "create-for-browsingcontext", "url": "#create-for-browsingcontext", "dfnText": "Create a Permissions Policy for a browsing context", "refSections": [{"refs": [{"id": "ref-for-create-for-browsingcontext"}], "title": "9.6. Create a Permissions Policy for a browsing context from response"}], "external": false};
-window.dfnpanelData['define-inherited-policy'] = {"dfnID": "define-inherited-policy", "url": "#define-inherited-policy", "dfnText": "Define an inherited policy for feature in browsing context", "refSections": [{"refs": [{"id": "ref-for-define-inherited-policy"}], "title": "9.5. Create a Permissions Policy for a browsing context"}], "external": false};
-window.dfnpanelData['define-inherited-policy-in-container'] = {"dfnID": "define-inherited-policy-in-container", "url": "#define-inherited-policy-in-container", "dfnText": "Define an inherited policy for feature in container at origin", "refSections": [{"refs": [{"id": "ref-for-define-inherited-policy-in-container"}], "title": "7.2. The permissionsPolicy object"}, {"refs": [{"id": "ref-for-define-inherited-policy-in-container\u2460"}], "title": "9.7. Define an inherited policy for feature in browsing context"}], "external": false};
-window.dfnpanelData['is-feature-enabled'] = {"dfnID": "is-feature-enabled", "url": "#is-feature-enabled", "dfnText": "Is feature enabled in document for origin?", "refSections": [{"refs": [{"id": "ref-for-is-feature-enabled"}], "title": "9.11. Should request be allowed to use feature?"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -3272,34 +2775,520 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"0234d42b": {"dfnID":"0234d42b","dfnText":"sh-dictionary","external":true,"refSections":[{"refs":[{"id":"ref-for-dictionary"}],"title":"4.7. Policy directives"},{"refs":[{"id":"ref-for-dictionary\u2460"}],"title":"6.1. Permissions-Policy HTTP Header\n    Field"}],"url":"https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#dictionary"},
+"086e3aff": {"dfnID":"086e3aff","dfnText":"origin","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-origin"},{"id":"ref-for-concept-origin\u2460"}],"title":"4.8. Allowlists"},{"refs":[{"id":"ref-for-concept-origin\u2461"},{"id":"ref-for-concept-origin\u2462"}],"title":"7.2. The permissionsPolicy object"},{"refs":[{"id":"ref-for-concept-origin\u2463"}],"title":"9.1. Process response policy"},{"refs":[{"id":"ref-for-concept-origin\u2464"}],"title":"9.2. Construct policy from dictionary and origin"},{"refs":[{"id":"ref-for-concept-origin\u2465"},{"id":"ref-for-concept-origin\u2466"}],"title":"9.3. Parse policy directive"},{"refs":[{"id":"ref-for-concept-origin\u2467"}],"title":"9.5. Create a Permissions Policy for a browsing context"},{"refs":[{"id":"ref-for-concept-origin\u2468"}],"title":"9.6. Create a Permissions Policy for a browsing context from response"},{"refs":[{"id":"ref-for-concept-origin\u2460\u24ea"}],"title":"9.7. Define an inherited policy for feature in browsing context"},{"refs":[{"id":"ref-for-concept-origin\u2460\u2460"}],"title":"9.8. Define an inherited policy for feature in container at origin"},{"refs":[{"id":"ref-for-concept-origin\u2460\u2461"}],"title":"9.9. Is feature enabled in document for origin?"}],"url":"https://html.spec.whatwg.org/multipage/browsers.html#concept-origin"},
+"0c9b0d3c": {"dfnID":"0c9b0d3c","dfnText":"WorkletGlobalScope","external":true,"refSections":[{"refs":[{"id":"ref-for-workletglobalscope"}],"title":"9.11. Should request be allowed to use feature?"}],"url":"https://html.spec.whatwg.org/multipage/worklets.html#workletglobalscope"},
+"0d0390b4": {"dfnID":"0d0390b4","dfnText":"browsing context","external":true,"refSections":[{"refs":[{"id":"ref-for-browsing-context"}],"title":"9.5. Create a Permissions Policy for a browsing context"},{"refs":[{"id":"ref-for-browsing-context\u2460"}],"title":"9.6. Create a Permissions Policy for a browsing context from response"},{"refs":[{"id":"ref-for-browsing-context\u2461"}],"title":"9.7. Define an inherited policy for feature in browsing context"}],"url":"https://html.spec.whatwg.org/multipage/document-sequences.html#browsing-context"},
+"10e25f42": {"dfnID":"10e25f42","dfnText":"HTMLIFrameElement","external":true,"refSections":[{"refs":[{"id":"ref-for-htmliframeelement"}],"title":"7.2. The permissionsPolicy object"}],"url":"https://html.spec.whatwg.org/multipage/iframe-embed-object.html#htmliframeelement"},
+"188c6617": {"dfnID":"188c6617","dfnText":"ReportBody","external":true,"refSections":[{"refs":[{"id":"ref-for-reportbody"}],"title":"8. Reporting"}],"url":"https://w3c.github.io/reporting/#reportbody"},
+"1ab127d6": {"dfnID":"1ab127d6","dfnText":"window","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-request-window"}],"title":"9.11. Should request be allowed to use feature?"}],"url":"https://fetch.spec.whatwg.org/#concept-request-window"},
+"296f3551": {"dfnID":"296f3551","dfnText":"Element","external":true,"refSections":[{"refs":[{"id":"ref-for-element"},{"id":"ref-for-element\u2460"}],"title":"7.2. The permissionsPolicy object"}],"url":"https://dom.spec.whatwg.org/#element"},
+"3349d69f": {"dfnID":"3349d69f","dfnText":"associated document","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-document-window"}],"title":"9.11. Should request be allowed to use feature?"}],"url":"https://html.spec.whatwg.org/multipage/nav-history-apis.html#concept-document-window"},
+"3c4b330a": {"dfnID":"3c4b330a","dfnText":"visible to reportingobservers","external":true,"refSections":[{"refs":[{"id":"ref-for-visible-to-reportingobservers"}],"title":"8. Reporting"}],"url":"https://w3c.github.io/reporting/#visible-to-reportingobservers"},
+"3e12e042": {"dfnID":"3e12e042","dfnText":"environment settings object","external":true,"refSections":[{"refs":[{"id":"ref-for-environment-settings-object"}],"title":"9.10. Generate report for violation of permissions policy on settings"}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object"},
+"4d5cebba": {"dfnID":"4d5cebba","dfnText":"report type","external":true,"refSections":[{"refs":[{"id":"ref-for-report-type"}],"title":"8. Reporting"}],"url":"https://w3c.github.io/reporting/#report-type"},
+"5216e1a0": {"dfnID":"5216e1a0","dfnText":"node document","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-node-document"},{"id":"ref-for-concept-node-document\u2460"},{"id":"ref-for-concept-node-document\u2461"},{"id":"ref-for-concept-node-document\u2462"}],"title":"7.2. The permissionsPolicy object"},{"refs":[{"id":"ref-for-concept-node-document\u2463"},{"id":"ref-for-concept-node-document\u2464"}],"title":"9.8. Define an inherited policy for feature in container at origin"}],"url":"https://dom.spec.whatwg.org/#concept-node-document"},
+"521818b9": {"dfnID":"521818b9","dfnText":"same origin-domain","external":true,"refSections":[{"refs":[{"id":"ref-for-same-origin-domain"}],"title":"4.8. Allowlists"}],"url":"https://html.spec.whatwg.org/multipage/browsers.html#same-origin-domain"},
+"5372cca8": {"dfnID":"5372cca8","dfnText":"boolean","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-boolean"}],"title":"7.2. The permissionsPolicy object"}],"url":"https://webidl.spec.whatwg.org/#idl-boolean"},
+"55213b5b": {"dfnID":"55213b5b","dfnText":"request","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-request"}],"title":"9.11. Should request be allowed to use feature?"}],"url":"https://fetch.spec.whatwg.org/#concept-request"},
+"5c35dd47": {"dfnID":"5c35dd47","dfnText":"sandbox","external":true,"refSections":[{"refs":[{"id":"ref-for-attr-iframe-sandbox"}],"title":"3. Other and related mechanisms"},{"refs":[{"id":"ref-for-attr-iframe-sandbox\u2460"}],"title":"7.2. The permissionsPolicy object"},{"refs":[{"id":"ref-for-attr-iframe-sandbox\u2461"}],"title":"11. Privacy and Security"}],"url":"https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-sandbox"},
+"5c66de35": {"dfnID":"5c66de35","dfnText":"get a structured field value","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-header-list-get-structured-header"}],"title":"9.1. Process response policy"}],"url":"https://fetch.spec.whatwg.org/#concept-header-list-get-structured-header"},
+"5d7209e9": {"dfnID":"5d7209e9","dfnText":"Window","external":true,"refSections":[{"refs":[{"id":"ref-for-window"}],"title":"9.11. Should request be allowed to use feature?"}],"url":"https://html.spec.whatwg.org/multipage/nav-history-apis.html#window"},
+"692595fe": {"dfnID":"692595fe","dfnText":"ordered set","external":true,"refSections":[{"refs":[{"id":"ref-for-ordered-set"}],"title":"4.8. Allowlists"},{"refs":[{"id":"ref-for-ordered-set\u2460"}],"title":"9.2. Construct policy from dictionary and origin"},{"refs":[{"id":"ref-for-ordered-set\u2461"}],"title":"9.3. Parse policy directive"}],"url":"https://infra.spec.whatwg.org/#ordered-set"},
+"72ee2843": {"dfnID":"72ee2843","dfnText":"srcdoc","external":true,"refSections":[{"refs":[{"id":"ref-for-attr-iframe-srcdoc"}],"title":"7.2. The permissionsPolicy object"}],"url":"https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-srcdoc"},
+"7393da89": {"dfnID":"7393da89","dfnText":"same origin","external":true,"refSections":[{"refs":[{"id":"ref-for-same-origin"}],"title":"9.8. Define an inherited policy for feature in container at origin"},{"refs":[{"id":"ref-for-same-origin\u2460"}],"title":"9.9. Is feature enabled in document for origin?"}],"url":"https://html.spec.whatwg.org/multipage/browsers.html#same-origin"},
+"7f9469b5": {"dfnID":"7f9469b5","dfnText":"ascii case-insensitive","external":true,"refSections":[{"refs":[{"id":"ref-for-ascii-case-insensitive"},{"id":"ref-for-ascii-case-insensitive\u2460"}],"title":"9.3. Parse policy directive"}],"url":"https://infra.spec.whatwg.org/#ascii-case-insensitive"},
+"83c59a3a": {"dfnID":"83c59a3a","dfnText":"WorkerGlobalScope","external":true,"refSections":[{"refs":[{"id":"ref-for-workerglobalscope"}],"title":"9.11. Should request be allowed to use feature?"}],"url":"https://html.spec.whatwg.org/multipage/workers.html#workerglobalscope"},
+"84b454ff": {"dfnID":"84b454ff","dfnText":"ordered map","external":true,"refSections":[{"refs":[{"id":"ref-for-ordered-map"}],"title":"9.2. Construct policy from dictionary and origin"}],"url":"https://infra.spec.whatwg.org/#ordered-map"},
+"85394472": {"dfnID":"85394472","dfnText":"Document","external":true,"refSections":[{"refs":[{"id":"ref-for-document"},{"id":"ref-for-document\u2460"}],"title":"4.3. Inherited policies"},{"refs":[{"id":"ref-for-document\u2461"},{"id":"ref-for-document\u2462"},{"id":"ref-for-document\u2463"},{"id":"ref-for-document\u2464"},{"id":"ref-for-document\u2465"},{"id":"ref-for-document\u2466"},{"id":"ref-for-document\u2467"}],"title":"7.2. The permissionsPolicy object"},{"refs":[{"id":"ref-for-document\u2468"}],"title":"9.9. Is feature enabled in document for origin?"}],"url":"https://dom.spec.whatwg.org/#document"},
+"87fcd40c": {"dfnID":"87fcd40c","dfnText":"iframe","external":true,"refSections":[{"refs":[{"id":"ref-for-the-iframe-element"}],"title":"3. Other and related mechanisms"},{"refs":[{"id":"ref-for-the-iframe-element\u2460"},{"id":"ref-for-the-iframe-element\u2461"}],"title":"6.2. The allow attribute of the\n    iframe element"},{"refs":[{"id":"ref-for-the-iframe-element\u2462"}],"title":"6.3.1. allowfullscreen"},{"refs":[{"id":"ref-for-the-iframe-element\u2463"},{"id":"ref-for-the-iframe-element\u2464"},{"id":"ref-for-the-iframe-element\u2465"}],"title":"7.2. The permissionsPolicy object"},{"refs":[{"id":"ref-for-the-iframe-element\u2466"}],"title":"9.4. Process permissions policy attributes"}],"url":"https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element"},
+"8855a9aa": {"dfnID":"8855a9aa","dfnText":"DOMString","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-DOMString"},{"id":"ref-for-idl-DOMString\u2460"},{"id":"ref-for-idl-DOMString\u2461"},{"id":"ref-for-idl-DOMString\u2462"},{"id":"ref-for-idl-DOMString\u2463"},{"id":"ref-for-idl-DOMString\u2464"}],"title":"7.2. The permissionsPolicy object"},{"refs":[{"id":"ref-for-idl-DOMString\u2465"},{"id":"ref-for-idl-DOMString\u2466"},{"id":"ref-for-idl-DOMString\u2467"}],"title":"8. Reporting"}],"url":"https://webidl.spec.whatwg.org/#idl-DOMString"},
+"889e932f": {"dfnID":"889e932f","dfnText":"Exposed","external":true,"refSections":[{"refs":[{"id":"ref-for-Exposed"}],"title":"7.2. The permissionsPolicy object"},{"refs":[{"id":"ref-for-Exposed\u2460"}],"title":"8. Reporting"}],"url":"https://webidl.spec.whatwg.org/#Exposed"},
+"8ea172e9": {"dfnID":"8ea172e9","dfnText":"sandbox","external":true,"refSections":[{"refs":[{"id":"ref-for-sandbox"}],"title":"3. Other and related mechanisms"}],"url":"https://w3c.github.io/webappsec-csp/#sandbox"},
+"96c16e60": {"dfnID":"96c16e60","dfnText":"Node","external":true,"refSections":[{"refs":[{"id":"ref-for-node"}],"title":"7.2. The permissionsPolicy object"}],"url":"https://dom.spec.whatwg.org/#node"},
+"9cce47fd": {"dfnID":"9cce47fd","dfnText":"sequence","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-sequence"},{"id":"ref-for-idl-sequence\u2460"},{"id":"ref-for-idl-sequence\u2461"}],"title":"7.2. The permissionsPolicy object"}],"url":"https://webidl.spec.whatwg.org/#idl-sequence"},
+"9fe8836b": {"dfnID":"9fe8836b","dfnText":"report","external":true,"refSections":[{"refs":[{"id":"ref-for-report"}],"title":"9.10. Generate report for violation of permissions policy on settings"}],"url":"https://w3c.github.io/reporting/#report"},
+"a5c91173": {"dfnID":"a5c91173","dfnText":"SameObject","external":true,"refSections":[{"refs":[{"id":"ref-for-SameObject"},{"id":"ref-for-SameObject\u2460"}],"title":"7.2. The permissionsPolicy object"}],"url":"https://webidl.spec.whatwg.org/#SameObject"},
+"a682cc44": {"dfnID":"a682cc44","dfnText":"split on ascii whitespace","external":true,"refSections":[{"refs":[{"id":"ref-for-split-on-ascii-whitespace"}],"title":"9.3. Parse policy directive"}],"url":"https://infra.spec.whatwg.org/#split-on-ascii-whitespace"},
+"a973e0fe": {"dfnID":"a973e0fe","dfnText":"document","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-document"}],"title":"8. Reporting"}],"url":"https://dom.spec.whatwg.org/#concept-document"},
+"ae2a6342": {"dfnID":"ae2a6342","dfnText":"top-level browsing context","external":true,"refSections":[{"refs":[{"id":"ref-for-top-level-browsing-context"}],"title":"4.3. Inherited policies"}],"url":"https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context"},
+"allow-list": {"dfnID":"allow-list","dfnText":"allow-list","external":false,"refSections":[{"refs":[{"id":"ref-for-allow-list"}],"title":"5.1. HTML attribute serialization"}],"url":"#allow-list"},
+"allow-list-value": {"dfnID":"allow-list-value","dfnText":"allow-list-value","external":false,"refSections":[{"refs":[{"id":"ref-for-allow-list-value"},{"id":"ref-for-allow-list-value\u2460"}],"title":"5.1. HTML attribute serialization"}],"url":"#allow-list-value"},
+"allowlist": {"dfnID":"allowlist","dfnText":"allowlist","external":false,"refSections":[{"refs":[{"id":"ref-for-allowlist"}],"title":"2. Examples"},{"refs":[{"id":"ref-for-allowlist\u2460"}],"title":"4.4. Declared policies"},{"refs":[{"id":"ref-for-allowlist\u2461"}],"title":"4.7. Policy directives"},{"refs":[{"id":"ref-for-allowlist\u2462"},{"id":"ref-for-allowlist\u2463"},{"id":"ref-for-allowlist\u2464"},{"id":"ref-for-allowlist\u2465"}],"title":"4.8. Allowlists"},{"refs":[{"id":"ref-for-allowlist\u2466"},{"id":"ref-for-allowlist\u2467"}],"title":"5.2. Structured header serialization"},{"refs":[{"id":"ref-for-allowlist\u2468"}],"title":"6.2. The allow attribute of the\n    iframe element"},{"refs":[{"id":"ref-for-allowlist\u2460\u24ea"}],"title":"6.3.1. allowfullscreen"},{"refs":[{"id":"ref-for-allowlist\u2460\u2460"}],"title":"9.2. Construct policy from dictionary and origin"},{"refs":[{"id":"ref-for-allowlist\u2460\u2461"}],"title":"9.3. Parse policy directive"},{"refs":[{"id":"ref-for-allowlist\u2460\u2462"},{"id":"ref-for-allowlist\u2460\u2463"}],"title":"9.8. Define an inherited policy for feature in container at origin"},{"refs":[{"id":"ref-for-allowlist\u2460\u2464"}],"title":"9.9. Is feature enabled in document for origin?"}],"url":"#allowlist"},
+"associated-node": {"dfnID":"associated-node","dfnText":"associated node","external":false,"refSections":[{"refs":[{"id":"ref-for-associated-node"},{"id":"ref-for-associated-node\u2460"},{"id":"ref-for-associated-node\u2461"},{"id":"ref-for-associated-node\u2462"},{"id":"ref-for-associated-node\u2463"},{"id":"ref-for-associated-node\u2464"},{"id":"ref-for-associated-node\u2465"},{"id":"ref-for-associated-node\u2466"},{"id":"ref-for-associated-node\u2467"}],"title":"7.2. The permissionsPolicy object"}],"url":"#associated-node"},
+"bcdb6841": {"dfnID":"bcdb6841","dfnText":"requestFullscreen()","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-element-requestfullscreen"}],"title":"6.3.1. allowfullscreen"}],"url":"https://fullscreen.spec.whatwg.org/#dom-element-requestfullscreen"},
+"ca3ca4ae": {"dfnID":"ca3ca4ae","dfnText":"url parser","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-url-parser"}],"title":"9.2. Construct policy from dictionary and origin"},{"refs":[{"id":"ref-for-concept-url-parser\u2460"}],"title":"9.3. Parse policy directive"}],"url":"https://url.spec.whatwg.org/#concept-url-parser"},
+"cf363990": {"dfnID":"cf363990","dfnText":"body","external":true,"refSections":[{"refs":[{"id":"ref-for-report-body"}],"title":"8. Reporting"}],"url":"https://w3c.github.io/reporting/#report-body"},
+"construct-policy-from-dictionary-and-origin": {"dfnID":"construct-policy-from-dictionary-and-origin","dfnText":"Construct policy from dictionary and origin","external":false,"refSections":[{"refs":[{"id":"ref-for-construct-policy-from-dictionary-and-origin"}],"title":"9.1. Process response policy"}],"url":"#construct-policy-from-dictionary-and-origin"},
+"container-policy": {"dfnID":"container-policy","dfnText":"container policy","external":false,"refSections":[{"refs":[{"id":"ref-for-container-policy"}],"title":"4.3. Inherited policies"},{"refs":[{"id":"ref-for-container-policy\u2460"},{"id":"ref-for-container-policy\u2461"},{"id":"ref-for-container-policy\u2462"},{"id":"ref-for-container-policy\u2463"}],"title":"4.6. Container policies"},{"refs":[{"id":"ref-for-container-policy\u2464"}],"title":"6.2. The allow attribute of the\n    iframe element"},{"refs":[{"id":"ref-for-container-policy\u2465"}],"title":"6.3.1. allowfullscreen"},{"refs":[{"id":"ref-for-container-policy\u2466"}],"title":"9.4. Process permissions policy attributes"}],"url":"#container-policy"},
+"create-for-browsingcontext": {"dfnID":"create-for-browsingcontext","dfnText":"Create a Permissions Policy for a browsing context","external":false,"refSections":[{"refs":[{"id":"ref-for-create-for-browsingcontext"}],"title":"9.6. Create a Permissions Policy for a browsing context from response"}],"url":"#create-for-browsingcontext"},
+"da63e480": {"dfnID":"da63e480","dfnText":"sandboxed origin browsing context flag","external":true,"refSections":[{"refs":[{"id":"ref-for-sandboxed-origin-browsing-context-flag"}],"title":"7.2. The permissionsPolicy object"}],"url":"https://html.spec.whatwg.org/multipage/browsers.html#sandboxed-origin-browsing-context-flag"},
+"dae0bfde": {"dfnID":"dae0bfde","dfnText":"serialization of an origin","external":true,"refSections":[{"refs":[{"id":"ref-for-ascii-serialisation-of-an-origin"}],"title":"5.1. HTML attribute serialization"},{"refs":[{"id":"ref-for-ascii-serialisation-of-an-origin\u2460"}],"title":"5.2. Structured header serialization"},{"refs":[{"id":"ref-for-ascii-serialisation-of-an-origin\u2461"}],"title":"7.2. The permissionsPolicy object"}],"url":"https://html.spec.whatwg.org/multipage/browsers.html#ascii-serialisation-of-an-origin"},
+"declared-origin": {"dfnID":"declared-origin","dfnText":"declared origin","external":false,"refSections":[{"refs":[{"id":"ref-for-declared-origin"},{"id":"ref-for-declared-origin\u2460"},{"id":"ref-for-declared-origin\u2461"}],"title":"7.2. The permissionsPolicy object"},{"refs":[{"id":"ref-for-declared-origin\u2462"}],"title":"9.4. Process permissions policy attributes"}],"url":"#declared-origin"},
+"declared-policy": {"dfnID":"declared-policy","dfnText":"declared\n    policy","external":false,"refSections":[{"refs":[{"id":"ref-for-declared-policy"},{"id":"ref-for-declared-policy\u2460"}],"title":"4.2. Policies"},{"refs":[{"id":"ref-for-declared-policy\u2461"}],"title":"4.3. Inherited policies"},{"refs":[{"id":"ref-for-declared-policy\u2462"}],"title":"4.5. Header policies"},{"refs":[{"id":"ref-for-declared-policy\u2463"}],"title":"9.1. Process response policy"},{"refs":[{"id":"ref-for-declared-policy\u2464"}],"title":"9.2. Construct policy from dictionary and origin"},{"refs":[{"id":"ref-for-declared-policy\u2465"}],"title":"9.6. Create a Permissions Policy for a browsing context from response"},{"refs":[{"id":"ref-for-declared-policy\u2466"},{"id":"ref-for-declared-policy\u2467"}],"title":"9.8. Define an inherited policy for feature in container at origin"},{"refs":[{"id":"ref-for-declared-policy\u2468"},{"id":"ref-for-declared-policy\u2460\u24ea"}],"title":"9.9. Is feature enabled in document for origin?"}],"url":"#declared-policy"},
+"deddc6fc": {"dfnID":"deddc6fc","dfnText":"src","external":true,"refSections":[{"refs":[{"id":"ref-for-attr-iframe-src"}],"title":"6.2. The allow attribute of the\n    iframe element"},{"refs":[{"id":"ref-for-attr-iframe-src\u2460"}],"title":"7.2. The permissionsPolicy object"}],"url":"https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-src"},
+"default-allowlist": {"dfnID":"default-allowlist","dfnText":"default allowlist","external":false,"refSections":[{"refs":[{"id":"ref-for-default-allowlist"}],"title":"4.1. Policy-controlled Features"},{"refs":[{"id":"ref-for-default-allowlist\u2460"},{"id":"ref-for-default-allowlist\u2461"}],"title":"4.9. Default Allowlists"},{"refs":[{"id":"ref-for-default-allowlist\u2462"},{"id":"ref-for-default-allowlist\u2463"}],"title":"9.8. Define an inherited policy for feature in container at origin"},{"refs":[{"id":"ref-for-default-allowlist\u2464"},{"id":"ref-for-default-allowlist\u2465"}],"title":"9.9. Is feature enabled in document for origin?"}],"url":"#default-allowlist"},
+"default-origin": {"dfnID":"default-origin","dfnText":"default origin","external":false,"refSections":[{"refs":[{"id":"ref-for-default-origin"},{"id":"ref-for-default-origin\u2460"},{"id":"ref-for-default-origin\u2461"},{"id":"ref-for-default-origin\u2462"},{"id":"ref-for-default-origin\u2463"}],"title":"7.2. The permissionsPolicy object"}],"url":"#default-origin"},
+"define-inherited-policy": {"dfnID":"define-inherited-policy","dfnText":"Define an inherited policy for feature in browsing context","external":false,"refSections":[{"refs":[{"id":"ref-for-define-inherited-policy"}],"title":"9.5. Create a Permissions Policy for a browsing context"}],"url":"#define-inherited-policy"},
+"define-inherited-policy-in-container": {"dfnID":"define-inherited-policy-in-container","dfnText":"Define an inherited policy for feature in container at origin","external":false,"refSections":[{"refs":[{"id":"ref-for-define-inherited-policy-in-container"}],"title":"7.2. The permissionsPolicy object"},{"refs":[{"id":"ref-for-define-inherited-policy-in-container\u2460"}],"title":"9.7. Define an inherited policy for feature in browsing context"}],"url":"#define-inherited-policy-in-container"},
+"document-policy-object": {"dfnID":"document-policy-object","dfnText":"policy object","external":false,"refSections":[{"refs":[{"id":"ref-for-document-policy-object"}],"title":"7.2. The permissionsPolicy object"}],"url":"#document-policy-object"},
+"dom-document-permissionspolicy": {"dfnID":"dom-document-permissionspolicy","dfnText":"permissionsPolicy","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-document-permissionspolicy"}],"title":"7.2. The permissionsPolicy object"}],"url":"#dom-document-permissionspolicy"},
+"dom-htmliframeelement-permissionspolicy": {"dfnID":"dom-htmliframeelement-permissionspolicy","dfnText":"permissionsPolicy","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-htmliframeelement-permissionspolicy"}],"title":"7.2. The permissionsPolicy object"}],"url":"#dom-htmliframeelement-permissionspolicy"},
+"dom-permissionspolicy-allowedfeatures": {"dfnID":"dom-permissionspolicy-allowedfeatures","dfnText":"allowedFeatures","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-permissionspolicy-allowedfeatures"}],"title":"7.2. The permissionsPolicy object"}],"url":"#dom-permissionspolicy-allowedfeatures"},
+"dom-permissionspolicy-allowsfeature": {"dfnID":"dom-permissionspolicy-allowsfeature","dfnText":"allowsFeature","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-permissionspolicy-allowsfeature"}],"title":"7.2. The permissionsPolicy object"}],"url":"#dom-permissionspolicy-allowsfeature"},
+"dom-permissionspolicy-features": {"dfnID":"dom-permissionspolicy-features","dfnText":"features","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-permissionspolicy-features"}],"title":"7.2. The permissionsPolicy object"}],"url":"#dom-permissionspolicy-features"},
+"dom-permissionspolicy-getallowlistforfeature": {"dfnID":"dom-permissionspolicy-getallowlistforfeature","dfnText":"getAllowlistForFeature","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-permissionspolicy-getallowlistforfeature"}],"title":"7.2. The permissionsPolicy object"}],"url":"#dom-permissionspolicy-getallowlistforfeature"},
+"e3201629": {"dfnID":"e3201629","dfnText":"response","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-response-response"}],"title":"6.1. Permissions-Policy HTTP Header\n    Field"},{"refs":[{"id":"ref-for-concept-response-response\u2460"}],"title":"9.1. Process response policy"},{"refs":[{"id":"ref-for-concept-response-response\u2461"}],"title":"9.6. Create a Permissions Policy for a browsing context from response"}],"url":"https://fetch.spec.whatwg.org/#concept-response-response"},
+"e5fc5b88": {"dfnID":"e5fc5b88","dfnText":"strictly split","external":true,"refSections":[{"refs":[{"id":"ref-for-strictly-split"}],"title":"9.3. Parse policy directive"}],"url":"https://infra.spec.whatwg.org/#strictly-split"},
+"ef20e900": {"dfnID":"ef20e900","dfnText":"feature","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-powerful-feature"}],"title":"5.2. Structured header serialization"}],"url":"https://w3c.github.io/permissions/#dfn-powerful-feature"},
+"f78d5b5c": {"dfnID":"f78d5b5c","dfnText":"origin","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-request-origin"}],"title":"9.11. Should request be allowed to use feature?"}],"url":"https://fetch.spec.whatwg.org/#concept-request-origin"},
+"f8de33a3": {"dfnID":"f8de33a3","dfnText":"long","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-long"},{"id":"ref-for-idl-long\u2460"}],"title":"8. Reporting"}],"url":"https://webidl.spec.whatwg.org/#idl-long"},
+"feature-identifier": {"dfnID":"feature-identifier","dfnText":"feature-identifier","external":false,"refSections":[{"refs":[{"id":"ref-for-feature-identifier"}],"title":"5.1. HTML attribute serialization"}],"url":"#feature-identifier"},
+"header-policy": {"dfnID":"header-policy","dfnText":"header policy","external":false,"refSections":[{"refs":[{"id":"ref-for-header-policy"}],"title":"4.6. Container policies"}],"url":"#header-policy"},
+"iframe-policy-object": {"dfnID":"iframe-policy-object","dfnText":"policy object","external":false,"refSections":[{"refs":[{"id":"ref-for-iframe-policy-object"}],"title":"7.2. The permissionsPolicy object"}],"url":"#iframe-policy-object"},
+"inherited-policy": {"dfnID":"inherited-policy","dfnText":"inherited\n    policy","external":false,"refSections":[{"refs":[{"id":"ref-for-inherited-policy"},{"id":"ref-for-inherited-policy\u2460"}],"title":"4.2. Policies"},{"refs":[{"id":"ref-for-inherited-policy\u2461"},{"id":"ref-for-inherited-policy\u2462"}],"title":"4.3. Inherited policies"},{"refs":[{"id":"ref-for-inherited-policy\u2463"}],"title":"4.6. Container policies"},{"refs":[{"id":"ref-for-inherited-policy\u2464"}],"title":"9.6. Create a Permissions Policy for a browsing context from response"},{"refs":[{"id":"ref-for-inherited-policy\u2465"}],"title":"9.7. Define an inherited policy for feature in browsing context"},{"refs":[{"id":"ref-for-inherited-policy\u2466"},{"id":"ref-for-inherited-policy\u2467"}],"title":"9.8. Define an inherited policy for feature in container at origin"},{"refs":[{"id":"ref-for-inherited-policy\u2468"}],"title":"9.9. Is feature enabled in document for origin?"}],"url":"#inherited-policy"},
+"is-feature-enabled": {"dfnID":"is-feature-enabled","dfnText":"Is feature enabled in document for origin?","external":false,"refSections":[{"refs":[{"id":"ref-for-is-feature-enabled"}],"title":"9.11. Should request be allowed to use feature?"}],"url":"#is-feature-enabled"},
+"matches": {"dfnID":"matches","dfnText":"matches","external":false,"refSections":[{"refs":[{"id":"ref-for-matches"},{"id":"ref-for-matches\u2460"}],"title":"9.8. Define an inherited policy for feature in container at origin"},{"refs":[{"id":"ref-for-matches\u2461"}],"title":"9.9. Is feature enabled in document for origin?"}],"url":"#matches"},
+"observable-policy": {"dfnID":"observable-policy","dfnText":"observable policy","external":false,"refSections":[{"refs":[{"id":"ref-for-observable-policy"},{"id":"ref-for-observable-policy\u2460"}],"title":"7.1.2. Frame policies"},{"refs":[{"id":"ref-for-observable-policy\u2461"},{"id":"ref-for-observable-policy\u2462"},{"id":"ref-for-observable-policy\u2463"},{"id":"ref-for-observable-policy\u2464"},{"id":"ref-for-observable-policy\u2465"}],"title":"7.2. The permissionsPolicy object"},{"refs":[{"id":"ref-for-observable-policy\u2466"},{"id":"ref-for-observable-policy\u2467"}],"title":"11.1. Exposure of cross-origin behavior"}],"url":"#observable-policy"},
+"parse-policy-directive": {"dfnID":"parse-policy-directive","dfnText":"Parse policy directive","external":false,"refSections":[{"refs":[{"id":"ref-for-parse-policy-directive"}],"title":"9.4. Process permissions policy attributes"}],"url":"#parse-policy-directive"},
+"permissions-policy": {"dfnID":"permissions-policy","dfnText":"permissions policy","external":false,"refSections":[{"refs":[{"id":"ref-for-permissions-policy"}],"title":"4.1. Policy-controlled Features"},{"refs":[{"id":"ref-for-permissions-policy\u2460"}],"title":"4.2. Policies"},{"refs":[{"id":"ref-for-permissions-policy\u2461"}],"title":"4.3. Inherited policies"},{"refs":[{"id":"ref-for-permissions-policy\u2462"}],"title":"4.5. Header policies"},{"refs":[{"id":"ref-for-permissions-policy\u2463"}],"title":"6.1. Permissions-Policy HTTP Header\n    Field"},{"refs":[{"id":"ref-for-permissions-policy\u2464"},{"id":"ref-for-permissions-policy\u2465"}],"title":"7.2. The permissionsPolicy object"},{"refs":[{"id":"ref-for-permissions-policy\u2466"},{"id":"ref-for-permissions-policy\u2467"}],"title":"9.5. Create a Permissions Policy for a browsing context"},{"refs":[{"id":"ref-for-permissions-policy\u2468"}],"title":"9.6. Create a Permissions Policy for a browsing context from response"},{"refs":[{"id":"ref-for-permissions-policy\u2460\u24ea"}],"title":"9.8. Define an inherited policy for feature in container at origin"},{"refs":[{"id":"ref-for-permissions-policy\u2460\u2460"}],"title":"9.9. Is feature enabled in document for origin?"}],"url":"#permissions-policy"},
+"permissions-policy-header": {"dfnID":"permissions-policy-header","dfnText":"Permissions-Policy","external":false,"refSections":[{"refs":[{"id":"ref-for-permissions-policy-header"},{"id":"ref-for-permissions-policy-header\u2460"}],"title":"2. Examples"}],"url":"#permissions-policy-header"},
+"permissions-policy-violation-reports": {"dfnID":"permissions-policy-violation-reports","dfnText":"Permissions policy violation reports","external":false,"refSections":[{"refs":[{"id":"ref-for-permissions-policy-violation-reports"},{"id":"ref-for-permissions-policy-violation-reports\u2460"},{"id":"ref-for-permissions-policy-violation-reports\u2461"}],"title":"8. Reporting"}],"url":"#permissions-policy-violation-reports"},
+"permissionspolicy": {"dfnID":"permissionspolicy","dfnText":"PermissionsPolicy","external":false,"refSections":[{"refs":[{"id":"ref-for-permissionspolicy"}],"title":"7.1. Overview"},{"refs":[{"id":"ref-for-permissionspolicy\u2460"}],"title":"7.1.1. Document policies"},{"refs":[{"id":"ref-for-permissionspolicy\u2461"},{"id":"ref-for-permissionspolicy\u2462"},{"id":"ref-for-permissionspolicy\u2463"},{"id":"ref-for-permissionspolicy\u2464"},{"id":"ref-for-permissionspolicy\u2465"},{"id":"ref-for-permissionspolicy\u2466"},{"id":"ref-for-permissionspolicy\u2467"},{"id":"ref-for-permissionspolicy\u2468"},{"id":"ref-for-permissionspolicy\u2460\u24ea"},{"id":"ref-for-permissionspolicy\u2460\u2460"},{"id":"ref-for-permissionspolicy\u2460\u2461"},{"id":"ref-for-permissionspolicy\u2460\u2462"},{"id":"ref-for-permissionspolicy\u2460\u2463"},{"id":"ref-for-permissionspolicy\u2460\u2464"},{"id":"ref-for-permissionspolicy\u2460\u2465"},{"id":"ref-for-permissionspolicy\u2460\u2466"}],"title":"7.2. The permissionsPolicy object"}],"url":"#permissionspolicy"},
+"permissionspolicyviolationreportbody": {"dfnID":"permissionspolicyviolationreportbody","dfnText":"PermissionsPolicyViolationReportBody","external":false,"refSections":[{"refs":[{"id":"ref-for-permissionspolicyviolationreportbody"}],"title":"8. Reporting"},{"refs":[{"id":"ref-for-permissionspolicyviolationreportbody\u2460"}],"title":"9.10. Generate report for violation of permissions policy on settings"}],"url":"#permissionspolicyviolationreportbody"},
+"permissionspolicyviolationreportbody-columnnumber": {"dfnID":"permissionspolicyviolationreportbody-columnnumber","dfnText":"columnNumber","external":false,"refSections":[{"refs":[{"id":"ref-for-permissionspolicyviolationreportbody-columnnumber"},{"id":"ref-for-permissionspolicyviolationreportbody-columnnumber\u2460"}],"title":"9.10. Generate report for violation of permissions policy on settings"}],"url":"#permissionspolicyviolationreportbody-columnnumber"},
+"permissionspolicyviolationreportbody-disposition": {"dfnID":"permissionspolicyviolationreportbody-disposition","dfnText":"disposition","external":false,"refSections":[{"refs":[{"id":"ref-for-permissionspolicyviolationreportbody-disposition"},{"id":"ref-for-permissionspolicyviolationreportbody-disposition\u2460"}],"title":"8. Reporting"},{"refs":[{"id":"ref-for-permissionspolicyviolationreportbody-disposition\u2461"}],"title":"9.10. Generate report for violation of permissions policy on settings"}],"url":"#permissionspolicyviolationreportbody-disposition"},
+"permissionspolicyviolationreportbody-featureid": {"dfnID":"permissionspolicyviolationreportbody-featureid","dfnText":"featureId","external":false,"refSections":[{"refs":[{"id":"ref-for-permissionspolicyviolationreportbody-featureid"}],"title":"9.10. Generate report for violation of permissions policy on settings"}],"url":"#permissionspolicyviolationreportbody-featureid"},
+"permissionspolicyviolationreportbody-linenumber": {"dfnID":"permissionspolicyviolationreportbody-linenumber","dfnText":"lineNumber","external":false,"refSections":[{"refs":[{"id":"ref-for-permissionspolicyviolationreportbody-linenumber"},{"id":"ref-for-permissionspolicyviolationreportbody-linenumber\u2460"}],"title":"9.10. Generate report for violation of permissions policy on settings"}],"url":"#permissionspolicyviolationreportbody-linenumber"},
+"permissionspolicyviolationreportbody-sourcefile": {"dfnID":"permissionspolicyviolationreportbody-sourcefile","dfnText":"sourceFile","external":false,"refSections":[{"refs":[{"id":"ref-for-permissionspolicyviolationreportbody-sourcefile"},{"id":"ref-for-permissionspolicyviolationreportbody-sourcefile\u2460"}],"title":"8. Reporting"},{"refs":[{"id":"ref-for-permissionspolicyviolationreportbody-sourcefile\u2461"},{"id":"ref-for-permissionspolicyviolationreportbody-sourcefile\u2462"}],"title":"9.10. Generate report for violation of permissions policy on settings"}],"url":"#permissionspolicyviolationreportbody-sourcefile"},
+"policy-controlled-feature": {"dfnID":"policy-controlled-feature","dfnText":"policy-controlled feature","external":false,"refSections":[{"refs":[{"id":"ref-for-policy-controlled-feature"},{"id":"ref-for-policy-controlled-feature\u2460"},{"id":"ref-for-policy-controlled-feature\u2461"},{"id":"ref-for-policy-controlled-feature\u2462"},{"id":"ref-for-policy-controlled-feature\u2463"},{"id":"ref-for-policy-controlled-feature\u2464"}],"title":"4.1. Policy-controlled Features"},{"refs":[{"id":"ref-for-policy-controlled-feature\u2465"},{"id":"ref-for-policy-controlled-feature\u2466"}],"title":"4.3. Inherited policies"},{"refs":[{"id":"ref-for-policy-controlled-feature\u2467"}],"title":"4.4. Declared policies"},{"refs":[{"id":"ref-for-policy-controlled-feature\u2468"}],"title":"4.7. Policy directives"},{"refs":[{"id":"ref-for-policy-controlled-feature\u2460\u24ea"},{"id":"ref-for-policy-controlled-feature\u2460\u2460"}],"title":"4.9. Default Allowlists"},{"refs":[{"id":"ref-for-policy-controlled-feature\u2460\u2461"}],"title":"6.2. The allow attribute of the\n    iframe element"},{"refs":[{"id":"ref-for-policy-controlled-feature\u2460\u2462"}],"title":"6.3. Additional attributes to support legacy\n    features"},{"refs":[{"id":"ref-for-policy-controlled-feature\u2460\u2463"}],"title":"8. Reporting"},{"refs":[{"id":"ref-for-policy-controlled-feature\u2460\u2464"},{"id":"ref-for-policy-controlled-feature\u2460\u2465"}],"title":"9.2. Construct policy from dictionary and origin"},{"refs":[{"id":"ref-for-policy-controlled-feature\u2460\u2466"},{"id":"ref-for-policy-controlled-feature\u2460\u2467"}],"title":"9.3. Parse policy directive"}],"url":"#policy-controlled-feature"},
+"policy-directive": {"dfnID":"policy-directive","dfnText":"policy\n    directive","external":false,"refSections":[{"refs":[{"id":"ref-for-policy-directive"}],"title":"4.1. Policy-controlled Features"},{"refs":[{"id":"ref-for-policy-directive\u2460"}],"title":"4.5. Header policies"},{"refs":[{"id":"ref-for-policy-directive\u2461"}],"title":"4.6. Container policies"},{"refs":[{"id":"ref-for-policy-directive\u2462"}],"title":"4.7. Policy directives"},{"refs":[{"id":"ref-for-policy-directive\u2463"}],"title":"5.1. HTML attribute serialization"},{"refs":[{"id":"ref-for-policy-directive\u2464"},{"id":"ref-for-policy-directive\u2465"}],"title":"5.2. Structured header serialization"},{"refs":[{"id":"ref-for-policy-directive\u2466"}],"title":"9.3. Parse policy directive"}],"url":"#policy-directive"},
+"process-permissions-policy-attributes": {"dfnID":"process-permissions-policy-attributes","dfnText":"Process permissions policy attributes","external":false,"refSections":[{"refs":[{"id":"ref-for-process-permissions-policy-attributes"}],"title":"9.8. Define an inherited policy for feature in container at origin"}],"url":"#process-permissions-policy-attributes"},
+"process-response-policy": {"dfnID":"process-response-policy","dfnText":"Process response policy","external":false,"refSections":[{"refs":[{"id":"ref-for-process-response-policy"}],"title":"9.6. Create a Permissions Policy for a browsing context from response"}],"url":"#process-response-policy"},
+"serialized-origin": {"dfnID":"serialized-origin","dfnText":"serialized-origin","external":false,"refSections":[{"refs":[{"id":"ref-for-serialized-origin"}],"title":"5.1. HTML attribute serialization"}],"url":"#serialized-origin"},
+"serialized-policy-directive": {"dfnID":"serialized-policy-directive","dfnText":"serialized-policy-directive","external":false,"refSections":[{"refs":[{"id":"ref-for-serialized-policy-directive"},{"id":"ref-for-serialized-policy-directive\u2460"}],"title":"5.1. HTML attribute serialization"},{"refs":[{"id":"ref-for-serialized-policy-directive"}],"title":"6.2. The allow attribute of the\n    iframe element"}],"url":"#serialized-policy-directive"},
+"supported-features": {"dfnID":"supported-features","dfnText":"supported features","external":false,"refSections":[{"refs":[{"id":"ref-for-supported-features"}],"title":"4.2. Policies"},{"refs":[{"id":"ref-for-supported-features\u2460"}],"title":"4.3. Inherited policies"},{"refs":[{"id":"ref-for-supported-features\u2461"},{"id":"ref-for-supported-features\u2462"},{"id":"ref-for-supported-features\u2463"}],"title":"7.2. The permissionsPolicy object"}],"url":"#supported-features"},
+"the-special-value": {"dfnID":"the-special-value","dfnText":"The special value *","external":false,"refSections":[{"refs":[{"id":"ref-for-the-special-value"}],"title":"4.8. Allowlists"},{"refs":[{"id":"ref-for-the-special-value\u2460"}],"title":"9.2. Construct policy from dictionary and origin"},{"refs":[{"id":"ref-for-the-special-value\u2461"}],"title":"9.3. Parse policy directive"},{"refs":[{"id":"ref-for-the-special-value\u2462"}],"title":"9.4. Process permissions policy attributes"}],"url":"#the-special-value"},
+"violate": {"dfnID":"violate","dfnText":"violate","external":false,"refSections":[{"refs":[{"id":"ref-for-violate"},{"id":"ref-for-violate\u2460"},{"id":"ref-for-violate\u2461"},{"id":"ref-for-violate\u2462"},{"id":"ref-for-violate\u2463"},{"id":"ref-for-violate\u2464"},{"id":"ref-for-violate\u2465"}],"title":"8. Reporting"},{"refs":[{"id":"ref-for-violate\u2466"},{"id":"ref-for-violate\u2467"}],"title":"9.10. Generate report for violation of permissions policy on settings"},{"refs":[{"id":"ref-for-violate\u2468"}],"title":"11.1. Exposure of cross-origin behavior"}],"url":"#violate"},
+};
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+});
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        dfn.panelData = panelData;
+        insertDfnPopupAction(dfn);
+    }
+}
+
+function genDfnPanel(dfn, { dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel on",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel({dfnPanel});
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.dfn = dfn;
+    dfn.dfnPanel = dfnPanel;
+    return dfnPanel;
+}
+
+
+
+function hideAllDfnPanels() {
+    // Delete the currently-active dfn panel.
+    queryAll(".dfn-panel").forEach(dfnPanel=>hideDfnPanel({dfnPanel}));
+}
+
+function showDfnPanel(dfn) {
+    hideAllDfnPanels(); // Only display one at a time.
+
+    dfn.setAttribute("aria-expanded", "true");
+
+    const dfnPanel = genDfnPanel(dfn, dfn.panelData);
+
+    // Give the dfn a unique tabindex, and then
+    // give all the tabbable panel bits successive indexes.
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+
+    append(document.body, dfnPanel);
+    positionDfnPanel(dfnPanel);
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.dfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }
+}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel({dfn, dfnPanel}) {
+    if(!dfnPanel) dfnPanel = dfn.dfnPanel;
+    if(!dfn) dfn = dfnPanel.dfn;
+    dfn.dfnPanel = undefined;
+    dfnPanel.dfn = undefined;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.remove()
+}
+
+function toggleDfnPanel(dfn) {
+    if(dfn.dfnPanel) {
+        hideDfnPanel(dfn);
+    } else {
+        showDfnPanel(dfn);
+    }
+}
+
+function insertDfnPopupAction(dfn) {
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        toggleDfnPanel(dfn);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+function needsFor(type) {
+    switch(type) {
+        case "descriptor":
+        case "value":
+        case "element-attr":
+        case "attr-value":
+        case "element-state":
+        case "method":
+        case "constructor":
+        case "argument":
+        case "attribute":
+        case "const":
+        case "dict-member":
+        case "event":
+        case "enum-value":
+        case "stringifier":
+        case "serializer":
+        case "iterator":
+        case "maplike":
+        case "setlike":
+        case "state":
+        case "mode":
+        case "context":
+        case "facet": return true;
+
+        default: return false;
+    }
+}
+function refusesFor(type) {
+    switch(type) {
+        case "property":
+        case "element":
+        case "interface":
+        case "namespace":
+        case "callback":
+        case "dictionary":
+        case "enum":
+        case "exception":
+        case "typedef":
+        case "http-header":
+        case "permission": return true;
+
+        default: return false;
+    }
+}
+function linkFormatterFromType(type) {
+    switch(type) {
+        case 'scheme':
+        case 'permission':
+        case 'dfn': return (text) => `[=${text}=]`;
+
+        case 'abstract-op': return (text) => `[\$${text}\$]`;
+
+        case 'function':
+        case 'at-rule':
+        case 'selector':
+        case 'value': return (text) => `''${text}''`;
+
+        case 'http-header': return (text) => `[:${text}:]`;
+
+        case 'interface':
+        case 'constructor':
+        case 'method':
+        case 'argument':
+        case 'attribute':
+        case 'callback':
+        case 'dictionary':
+        case 'dict-member':
+        case 'enum':
+        case 'enum-value':
+        case 'exception':
+        case 'const':
+        case 'typedef':
+        case 'stringifier':
+        case 'serializer':
+        case 'iterator':
+        case 'maplike':
+        case 'setlike':
+        case 'extended-attribute':
+        case 'event':
+        case 'idl': return (text) => `{{${text}}}`;
+
+        case 'element-state':
+        case 'element-attr':
+        case 'attr-value':
+        case 'element': return (element) => `<{${element}}>`;
+
+        case 'grammar': return (text) => `${text} (within a <pre class=prod>)`;
+
+        case 'type': return (text)=> `<<${text}>>`;
+
+        case 'descriptor':
+        case 'property': return (text) => `'${text}'`;
+
+        default: return;
+    };
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!needsFor(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!refusesFor(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
 }
 </script>
 <script>/* Boilerplate: script-position-annos */
 "use strict";
 {
-
 function repositionAnnoPanels(){
     const panels = [...document.querySelectorAll("[data-anno-for]")];
-    const main = document.querySelector("main");
-    let mainRect;
-    if(main) mainRect = main.getBoundingClientRect();
-    for(const panel of panels) {
-        const dfn = document.getElementById(panel.getAttribute("data-anno-for"));
-        if(!dfn) {
-            console.log("Can't find the annotation panel target:", panel);
-            continue;
-        }
-        const rect = dfn.getBoundingClientRect();
-        const top = window.scrollY + rect.top
-        panel.style.top = top + "px";
-        panel.top = top;
-        panel.height = rect.height;
-        panel.classList.remove("unpositioned");
-        const panelRect = panel.getBoundingClientRect()
-        if(main) {
-            panel.classList.toggle("overlapping-main", panelRect.left < mainRect.right)
-        }
-    }
+    hydratePanels(panels);
     let vSoFar = 0;
     for(const panel of panels.sort(cmpTops)) {
         if(panel.top < vSoFar) {
@@ -3307,6 +3296,39 @@ function repositionAnnoPanels(){
             panel.style.top = vSoFar + "px";
         }
         vSoFar = panel.top + panel.height + 15;
+    }
+}
+function hydratePanels(panels) {
+    const main = document.querySelector("main");
+    let mainRect;
+    if(main) mainRect = main.getBoundingClientRect();
+    // First display them all, if they're not already visible.
+    for(const panel of panels) {
+        panel.classList.remove("unpositioned");
+    }
+    // Measure them all
+    for(const panel of panels) {
+        const dfn = document.getElementById(panel.getAttribute("data-anno-for"));
+        if(!dfn) {
+            console.log("Can't find the annotation panel target:", panel);
+            continue;
+        }
+        panel.dfn = dfn;
+        panel.top = window.scrollY + dfn.getBoundingClientRect().top;
+        let panelRect = panel.getBoundingClientRect();
+        panel.height = panelRect.height;
+        if(main) {
+            panel.overlappingMain = panelRect.left < mainRect.right;
+        } else {
+            panel.overlappingMain = false;
+        }
+    }
+    // And finally position them
+    for(const panel of panels) {
+        const dfn = panel.dfn;
+        if(!dfn) continue;
+        panel.style.top = panel.top + "px";
+        panel.classList.toggle("overlapping-main", panel.overlappingMain);
     }
 }
 
@@ -3321,402 +3343,380 @@ window.addEventListener("resize", repositionAnnoPanels);
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
-                mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
+let refsData = {
+"#allow-list": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"allow-list","type":"dfn","url":"#allow-list"},
+"#allow-list-value": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"allow-list-value","type":"dfn","url":"#allow-list-value"},
+"#allowlist": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"allowlist","type":"dfn","url":"#allowlist"},
+"#associated-node": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"associated node","type":"dfn","url":"#associated-node"},
+"#construct-policy-from-dictionary-and-origin": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"construct policy from dictionary and origin","type":"dfn","url":"#construct-policy-from-dictionary-and-origin"},
+"#container-policy": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"container policy","type":"dfn","url":"#container-policy"},
+"#create-for-browsingcontext": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"create a permissions policy for a browsing context","type":"dfn","url":"#create-for-browsingcontext"},
+"#declared-origin": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"declared origin","type":"dfn","url":"#declared-origin"},
+"#declared-policy": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"declared policy","type":"dfn","url":"#declared-policy"},
+"#default-allowlist": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"default allowlist","type":"dfn","url":"#default-allowlist"},
+"#default-origin": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"default origin","type":"dfn","url":"#default-origin"},
+"#define-inherited-policy-in-container": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"define an inherited policy for feature in container at origin","type":"dfn","url":"#define-inherited-policy-in-container"},
+"#document-policy-object": {"export":true,"for_":["Document"],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"policy object","type":"dfn","url":"#document-policy-object"},
+"#dom-document-permissionspolicy": {"export":true,"for_":["Document"],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"permissionsPolicy","type":"attribute","url":"#dom-document-permissionspolicy"},
+"#dom-htmliframeelement-permissionspolicy": {"export":true,"for_":["HTMLIFrameElement"],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"permissionsPolicy","type":"attribute","url":"#dom-htmliframeelement-permissionspolicy"},
+"#dom-permissionspolicy-allowedfeatures": {"export":true,"for_":["PermissionsPolicy"],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"allowedFeatures()","type":"method","url":"#dom-permissionspolicy-allowedfeatures"},
+"#dom-permissionspolicy-allowsfeature": {"export":true,"for_":["PermissionsPolicy"],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"allowsFeature(feature, origin)","type":"method","url":"#dom-permissionspolicy-allowsfeature"},
+"#dom-permissionspolicy-features": {"export":true,"for_":["PermissionsPolicy"],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"features()","type":"method","url":"#dom-permissionspolicy-features"},
+"#dom-permissionspolicy-getallowlistforfeature": {"export":true,"for_":["PermissionsPolicy"],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"getAllowlistForFeature(feature)","type":"method","url":"#dom-permissionspolicy-getallowlistforfeature"},
+"#feature-identifier": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"feature-identifier","type":"dfn","url":"#feature-identifier"},
+"#header-policy": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"header policy","type":"dfn","url":"#header-policy"},
+"#iframe-policy-object": {"export":true,"for_":["iframe"],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"policy object","type":"dfn","url":"#iframe-policy-object"},
+"#inherited-policy": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"inherited policy","type":"dfn","url":"#inherited-policy"},
+"#matches": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"matches","type":"dfn","url":"#matches"},
+"#observable-policy": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"observable policy","type":"dfn","url":"#observable-policy"},
+"#parse-policy-directive": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"parse policy directive","type":"dfn","url":"#parse-policy-directive"},
+"#permissions-policy": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"permissions policy","type":"dfn","url":"#permissions-policy"},
+"#permissions-policy-header": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"permissions-policy","type":"http-header","url":"#permissions-policy-header"},
+"#permissions-policy-violation-reports": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"permissions policy violation reports","type":"dfn","url":"#permissions-policy-violation-reports"},
+"#permissionspolicy": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"PermissionsPolicy","type":"interface","url":"#permissionspolicy"},
+"#permissionspolicyviolationreportbody": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"PermissionsPolicyViolationReportBody","type":"interface","url":"#permissionspolicyviolationreportbody"},
+"#permissionspolicyviolationreportbody-columnnumber": {"export":true,"for_":["PermissionsPolicyViolationReportBody"],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"columnnumber","type":"dfn","url":"#permissionspolicyviolationreportbody-columnnumber"},
+"#permissionspolicyviolationreportbody-disposition": {"export":true,"for_":["PermissionsPolicyViolationReportBody"],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"disposition","type":"dfn","url":"#permissionspolicyviolationreportbody-disposition"},
+"#permissionspolicyviolationreportbody-featureid": {"export":true,"for_":["PermissionsPolicyViolationReportBody"],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"featureid","type":"dfn","url":"#permissionspolicyviolationreportbody-featureid"},
+"#permissionspolicyviolationreportbody-linenumber": {"export":true,"for_":["PermissionsPolicyViolationReportBody"],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"linenumber","type":"dfn","url":"#permissionspolicyviolationreportbody-linenumber"},
+"#permissionspolicyviolationreportbody-sourcefile": {"export":true,"for_":["PermissionsPolicyViolationReportBody"],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"sourcefile","type":"dfn","url":"#permissionspolicyviolationreportbody-sourcefile"},
+"#policy-controlled-feature": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"policy-controlled feature","type":"dfn","url":"#policy-controlled-feature"},
+"#policy-directive": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"policy directives","type":"dfn","url":"#policy-directive"},
+"#process-permissions-policy-attributes": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"process permissions policy attributes","type":"dfn","url":"#process-permissions-policy-attributes"},
+"#serialized-origin": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"serialized-origin","type":"dfn","url":"#serialized-origin"},
+"#serialized-policy-directive": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"serialized-policy-directive","type":"dfn","url":"#serialized-policy-directive"},
+"#supported-features": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"supported features","type":"dfn","url":"#supported-features"},
+"#the-special-value": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"the special value *","type":"dfn","url":"#the-special-value"},
+"#violate": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"local","text":"violated","type":"dfn","url":"#violate"},
+"https://dom.spec.whatwg.org/#concept-document": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"document","type":"dfn","url":"https://dom.spec.whatwg.org/#concept-document"},
+"https://dom.spec.whatwg.org/#concept-node-document": {"export":true,"for_":["Node"],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"node document","type":"dfn","url":"https://dom.spec.whatwg.org/#concept-node-document"},
+"https://dom.spec.whatwg.org/#document": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"Document","type":"interface","url":"https://dom.spec.whatwg.org/#document"},
+"https://dom.spec.whatwg.org/#element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"Element","type":"interface","url":"https://dom.spec.whatwg.org/#element"},
+"https://dom.spec.whatwg.org/#node": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"Node","type":"interface","url":"https://dom.spec.whatwg.org/#node"},
+"https://fetch.spec.whatwg.org/#concept-header-list-get-structured-header": {"export":true,"for_":["header list"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"get a structured field value","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-header-list-get-structured-header"},
+"https://fetch.spec.whatwg.org/#concept-request": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"request","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-request"},
+"https://fetch.spec.whatwg.org/#concept-request-origin": {"export":true,"for_":["request"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"origin","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-request-origin"},
+"https://fetch.spec.whatwg.org/#concept-request-window": {"export":true,"for_":["request"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"window","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-request-window"},
+"https://fetch.spec.whatwg.org/#concept-response-response": {"export":true,"for_":["Response"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"response","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-response-response"},
+"https://fullscreen.spec.whatwg.org/#dom-element-requestfullscreen": {"export":true,"for_":["Element"],"level":"1","normative":true,"shortname":"fullscreen","spec":"fullscreen","status":"current","text":"requestFullscreen()","type":"method","url":"https://fullscreen.spec.whatwg.org/#dom-element-requestfullscreen"},
+"https://html.spec.whatwg.org/multipage/browsers.html#ascii-serialisation-of-an-origin": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"serialization of an origin","type":"dfn","url":"https://html.spec.whatwg.org/multipage/browsers.html#ascii-serialisation-of-an-origin"},
+"https://html.spec.whatwg.org/multipage/browsers.html#concept-origin": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"origin","type":"dfn","url":"https://html.spec.whatwg.org/multipage/browsers.html#concept-origin"},
+"https://html.spec.whatwg.org/multipage/browsers.html#same-origin": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"same origin","type":"dfn","url":"https://html.spec.whatwg.org/multipage/browsers.html#same-origin"},
+"https://html.spec.whatwg.org/multipage/browsers.html#same-origin-domain": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"same origin-domain","type":"dfn","url":"https://html.spec.whatwg.org/multipage/browsers.html#same-origin-domain"},
+"https://html.spec.whatwg.org/multipage/browsers.html#sandboxed-origin-browsing-context-flag": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"sandboxed origin browsing context flag","type":"dfn","url":"https://html.spec.whatwg.org/multipage/browsers.html#sandboxed-origin-browsing-context-flag"},
+"https://html.spec.whatwg.org/multipage/document-sequences.html#browsing-context": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"browsing context","type":"dfn","url":"https://html.spec.whatwg.org/multipage/document-sequences.html#browsing-context"},
+"https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"top-level browsing context","type":"dfn","url":"https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context"},
+"https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-sandbox": {"export":true,"for_":["iframe"],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"sandbox","type":"element-attr","url":"https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-sandbox"},
+"https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-src": {"export":true,"for_":["iframe"],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"src","type":"element-attr","url":"https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-src"},
+"https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-srcdoc": {"export":true,"for_":["iframe"],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"srcdoc","type":"element-attr","url":"https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-srcdoc"},
+"https://html.spec.whatwg.org/multipage/iframe-embed-object.html#htmliframeelement": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"HTMLIFrameElement","type":"interface","url":"https://html.spec.whatwg.org/multipage/iframe-embed-object.html#htmliframeelement"},
+"https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"iframe","type":"element","url":"https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element"},
+"https://html.spec.whatwg.org/multipage/nav-history-apis.html#concept-document-window": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"associated document","type":"dfn","url":"https://html.spec.whatwg.org/multipage/nav-history-apis.html#concept-document-window"},
+"https://html.spec.whatwg.org/multipage/nav-history-apis.html#window": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"Window","type":"interface","url":"https://html.spec.whatwg.org/multipage/nav-history-apis.html#window"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"environment settings object","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object"},
+"https://html.spec.whatwg.org/multipage/workers.html#workerglobalscope": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"WorkerGlobalScope","type":"interface","url":"https://html.spec.whatwg.org/multipage/workers.html#workerglobalscope"},
+"https://html.spec.whatwg.org/multipage/worklets.html#workletglobalscope": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"WorkletGlobalScope","type":"interface","url":"https://html.spec.whatwg.org/multipage/worklets.html#workletglobalscope"},
+"https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#dictionary": {"export":true,"for_":[],"level":"","normative":true,"shortname":"header-structure","spec":"header-structure","status":"anchor-block","text":"sh-dictionary","type":"dfn","url":"https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#dictionary"},
+"https://infra.spec.whatwg.org/#ascii-case-insensitive": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"ascii case-insensitive","type":"dfn","url":"https://infra.spec.whatwg.org/#ascii-case-insensitive"},
+"https://infra.spec.whatwg.org/#ordered-map": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"ordered map","type":"dfn","url":"https://infra.spec.whatwg.org/#ordered-map"},
+"https://infra.spec.whatwg.org/#ordered-set": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"ordered set","type":"dfn","url":"https://infra.spec.whatwg.org/#ordered-set"},
+"https://infra.spec.whatwg.org/#split-on-ascii-whitespace": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"split on ascii whitespace","type":"dfn","url":"https://infra.spec.whatwg.org/#split-on-ascii-whitespace"},
+"https://infra.spec.whatwg.org/#strictly-split": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"strictly split","type":"dfn","url":"https://infra.spec.whatwg.org/#strictly-split"},
+"https://url.spec.whatwg.org/#concept-url-parser": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"url","spec":"url","status":"current","text":"url parser","type":"dfn","url":"https://url.spec.whatwg.org/#concept-url-parser"},
+"https://w3c.github.io/permissions/#dfn-powerful-feature": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions","spec":"permissions","status":"current","text":"feature","type":"dfn","url":"https://w3c.github.io/permissions/#dfn-powerful-feature"},
+"https://w3c.github.io/reporting/#report": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"reporting","spec":"reporting-1","status":"current","text":"report","type":"dfn","url":"https://w3c.github.io/reporting/#report"},
+"https://w3c.github.io/reporting/#report-body": {"export":true,"for_":["report"],"level":"1","normative":true,"shortname":"reporting","spec":"reporting-1","status":"current","text":"body","type":"dfn","url":"https://w3c.github.io/reporting/#report-body"},
+"https://w3c.github.io/reporting/#report-type": {"export":true,"for_":[],"level":"","normative":true,"shortname":"reporting","spec":"reporting","status":"anchor-block","text":"report type","type":"dfn","url":"https://w3c.github.io/reporting/#report-type"},
+"https://w3c.github.io/reporting/#reportbody": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"reporting","spec":"reporting-1","status":"current","text":"ReportBody","type":"interface","url":"https://w3c.github.io/reporting/#reportbody"},
+"https://w3c.github.io/reporting/#visible-to-reportingobservers": {"export":true,"for_":[],"level":"","normative":true,"shortname":"reporting","spec":"reporting","status":"anchor-block","text":"visible to reportingobservers","type":"dfn","url":"https://w3c.github.io/reporting/#visible-to-reportingobservers"},
+"https://w3c.github.io/webappsec-csp/#sandbox": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"csp","spec":"csp3","status":"current","text":"sandbox","type":"dfn","url":"https://w3c.github.io/webappsec-csp/#sandbox"},
+"https://webidl.spec.whatwg.org/#Exposed": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"Exposed","type":"extended-attribute","url":"https://webidl.spec.whatwg.org/#Exposed"},
+"https://webidl.spec.whatwg.org/#SameObject": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"SameObject","type":"extended-attribute","url":"https://webidl.spec.whatwg.org/#SameObject"},
+"https://webidl.spec.whatwg.org/#idl-DOMString": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"DOMString","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-DOMString"},
+"https://webidl.spec.whatwg.org/#idl-boolean": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"boolean","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-boolean"},
+"https://webidl.spec.whatwg.org/#idl-long": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"long","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-long"},
+"https://webidl.spec.whatwg.org/#idl-sequence": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"sequence","type":"dfn","url":"https://webidl.spec.whatwg.org/#idl-sequence"},
+};
+
+function mkRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "Term: "),
+                mk.span({}, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    let forListElements;
+    if(forList.length == 0) {
+        forListElements = [];
+    } else if(forList.length == 1) {
+        forListElements = mk.li({},
+            mk.b({}, "For: "),
+            mk.span({}, forList[0]),
+        );
+    } else {
+        forListElements = mk.li({},
             mk.b({}, "For: "),
             mk.ul({},
                 ...forList.map(forItem =>
                     mk.li({},
-                        mk.span({}, `${forItem}`)
+                        mk.span({}, forItem)
                     ),
                 ),
             ),
         );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+    }
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    setupRefHintEventListeners(link, hintPanel);
+    return hintPanel;
+}
+
+function hideAllRefHints() {
+    queryAll(".ref-hint").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    if(refHint.teardownEventListeners) {
+        refHint.teardownEventListeners();
     }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+    refHint.remove();
+}
+
+function showRefHint(link) {
+    if(link.classList.contains("dfn-link")) return;
+    const url = link.getAttribute("href");
+    const ref = refsData[url];
+    if(!ref) return;
+
+    hideAllRefHints(); // Only display one at this time.
+
+    const refHint = mkRefHint(link, ref);
+    append(document.body, refHint);
+    link.setAttribute("aria-expanded", "true");
+    positionRefHint(refHint);
+}
+
+function setupRefHintEventListeners(link, refHint) {
+    if (refHint.teardownEventListeners) return;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
+
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
-
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
-    }
-
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
-        }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
-
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
-    }
-
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+document.addEventListener("DOMContentLoaded", () => {
+    document.body.addEventListener("mouseover", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
+    });
+    document.body.addEventListener("focus", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
     });
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
 </script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['#permissions-policy-header'] = {"text": "permissions-policy", "type": "http-header", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#permissions-policy-header", "export": true, "normative": true, "for_": []};
-window.refsData['#allowlist'] = {"text": "allowlist", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#allowlist", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-sandbox'] = {"text": "sandbox", "type": "element-attr", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-sandbox", "export": true, "normative": true, "for_": ["iframe"]};
-window.refsData['https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element'] = {"text": "iframe", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/webappsec-csp/#sandbox'] = {"text": "sandbox", "type": "dfn", "spec": "csp3", "shortname": "csp", "level": "3", "status": "current", "url": "https://w3c.github.io/webappsec-csp/#sandbox", "export": true, "normative": true, "for_": []};
-window.refsData['#permissions-policy'] = {"text": "permissions policy", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#permissions-policy", "export": true, "normative": true, "for_": []};
-window.refsData['#policy-controlled-feature'] = {"text": "policy-controlled feature", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#policy-controlled-feature", "export": true, "normative": true, "for_": []};
-window.refsData['#policy-directive'] = {"text": "policy directives", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#policy-directive", "export": true, "normative": true, "for_": []};
-window.refsData['#default-allowlist'] = {"text": "default allowlist", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#default-allowlist", "export": true, "normative": true, "for_": []};
-window.refsData['#inherited-policy'] = {"text": "inherited policy", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#inherited-policy", "export": true, "normative": true, "for_": []};
-window.refsData['#declared-policy'] = {"text": "declared policy", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#declared-policy", "export": true, "normative": true, "for_": []};
-window.refsData['#supported-features'] = {"text": "supported features", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#supported-features", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context'] = {"text": "top-level browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context", "export": true, "normative": true, "for_": []};
-window.refsData['#container-policy'] = {"text": "container policy", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#container-policy", "export": true, "normative": true, "for_": []};
-window.refsData['#header-policy'] = {"text": "header policy", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#header-policy", "export": true, "normative": true, "for_": []};
-window.refsData['https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#dictionary'] = {"text": "sh-dictionary", "type": "dfn", "spec": "header-structure", "shortname": "header-structure", "level": "", "status": "anchor-block", "url": "https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#dictionary", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#concept-origin'] = {"text": "origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-origin", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#ordered-set'] = {"text": "ordered set", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ordered-set", "export": true, "normative": true, "for_": []};
-window.refsData['#the-special-value'] = {"text": "the special value *", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#the-special-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#same-origin-domain'] = {"text": "same origin-domain", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#same-origin-domain", "export": true, "normative": true, "for_": []};
-window.refsData['#serialized-policy-directive'] = {"text": "serialized-policy-directive", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#serialized-policy-directive", "export": true, "normative": true, "for_": []};
-window.refsData['#feature-identifier'] = {"text": "feature-identifier", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#feature-identifier", "export": true, "normative": true, "for_": []};
-window.refsData['#allow-list'] = {"text": "allow-list", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#allow-list", "export": true, "normative": true, "for_": []};
-window.refsData['#allow-list-value'] = {"text": "allow-list-value", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#allow-list-value", "export": true, "normative": true, "for_": []};
-window.refsData['#serialized-origin'] = {"text": "serialized-origin", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#serialized-origin", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#ascii-serialisation-of-an-origin'] = {"text": "serialization of an origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#ascii-serialisation-of-an-origin", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/permissions/#dfn-powerful-feature'] = {"text": "feature", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-powerful-feature", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#concept-response-response'] = {"text": "response", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response-response", "export": true, "normative": true, "for_": ["Response"]};
-window.refsData['https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-src'] = {"text": "src", "type": "element-attr", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-src", "export": true, "normative": true, "for_": ["iframe"]};
-window.refsData['https://fullscreen.spec.whatwg.org/#dom-element-requestfullscreen'] = {"text": "requestFullscreen()", "type": "method", "spec": "fullscreen", "shortname": "fullscreen", "level": "1", "status": "current", "url": "https://fullscreen.spec.whatwg.org/#dom-element-requestfullscreen", "export": true, "normative": true, "for_": ["Element"]};
-window.refsData['#permissionspolicy'] = {"text": "PermissionsPolicy", "type": "interface", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#permissionspolicy", "export": true, "normative": true, "for_": []};
-window.refsData['#observable-policy'] = {"text": "observable policy", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#observable-policy", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#SameObject'] = {"text": "SameObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SameObject", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/iframe-embed-object.html#htmliframeelement'] = {"text": "HTMLIFrameElement", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/iframe-embed-object.html#htmliframeelement", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#node'] = {"text": "Node", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#node", "export": true, "normative": true, "for_": []};
-window.refsData['#associated-node'] = {"text": "associated node", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#associated-node", "export": true, "normative": true, "for_": []};
-window.refsData['#default-origin'] = {"text": "default origin", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#default-origin", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#element'] = {"text": "Element", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#element", "export": true, "normative": true, "for_": []};
-window.refsData['#declared-origin'] = {"text": "declared origin", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#declared-origin", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-document-permissionspolicy'] = {"text": "permissionsPolicy", "type": "attribute", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#dom-document-permissionspolicy", "export": true, "normative": true, "for_": ["Document"]};
-window.refsData['#document-policy-object'] = {"text": "policy object", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#document-policy-object", "export": true, "normative": true, "for_": ["Document"]};
-window.refsData['#dom-htmliframeelement-permissionspolicy'] = {"text": "permissionsPolicy", "type": "attribute", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#dom-htmliframeelement-permissionspolicy", "export": true, "normative": true, "for_": ["HTMLIFrameElement"]};
-window.refsData['#iframe-policy-object'] = {"text": "policy object", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#iframe-policy-object", "export": true, "normative": true, "for_": ["iframe"]};
-window.refsData['#dom-permissionspolicy-allowsfeature'] = {"text": "allowsFeature(feature, origin)", "type": "method", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#dom-permissionspolicy-allowsfeature", "export": true, "normative": true, "for_": ["PermissionsPolicy"]};
-window.refsData['#dom-permissionspolicy-features'] = {"text": "features()", "type": "method", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#dom-permissionspolicy-features", "export": true, "normative": true, "for_": ["PermissionsPolicy"]};
-window.refsData['#dom-permissionspolicy-allowedfeatures'] = {"text": "allowedFeatures()", "type": "method", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#dom-permissionspolicy-allowedfeatures", "export": true, "normative": true, "for_": ["PermissionsPolicy"]};
-window.refsData['#dom-permissionspolicy-getallowlistforfeature'] = {"text": "getAllowlistForFeature(feature)", "type": "method", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#dom-permissionspolicy-getallowlistforfeature", "export": true, "normative": true, "for_": ["PermissionsPolicy"]};
-window.refsData['#define-inherited-policy-in-container'] = {"text": "define an inherited policy for feature in container at origin", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#define-inherited-policy-in-container", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#concept-node-document'] = {"text": "node document", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-node-document", "export": true, "normative": true, "for_": ["Node"]};
-window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#sandboxed-origin-browsing-context-flag'] = {"text": "sandboxed origin browsing context flag", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#sandboxed-origin-browsing-context-flag", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-srcdoc'] = {"text": "srcdoc", "type": "element-attr", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-srcdoc", "export": true, "normative": true, "for_": ["iframe"]};
-window.refsData['https://dom.spec.whatwg.org/#concept-document'] = {"text": "document", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-document", "export": true, "normative": true, "for_": []};
-window.refsData['#violate'] = {"text": "violated", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#violate", "export": true, "normative": true, "for_": []};
-window.refsData['#permissions-policy-violation-reports'] = {"text": "permissions policy violation reports", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#permissions-policy-violation-reports", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/reporting/#report-type'] = {"text": "report type", "type": "dfn", "spec": "reporting", "shortname": "reporting", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/reporting/#report-type", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/reporting/#visible-to-reportingobservers'] = {"text": "visible to reportingobservers", "type": "dfn", "spec": "reporting", "shortname": "reporting", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/reporting/#visible-to-reportingobservers", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/reporting/#reportbody'] = {"text": "ReportBody", "type": "interface", "spec": "reporting-1", "shortname": "reporting", "level": "1", "status": "current", "url": "https://w3c.github.io/reporting/#reportbody", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-long'] = {"text": "long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-long", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/reporting/#report-body'] = {"text": "body", "type": "dfn", "spec": "reporting-1", "shortname": "reporting", "level": "1", "status": "current", "url": "https://w3c.github.io/reporting/#report-body", "export": true, "normative": true, "for_": ["report"]};
-window.refsData['#permissionspolicyviolationreportbody'] = {"text": "PermissionsPolicyViolationReportBody", "type": "interface", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#permissionspolicyviolationreportbody", "export": true, "normative": true, "for_": []};
-window.refsData['#permissionspolicyviolationreportbody-sourcefile'] = {"text": "sourcefile", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#permissionspolicyviolationreportbody-sourcefile", "export": true, "normative": true, "for_": ["PermissionsPolicyViolationReportBody"]};
-window.refsData['#permissionspolicyviolationreportbody-disposition'] = {"text": "disposition", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#permissionspolicyviolationreportbody-disposition", "export": true, "normative": true, "for_": ["PermissionsPolicyViolationReportBody"]};
-window.refsData['https://fetch.spec.whatwg.org/#concept-header-list-get-structured-header'] = {"text": "get a structured field value", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-header-list-get-structured-header", "export": true, "normative": true, "for_": ["header list"]};
-window.refsData['#construct-policy-from-dictionary-and-origin'] = {"text": "construct policy from dictionary and origin", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#construct-policy-from-dictionary-and-origin", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#ordered-map'] = {"text": "ordered map", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ordered-map", "export": true, "normative": true, "for_": []};
-window.refsData['https://url.spec.whatwg.org/#concept-url-parser'] = {"text": "url parser", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-parser", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#strictly-split'] = {"text": "strictly split", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#strictly-split", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#split-on-ascii-whitespace'] = {"text": "split on ascii whitespace", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#split-on-ascii-whitespace", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#ascii-case-insensitive'] = {"text": "ascii case-insensitive", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-case-insensitive", "export": true, "normative": true, "for_": []};
-window.refsData['#parse-policy-directive'] = {"text": "parse policy directive", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#parse-policy-directive", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#browsing-context'] = {"text": "browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#browsing-context", "export": true, "normative": true, "for_": []};
-window.refsData['#create-for-browsingcontext'] = {"text": "create a permissions policy for a browsing context", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#create-for-browsingcontext", "export": true, "normative": true, "for_": []};
-window.refsData['#matches'] = {"text": "matches", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#matches", "export": true, "normative": true, "for_": []};
-window.refsData['#process-permissions-policy-attributes'] = {"text": "process permissions policy attributes", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#process-permissions-policy-attributes", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#same-origin'] = {"text": "same origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#same-origin", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object'] = {"text": "environment settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/reporting/#report'] = {"text": "report", "type": "dfn", "spec": "reporting-1", "shortname": "reporting", "level": "1", "status": "current", "url": "https://w3c.github.io/reporting/#report", "export": true, "normative": true, "for_": []};
-window.refsData['#permissionspolicyviolationreportbody-featureid'] = {"text": "featureid", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#permissionspolicyviolationreportbody-featureid", "export": true, "normative": true, "for_": ["PermissionsPolicyViolationReportBody"]};
-window.refsData['#permissionspolicyviolationreportbody-linenumber'] = {"text": "linenumber", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#permissionspolicyviolationreportbody-linenumber", "export": true, "normative": true, "for_": ["PermissionsPolicyViolationReportBody"]};
-window.refsData['#permissionspolicyviolationreportbody-columnnumber'] = {"text": "columnnumber", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "local", "url": "#permissionspolicyviolationreportbody-columnnumber", "export": true, "normative": true, "for_": ["PermissionsPolicyViolationReportBody"]};
-window.refsData['https://fetch.spec.whatwg.org/#concept-request'] = {"text": "request", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#concept-request-window'] = {"text": "window", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-window", "export": true, "normative": true, "for_": ["request"]};
-window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#window'] = {"text": "Window", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/workers.html#workerglobalscope'] = {"text": "WorkerGlobalScope", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/workers.html#workerglobalscope", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/worklets.html#workletglobalscope'] = {"text": "WorkletGlobalScope", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/worklets.html#workletglobalscope", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#concept-document-window'] = {"text": "associated document", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#concept-document-window", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#concept-request-origin'] = {"text": "origin", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-origin", "export": true, "normative": true, "for_": ["request"]};
-</script>
 <script>/* Boilerplate: script-var-click-highlighting */
+"use strict";
+{
 /*
 Color-choosing design:
 
-Colors are ordered by goodness.
-Each color has a usage count (initially zero).
-Each variable has a last-used color.
-
-* If the var has a last-used color, and that color's usage is 0,
-    return that color.
-* Otherwise, return the lowest-indexed color with the lowest usage.
-    Increment the color's usage and set it as the last-used color
-    for that var.
-* On unclicking, decrement usage of the color.
+* Colors are ordered by goodness.
+* On clicking a var, give it the earliest color
+    with the lowest usage in the algorithm.
+* On re-clicking, re-use the var's most recent color
+    if that's not currently being used elsewhere.
 */
-"use strict";
-{
-    document.addEventListener("click", e=>{
-        if(e.target.nodeName == "VAR") {
-            highlightSameAlgoVars(e.target);
-        }
-    });
-    const indexCounts = new Map();
-    const indexNames = new Map();
-    function highlightSameAlgoVars(v) {
-        // Find the algorithm container.
-        let algoContainer = null;
-        let searchEl = v;
-        while(algoContainer == null && searchEl != document.body) {
-            searchEl = searchEl.parentNode;
-            if(searchEl.hasAttribute("data-algorithm")) {
-                algoContainer = searchEl;
-            }
-        }
 
-        // Not highlighting document-global vars,
-        // too likely to be unrelated.
-        if(algoContainer == null) return;
+const COLOR_COUNT = 7;
 
-        const algoName = algoContainer.getAttribute("data-algorithm");
-        const varName = getVarName(v);
-        const addClass = !v.classList.contains("selected");
-        let highlightClass = null;
-        if(addClass) {
-            const index = chooseHighlightIndex(algoName, varName);
-            indexCounts.get(algoName)[index] += 1;
-            indexNames.set(algoName+"///"+varName, index);
-            highlightClass = nameFromIndex(index);
-        } else {
-            const index = previousHighlightIndex(algoName, varName);
-            indexCounts.get(algoName)[index] -= 1;
-            highlightClass = nameFromIndex(index);
-        }
+document.addEventListener("click", e=>{
+    if(e.target.nodeName == "VAR") {
+        highlightSameAlgoVars(e.target);
+    }
+});
 
-        // Find all same-name vars, and toggle their class appropriately.
+function highlightSameAlgoVars(v) {
+    // Find the algorithm container.
+    let algoContainer = findAlgoContainer(v);
+
+    // Not highlighting document-global vars,
+    // too likely to be unrelated.
+    if(algoContainer == null) return;
+
+    const varName = nameFromVar(v);
+    if(!v.hasAttribute("data-var-color")) {
+        const newColor = chooseHighlightColor(algoContainer, v);
         for(const el of algoContainer.querySelectorAll("var")) {
-            if(getVarName(el) == varName) {
-                el.classList.toggle("selected", addClass);
-                el.classList.toggle(highlightClass, addClass);
+            if(nameFromVar(el) == varName) {
+                el.setAttribute("data-var-color", newColor);
+                el.setAttribute("data-var-last-color", newColor);
+            }
+        }
+    } else {
+        for(const el of algoContainer.querySelectorAll("var")) {
+            if(nameFromVar(el) == varName) {
+                el.removeAttribute("data-var-color");
             }
         }
     }
-    function getVarName(el) {
-        return el.textContent.replace(/(\s|\xa0)+/, " ").trim();
+}
+function findAlgoContainer(el) {
+    while(el != document.body) {
+        if(el.hasAttribute("data-algorithm")) return el;
+        el = el.parentNode;
     }
-    function chooseHighlightIndex(algoName, varName) {
-        let indexes = null;
-        if(indexCounts.has(algoName)) {
-            indexes = indexCounts.get(algoName);
-        } else {
-            // 7 classes right now
-            indexes = [0,0,0,0,0,0,0];
-            indexCounts.set(algoName, indexes);
-        }
+    return null;
+}
+function nameFromVar(el) {
+    return el.textContent.replace(/(\s|\xa0)+/, " ").trim();
+}
+function colorCountsFromContainer(container) {
+    const namesFromColor = Array.from({length:COLOR_COUNT}, x=>new Set());
+    for(let v of container.querySelectorAll("var[data-var-color]")) {
+        let color = +v.getAttribute("data-var-color");
+        namesFromColor[color].add(nameFromVar(v));
+    }
 
-        // If the element was recently unclicked,
-        // *and* that color is still unclaimed,
-        // give it back the same color.
-        const lastIndex = previousHighlightIndex(algoName, varName);
-        if(indexes[lastIndex] === 0) return lastIndex;
-
-        // Find the earliest index with the lowest count.
-        const minCount = Math.min.apply(null, indexes);
-        let index = null;
-        for(var i = 0; i < indexes.length; i++) {
-            if(indexes[i] == minCount) {
-                return i;
-            }
+    return namesFromColor.map(x=>x.size);
+}
+function leastUsedColor(colors) {
+    // Find the earliest color with the lowest count.
+    let minCount = Infinity;
+    let minColor = null;
+    for(var i = 0; i < colors.length; i++) {
+        if(colors[i] < minCount) {
+            minColor = i;
+            minCount = colors[i];
         }
     }
-    function previousHighlightIndex(algoName, varName) {
-        return indexNames.get(algoName+"///"+varName);
+    return minColor;
+}
+function chooseHighlightColor(container, v) {
+    const colorCounts = colorCountsFromContainer(container);
+    if(v.hasAttribute("data-var-last-color")) {
+        let color = +v.getAttribute("data-var-last-color");
+        if(colorCounts[color] == 0) return color;
     }
-    function nameFromIndex(index) {
-        return "selected" + index;
-    }
+    return leastUsedColor(colorCounts);
+}
 }
 </script>

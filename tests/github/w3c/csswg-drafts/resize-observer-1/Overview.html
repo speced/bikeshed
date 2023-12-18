@@ -79,7 +79,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -453,6 +452,11 @@ figcaption:not(.no-marker)::before {
     }
 }
 </style>
+<style>/* Boilerplate: style-idl-highlighting */
+pre.idl.highlight {
+    background: var(--borderedblock-bg, var(--def-bg));
+}
+</style>
 <style>/* Boilerplate: style-issues */
 a[href].issue-return {
     float: right;
@@ -705,7 +709,7 @@ a[href].issue-return {
 }
 
 .ref-hint {
-    display: none;
+    display: inline-block;
     position: absolute;
     z-index: 35;
     width: 20em;
@@ -721,16 +725,11 @@ a[href].issue-return {
     white-space: normal; /* in case it's moved into a pre */
 }
 
-.ref-hint.on {
-    display: inline-block;
-}
-
 .ref-hint * { margin: 0; padding: 0; text-indent: 0; }
 
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -790,7 +789,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -847,7 +845,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -2225,473 +2222,8 @@ will be considered for delivery in the next loop.</p>
     </div>
    </div>
   </details>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['6ecaf901'] = {"dfnID": "6ecaf901", "url": "https://www.w3.org/TR/intersection-observer/#intersection-observer-interface", "dfnText": "IntersectionObserver", "refSections": [{"refs": [{"id": "ref-for-intersection-observer-interface"}], "title": "2.1. ResizeObserver interface"}], "external": true};
-window.dfnpanelData['6dd10dcb'] = {"dfnID": "6dd10dcb", "url": "https://www.w3.org/TR/SVG2/coords.html#BoundingBoxes", "dfnText": "bounding box", "refSections": [{"refs": [{"id": "ref-for-BoundingBoxes"}, {"id": "ref-for-BoundingBoxes\u2460"}, {"id": "ref-for-BoundingBoxes\u2461"}], "title": "3.3.1. content rect"}, {"refs": [{"id": "ref-for-BoundingBoxes\u2462"}, {"id": "ref-for-BoundingBoxes\u2463"}, {"id": "ref-for-BoundingBoxes\u2464"}, {"id": "ref-for-BoundingBoxes\u2465"}], "title": "3.4.8. Calculate box size, given target and observed box"}], "external": true};
-window.dfnpanelData['b51f63c2'] = {"dfnID": "b51f63c2", "url": "https://www.w3.org/TR/CSS21/box.html#box-border-area", "dfnText": "box border area", "refSections": [{"refs": [{"id": "ref-for-box-border-area"}], "title": "2.1. ResizeObserver interface"}], "external": true};
-window.dfnpanelData['8a20fb62'] = {"dfnID": "8a20fb62", "url": "https://drafts.csswg.org/css-box-3/#content-area", "dfnText": "content area", "refSections": [{"refs": [{"id": "ref-for-content-area"}, {"id": "ref-for-content-area\u2460"}], "title": "2.1. ResizeObserver interface"}, {"refs": [{"id": "ref-for-content-area\u2461"}, {"id": "ref-for-content-area\u2462"}, {"id": "ref-for-content-area\u2463"}, {"id": "ref-for-content-area\u2464"}], "title": "3.4.8. Calculate box size, given target and observed box"}], "external": true};
-window.dfnpanelData['e53127ab'] = {"dfnID": "e53127ab", "url": "https://www.w3.org/TR/CSS2/box.html#content-height", "dfnText": "content height", "refSections": [{"refs": [{"id": "ref-for-content-height"}], "title": "3.3.1. content rect"}], "external": true};
-window.dfnpanelData['0a34f138'] = {"dfnID": "0a34f138", "url": "https://www.w3.org/TR/CSS2/box.html#content-width", "dfnText": "content width", "refSections": [{"refs": [{"id": "ref-for-content-width"}, {"id": "ref-for-content-width\u2460"}], "title": "3.3.1. content rect"}], "external": true};
-window.dfnpanelData['5528a7dc'] = {"dfnID": "5528a7dc", "url": "https://www.w3.org/TR/cssom-view-1/#dom-window-devicepixelratio", "dfnText": "devicepixelratio", "refSections": [{"refs": [{"id": "ref-for-dom-window-devicepixelratio"}], "title": "2.1. ResizeObserver interface"}], "external": true};
-window.dfnpanelData['2ccfe434'] = {"dfnID": "2ccfe434", "url": "https://www.w3.org/TR/css-display-3/#propdef-display", "dfnText": "display", "refSections": [{"refs": [{"id": "ref-for-propdef-display"}], "title": "1. Introduction"}], "external": true};
-window.dfnpanelData['ad2902e5'] = {"dfnID": "ad2902e5", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#processing-model-8", "dfnText": "html processing model", "refSections": [{"refs": [{"id": "ref-for-processing-model-8"}], "title": "3.6.1.  HTML Processing Model: Event Loop"}], "external": true};
-window.dfnpanelData['8b66de82'] = {"dfnID": "8b66de82", "url": "https://www.w3.org/TR/css3-multicol/#", "dfnText": "multi-column", "refSections": [{"refs": [{"id": "ref-for-something"}, {"id": "ref-for-something\u2460"}], "title": "2.3. ResizeObserverEntry"}, {"refs": [{"id": "ref-for-something\u2461"}, {"id": "ref-for-something\u2462"}], "title": "3.3.1. content rect"}], "external": true};
-window.dfnpanelData['1c983f76'] = {"dfnID": "1c983f76", "url": "https://drafts.csswg.org/css-box-3/#padding-physical", "dfnText": "padding left", "refSections": [{"refs": [{"id": "ref-for-padding-physical"}, {"id": "ref-for-padding-physical\u2460"}], "title": "3.3.1. content rect"}, {"refs": [{"id": "ref-for-padding-physical\u2461"}, {"id": "ref-for-padding-physical\u2462"}], "title": "3.4.4. \nCreate and populate a ResizeObserverEntry\n"}], "external": true};
-window.dfnpanelData['0e64dfd9'] = {"dfnID": "0e64dfd9", "url": "https://drafts.csswg.org/css-box-3/#padding-physical", "dfnText": "padding top", "refSections": [{"refs": [{"id": "ref-for-padding-physical"}, {"id": "ref-for-padding-physical\u2460"}], "title": "3.3.1. content rect"}, {"refs": [{"id": "ref-for-padding-physical\u2461"}, {"id": "ref-for-padding-physical\u2462"}], "title": "3.4.4. \nCreate and populate a ResizeObserverEntry\n"}], "external": true};
-window.dfnpanelData['e7c00499'] = {"dfnID": "e7c00499", "url": "https://www.w3.org/TR/SVG2/types.html#InterfaceSVGGraphicsElement", "dfnText": "svggraphicselement", "refSections": [{"refs": [{"id": "ref-for-InterfaceSVGGraphicsElement"}], "title": "3.3.1. content rect"}], "external": true};
-window.dfnpanelData['25fe6f4a'] = {"dfnID": "25fe6f4a", "url": "https://www.w3.org/TR/css3-positioning/#viewport", "dfnText": "viewport", "refSections": [{"refs": [{"id": "ref-for-viewport"}], "title": "1. Introduction"}], "external": true};
-window.dfnpanelData['4a57c942'] = {"dfnID": "4a57c942", "url": "https://drafts.csswg.org/css-box-4/#border-area", "dfnText": "border area", "refSections": [{"refs": [{"id": "ref-for-border-area"}, {"id": "ref-for-border-area\u2460"}], "title": "3.4.8. Calculate box size, given target and observed box"}], "external": true};
-window.dfnpanelData['f598742d'] = {"dfnID": "f598742d", "url": "https://drafts.csswg.org/css-box-4/#border-box", "dfnText": "border box", "refSections": [{"refs": [{"id": "ref-for-border-box"}, {"id": "ref-for-border-box\u2460"}], "title": "2.3. ResizeObserverEntry"}], "external": true};
-window.dfnpanelData['fb17617c'] = {"dfnID": "fb17617c", "url": "https://drafts.csswg.org/cssom-view-1/#eventdef-window-resize", "dfnText": "resize", "refSections": [{"refs": [{"id": "ref-for-eventdef-window-resize"}, {"id": "ref-for-eventdef-window-resize\u2460"}], "title": "1. Introduction"}], "external": true};
-window.dfnpanelData['85394472'] = {"dfnID": "85394472", "url": "https://dom.spec.whatwg.org/#document", "dfnText": "Document", "refSections": [{"refs": [{"id": "ref-for-document"}], "title": "2.1. ResizeObserver interface"}, {"refs": [{"id": "ref-for-document\u2460"}], "title": "3.4.2. Has active observations"}, {"refs": [{"id": "ref-for-document\u2461"}], "title": "3.4.3. Has skipped observations"}, {"refs": [{"id": "ref-for-document\u2462"}, {"id": "ref-for-document\u2463"}, {"id": "ref-for-document\u2464"}, {"id": "ref-for-document\u2465"}], "title": "3.6.1.  HTML Processing Model: Event Loop"}], "external": true};
-window.dfnpanelData['296f3551'] = {"dfnID": "296f3551", "url": "https://dom.spec.whatwg.org/#element", "dfnText": "Element", "refSections": [{"refs": [{"id": "ref-for-element"}, {"id": "ref-for-element\u2460"}, {"id": "ref-for-element\u2461"}, {"id": "ref-for-element\u2462"}, {"id": "ref-for-element\u2463"}], "title": "1. Introduction"}, {"refs": [{"id": "ref-for-element\u2464"}, {"id": "ref-for-element\u2465"}, {"id": "ref-for-element\u2466"}], "title": "2.1. ResizeObserver interface"}, {"refs": [{"id": "ref-for-element\u2467"}, {"id": "ref-for-element\u2468"}, {"id": "ref-for-element\u2460\u24ea"}, {"id": "ref-for-element\u2460\u2460"}, {"id": "ref-for-element\u2460\u2461"}, {"id": "ref-for-element\u2460\u2462"}, {"id": "ref-for-element\u2460\u2463"}], "title": "2.3. ResizeObserverEntry"}, {"refs": [{"id": "ref-for-element\u2460\u2464"}, {"id": "ref-for-element\u2460\u2465"}, {"id": "ref-for-element\u2460\u2466"}, {"id": "ref-for-element\u2460\u2467"}, {"id": "ref-for-element\u2460\u2468"}], "title": "3.1. ResizeObservation example struct"}, {"refs": [{"id": "ref-for-element\u2461\u24ea"}], "title": "3.3.1. content rect"}, {"refs": [{"id": "ref-for-element\u2461\u2460"}], "title": "3.4.8. Calculate box size, given target and observed box"}], "external": true};
-window.dfnpanelData['83c7a70f'] = {"dfnID": "83c7a70f", "url": "https://dom.spec.whatwg.org/#mutationobserver", "dfnText": "MutationObserver", "refSections": [{"refs": [{"id": "ref-for-mutationobserver"}], "title": "2.1. ResizeObserver interface"}], "external": true};
-window.dfnpanelData['a973e0fe'] = {"dfnID": "a973e0fe", "url": "https://dom.spec.whatwg.org/#concept-document", "dfnText": "document", "refSections": [{"refs": [{"id": "ref-for-concept-document"}], "title": "3.2.1. Document"}], "external": true};
-window.dfnpanelData['fdd2dd4e'] = {"dfnID": "fdd2dd4e", "url": "https://drafts.fxtf.org/geometry-1/#domrectreadonly", "dfnText": "DOMRectReadOnly", "refSections": [{"refs": [{"id": "ref-for-domrectreadonly"}, {"id": "ref-for-domrectreadonly\u2460"}], "title": "2.3. ResizeObserverEntry"}], "external": true};
-window.dfnpanelData['ccfe986b'] = {"dfnID": "ccfe986b", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#errorevent", "dfnText": "ErrorEvent", "refSections": [{"refs": [{"id": "ref-for-errorevent"}], "title": "3.4.6. Deliver Resize Loop Error"}], "external": true};
-window.dfnpanelData['1f3a75ee'] = {"dfnID": "1f3a75ee", "url": "https://svgwg.org/svg2-draft/types.html#InterfaceSVGGraphicsElement", "dfnText": "SVGGraphicsElement", "refSections": [{"refs": [{"id": "ref-for-InterfaceSVGGraphicsElement\u2460"}, {"id": "ref-for-InterfaceSVGGraphicsElement\u2461"}], "title": "3.4.8. Calculate box size, given target and observed box"}], "external": true};
-window.dfnpanelData['889e932f'] = {"dfnID": "889e932f", "url": "https://webidl.spec.whatwg.org/#Exposed", "dfnText": "Exposed", "refSections": [{"refs": [{"id": "ref-for-Exposed"}], "title": "2.1. ResizeObserver interface"}, {"refs": [{"id": "ref-for-Exposed\u2460"}, {"id": "ref-for-Exposed\u2461"}], "title": "2.3. ResizeObserverEntry"}], "external": true};
-window.dfnpanelData['dcf5fafa'] = {"dfnID": "dcf5fafa", "url": "https://webidl.spec.whatwg.org/#idl-frozen-array", "dfnText": "FrozenArray", "refSections": [{"refs": [{"id": "ref-for-idl-frozen-array"}, {"id": "ref-for-idl-frozen-array\u2460"}, {"id": "ref-for-idl-frozen-array\u2461"}, {"id": "ref-for-idl-frozen-array\u2462"}, {"id": "ref-for-idl-frozen-array\u2463"}, {"id": "ref-for-idl-frozen-array\u2464"}, {"id": "ref-for-idl-frozen-array\u2465"}, {"id": "ref-for-idl-frozen-array\u2466"}, {"id": "ref-for-idl-frozen-array\u2467"}], "title": "2.3. ResizeObserverEntry"}, {"refs": [{"id": "ref-for-idl-frozen-array\u2468"}], "title": "3.1. ResizeObservation example struct"}], "external": true};
-window.dfnpanelData['9cce47fd'] = {"dfnID": "9cce47fd", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "dfnText": "sequence", "refSections": [{"refs": [{"id": "ref-for-idl-sequence"}], "title": "2.2. ResizeObserverCallback"}], "external": true};
-window.dfnpanelData['5f90bbfb'] = {"dfnID": "5f90bbfb", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "dfnText": "undefined", "refSections": [{"refs": [{"id": "ref-for-idl-undefined"}, {"id": "ref-for-idl-undefined\u2460"}, {"id": "ref-for-idl-undefined\u2461"}], "title": "2.1. ResizeObserver interface"}, {"refs": [{"id": "ref-for-idl-undefined\u2462"}], "title": "2.2. ResizeObserverCallback"}], "external": true};
-window.dfnpanelData['11e0b87f'] = {"dfnID": "11e0b87f", "url": "https://webidl.spec.whatwg.org/#idl-unrestricted-double", "dfnText": "unrestricted double", "refSections": [{"refs": [{"id": "ref-for-idl-unrestricted-double"}, {"id": "ref-for-idl-unrestricted-double\u2460"}], "title": "2.3. ResizeObserverEntry"}], "external": true};
-window.dfnpanelData['enumdef-resizeobserverboxoptions'] = {"dfnID": "enumdef-resizeobserverboxoptions", "url": "#enumdef-resizeobserverboxoptions", "dfnText": "ResizeObserverBoxOptions", "refSections": [{"refs": [{"id": "ref-for-enumdef-resizeobserverboxoptions"}], "title": "2.1. ResizeObserver interface"}, {"refs": [{"id": "ref-for-enumdef-resizeobserverboxoptions\u2460"}, {"id": "ref-for-enumdef-resizeobserverboxoptions\u2461"}], "title": "3.1. ResizeObservation example struct"}, {"refs": [{"id": "ref-for-enumdef-resizeobserverboxoptions\u2462"}], "title": "3.4.8. Calculate box size, given target and observed box"}], "external": false};
-window.dfnpanelData['dom-resizeobserverboxoptions-border-box'] = {"dfnID": "dom-resizeobserverboxoptions-border-box", "url": "#dom-resizeobserverboxoptions-border-box", "dfnText": "\"border-box\"", "refSections": [{"refs": [{"id": "ref-for-dom-resizeobserverboxoptions-border-box"}], "title": "2.1. ResizeObserver interface"}], "external": false};
-window.dfnpanelData['dom-resizeobserverboxoptions-content-box'] = {"dfnID": "dom-resizeobserverboxoptions-content-box", "url": "#dom-resizeobserverboxoptions-content-box", "dfnText": "\"content-box\"", "refSections": [{"refs": [{"id": "ref-for-dom-resizeobserverboxoptions-content-box"}, {"id": "ref-for-dom-resizeobserverboxoptions-content-box\u2460"}, {"id": "ref-for-dom-resizeobserverboxoptions-content-box\u2461"}], "title": "2.1. ResizeObserver interface"}], "external": false};
-window.dfnpanelData['dom-resizeobserverboxoptions-device-pixel-content-box'] = {"dfnID": "dom-resizeobserverboxoptions-device-pixel-content-box", "url": "#dom-resizeobserverboxoptions-device-pixel-content-box", "dfnText": "\"device-pixel-content-box\"", "refSections": [{"refs": [{"id": "ref-for-dom-resizeobserverboxoptions-device-pixel-content-box"}, {"id": "ref-for-dom-resizeobserverboxoptions-device-pixel-content-box\u2460"}], "title": "2.1. ResizeObserver interface"}], "external": false};
-window.dfnpanelData['dictdef-resizeobserveroptions'] = {"dfnID": "dictdef-resizeobserveroptions", "url": "#dictdef-resizeobserveroptions", "dfnText": "ResizeObserverOptions", "refSections": [{"refs": [{"id": "ref-for-dictdef-resizeobserveroptions"}], "title": "2.1. ResizeObserver interface"}], "external": false};
-window.dfnpanelData['resizeobserver'] = {"dfnID": "resizeobserver", "url": "#resizeobserver", "dfnText": "ResizeObserver", "refSections": [{"refs": [{"id": "ref-for-resizeobserver"}], "title": "2.1. ResizeObserver interface"}, {"refs": [{"id": "ref-for-resizeobserver\u2460"}, {"id": "ref-for-resizeobserver\u2461"}], "title": "2.2. ResizeObserverCallback"}, {"refs": [{"id": "ref-for-resizeobserver\u2462"}], "title": "3.2.1. Document"}, {"refs": [{"id": "ref-for-resizeobserver\u2463"}, {"id": "ref-for-resizeobserver\u2464"}, {"id": "ref-for-resizeobserver\u2465"}, {"id": "ref-for-resizeobserver\u2466"}], "title": "3.2.2. ResizeObserver"}, {"refs": [{"id": "ref-for-resizeobserver\u2467"}], "title": "3.5. ResizeObserver Lifetime"}, {"refs": [{"id": "ref-for-resizeobserver\u2468"}, {"id": "ref-for-resizeobserver\u2460\u24ea"}, {"id": "ref-for-resizeobserver\u2460\u2460"}], "title": "3.6.1.  HTML Processing Model: Event Loop"}], "external": false};
-window.dfnpanelData['dom-resizeobserver-resizeobserver'] = {"dfnID": "dom-resizeobserver-resizeobserver", "url": "#dom-resizeobserver-resizeobserver", "dfnText": "new ResizeObserver(callback)", "refSections": [{"refs": [{"id": "ref-for-dom-resizeobserver-resizeobserver"}], "title": "2.1. ResizeObserver interface"}], "external": false};
-window.dfnpanelData['dom-resizeobserver-observe'] = {"dfnID": "dom-resizeobserver-observe", "url": "#dom-resizeobserver-observe", "dfnText": "observe(target, options)", "refSections": [{"refs": [{"id": "ref-for-dom-resizeobserver-observe"}], "title": "2.1. ResizeObserver interface"}], "external": false};
-window.dfnpanelData['dom-resizeobserver-unobserve'] = {"dfnID": "dom-resizeobserver-unobserve", "url": "#dom-resizeobserver-unobserve", "dfnText": "unobserve(target)", "refSections": [{"refs": [{"id": "ref-for-dom-resizeobserver-unobserve"}], "title": "2.1. ResizeObserver interface"}], "external": false};
-window.dfnpanelData['dom-resizeobserver-disconnect'] = {"dfnID": "dom-resizeobserver-disconnect", "url": "#dom-resizeobserver-disconnect", "dfnText": "disconnect()", "refSections": [{"refs": [{"id": "ref-for-dom-resizeobserver-disconnect"}], "title": "2.1. ResizeObserver interface"}], "external": false};
-window.dfnpanelData['callbackdef-resizeobservercallback'] = {"dfnID": "callbackdef-resizeobservercallback", "url": "#callbackdef-resizeobservercallback", "dfnText": "ResizeObserverCallback", "refSections": [{"refs": [{"id": "ref-for-callbackdef-resizeobservercallback"}], "title": "2.1. ResizeObserver interface"}, {"refs": [{"id": "ref-for-callbackdef-resizeobservercallback\u2460"}, {"id": "ref-for-callbackdef-resizeobservercallback\u2461"}, {"id": "ref-for-callbackdef-resizeobservercallback\u2462"}, {"id": "ref-for-callbackdef-resizeobservercallback\u2463"}], "title": "2.3. ResizeObserverEntry"}], "external": false};
-window.dfnpanelData['resizeobserverentry'] = {"dfnID": "resizeobserverentry", "url": "#resizeobserverentry", "dfnText": "ResizeObserverEntry", "refSections": [{"refs": [{"id": "ref-for-resizeobserverentry"}], "title": "2.2. ResizeObserverCallback"}, {"refs": [{"id": "ref-for-resizeobserverentry\u2460"}], "title": "3.4.4. \nCreate and populate a ResizeObserverEntry\n"}, {"refs": [{"id": "ref-for-resizeobserverentry\u2461"}], "title": "3.4.5. Broadcast active observations"}], "external": false};
-window.dfnpanelData['dom-resizeobserverentry-target'] = {"dfnID": "dom-resizeobserverentry-target", "url": "#dom-resizeobserverentry-target", "dfnText": "target", "refSections": [{"refs": [{"id": "ref-for-dom-resizeobserverentry-target"}], "title": "2.3. ResizeObserverEntry"}, {"refs": [{"id": "ref-for-dom-resizeobserverentry-target\u2460"}], "title": "3.4.4. \nCreate and populate a ResizeObserverEntry\n"}], "external": false};
-window.dfnpanelData['dom-resizeobserverentry-contentrect'] = {"dfnID": "dom-resizeobserverentry-contentrect", "url": "#dom-resizeobserverentry-contentrect", "dfnText": "contentRect", "refSections": [{"refs": [{"id": "ref-for-dom-resizeobserverentry-contentrect"}], "title": "2.3. ResizeObserverEntry"}, {"refs": [{"id": "ref-for-dom-resizeobserverentry-contentrect\u2460"}], "title": "3.4.4. \nCreate and populate a ResizeObserverEntry\n"}], "external": false};
-window.dfnpanelData['dom-resizeobserverentry-borderboxsize'] = {"dfnID": "dom-resizeobserverentry-borderboxsize", "url": "#dom-resizeobserverentry-borderboxsize", "dfnText": "borderBoxSize", "refSections": [{"refs": [{"id": "ref-for-dom-resizeobserverentry-borderboxsize"}], "title": "2.3. ResizeObserverEntry"}, {"refs": [{"id": "ref-for-dom-resizeobserverentry-borderboxsize\u2460"}], "title": "3.4.4. \nCreate and populate a ResizeObserverEntry\n"}, {"refs": [{"id": "ref-for-dom-resizeobserverentry-borderboxsize\u2461"}], "title": "3.4.5. Broadcast active observations"}], "external": false};
-window.dfnpanelData['dom-resizeobserverentry-contentboxsize'] = {"dfnID": "dom-resizeobserverentry-contentboxsize", "url": "#dom-resizeobserverentry-contentboxsize", "dfnText": "contentBoxSize", "refSections": [{"refs": [{"id": "ref-for-dom-resizeobserverentry-contentboxsize"}], "title": "2.3. ResizeObserverEntry"}, {"refs": [{"id": "ref-for-dom-resizeobserverentry-contentboxsize\u2460"}, {"id": "ref-for-dom-resizeobserverentry-contentboxsize\u2461"}], "title": "3.4.4. \nCreate and populate a ResizeObserverEntry\n"}, {"refs": [{"id": "ref-for-dom-resizeobserverentry-contentboxsize\u2462"}], "title": "3.4.5. Broadcast active observations"}], "external": false};
-window.dfnpanelData['dom-resizeobserverentry-devicepixelcontentboxsize'] = {"dfnID": "dom-resizeobserverentry-devicepixelcontentboxsize", "url": "#dom-resizeobserverentry-devicepixelcontentboxsize", "dfnText": "devicePixelContentBoxSize", "refSections": [{"refs": [{"id": "ref-for-dom-resizeobserverentry-devicepixelcontentboxsize"}], "title": "2.3. ResizeObserverEntry"}, {"refs": [{"id": "ref-for-dom-resizeobserverentry-devicepixelcontentboxsize\u2460"}], "title": "3.4.4. \nCreate and populate a ResizeObserverEntry\n"}, {"refs": [{"id": "ref-for-dom-resizeobserverentry-devicepixelcontentboxsize\u2461"}], "title": "3.4.5. Broadcast active observations"}], "external": false};
-window.dfnpanelData['resizeobserversize'] = {"dfnID": "resizeobserversize", "url": "#resizeobserversize", "dfnText": "ResizeObserverSize", "refSections": [{"refs": [{"id": "ref-for-resizeobserversize"}, {"id": "ref-for-resizeobserversize\u2460"}, {"id": "ref-for-resizeobserversize\u2461"}, {"id": "ref-for-resizeobserversize\u2462"}, {"id": "ref-for-resizeobserversize\u2463"}, {"id": "ref-for-resizeobserversize\u2464"}], "title": "2.3. ResizeObserverEntry"}, {"refs": [{"id": "ref-for-resizeobserversize\u2465"}, {"id": "ref-for-resizeobserversize\u2466"}], "title": "3.1. ResizeObservation example struct"}], "external": false};
-window.dfnpanelData['resizeobservation'] = {"dfnID": "resizeobservation", "url": "#resizeobservation", "dfnText": "ResizeObservation", "refSections": [{"refs": [{"id": "ref-for-resizeobservation"}, {"id": "ref-for-resizeobservation\u2460"}], "title": "2.1. ResizeObserver interface"}, {"refs": [{"id": "ref-for-resizeobservation\u2461"}], "title": "3.1. ResizeObservation example struct"}, {"refs": [{"id": "ref-for-resizeobservation\u2462"}, {"id": "ref-for-resizeobservation\u2463"}, {"id": "ref-for-resizeobservation\u2464"}], "title": "3.2.2. ResizeObserver"}], "external": false};
-window.dfnpanelData['dom-resizeobservation-target'] = {"dfnID": "dom-resizeobservation-target", "url": "#dom-resizeobservation-target", "dfnText": "target", "refSections": [{"refs": [{"id": "ref-for-dom-resizeobservation-target"}, {"id": "ref-for-dom-resizeobservation-target\u2460"}], "title": "3.1. ResizeObservation example struct"}, {"refs": [{"id": "ref-for-dom-resizeobservation-target\u2461"}], "title": "3.4.1. Gather active observations at depth"}, {"refs": [{"id": "ref-for-dom-resizeobservation-target\u2462"}, {"id": "ref-for-dom-resizeobservation-target\u2463"}], "title": "3.4.5. Broadcast active observations"}], "external": false};
-window.dfnpanelData['dom-resizeobservation-observedbox'] = {"dfnID": "dom-resizeobservation-observedbox", "url": "#dom-resizeobservation-observedbox", "dfnText": "observedBox", "refSections": [{"refs": [{"id": "ref-for-dom-resizeobservation-observedbox"}, {"id": "ref-for-dom-resizeobservation-observedbox\u2460"}], "title": "3.1. ResizeObservation example struct"}, {"refs": [{"id": "ref-for-dom-resizeobservation-observedbox\u2461"}, {"id": "ref-for-dom-resizeobservation-observedbox\u2462"}, {"id": "ref-for-dom-resizeobservation-observedbox\u2463"}], "title": "3.4.5. Broadcast active observations"}], "external": false};
-window.dfnpanelData['dom-resizeobservation-lastreportedsizes'] = {"dfnID": "dom-resizeobservation-lastreportedsizes", "url": "#dom-resizeobservation-lastreportedsizes", "dfnText": "lastReportedSizes", "refSections": [{"refs": [{"id": "ref-for-dom-resizeobservation-lastreportedsizes"}, {"id": "ref-for-dom-resizeobservation-lastreportedsizes\u2460"}, {"id": "ref-for-dom-resizeobservation-lastreportedsizes\u2461"}], "title": "3.1. ResizeObservation example struct"}, {"refs": [{"id": "ref-for-dom-resizeobservation-lastreportedsizes\u2462"}], "title": "3.4.5. Broadcast active observations"}], "external": false};
-window.dfnpanelData['dom-resizeobservation-isactive'] = {"dfnID": "dom-resizeobservation-isactive", "url": "#dom-resizeobservation-isactive", "dfnText": "isActive()", "refSections": [{"refs": [{"id": "ref-for-dom-resizeobservation-isactive"}], "title": "3.4.1. Gather active observations at depth"}], "external": false};
-window.dfnpanelData['dom-document-resizeobservers-slot'] = {"dfnID": "dom-document-resizeobservers-slot", "url": "#dom-document-resizeobservers-slot", "dfnText": "[[resizeObservers]]", "refSections": [{"refs": [{"id": "ref-for-dom-document-resizeobservers-slot"}], "title": "2.1. ResizeObserver interface"}, {"refs": [{"id": "ref-for-dom-document-resizeobservers-slot\u2460"}], "title": "3.4.1. Gather active observations at depth"}, {"refs": [{"id": "ref-for-dom-document-resizeobservers-slot\u2461"}], "title": "3.4.2. Has active observations"}, {"refs": [{"id": "ref-for-dom-document-resizeobservers-slot\u2462"}], "title": "3.4.3. Has skipped observations"}, {"refs": [{"id": "ref-for-dom-document-resizeobservers-slot\u2463"}], "title": "3.4.5. Broadcast active observations"}], "external": false};
-window.dfnpanelData['dom-resizeobserver-callback-slot'] = {"dfnID": "dom-resizeobserver-callback-slot", "url": "#dom-resizeobserver-callback-slot", "dfnText": "[[callback]]", "refSections": [{"refs": [{"id": "ref-for-dom-resizeobserver-callback-slot"}], "title": "2.1. ResizeObserver interface"}, {"refs": [{"id": "ref-for-dom-resizeobserver-callback-slot\u2460"}], "title": "3.4.5. Broadcast active observations"}], "external": false};
-window.dfnpanelData['dom-resizeobserver-observationtargets-slot'] = {"dfnID": "dom-resizeobserver-observationtargets-slot", "url": "#dom-resizeobserver-observationtargets-slot", "dfnText": "[[observationTargets]]", "refSections": [{"refs": [{"id": "ref-for-dom-resizeobserver-observationtargets-slot"}, {"id": "ref-for-dom-resizeobserver-observationtargets-slot\u2460"}, {"id": "ref-for-dom-resizeobserver-observationtargets-slot\u2461"}, {"id": "ref-for-dom-resizeobserver-observationtargets-slot\u2462"}, {"id": "ref-for-dom-resizeobserver-observationtargets-slot\u2463"}, {"id": "ref-for-dom-resizeobserver-observationtargets-slot\u2464"}], "title": "2.1. ResizeObserver interface"}, {"refs": [{"id": "ref-for-dom-resizeobserver-observationtargets-slot\u2465"}], "title": "3.4.1. Gather active observations at depth"}], "external": false};
-window.dfnpanelData['dom-resizeobserver-activetargets-slot'] = {"dfnID": "dom-resizeobserver-activetargets-slot", "url": "#dom-resizeobserver-activetargets-slot", "dfnText": "[[activeTargets]]", "refSections": [{"refs": [{"id": "ref-for-dom-resizeobserver-activetargets-slot"}], "title": "2.1. ResizeObserver interface"}, {"refs": [{"id": "ref-for-dom-resizeobserver-activetargets-slot\u2460"}, {"id": "ref-for-dom-resizeobserver-activetargets-slot\u2461"}], "title": "3.4.1. Gather active observations at depth"}, {"refs": [{"id": "ref-for-dom-resizeobserver-activetargets-slot\u2462"}], "title": "3.4.2. Has active observations"}, {"refs": [{"id": "ref-for-dom-resizeobserver-activetargets-slot\u2463"}, {"id": "ref-for-dom-resizeobserver-activetargets-slot\u2464"}, {"id": "ref-for-dom-resizeobserver-activetargets-slot\u2465"}], "title": "3.4.5. Broadcast active observations"}], "external": false};
-window.dfnpanelData['dom-resizeobserver-skippedtargets-slot'] = {"dfnID": "dom-resizeobserver-skippedtargets-slot", "url": "#dom-resizeobserver-skippedtargets-slot", "dfnText": "[[skippedTargets]]", "refSections": [{"refs": [{"id": "ref-for-dom-resizeobserver-skippedtargets-slot"}, {"id": "ref-for-dom-resizeobserver-skippedtargets-slot\u2460"}], "title": "3.4.1. Gather active observations at depth"}, {"refs": [{"id": "ref-for-dom-resizeobserver-skippedtargets-slot\u2461"}], "title": "3.4.3. Has skipped observations"}], "external": false};
-window.dfnpanelData['content-rect'] = {"dfnID": "content-rect", "url": "#content-rect", "dfnText": "content rect", "refSections": [{"refs": [{"id": "ref-for-content-rect"}, {"id": "ref-for-content-rect\u2460"}, {"id": "ref-for-content-rect\u2461"}, {"id": "ref-for-content-rect\u2462"}], "title": "2.3. ResizeObserverEntry"}], "external": false};
-window.dfnpanelData['gather-active-observations-at-depth'] = {"dfnID": "gather-active-observations-at-depth", "url": "#gather-active-observations-at-depth", "dfnText": "gather active observations at depth", "refSections": [{"refs": [{"id": "ref-for-gather-active-observations-at-depth"}, {"id": "ref-for-gather-active-observations-at-depth\u2460"}], "title": "3.6.1.  HTML Processing Model: Event Loop"}], "external": false};
-window.dfnpanelData['has-active-observations'] = {"dfnID": "has-active-observations", "url": "#has-active-observations", "dfnText": "has active observations", "refSections": [{"refs": [{"id": "ref-for-has-active-observations"}], "title": "3.6.1.  HTML Processing Model: Event Loop"}], "external": false};
-window.dfnpanelData['has-skipped-observations'] = {"dfnID": "has-skipped-observations", "url": "#has-skipped-observations", "dfnText": "has skipped observations", "refSections": [{"refs": [{"id": "ref-for-has-skipped-observations"}], "title": "3.6.1.  HTML Processing Model: Event Loop"}], "external": false};
-window.dfnpanelData['create-and-populate-a-resizeobserverentry'] = {"dfnID": "create-and-populate-a-resizeobserverentry", "url": "#create-and-populate-a-resizeobserverentry", "dfnText": "create and populate a ResizeObserverEntry", "refSections": [{"refs": [{"id": "ref-for-create-and-populate-a-resizeobserverentry"}], "title": "3.4.5. Broadcast active observations"}], "external": false};
-window.dfnpanelData['broadcast-active-observations'] = {"dfnID": "broadcast-active-observations", "url": "#broadcast-active-observations", "dfnText": "broadcast active observations", "refSections": [{"refs": [{"id": "ref-for-broadcast-active-observations"}], "title": "2.2. ResizeObserverCallback"}, {"refs": [{"id": "ref-for-broadcast-active-observations\u2460"}], "title": "3.6.1.  HTML Processing Model: Event Loop"}], "external": false};
-window.dfnpanelData['deliver-resize-loop-error-notification'] = {"dfnID": "deliver-resize-loop-error-notification", "url": "#deliver-resize-loop-error-notification", "dfnText": "deliver resize loop error notification", "refSections": [{"refs": [{"id": "ref-for-deliver-resize-loop-error-notification"}], "title": "3.6.1.  HTML Processing Model: Event Loop"}], "external": false};
-window.dfnpanelData['calculate-depth-for-node'] = {"dfnID": "calculate-depth-for-node", "url": "#calculate-depth-for-node", "dfnText": "calculate depth for node", "refSections": [{"refs": [{"id": "ref-for-calculate-depth-for-node"}], "title": "3.4.1. Gather active observations at depth"}, {"refs": [{"id": "ref-for-calculate-depth-for-node\u2460"}], "title": "3.4.5. Broadcast active observations"}], "external": false};
-window.dfnpanelData['calculate-box-size'] = {"dfnID": "calculate-box-size", "url": "#calculate-box-size", "dfnText": "calculate box size", "refSections": [{"refs": [{"id": "ref-for-calculate-box-size"}], "title": "3.1. ResizeObservation example struct"}, {"refs": [{"id": "ref-for-calculate-box-size"}, {"id": "ref-for-calculate-box-size"}, {"id": "ref-for-calculate-box-size"}], "title": "3.4.4. \nCreate and populate a ResizeObserverEntry\n"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -2885,34 +2417,491 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"0a34f138": {"dfnID":"0a34f138","dfnText":"content width","external":true,"refSections":[{"refs":[{"id":"ref-for-content-width"},{"id":"ref-for-content-width\u2460"}],"title":"3.3.1. content rect"}],"url":"https://www.w3.org/TR/CSS2/box.html#content-width"},
+"0e64dfd9": {"dfnID":"0e64dfd9","dfnText":"padding top","external":true,"refSections":[{"refs":[{"id":"ref-for-padding-physical"},{"id":"ref-for-padding-physical\u2460"}],"title":"3.3.1. content rect"},{"refs":[{"id":"ref-for-padding-physical\u2461"},{"id":"ref-for-padding-physical\u2462"}],"title":"3.4.4. \nCreate and populate a ResizeObserverEntry\n"}],"url":"https://drafts.csswg.org/css-box-3/#padding-physical"},
+"11e0b87f": {"dfnID":"11e0b87f","dfnText":"unrestricted double","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-unrestricted-double"},{"id":"ref-for-idl-unrestricted-double\u2460"}],"title":"2.3. ResizeObserverEntry"}],"url":"https://webidl.spec.whatwg.org/#idl-unrestricted-double"},
+"1c983f76": {"dfnID":"1c983f76","dfnText":"padding left","external":true,"refSections":[{"refs":[{"id":"ref-for-padding-physical"},{"id":"ref-for-padding-physical\u2460"}],"title":"3.3.1. content rect"},{"refs":[{"id":"ref-for-padding-physical\u2461"},{"id":"ref-for-padding-physical\u2462"}],"title":"3.4.4. \nCreate and populate a ResizeObserverEntry\n"}],"url":"https://drafts.csswg.org/css-box-3/#padding-physical"},
+"1f3a75ee": {"dfnID":"1f3a75ee","dfnText":"SVGGraphicsElement","external":true,"refSections":[{"refs":[{"id":"ref-for-InterfaceSVGGraphicsElement\u2460"},{"id":"ref-for-InterfaceSVGGraphicsElement\u2461"}],"title":"3.4.8. Calculate box size, given target and observed box"}],"url":"https://svgwg.org/svg2-draft/types.html#InterfaceSVGGraphicsElement"},
+"25fe6f4a": {"dfnID":"25fe6f4a","dfnText":"viewport","external":true,"refSections":[{"refs":[{"id":"ref-for-viewport"}],"title":"1. Introduction"}],"url":"https://www.w3.org/TR/css3-positioning/#viewport"},
+"296f3551": {"dfnID":"296f3551","dfnText":"Element","external":true,"refSections":[{"refs":[{"id":"ref-for-element"},{"id":"ref-for-element\u2460"},{"id":"ref-for-element\u2461"},{"id":"ref-for-element\u2462"},{"id":"ref-for-element\u2463"}],"title":"1. Introduction"},{"refs":[{"id":"ref-for-element\u2464"},{"id":"ref-for-element\u2465"},{"id":"ref-for-element\u2466"}],"title":"2.1. ResizeObserver interface"},{"refs":[{"id":"ref-for-element\u2467"},{"id":"ref-for-element\u2468"},{"id":"ref-for-element\u2460\u24ea"},{"id":"ref-for-element\u2460\u2460"},{"id":"ref-for-element\u2460\u2461"},{"id":"ref-for-element\u2460\u2462"},{"id":"ref-for-element\u2460\u2463"}],"title":"2.3. ResizeObserverEntry"},{"refs":[{"id":"ref-for-element\u2460\u2464"},{"id":"ref-for-element\u2460\u2465"},{"id":"ref-for-element\u2460\u2466"},{"id":"ref-for-element\u2460\u2467"},{"id":"ref-for-element\u2460\u2468"}],"title":"3.1. ResizeObservation example struct"},{"refs":[{"id":"ref-for-element\u2461\u24ea"}],"title":"3.3.1. content rect"},{"refs":[{"id":"ref-for-element\u2461\u2460"}],"title":"3.4.8. Calculate box size, given target and observed box"}],"url":"https://dom.spec.whatwg.org/#element"},
+"2ccfe434": {"dfnID":"2ccfe434","dfnText":"display","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-display"}],"title":"1. Introduction"}],"url":"https://www.w3.org/TR/css-display-3/#propdef-display"},
+"4a57c942": {"dfnID":"4a57c942","dfnText":"border area","external":true,"refSections":[{"refs":[{"id":"ref-for-border-area"},{"id":"ref-for-border-area\u2460"}],"title":"3.4.8. Calculate box size, given target and observed box"}],"url":"https://drafts.csswg.org/css-box-4/#border-area"},
+"5528a7dc": {"dfnID":"5528a7dc","dfnText":"devicepixelratio","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-window-devicepixelratio"}],"title":"2.1. ResizeObserver interface"}],"url":"https://www.w3.org/TR/cssom-view-1/#dom-window-devicepixelratio"},
+"5f90bbfb": {"dfnID":"5f90bbfb","dfnText":"undefined","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-undefined"},{"id":"ref-for-idl-undefined\u2460"},{"id":"ref-for-idl-undefined\u2461"}],"title":"2.1. ResizeObserver interface"},{"refs":[{"id":"ref-for-idl-undefined\u2462"}],"title":"2.2. ResizeObserverCallback"}],"url":"https://webidl.spec.whatwg.org/#idl-undefined"},
+"6dd10dcb": {"dfnID":"6dd10dcb","dfnText":"bounding box","external":true,"refSections":[{"refs":[{"id":"ref-for-BoundingBoxes"},{"id":"ref-for-BoundingBoxes\u2460"},{"id":"ref-for-BoundingBoxes\u2461"}],"title":"3.3.1. content rect"},{"refs":[{"id":"ref-for-BoundingBoxes\u2462"},{"id":"ref-for-BoundingBoxes\u2463"},{"id":"ref-for-BoundingBoxes\u2464"},{"id":"ref-for-BoundingBoxes\u2465"}],"title":"3.4.8. Calculate box size, given target and observed box"}],"url":"https://www.w3.org/TR/SVG2/coords.html#BoundingBoxes"},
+"6ecaf901": {"dfnID":"6ecaf901","dfnText":"IntersectionObserver","external":true,"refSections":[{"refs":[{"id":"ref-for-intersection-observer-interface"}],"title":"2.1. ResizeObserver interface"}],"url":"https://www.w3.org/TR/intersection-observer/#intersection-observer-interface"},
+"83c7a70f": {"dfnID":"83c7a70f","dfnText":"MutationObserver","external":true,"refSections":[{"refs":[{"id":"ref-for-mutationobserver"}],"title":"2.1. ResizeObserver interface"}],"url":"https://dom.spec.whatwg.org/#mutationobserver"},
+"85394472": {"dfnID":"85394472","dfnText":"Document","external":true,"refSections":[{"refs":[{"id":"ref-for-document"}],"title":"2.1. ResizeObserver interface"},{"refs":[{"id":"ref-for-document\u2460"}],"title":"3.4.2. Has active observations"},{"refs":[{"id":"ref-for-document\u2461"}],"title":"3.4.3. Has skipped observations"},{"refs":[{"id":"ref-for-document\u2462"},{"id":"ref-for-document\u2463"},{"id":"ref-for-document\u2464"},{"id":"ref-for-document\u2465"}],"title":"3.6.1.  HTML Processing Model: Event Loop"}],"url":"https://dom.spec.whatwg.org/#document"},
+"889e932f": {"dfnID":"889e932f","dfnText":"Exposed","external":true,"refSections":[{"refs":[{"id":"ref-for-Exposed"}],"title":"2.1. ResizeObserver interface"},{"refs":[{"id":"ref-for-Exposed\u2460"},{"id":"ref-for-Exposed\u2461"}],"title":"2.3. ResizeObserverEntry"}],"url":"https://webidl.spec.whatwg.org/#Exposed"},
+"8a20fb62": {"dfnID":"8a20fb62","dfnText":"content area","external":true,"refSections":[{"refs":[{"id":"ref-for-content-area"},{"id":"ref-for-content-area\u2460"}],"title":"2.1. ResizeObserver interface"},{"refs":[{"id":"ref-for-content-area\u2461"},{"id":"ref-for-content-area\u2462"},{"id":"ref-for-content-area\u2463"},{"id":"ref-for-content-area\u2464"}],"title":"3.4.8. Calculate box size, given target and observed box"}],"url":"https://drafts.csswg.org/css-box-3/#content-area"},
+"8b66de82": {"dfnID":"8b66de82","dfnText":"multi-column","external":true,"refSections":[{"refs":[{"id":"ref-for-something"},{"id":"ref-for-something\u2460"}],"title":"2.3. ResizeObserverEntry"},{"refs":[{"id":"ref-for-something\u2461"},{"id":"ref-for-something\u2462"}],"title":"3.3.1. content rect"}],"url":"https://www.w3.org/TR/css3-multicol/#"},
+"9cce47fd": {"dfnID":"9cce47fd","dfnText":"sequence","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-sequence"}],"title":"2.2. ResizeObserverCallback"}],"url":"https://webidl.spec.whatwg.org/#idl-sequence"},
+"a973e0fe": {"dfnID":"a973e0fe","dfnText":"document","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-document"}],"title":"3.2.1. Document"}],"url":"https://dom.spec.whatwg.org/#concept-document"},
+"ad2902e5": {"dfnID":"ad2902e5","dfnText":"html processing model","external":true,"refSections":[{"refs":[{"id":"ref-for-processing-model-8"}],"title":"3.6.1.  HTML Processing Model: Event Loop"}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#processing-model-8"},
+"b51f63c2": {"dfnID":"b51f63c2","dfnText":"box border area","external":true,"refSections":[{"refs":[{"id":"ref-for-box-border-area"}],"title":"2.1. ResizeObserver interface"}],"url":"https://www.w3.org/TR/CSS21/box.html#box-border-area"},
+"broadcast-active-observations": {"dfnID":"broadcast-active-observations","dfnText":"broadcast active observations","external":false,"refSections":[{"refs":[{"id":"ref-for-broadcast-active-observations"}],"title":"2.2. ResizeObserverCallback"},{"refs":[{"id":"ref-for-broadcast-active-observations\u2460"}],"title":"3.6.1.  HTML Processing Model: Event Loop"}],"url":"#broadcast-active-observations"},
+"calculate-box-size": {"dfnID":"calculate-box-size","dfnText":"calculate box size","external":false,"refSections":[{"refs":[{"id":"ref-for-calculate-box-size"}],"title":"3.1. ResizeObservation example struct"},{"refs":[{"id":"ref-for-calculate-box-size"},{"id":"ref-for-calculate-box-size"},{"id":"ref-for-calculate-box-size"}],"title":"3.4.4. \nCreate and populate a ResizeObserverEntry\n"}],"url":"#calculate-box-size"},
+"calculate-depth-for-node": {"dfnID":"calculate-depth-for-node","dfnText":"calculate depth for node","external":false,"refSections":[{"refs":[{"id":"ref-for-calculate-depth-for-node"}],"title":"3.4.1. Gather active observations at depth"},{"refs":[{"id":"ref-for-calculate-depth-for-node\u2460"}],"title":"3.4.5. Broadcast active observations"}],"url":"#calculate-depth-for-node"},
+"callbackdef-resizeobservercallback": {"dfnID":"callbackdef-resizeobservercallback","dfnText":"ResizeObserverCallback","external":false,"refSections":[{"refs":[{"id":"ref-for-callbackdef-resizeobservercallback"}],"title":"2.1. ResizeObserver interface"},{"refs":[{"id":"ref-for-callbackdef-resizeobservercallback\u2460"},{"id":"ref-for-callbackdef-resizeobservercallback\u2461"},{"id":"ref-for-callbackdef-resizeobservercallback\u2462"},{"id":"ref-for-callbackdef-resizeobservercallback\u2463"}],"title":"2.3. ResizeObserverEntry"}],"url":"#callbackdef-resizeobservercallback"},
+"ccfe986b": {"dfnID":"ccfe986b","dfnText":"ErrorEvent","external":true,"refSections":[{"refs":[{"id":"ref-for-errorevent"}],"title":"3.4.6. Deliver Resize Loop Error"}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#errorevent"},
+"content-rect": {"dfnID":"content-rect","dfnText":"content rect","external":false,"refSections":[{"refs":[{"id":"ref-for-content-rect"},{"id":"ref-for-content-rect\u2460"},{"id":"ref-for-content-rect\u2461"},{"id":"ref-for-content-rect\u2462"}],"title":"2.3. ResizeObserverEntry"}],"url":"#content-rect"},
+"create-and-populate-a-resizeobserverentry": {"dfnID":"create-and-populate-a-resizeobserverentry","dfnText":"create and populate a ResizeObserverEntry","external":false,"refSections":[{"refs":[{"id":"ref-for-create-and-populate-a-resizeobserverentry"}],"title":"3.4.5. Broadcast active observations"}],"url":"#create-and-populate-a-resizeobserverentry"},
+"dcf5fafa": {"dfnID":"dcf5fafa","dfnText":"FrozenArray","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-frozen-array"},{"id":"ref-for-idl-frozen-array\u2460"},{"id":"ref-for-idl-frozen-array\u2461"},{"id":"ref-for-idl-frozen-array\u2462"},{"id":"ref-for-idl-frozen-array\u2463"},{"id":"ref-for-idl-frozen-array\u2464"},{"id":"ref-for-idl-frozen-array\u2465"},{"id":"ref-for-idl-frozen-array\u2466"},{"id":"ref-for-idl-frozen-array\u2467"}],"title":"2.3. ResizeObserverEntry"},{"refs":[{"id":"ref-for-idl-frozen-array\u2468"}],"title":"3.1. ResizeObservation example struct"}],"url":"https://webidl.spec.whatwg.org/#idl-frozen-array"},
+"deliver-resize-loop-error-notification": {"dfnID":"deliver-resize-loop-error-notification","dfnText":"deliver resize loop error notification","external":false,"refSections":[{"refs":[{"id":"ref-for-deliver-resize-loop-error-notification"}],"title":"3.6.1.  HTML Processing Model: Event Loop"}],"url":"#deliver-resize-loop-error-notification"},
+"dictdef-resizeobserveroptions": {"dfnID":"dictdef-resizeobserveroptions","dfnText":"ResizeObserverOptions","external":false,"refSections":[{"refs":[{"id":"ref-for-dictdef-resizeobserveroptions"}],"title":"2.1. ResizeObserver interface"}],"url":"#dictdef-resizeobserveroptions"},
+"dom-document-resizeobservers-slot": {"dfnID":"dom-document-resizeobservers-slot","dfnText":"[[resizeObservers]]","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-document-resizeobservers-slot"}],"title":"2.1. ResizeObserver interface"},{"refs":[{"id":"ref-for-dom-document-resizeobservers-slot\u2460"}],"title":"3.4.1. Gather active observations at depth"},{"refs":[{"id":"ref-for-dom-document-resizeobservers-slot\u2461"}],"title":"3.4.2. Has active observations"},{"refs":[{"id":"ref-for-dom-document-resizeobservers-slot\u2462"}],"title":"3.4.3. Has skipped observations"},{"refs":[{"id":"ref-for-dom-document-resizeobservers-slot\u2463"}],"title":"3.4.5. Broadcast active observations"}],"url":"#dom-document-resizeobservers-slot"},
+"dom-resizeobservation-isactive": {"dfnID":"dom-resizeobservation-isactive","dfnText":"isActive()","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-resizeobservation-isactive"}],"title":"3.4.1. Gather active observations at depth"}],"url":"#dom-resizeobservation-isactive"},
+"dom-resizeobservation-lastreportedsizes": {"dfnID":"dom-resizeobservation-lastreportedsizes","dfnText":"lastReportedSizes","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-resizeobservation-lastreportedsizes"},{"id":"ref-for-dom-resizeobservation-lastreportedsizes\u2460"},{"id":"ref-for-dom-resizeobservation-lastreportedsizes\u2461"}],"title":"3.1. ResizeObservation example struct"},{"refs":[{"id":"ref-for-dom-resizeobservation-lastreportedsizes\u2462"}],"title":"3.4.5. Broadcast active observations"}],"url":"#dom-resizeobservation-lastreportedsizes"},
+"dom-resizeobservation-observedbox": {"dfnID":"dom-resizeobservation-observedbox","dfnText":"observedBox","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-resizeobservation-observedbox"},{"id":"ref-for-dom-resizeobservation-observedbox\u2460"}],"title":"3.1. ResizeObservation example struct"},{"refs":[{"id":"ref-for-dom-resizeobservation-observedbox\u2461"},{"id":"ref-for-dom-resizeobservation-observedbox\u2462"},{"id":"ref-for-dom-resizeobservation-observedbox\u2463"}],"title":"3.4.5. Broadcast active observations"}],"url":"#dom-resizeobservation-observedbox"},
+"dom-resizeobservation-target": {"dfnID":"dom-resizeobservation-target","dfnText":"target","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-resizeobservation-target"},{"id":"ref-for-dom-resizeobservation-target\u2460"}],"title":"3.1. ResizeObservation example struct"},{"refs":[{"id":"ref-for-dom-resizeobservation-target\u2461"}],"title":"3.4.1. Gather active observations at depth"},{"refs":[{"id":"ref-for-dom-resizeobservation-target\u2462"},{"id":"ref-for-dom-resizeobservation-target\u2463"}],"title":"3.4.5. Broadcast active observations"}],"url":"#dom-resizeobservation-target"},
+"dom-resizeobserver-activetargets-slot": {"dfnID":"dom-resizeobserver-activetargets-slot","dfnText":"[[activeTargets]]","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-resizeobserver-activetargets-slot"}],"title":"2.1. ResizeObserver interface"},{"refs":[{"id":"ref-for-dom-resizeobserver-activetargets-slot\u2460"},{"id":"ref-for-dom-resizeobserver-activetargets-slot\u2461"}],"title":"3.4.1. Gather active observations at depth"},{"refs":[{"id":"ref-for-dom-resizeobserver-activetargets-slot\u2462"}],"title":"3.4.2. Has active observations"},{"refs":[{"id":"ref-for-dom-resizeobserver-activetargets-slot\u2463"},{"id":"ref-for-dom-resizeobserver-activetargets-slot\u2464"},{"id":"ref-for-dom-resizeobserver-activetargets-slot\u2465"}],"title":"3.4.5. Broadcast active observations"}],"url":"#dom-resizeobserver-activetargets-slot"},
+"dom-resizeobserver-callback-slot": {"dfnID":"dom-resizeobserver-callback-slot","dfnText":"[[callback]]","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-resizeobserver-callback-slot"}],"title":"2.1. ResizeObserver interface"},{"refs":[{"id":"ref-for-dom-resizeobserver-callback-slot\u2460"}],"title":"3.4.5. Broadcast active observations"}],"url":"#dom-resizeobserver-callback-slot"},
+"dom-resizeobserver-disconnect": {"dfnID":"dom-resizeobserver-disconnect","dfnText":"disconnect()","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-resizeobserver-disconnect"}],"title":"2.1. ResizeObserver interface"}],"url":"#dom-resizeobserver-disconnect"},
+"dom-resizeobserver-observationtargets-slot": {"dfnID":"dom-resizeobserver-observationtargets-slot","dfnText":"[[observationTargets]]","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-resizeobserver-observationtargets-slot"},{"id":"ref-for-dom-resizeobserver-observationtargets-slot\u2460"},{"id":"ref-for-dom-resizeobserver-observationtargets-slot\u2461"},{"id":"ref-for-dom-resizeobserver-observationtargets-slot\u2462"},{"id":"ref-for-dom-resizeobserver-observationtargets-slot\u2463"},{"id":"ref-for-dom-resizeobserver-observationtargets-slot\u2464"}],"title":"2.1. ResizeObserver interface"},{"refs":[{"id":"ref-for-dom-resizeobserver-observationtargets-slot\u2465"}],"title":"3.4.1. Gather active observations at depth"}],"url":"#dom-resizeobserver-observationtargets-slot"},
+"dom-resizeobserver-observe": {"dfnID":"dom-resizeobserver-observe","dfnText":"observe(target, options)","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-resizeobserver-observe"}],"title":"2.1. ResizeObserver interface"}],"url":"#dom-resizeobserver-observe"},
+"dom-resizeobserver-resizeobserver": {"dfnID":"dom-resizeobserver-resizeobserver","dfnText":"new ResizeObserver(callback)","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-resizeobserver-resizeobserver"}],"title":"2.1. ResizeObserver interface"}],"url":"#dom-resizeobserver-resizeobserver"},
+"dom-resizeobserver-skippedtargets-slot": {"dfnID":"dom-resizeobserver-skippedtargets-slot","dfnText":"[[skippedTargets]]","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-resizeobserver-skippedtargets-slot"},{"id":"ref-for-dom-resizeobserver-skippedtargets-slot\u2460"}],"title":"3.4.1. Gather active observations at depth"},{"refs":[{"id":"ref-for-dom-resizeobserver-skippedtargets-slot\u2461"}],"title":"3.4.3. Has skipped observations"}],"url":"#dom-resizeobserver-skippedtargets-slot"},
+"dom-resizeobserver-unobserve": {"dfnID":"dom-resizeobserver-unobserve","dfnText":"unobserve(target)","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-resizeobserver-unobserve"}],"title":"2.1. ResizeObserver interface"}],"url":"#dom-resizeobserver-unobserve"},
+"dom-resizeobserverboxoptions-border-box": {"dfnID":"dom-resizeobserverboxoptions-border-box","dfnText":"\"border-box\"","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-resizeobserverboxoptions-border-box"}],"title":"2.1. ResizeObserver interface"}],"url":"#dom-resizeobserverboxoptions-border-box"},
+"dom-resizeobserverboxoptions-content-box": {"dfnID":"dom-resizeobserverboxoptions-content-box","dfnText":"\"content-box\"","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-resizeobserverboxoptions-content-box"},{"id":"ref-for-dom-resizeobserverboxoptions-content-box\u2460"},{"id":"ref-for-dom-resizeobserverboxoptions-content-box\u2461"}],"title":"2.1. ResizeObserver interface"}],"url":"#dom-resizeobserverboxoptions-content-box"},
+"dom-resizeobserverboxoptions-device-pixel-content-box": {"dfnID":"dom-resizeobserverboxoptions-device-pixel-content-box","dfnText":"\"device-pixel-content-box\"","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-resizeobserverboxoptions-device-pixel-content-box"},{"id":"ref-for-dom-resizeobserverboxoptions-device-pixel-content-box\u2460"}],"title":"2.1. ResizeObserver interface"}],"url":"#dom-resizeobserverboxoptions-device-pixel-content-box"},
+"dom-resizeobserverentry-borderboxsize": {"dfnID":"dom-resizeobserverentry-borderboxsize","dfnText":"borderBoxSize","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-resizeobserverentry-borderboxsize"}],"title":"2.3. ResizeObserverEntry"},{"refs":[{"id":"ref-for-dom-resizeobserverentry-borderboxsize\u2460"}],"title":"3.4.4. \nCreate and populate a ResizeObserverEntry\n"},{"refs":[{"id":"ref-for-dom-resizeobserverentry-borderboxsize\u2461"}],"title":"3.4.5. Broadcast active observations"}],"url":"#dom-resizeobserverentry-borderboxsize"},
+"dom-resizeobserverentry-contentboxsize": {"dfnID":"dom-resizeobserverentry-contentboxsize","dfnText":"contentBoxSize","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-resizeobserverentry-contentboxsize"}],"title":"2.3. ResizeObserverEntry"},{"refs":[{"id":"ref-for-dom-resizeobserverentry-contentboxsize\u2460"},{"id":"ref-for-dom-resizeobserverentry-contentboxsize\u2461"}],"title":"3.4.4. \nCreate and populate a ResizeObserverEntry\n"},{"refs":[{"id":"ref-for-dom-resizeobserverentry-contentboxsize\u2462"}],"title":"3.4.5. Broadcast active observations"}],"url":"#dom-resizeobserverentry-contentboxsize"},
+"dom-resizeobserverentry-contentrect": {"dfnID":"dom-resizeobserverentry-contentrect","dfnText":"contentRect","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-resizeobserverentry-contentrect"}],"title":"2.3. ResizeObserverEntry"},{"refs":[{"id":"ref-for-dom-resizeobserverentry-contentrect\u2460"}],"title":"3.4.4. \nCreate and populate a ResizeObserverEntry\n"}],"url":"#dom-resizeobserverentry-contentrect"},
+"dom-resizeobserverentry-devicepixelcontentboxsize": {"dfnID":"dom-resizeobserverentry-devicepixelcontentboxsize","dfnText":"devicePixelContentBoxSize","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-resizeobserverentry-devicepixelcontentboxsize"}],"title":"2.3. ResizeObserverEntry"},{"refs":[{"id":"ref-for-dom-resizeobserverentry-devicepixelcontentboxsize\u2460"}],"title":"3.4.4. \nCreate and populate a ResizeObserverEntry\n"},{"refs":[{"id":"ref-for-dom-resizeobserverentry-devicepixelcontentboxsize\u2461"}],"title":"3.4.5. Broadcast active observations"}],"url":"#dom-resizeobserverentry-devicepixelcontentboxsize"},
+"dom-resizeobserverentry-target": {"dfnID":"dom-resizeobserverentry-target","dfnText":"target","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-resizeobserverentry-target"}],"title":"2.3. ResizeObserverEntry"},{"refs":[{"id":"ref-for-dom-resizeobserverentry-target\u2460"}],"title":"3.4.4. \nCreate and populate a ResizeObserverEntry\n"}],"url":"#dom-resizeobserverentry-target"},
+"e53127ab": {"dfnID":"e53127ab","dfnText":"content height","external":true,"refSections":[{"refs":[{"id":"ref-for-content-height"}],"title":"3.3.1. content rect"}],"url":"https://www.w3.org/TR/CSS2/box.html#content-height"},
+"e7c00499": {"dfnID":"e7c00499","dfnText":"svggraphicselement","external":true,"refSections":[{"refs":[{"id":"ref-for-InterfaceSVGGraphicsElement"}],"title":"3.3.1. content rect"}],"url":"https://www.w3.org/TR/SVG2/types.html#InterfaceSVGGraphicsElement"},
+"enumdef-resizeobserverboxoptions": {"dfnID":"enumdef-resizeobserverboxoptions","dfnText":"ResizeObserverBoxOptions","external":false,"refSections":[{"refs":[{"id":"ref-for-enumdef-resizeobserverboxoptions"}],"title":"2.1. ResizeObserver interface"},{"refs":[{"id":"ref-for-enumdef-resizeobserverboxoptions\u2460"},{"id":"ref-for-enumdef-resizeobserverboxoptions\u2461"}],"title":"3.1. ResizeObservation example struct"},{"refs":[{"id":"ref-for-enumdef-resizeobserverboxoptions\u2462"}],"title":"3.4.8. Calculate box size, given target and observed box"}],"url":"#enumdef-resizeobserverboxoptions"},
+"f598742d": {"dfnID":"f598742d","dfnText":"border box","external":true,"refSections":[{"refs":[{"id":"ref-for-border-box"},{"id":"ref-for-border-box\u2460"}],"title":"2.3. ResizeObserverEntry"}],"url":"https://drafts.csswg.org/css-box-4/#border-box"},
+"fb17617c": {"dfnID":"fb17617c","dfnText":"resize","external":true,"refSections":[{"refs":[{"id":"ref-for-eventdef-window-resize"},{"id":"ref-for-eventdef-window-resize\u2460"}],"title":"1. Introduction"}],"url":"https://drafts.csswg.org/cssom-view-1/#eventdef-window-resize"},
+"fdd2dd4e": {"dfnID":"fdd2dd4e","dfnText":"DOMRectReadOnly","external":true,"refSections":[{"refs":[{"id":"ref-for-domrectreadonly"},{"id":"ref-for-domrectreadonly\u2460"}],"title":"2.3. ResizeObserverEntry"}],"url":"https://drafts.fxtf.org/geometry-1/#domrectreadonly"},
+"gather-active-observations-at-depth": {"dfnID":"gather-active-observations-at-depth","dfnText":"gather active observations at depth","external":false,"refSections":[{"refs":[{"id":"ref-for-gather-active-observations-at-depth"},{"id":"ref-for-gather-active-observations-at-depth\u2460"}],"title":"3.6.1.  HTML Processing Model: Event Loop"}],"url":"#gather-active-observations-at-depth"},
+"has-active-observations": {"dfnID":"has-active-observations","dfnText":"has active observations","external":false,"refSections":[{"refs":[{"id":"ref-for-has-active-observations"}],"title":"3.6.1.  HTML Processing Model: Event Loop"}],"url":"#has-active-observations"},
+"has-skipped-observations": {"dfnID":"has-skipped-observations","dfnText":"has skipped observations","external":false,"refSections":[{"refs":[{"id":"ref-for-has-skipped-observations"}],"title":"3.6.1.  HTML Processing Model: Event Loop"}],"url":"#has-skipped-observations"},
+"resizeobservation": {"dfnID":"resizeobservation","dfnText":"ResizeObservation","external":false,"refSections":[{"refs":[{"id":"ref-for-resizeobservation"},{"id":"ref-for-resizeobservation\u2460"}],"title":"2.1. ResizeObserver interface"},{"refs":[{"id":"ref-for-resizeobservation\u2461"}],"title":"3.1. ResizeObservation example struct"},{"refs":[{"id":"ref-for-resizeobservation\u2462"},{"id":"ref-for-resizeobservation\u2463"},{"id":"ref-for-resizeobservation\u2464"}],"title":"3.2.2. ResizeObserver"}],"url":"#resizeobservation"},
+"resizeobserver": {"dfnID":"resizeobserver","dfnText":"ResizeObserver","external":false,"refSections":[{"refs":[{"id":"ref-for-resizeobserver"}],"title":"2.1. ResizeObserver interface"},{"refs":[{"id":"ref-for-resizeobserver\u2460"},{"id":"ref-for-resizeobserver\u2461"}],"title":"2.2. ResizeObserverCallback"},{"refs":[{"id":"ref-for-resizeobserver\u2462"}],"title":"3.2.1. Document"},{"refs":[{"id":"ref-for-resizeobserver\u2463"},{"id":"ref-for-resizeobserver\u2464"},{"id":"ref-for-resizeobserver\u2465"},{"id":"ref-for-resizeobserver\u2466"}],"title":"3.2.2. ResizeObserver"},{"refs":[{"id":"ref-for-resizeobserver\u2467"}],"title":"3.5. ResizeObserver Lifetime"},{"refs":[{"id":"ref-for-resizeobserver\u2468"},{"id":"ref-for-resizeobserver\u2460\u24ea"},{"id":"ref-for-resizeobserver\u2460\u2460"}],"title":"3.6.1.  HTML Processing Model: Event Loop"}],"url":"#resizeobserver"},
+"resizeobserverentry": {"dfnID":"resizeobserverentry","dfnText":"ResizeObserverEntry","external":false,"refSections":[{"refs":[{"id":"ref-for-resizeobserverentry"}],"title":"2.2. ResizeObserverCallback"},{"refs":[{"id":"ref-for-resizeobserverentry\u2460"}],"title":"3.4.4. \nCreate and populate a ResizeObserverEntry\n"},{"refs":[{"id":"ref-for-resizeobserverentry\u2461"}],"title":"3.4.5. Broadcast active observations"}],"url":"#resizeobserverentry"},
+"resizeobserversize": {"dfnID":"resizeobserversize","dfnText":"ResizeObserverSize","external":false,"refSections":[{"refs":[{"id":"ref-for-resizeobserversize"},{"id":"ref-for-resizeobserversize\u2460"},{"id":"ref-for-resizeobserversize\u2461"},{"id":"ref-for-resizeobserversize\u2462"},{"id":"ref-for-resizeobserversize\u2463"},{"id":"ref-for-resizeobserversize\u2464"}],"title":"2.3. ResizeObserverEntry"},{"refs":[{"id":"ref-for-resizeobserversize\u2465"},{"id":"ref-for-resizeobserversize\u2466"}],"title":"3.1. ResizeObservation example struct"}],"url":"#resizeobserversize"},
+};
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+});
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        dfn.panelData = panelData;
+        insertDfnPopupAction(dfn);
+    }
+}
+
+function genDfnPanel(dfn, { dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel on",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel({dfnPanel});
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.dfn = dfn;
+    dfn.dfnPanel = dfnPanel;
+    return dfnPanel;
+}
+
+
+
+function hideAllDfnPanels() {
+    // Delete the currently-active dfn panel.
+    queryAll(".dfn-panel").forEach(dfnPanel=>hideDfnPanel({dfnPanel}));
+}
+
+function showDfnPanel(dfn) {
+    hideAllDfnPanels(); // Only display one at a time.
+
+    dfn.setAttribute("aria-expanded", "true");
+
+    const dfnPanel = genDfnPanel(dfn, dfn.panelData);
+
+    // Give the dfn a unique tabindex, and then
+    // give all the tabbable panel bits successive indexes.
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+
+    append(document.body, dfnPanel);
+    positionDfnPanel(dfnPanel);
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.dfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }
+}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel({dfn, dfnPanel}) {
+    if(!dfnPanel) dfnPanel = dfn.dfnPanel;
+    if(!dfn) dfn = dfnPanel.dfn;
+    dfn.dfnPanel = undefined;
+    dfnPanel.dfn = undefined;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.remove()
+}
+
+function toggleDfnPanel(dfn) {
+    if(dfn.dfnPanel) {
+        hideDfnPanel(dfn);
+    } else {
+        showDfnPanel(dfn);
+    }
+}
+
+function insertDfnPopupAction(dfn) {
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        toggleDfnPanel(dfn);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+function needsFor(type) {
+    switch(type) {
+        case "descriptor":
+        case "value":
+        case "element-attr":
+        case "attr-value":
+        case "element-state":
+        case "method":
+        case "constructor":
+        case "argument":
+        case "attribute":
+        case "const":
+        case "dict-member":
+        case "event":
+        case "enum-value":
+        case "stringifier":
+        case "serializer":
+        case "iterator":
+        case "maplike":
+        case "setlike":
+        case "state":
+        case "mode":
+        case "context":
+        case "facet": return true;
+
+        default: return false;
+    }
+}
+function refusesFor(type) {
+    switch(type) {
+        case "property":
+        case "element":
+        case "interface":
+        case "namespace":
+        case "callback":
+        case "dictionary":
+        case "enum":
+        case "exception":
+        case "typedef":
+        case "http-header":
+        case "permission": return true;
+
+        default: return false;
+    }
+}
+function linkFormatterFromType(type) {
+    switch(type) {
+        case 'scheme':
+        case 'permission':
+        case 'dfn': return (text) => `[=${text}=]`;
+
+        case 'abstract-op': return (text) => `[\$${text}\$]`;
+
+        case 'function':
+        case 'at-rule':
+        case 'selector':
+        case 'value': return (text) => `''${text}''`;
+
+        case 'http-header': return (text) => `[:${text}:]`;
+
+        case 'interface':
+        case 'constructor':
+        case 'method':
+        case 'argument':
+        case 'attribute':
+        case 'callback':
+        case 'dictionary':
+        case 'dict-member':
+        case 'enum':
+        case 'enum-value':
+        case 'exception':
+        case 'const':
+        case 'typedef':
+        case 'stringifier':
+        case 'serializer':
+        case 'iterator':
+        case 'maplike':
+        case 'setlike':
+        case 'extended-attribute':
+        case 'event':
+        case 'idl': return (text) => `{{${text}}}`;
+
+        case 'element-state':
+        case 'element-attr':
+        case 'attr-value':
+        case 'element': return (element) => `<{${element}}>`;
+
+        case 'grammar': return (text) => `${text} (within a <pre class=prod>)`;
+
+        case 'type': return (text)=> `<<${text}>>`;
+
+        case 'descriptor':
+        case 'property': return (text) => `'${text}'`;
+
+        default: return;
+    };
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!needsFor(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!refusesFor(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
 }
 </script>
 <script>/* Boilerplate: script-position-annos */
 "use strict";
 {
-
 function repositionAnnoPanels(){
     const panels = [...document.querySelectorAll("[data-anno-for]")];
-    const main = document.querySelector("main");
-    let mainRect;
-    if(main) mainRect = main.getBoundingClientRect();
-    for(const panel of panels) {
-        const dfn = document.getElementById(panel.getAttribute("data-anno-for"));
-        if(!dfn) {
-            console.log("Can't find the annotation panel target:", panel);
-            continue;
-        }
-        const rect = dfn.getBoundingClientRect();
-        const top = window.scrollY + rect.top
-        panel.style.top = top + "px";
-        panel.top = top;
-        panel.height = rect.height;
-        panel.classList.remove("unpositioned");
-        const panelRect = panel.getBoundingClientRect()
-        if(main) {
-            panel.classList.toggle("overlapping-main", panelRect.left < mainRect.right)
-        }
-    }
+    hydratePanels(panels);
     let vSoFar = 0;
     for(const panel of panels.sort(cmpTops)) {
         if(panel.top < vSoFar) {
@@ -2920,6 +2909,39 @@ function repositionAnnoPanels(){
             panel.style.top = vSoFar + "px";
         }
         vSoFar = panel.top + panel.height + 15;
+    }
+}
+function hydratePanels(panels) {
+    const main = document.querySelector("main");
+    let mainRect;
+    if(main) mainRect = main.getBoundingClientRect();
+    // First display them all, if they're not already visible.
+    for(const panel of panels) {
+        panel.classList.remove("unpositioned");
+    }
+    // Measure them all
+    for(const panel of panels) {
+        const dfn = document.getElementById(panel.getAttribute("data-anno-for"));
+        if(!dfn) {
+            console.log("Can't find the annotation panel target:", panel);
+            continue;
+        }
+        panel.dfn = dfn;
+        panel.top = window.scrollY + dfn.getBoundingClientRect().top;
+        let panelRect = panel.getBoundingClientRect();
+        panel.height = panelRect.height;
+        if(main) {
+            panel.overlappingMain = panelRect.left < mainRect.right;
+        } else {
+            panel.overlappingMain = false;
+        }
+    }
+    // And finally position them
+    for(const panel of panels) {
+        const dfn = panel.dfn;
+        if(!dfn) continue;
+        panel.style.top = panel.top + "px";
+        panel.classList.toggle("overlapping-main", panel.overlappingMain);
     }
 }
 
@@ -2934,277 +2956,266 @@ window.addEventListener("resize", repositionAnnoPanels);
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
-                mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
+let refsData = {
+"#broadcast-active-observations": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"broadcast active observations","type":"dfn","url":"#broadcast-active-observations"},
+"#calculate-box-size": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"calculate box size","type":"dfn","url":"#calculate-box-size"},
+"#calculate-depth-for-node": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"calculate depth for node","type":"dfn","url":"#calculate-depth-for-node"},
+"#callbackdef-resizeobservercallback": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"ResizeObserverCallback","type":"callback","url":"#callbackdef-resizeobservercallback"},
+"#content-rect": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"content rect","type":"dfn","url":"#content-rect"},
+"#create-and-populate-a-resizeobserverentry": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"create and populate a resizeobserverentry","type":"dfn","url":"#create-and-populate-a-resizeobserverentry"},
+"#deliver-resize-loop-error-notification": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"deliver resize loop error notification","type":"dfn","url":"#deliver-resize-loop-error-notification"},
+"#dictdef-resizeobserveroptions": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"ResizeObserverOptions","type":"dictionary","url":"#dictdef-resizeobserveroptions"},
+"#dom-document-resizeobservers-slot": {"export":true,"for_":["Document"],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"[[resizeObservers]]","type":"attribute","url":"#dom-document-resizeobservers-slot"},
+"#dom-resizeobservation-isactive": {"export":true,"for_":["ResizeObservation"],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"isActive()","type":"method","url":"#dom-resizeobservation-isactive"},
+"#dom-resizeobservation-lastreportedsizes": {"export":true,"for_":["ResizeObservation"],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"lastReportedSizes","type":"attribute","url":"#dom-resizeobservation-lastreportedsizes"},
+"#dom-resizeobservation-observedbox": {"export":true,"for_":["ResizeObservation"],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"observedBox","type":"attribute","url":"#dom-resizeobservation-observedbox"},
+"#dom-resizeobservation-target": {"export":true,"for_":["ResizeObservation"],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"target","type":"attribute","url":"#dom-resizeobservation-target"},
+"#dom-resizeobserver-activetargets-slot": {"export":true,"for_":["ResizeObserver"],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"[[activeTargets]]","type":"attribute","url":"#dom-resizeobserver-activetargets-slot"},
+"#dom-resizeobserver-callback-slot": {"export":true,"for_":["ResizeObserver"],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"[[callback]]","type":"attribute","url":"#dom-resizeobserver-callback-slot"},
+"#dom-resizeobserver-disconnect": {"export":true,"for_":["ResizeObserver"],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"disconnect()","type":"method","url":"#dom-resizeobserver-disconnect"},
+"#dom-resizeobserver-observationtargets-slot": {"export":true,"for_":["ResizeObserver"],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"[[observationTargets]]","type":"attribute","url":"#dom-resizeobserver-observationtargets-slot"},
+"#dom-resizeobserver-observe": {"export":true,"for_":["ResizeObserver"],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"observe(target, options)","type":"method","url":"#dom-resizeobserver-observe"},
+"#dom-resizeobserver-resizeobserver": {"export":true,"for_":["ResizeObserver"],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"ResizeObserver(callback)","type":"constructor","url":"#dom-resizeobserver-resizeobserver"},
+"#dom-resizeobserver-skippedtargets-slot": {"export":true,"for_":["ResizeObserver"],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"[[skippedTargets]]","type":"attribute","url":"#dom-resizeobserver-skippedtargets-slot"},
+"#dom-resizeobserver-unobserve": {"export":true,"for_":["ResizeObserver"],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"unobserve(target)","type":"method","url":"#dom-resizeobserver-unobserve"},
+"#dom-resizeobserverboxoptions-border-box": {"export":true,"for_":["ResizeObserverBoxOptions"],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"\"border-box\"","type":"enum-value","url":"#dom-resizeobserverboxoptions-border-box"},
+"#dom-resizeobserverboxoptions-content-box": {"export":true,"for_":["ResizeObserverBoxOptions"],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"\"content-box\"","type":"enum-value","url":"#dom-resizeobserverboxoptions-content-box"},
+"#dom-resizeobserverboxoptions-device-pixel-content-box": {"export":true,"for_":["ResizeObserverBoxOptions"],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"\"device-pixel-content-box\"","type":"enum-value","url":"#dom-resizeobserverboxoptions-device-pixel-content-box"},
+"#dom-resizeobserverentry-borderboxsize": {"export":true,"for_":["ResizeObserverEntry"],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"borderBoxSize","type":"attribute","url":"#dom-resizeobserverentry-borderboxsize"},
+"#dom-resizeobserverentry-contentboxsize": {"export":true,"for_":["ResizeObserverEntry"],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"contentBoxSize","type":"attribute","url":"#dom-resizeobserverentry-contentboxsize"},
+"#dom-resizeobserverentry-contentrect": {"export":true,"for_":["ResizeObserverEntry"],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"contentRect","type":"attribute","url":"#dom-resizeobserverentry-contentrect"},
+"#dom-resizeobserverentry-devicepixelcontentboxsize": {"export":true,"for_":["ResizeObserverEntry"],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"devicePixelContentBoxSize","type":"attribute","url":"#dom-resizeobserverentry-devicepixelcontentboxsize"},
+"#dom-resizeobserverentry-target": {"export":true,"for_":["ResizeObserverEntry"],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"target","type":"attribute","url":"#dom-resizeobserverentry-target"},
+"#enumdef-resizeobserverboxoptions": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"ResizeObserverBoxOptions","type":"enum","url":"#enumdef-resizeobserverboxoptions"},
+"#gather-active-observations-at-depth": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"gather active observations at depth","type":"dfn","url":"#gather-active-observations-at-depth"},
+"#has-active-observations": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"has active observations","type":"dfn","url":"#has-active-observations"},
+"#has-skipped-observations": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"has skipped observations","type":"dfn","url":"#has-skipped-observations"},
+"#resizeobservation": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"ResizeObservation","type":"interface","url":"#resizeobservation"},
+"#resizeobserver": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"ResizeObserver","type":"interface","url":"#resizeobserver"},
+"#resizeobserverentry": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"ResizeObserverEntry","type":"interface","url":"#resizeobserverentry"},
+"#resizeobserversize": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"resize-observer","spec":"resize-observer-1","status":"local","text":"ResizeObserverSize","type":"interface","url":"#resizeobserversize"},
+"https://dom.spec.whatwg.org/#concept-document": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"document","type":"dfn","url":"https://dom.spec.whatwg.org/#concept-document"},
+"https://dom.spec.whatwg.org/#document": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"Document","type":"interface","url":"https://dom.spec.whatwg.org/#document"},
+"https://dom.spec.whatwg.org/#element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"Element","type":"interface","url":"https://dom.spec.whatwg.org/#element"},
+"https://dom.spec.whatwg.org/#mutationobserver": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"MutationObserver","type":"interface","url":"https://dom.spec.whatwg.org/#mutationobserver"},
+"https://drafts.csswg.org/css-box-3/#content-area": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"resize-observer","spec":"","status":"anchor-block","text":"content area","type":"dfn","url":"https://drafts.csswg.org/css-box-3/#content-area"},
+"https://drafts.csswg.org/css-box-3/#padding-physical": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"resize-observer","spec":"","status":"anchor-block","text":"padding top","type":"dfn","url":"https://drafts.csswg.org/css-box-3/#padding-physical"},
+"https://drafts.csswg.org/css-box-4/#border-area": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"current","text":"border area","type":"dfn","url":"https://drafts.csswg.org/css-box-4/#border-area"},
+"https://drafts.csswg.org/css-box-4/#border-box": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"current","text":"border box","type":"dfn","url":"https://drafts.csswg.org/css-box-4/#border-box"},
+"https://drafts.csswg.org/cssom-view-1/#eventdef-window-resize": {"export":true,"for_":["Window","VisualViewport"],"level":"1","normative":true,"shortname":"cssom-view","spec":"cssom-view-1","status":"current","text":"resize","type":"event","url":"https://drafts.csswg.org/cssom-view-1/#eventdef-window-resize"},
+"https://drafts.fxtf.org/geometry-1/#domrectreadonly": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"geometry","spec":"geometry-1","status":"current","text":"DOMRectReadOnly","type":"interface","url":"https://drafts.fxtf.org/geometry-1/#domrectreadonly"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#errorevent": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"ErrorEvent","type":"interface","url":"https://html.spec.whatwg.org/multipage/webappapis.html#errorevent"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#processing-model-8": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"resize-observer","spec":"","status":"anchor-block","text":"html processing model","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#processing-model-8"},
+"https://svgwg.org/svg2-draft/types.html#InterfaceSVGGraphicsElement": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"SVGGraphicsElement","type":"interface","url":"https://svgwg.org/svg2-draft/types.html#InterfaceSVGGraphicsElement"},
+"https://webidl.spec.whatwg.org/#Exposed": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"Exposed","type":"extended-attribute","url":"https://webidl.spec.whatwg.org/#Exposed"},
+"https://webidl.spec.whatwg.org/#idl-frozen-array": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"FrozenArray","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-frozen-array"},
+"https://webidl.spec.whatwg.org/#idl-sequence": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"sequence","type":"dfn","url":"https://webidl.spec.whatwg.org/#idl-sequence"},
+"https://webidl.spec.whatwg.org/#idl-undefined": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"undefined","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-undefined"},
+"https://webidl.spec.whatwg.org/#idl-unrestricted-double": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"unrestricted double","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-unrestricted-double"},
+"https://www.w3.org/TR/CSS2/box.html#content-height": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"resize-observer","spec":"","status":"anchor-block","text":"content height","type":"dfn","url":"https://www.w3.org/TR/CSS2/box.html#content-height"},
+"https://www.w3.org/TR/CSS2/box.html#content-width": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"resize-observer","spec":"","status":"anchor-block","text":"content width","type":"dfn","url":"https://www.w3.org/TR/CSS2/box.html#content-width"},
+"https://www.w3.org/TR/CSS21/box.html#box-border-area": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"resize-observer","spec":"","status":"anchor-block","text":"box border area","type":"dfn","url":"https://www.w3.org/TR/CSS21/box.html#box-border-area"},
+"https://www.w3.org/TR/SVG2/coords.html#BoundingBoxes": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"resize-observer","spec":"","status":"anchor-block","text":"bounding box","type":"dfn","url":"https://www.w3.org/TR/SVG2/coords.html#BoundingBoxes"},
+"https://www.w3.org/TR/SVG2/types.html#InterfaceSVGGraphicsElement": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"resize-observer","spec":"","status":"anchor-block","text":"svggraphicselement","type":"dfn","url":"https://www.w3.org/TR/SVG2/types.html#InterfaceSVGGraphicsElement"},
+"https://www.w3.org/TR/css-display-3/#propdef-display": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"resize-observer","spec":"","status":"anchor-block","text":"display","type":"dfn","url":"https://www.w3.org/TR/css-display-3/#propdef-display"},
+"https://www.w3.org/TR/css3-multicol/#": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"resize-observer","spec":"","status":"anchor-block","text":"multi-column","type":"dfn","url":"https://www.w3.org/TR/css3-multicol/#"},
+"https://www.w3.org/TR/css3-positioning/#viewport": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"resize-observer","spec":"","status":"anchor-block","text":"viewport","type":"dfn","url":"https://www.w3.org/TR/css3-positioning/#viewport"},
+"https://www.w3.org/TR/cssom-view-1/#dom-window-devicepixelratio": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"resize-observer","spec":"","status":"anchor-block","text":"devicepixelratio","type":"dfn","url":"https://www.w3.org/TR/cssom-view-1/#dom-window-devicepixelratio"},
+"https://www.w3.org/TR/intersection-observer/#intersection-observer-interface": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"resize-observer","spec":"","status":"anchor-block","text":"IntersectionObserver","type":"interface","url":"https://www.w3.org/TR/intersection-observer/#intersection-observer-interface"},
+};
+
+function mkRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "Term: "),
+                mk.span({}, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    let forListElements;
+    if(forList.length == 0) {
+        forListElements = [];
+    } else if(forList.length == 1) {
+        forListElements = mk.li({},
+            mk.b({}, "For: "),
+            mk.span({}, forList[0]),
+        );
+    } else {
+        forListElements = mk.li({},
             mk.b({}, "For: "),
             mk.ul({},
                 ...forList.map(forItem =>
                     mk.li({},
-                        mk.span({}, `${forItem}`)
+                        mk.span({}, forItem)
                     ),
                 ),
             ),
         );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+    }
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    setupRefHintEventListeners(link, hintPanel);
+    return hintPanel;
+}
+
+function hideAllRefHints() {
+    queryAll(".ref-hint").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    if(refHint.teardownEventListeners) {
+        refHint.teardownEventListeners();
     }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+    refHint.remove();
+}
+
+function showRefHint(link) {
+    if(link.classList.contains("dfn-link")) return;
+    const url = link.getAttribute("href");
+    const ref = refsData[url];
+    if(!ref) return;
+
+    hideAllRefHints(); // Only display one at this time.
+
+    const refHint = mkRefHint(link, ref);
+    append(document.body, refHint);
+    link.setAttribute("aria-expanded", "true");
+    positionRefHint(refHint);
+}
+
+function setupRefHintEventListeners(link, refHint) {
+    if (refHint.teardownEventListeners) return;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
+
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
-
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
-    }
-
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
-        }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
-
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
-    }
-
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+document.addEventListener("DOMContentLoaded", () => {
+    document.body.addEventListener("mouseover", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
+    });
+    document.body.addEventListener("focus", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
     });
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['https://dom.spec.whatwg.org/#element'] = {"text": "Element", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#element", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css3-positioning/#viewport'] = {"text": "viewport", "type": "dfn", "spec": "", "shortname": "resize-observer", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/css3-positioning/#viewport", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/cssom-view-1/#eventdef-window-resize'] = {"text": "resize", "type": "event", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-view-1/#eventdef-window-resize", "export": true, "normative": true, "for_": ["Window", "VisualViewport"]};
-window.refsData['https://www.w3.org/TR/css-display-3/#propdef-display'] = {"text": "display", "type": "dfn", "spec": "", "shortname": "resize-observer", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/css-display-3/#propdef-display", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#mutationobserver'] = {"text": "MutationObserver", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#mutationobserver", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/intersection-observer/#intersection-observer-interface'] = {"text": "IntersectionObserver", "type": "interface", "spec": "", "shortname": "resize-observer", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/intersection-observer/#intersection-observer-interface", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-resizeobserverboxoptions-border-box'] = {"text": "\"border-box\"", "type": "enum-value", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobserverboxoptions-border-box", "export": true, "normative": true, "for_": ["ResizeObserverBoxOptions"]};
-window.refsData['https://www.w3.org/TR/CSS21/box.html#box-border-area'] = {"text": "box border area", "type": "dfn", "spec": "", "shortname": "resize-observer", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/CSS21/box.html#box-border-area", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-resizeobserverboxoptions-content-box'] = {"text": "\"content-box\"", "type": "enum-value", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobserverboxoptions-content-box", "export": true, "normative": true, "for_": ["ResizeObserverBoxOptions"]};
-window.refsData['https://drafts.csswg.org/css-box-3/#content-area'] = {"text": "content area", "type": "dfn", "spec": "", "shortname": "resize-observer", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/css-box-3/#content-area", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-resizeobserverboxoptions-device-pixel-content-box'] = {"text": "\"device-pixel-content-box\"", "type": "enum-value", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobserverboxoptions-device-pixel-content-box", "export": true, "normative": true, "for_": ["ResizeObserverBoxOptions"]};
-window.refsData['https://www.w3.org/TR/cssom-view-1/#dom-window-devicepixelratio'] = {"text": "devicepixelratio", "type": "dfn", "spec": "", "shortname": "resize-observer", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/cssom-view-1/#dom-window-devicepixelratio", "export": true, "normative": true, "for_": []};
-window.refsData['#enumdef-resizeobserverboxoptions'] = {"text": "ResizeObserverBoxOptions", "type": "enum", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#enumdef-resizeobserverboxoptions", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-resizeobserver-resizeobserver'] = {"text": "ResizeObserver(callback)", "type": "constructor", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobserver-resizeobserver", "export": true, "normative": true, "for_": ["ResizeObserver"]};
-window.refsData['#callbackdef-resizeobservercallback'] = {"text": "ResizeObserverCallback", "type": "callback", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#callbackdef-resizeobservercallback", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-resizeobserver-observe'] = {"text": "observe(target, options)", "type": "method", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobserver-observe", "export": true, "normative": true, "for_": ["ResizeObserver"]};
-window.refsData['#dictdef-resizeobserveroptions'] = {"text": "ResizeObserverOptions", "type": "dictionary", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dictdef-resizeobserveroptions", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-resizeobserver-unobserve'] = {"text": "unobserve(target)", "type": "method", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobserver-unobserve", "export": true, "normative": true, "for_": ["ResizeObserver"]};
-window.refsData['#dom-resizeobserver-disconnect'] = {"text": "disconnect()", "type": "method", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobserver-disconnect", "export": true, "normative": true, "for_": ["ResizeObserver"]};
-window.refsData['#resizeobserver'] = {"text": "ResizeObserver", "type": "interface", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#resizeobserver", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-resizeobserver-callback-slot'] = {"text": "[[callback]]", "type": "attribute", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobserver-callback-slot", "export": true, "normative": true, "for_": ["ResizeObserver"]};
-window.refsData['#dom-resizeobserver-observationtargets-slot'] = {"text": "[[observationTargets]]", "type": "attribute", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobserver-observationtargets-slot", "export": true, "normative": true, "for_": ["ResizeObserver"]};
-window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-document-resizeobservers-slot'] = {"text": "[[resizeObservers]]", "type": "attribute", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-document-resizeobservers-slot", "export": true, "normative": true, "for_": ["Document"]};
-window.refsData['#resizeobservation'] = {"text": "ResizeObservation", "type": "interface", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#resizeobservation", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-resizeobserver-activetargets-slot'] = {"text": "[[activeTargets]]", "type": "attribute", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobserver-activetargets-slot", "export": true, "normative": true, "for_": ["ResizeObserver"]};
-window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
-window.refsData['#resizeobserverentry'] = {"text": "ResizeObserverEntry", "type": "interface", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#resizeobserverentry", "export": true, "normative": true, "for_": []};
-window.refsData['#broadcast-active-observations'] = {"text": "broadcast active observations", "type": "dfn", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#broadcast-active-observations", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-resizeobserverentry-target'] = {"text": "target", "type": "attribute", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobserverentry-target", "export": true, "normative": true, "for_": ["ResizeObserverEntry"]};
-window.refsData['https://drafts.fxtf.org/geometry-1/#domrectreadonly'] = {"text": "DOMRectReadOnly", "type": "interface", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/geometry-1/#domrectreadonly", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-resizeobserverentry-contentrect'] = {"text": "contentRect", "type": "attribute", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobserverentry-contentrect", "export": true, "normative": true, "for_": ["ResizeObserverEntry"]};
-window.refsData['https://webidl.spec.whatwg.org/#idl-frozen-array'] = {"text": "FrozenArray", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-frozen-array", "export": true, "normative": true, "for_": []};
-window.refsData['#resizeobserversize'] = {"text": "ResizeObserverSize", "type": "interface", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#resizeobserversize", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-resizeobserverentry-borderboxsize'] = {"text": "borderBoxSize", "type": "attribute", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobserverentry-borderboxsize", "export": true, "normative": true, "for_": ["ResizeObserverEntry"]};
-window.refsData['#dom-resizeobserverentry-contentboxsize'] = {"text": "contentBoxSize", "type": "attribute", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobserverentry-contentboxsize", "export": true, "normative": true, "for_": ["ResizeObserverEntry"]};
-window.refsData['#dom-resizeobserverentry-devicepixelcontentboxsize'] = {"text": "devicePixelContentBoxSize", "type": "attribute", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobserverentry-devicepixelcontentboxsize", "export": true, "normative": true, "for_": ["ResizeObserverEntry"]};
-window.refsData['#content-rect'] = {"text": "content rect", "type": "dfn", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#content-rect", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-box-4/#border-box'] = {"text": "border box", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#border-box", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css3-multicol/#'] = {"text": "multi-column", "type": "dfn", "spec": "", "shortname": "resize-observer", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/css3-multicol/#", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-unrestricted-double'] = {"text": "unrestricted double", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unrestricted-double", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-resizeobservation-target'] = {"text": "target", "type": "attribute", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobservation-target", "export": true, "normative": true, "for_": ["ResizeObservation"]};
-window.refsData['#dom-resizeobservation-observedbox'] = {"text": "observedBox", "type": "attribute", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobservation-observedbox", "export": true, "normative": true, "for_": ["ResizeObservation"]};
-window.refsData['#dom-resizeobservation-lastreportedsizes'] = {"text": "lastReportedSizes", "type": "attribute", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobservation-lastreportedsizes", "export": true, "normative": true, "for_": ["ResizeObservation"]};
-window.refsData['#calculate-box-size'] = {"text": "calculate box size", "type": "dfn", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#calculate-box-size", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#concept-document'] = {"text": "document", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-document", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/CSS2/box.html#content-width'] = {"text": "content width", "type": "dfn", "spec": "", "shortname": "resize-observer", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/CSS2/box.html#content-width", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/CSS2/box.html#content-height'] = {"text": "content height", "type": "dfn", "spec": "", "shortname": "resize-observer", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/CSS2/box.html#content-height", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-box-3/#padding-physical'] = {"text": "padding top", "type": "dfn", "spec": "", "shortname": "resize-observer", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/css-box-3/#padding-physical", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/SVG2/coords.html#BoundingBoxes'] = {"text": "bounding box", "type": "dfn", "spec": "", "shortname": "resize-observer", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/SVG2/coords.html#BoundingBoxes", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/SVG2/types.html#InterfaceSVGGraphicsElement'] = {"text": "svggraphicselement", "type": "dfn", "spec": "", "shortname": "resize-observer", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/SVG2/types.html#InterfaceSVGGraphicsElement", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-resizeobserver-skippedtargets-slot'] = {"text": "[[skippedTargets]]", "type": "attribute", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobserver-skippedtargets-slot", "export": true, "normative": true, "for_": ["ResizeObserver"]};
-window.refsData['#dom-resizeobservation-isactive'] = {"text": "isActive()", "type": "method", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#dom-resizeobservation-isactive", "export": true, "normative": true, "for_": ["ResizeObservation"]};
-window.refsData['#calculate-depth-for-node'] = {"text": "calculate depth for node", "type": "dfn", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#calculate-depth-for-node", "export": true, "normative": true, "for_": []};
-window.refsData['#create-and-populate-a-resizeobserverentry'] = {"text": "create and populate a resizeobserverentry", "type": "dfn", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#create-and-populate-a-resizeobserverentry", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#errorevent'] = {"text": "ErrorEvent", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#errorevent", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/types.html#InterfaceSVGGraphicsElement'] = {"text": "SVGGraphicsElement", "type": "interface", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/types.html#InterfaceSVGGraphicsElement", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-box-4/#border-area'] = {"text": "border area", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#border-area", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#processing-model-8'] = {"text": "html processing model", "type": "dfn", "spec": "", "shortname": "resize-observer", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#processing-model-8", "export": true, "normative": true, "for_": []};
-window.refsData['#gather-active-observations-at-depth'] = {"text": "gather active observations at depth", "type": "dfn", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#gather-active-observations-at-depth", "export": true, "normative": true, "for_": []};
-window.refsData['#has-active-observations'] = {"text": "has active observations", "type": "dfn", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#has-active-observations", "export": true, "normative": true, "for_": []};
-window.refsData['#has-skipped-observations'] = {"text": "has skipped observations", "type": "dfn", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#has-skipped-observations", "export": true, "normative": true, "for_": []};
-window.refsData['#deliver-resize-loop-error-notification'] = {"text": "deliver resize loop error notification", "type": "dfn", "spec": "resize-observer-1", "shortname": "resize-observer", "level": "1", "status": "local", "url": "#deliver-resize-loop-error-notification", "export": true, "normative": true, "for_": []};
 </script>

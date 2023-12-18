@@ -79,7 +79,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -453,6 +452,11 @@ figcaption:not(.no-marker)::before {
     }
 }
 </style>
+<style>/* Boilerplate: style-idl-highlighting */
+pre.idl.highlight {
+    background: var(--borderedblock-bg, var(--def-bg));
+}
+</style>
 <style>/* Boilerplate: style-issues */
 a[href].issue-return {
     float: right;
@@ -705,7 +709,7 @@ a[href].issue-return {
 }
 
 .ref-hint {
-    display: none;
+    display: inline-block;
     position: absolute;
     z-index: 35;
     width: 20em;
@@ -721,16 +725,11 @@ a[href].issue-return {
     white-space: normal; /* in case it's moved into a pre */
 }
 
-.ref-hint.on {
-    display: inline-block;
-}
-
 .ref-hint * { margin: 0; padding: 0; text-indent: 0; }
 
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -790,7 +789,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -847,7 +845,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -2996,505 +2993,8 @@ Is that always defined? <a class="issue-return" href="#issue-65bdbf2d" title="Ju
     </div>
    </div>
   </details>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['1efc67e7'] = {"dfnID": "1efc67e7", "url": "https://www.w3.org/TR/css-font-loading-3/#dom-fontfacesetcheck-font", "dfnText": "font (for FontFaceSet/check())", "refSections": [{"refs": [{"id": "ref-for-dom-fontfacesetcheck-font"}], "title": "3.3. \nThe check() method"}], "external": true};
-window.dfnpanelData['3d1ecaad'] = {"dfnID": "3d1ecaad", "url": "https://www.w3.org/TR/css-font-loading-3/#dom-fontfacesetload-font", "dfnText": "font (for FontFaceSet/load())", "refSections": [{"refs": [{"id": "ref-for-dom-fontfacesetload-font"}], "title": "3.2. \nThe load() method"}], "external": true};
-window.dfnpanelData['0d86ede8'] = {"dfnID": "0d86ede8", "url": "https://www.w3.org/TR/css-font-loading-3/#dom-fontfacesetcheck-text", "dfnText": "text (for FontFaceSet/check())", "refSections": [{"refs": [{"id": "ref-for-dom-fontfacesetcheck-text"}], "title": "3.3. \nThe check() method"}], "external": true};
-window.dfnpanelData['86eccf79'] = {"dfnID": "86eccf79", "url": "https://www.w3.org/TR/css-font-loading-3/#dom-fontfacesetload-text", "dfnText": "text (for FontFaceSet/load())", "refSections": [{"refs": [{"id": "ref-for-dom-fontfacesetload-text"}], "title": "3.2. \nThe load() method"}], "external": true};
-window.dfnpanelData['3c91be7d'] = {"dfnID": "3c91be7d", "url": "https://drafts.csswg.org/css-fonts-4/#valdef-font-weight-bolder", "dfnText": "bolder", "refSections": [{"refs": [{"id": "ref-for-valdef-font-weight-bolder"}], "title": "3.1. \nEvents"}], "external": true};
-window.dfnpanelData['2c57f900'] = {"dfnID": "2c57f900", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font", "dfnText": "font", "refSections": [{"refs": [{"id": "ref-for-propdef-font"}], "title": "3.1. \nEvents"}], "external": true};
-window.dfnpanelData['2ede577f'] = {"dfnID": "2ede577f", "url": "https://drafts.csswg.org/css-fonts-4/#valdef-font-weight-normal", "dfnText": "normal", "refSections": [{"refs": [{"id": "ref-for-valdef-font-weight-normal"}], "title": "3.1. \nEvents"}], "external": true};
-window.dfnpanelData['0497de86'] = {"dfnID": "0497de86", "url": "https://drafts.csswg.org/css-fonts-5/#at-font-face-rule", "dfnText": "@font-face", "refSections": [{"refs": [{"id": "ref-for-at-font-face-rule"}], "title": "1. \nIntroduction"}, {"refs": [{"id": "ref-for-at-font-face-rule\u2460"}, {"id": "ref-for-at-font-face-rule\u2461"}, {"id": "ref-for-at-font-face-rule\u2462"}, {"id": "ref-for-at-font-face-rule\u2463"}, {"id": "ref-for-at-font-face-rule\u2464"}, {"id": "ref-for-at-font-face-rule\u2465"}], "title": "2. \nThe FontFace Interface"}, {"refs": [{"id": "ref-for-at-font-face-rule\u2466"}, {"id": "ref-for-at-font-face-rule\u2467"}], "title": "2.1. \nThe Constructor"}, {"refs": [{"id": "ref-for-at-font-face-rule\u2468"}], "title": "2.2. \nThe load() method"}, {"refs": [{"id": "ref-for-at-font-face-rule\u2460\u24ea"}, {"id": "ref-for-at-font-face-rule\u2460\u2460"}, {"id": "ref-for-at-font-face-rule\u2460\u2461"}, {"id": "ref-for-at-font-face-rule\u2460\u2462"}, {"id": "ref-for-at-font-face-rule\u2460\u2463"}, {"id": "ref-for-at-font-face-rule\u2460\u2464"}, {"id": "ref-for-at-font-face-rule\u2460\u2465"}, {"id": "ref-for-at-font-face-rule\u2460\u2466"}, {"id": "ref-for-at-font-face-rule\u2460\u2467"}, {"id": "ref-for-at-font-face-rule\u2460\u2468"}, {"id": "ref-for-at-font-face-rule\u2461\u24ea"}], "title": "2.3. \nInteraction with CSS\u2019s @font-face Rule"}, {"refs": [{"id": "ref-for-at-font-face-rule\u2461\u2460"}], "title": "3. \nThe FontFaceSet Interface"}, {"refs": [{"id": "ref-for-at-font-face-rule\u2461\u2461"}, {"id": "ref-for-at-font-face-rule\u2461\u2462"}, {"id": "ref-for-at-font-face-rule\u2461\u2463"}], "title": "3.5. \nInteraction with CSS Font Loading and Matching"}, {"refs": [{"id": "ref-for-at-font-face-rule\u2461\u2464"}, {"id": "ref-for-at-font-face-rule\u2461\u2465"}, {"id": "ref-for-at-font-face-rule\u2461\u2466"}, {"id": "ref-for-at-font-face-rule\u2461\u2467"}], "title": "4.2. \nInteraction with CSS\u2019s @font-face Rule"}, {"refs": [{"id": "ref-for-at-font-face-rule\u2461\u2468"}], "title": "Changes"}, {"refs": [{"id": "ref-for-at-font-face-rule\u2462\u24ea"}], "title": "\nPrivacy & Security Considerations"}], "external": true};
-window.dfnpanelData['76c4403d'] = {"dfnID": "76c4403d", "url": "https://drafts.csswg.org/css-syntax-3/#css-parse-something-according-to-a-css-grammar", "dfnText": "parse", "refSections": [{"refs": [{"id": "ref-for-css-parse-something-according-to-a-css-grammar"}, {"id": "ref-for-css-parse-something-according-to-a-css-grammar\u2460"}], "title": "2. \nThe FontFace Interface"}, {"refs": [{"id": "ref-for-css-parse-something-according-to-a-css-grammar\u2461"}], "title": "2.1. \nThe Constructor"}], "external": true};
-window.dfnpanelData['358fd6ff'] = {"dfnID": "358fd6ff", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "dfnText": "css-wide keywords", "refSections": [{"refs": [{"id": "ref-for-css-wide-keywords"}], "title": "3.1. \nEvents"}], "external": true};
-window.dfnpanelData['5a2f7ea1'] = {"dfnID": "5a2f7ea1", "url": "https://drafts.csswg.org/css-values-4/#funcdef-url", "dfnText": "url()", "refSections": [{"refs": [{"id": "ref-for-funcdef-url"}], "title": "2.1. \nThe Constructor"}], "external": true};
-window.dfnpanelData['5fced98b'] = {"dfnID": "5fced98b", "url": "https://drafts.csswg.org/cssom-1/#cssomstring", "dfnText": "CSSOMString", "refSections": [{"refs": [{"id": "ref-for-cssomstring"}, {"id": "ref-for-cssomstring\u2460"}, {"id": "ref-for-cssomstring\u2461"}, {"id": "ref-for-cssomstring\u2462"}, {"id": "ref-for-cssomstring\u2463"}, {"id": "ref-for-cssomstring\u2464"}, {"id": "ref-for-cssomstring\u2465"}, {"id": "ref-for-cssomstring\u2466"}, {"id": "ref-for-cssomstring\u2467"}, {"id": "ref-for-cssomstring\u2468"}, {"id": "ref-for-cssomstring\u2460\u24ea"}, {"id": "ref-for-cssomstring\u2460\u2460"}, {"id": "ref-for-cssomstring\u2460\u2461"}, {"id": "ref-for-cssomstring\u2460\u2462"}, {"id": "ref-for-cssomstring\u2460\u2463"}, {"id": "ref-for-cssomstring\u2460\u2464"}, {"id": "ref-for-cssomstring\u2460\u2465"}, {"id": "ref-for-cssomstring\u2460\u2466"}, {"id": "ref-for-cssomstring\u2460\u2467"}, {"id": "ref-for-cssomstring\u2460\u2468"}, {"id": "ref-for-cssomstring\u2461\u24ea"}, {"id": "ref-for-cssomstring\u2461\u2460"}, {"id": "ref-for-cssomstring\u2461\u2461"}, {"id": "ref-for-cssomstring\u2461\u2462"}, {"id": "ref-for-cssomstring\u2461\u2463"}, {"id": "ref-for-cssomstring\u2461\u2464"}, {"id": "ref-for-cssomstring\u2461\u2465"}, {"id": "ref-for-cssomstring\u2461\u2466"}, {"id": "ref-for-cssomstring\u2461\u2467"}, {"id": "ref-for-cssomstring\u2461\u2468"}, {"id": "ref-for-cssomstring\u2462\u24ea"}, {"id": "ref-for-cssomstring\u2462\u2460"}, {"id": "ref-for-cssomstring\u2462\u2461"}, {"id": "ref-for-cssomstring\u2462\u2462"}, {"id": "ref-for-cssomstring\u2462\u2463"}, {"id": "ref-for-cssomstring\u2462\u2464"}, {"id": "ref-for-cssomstring\u2462\u2465"}], "title": "2. \nThe FontFace Interface"}, {"refs": [{"id": "ref-for-cssomstring\u2462\u2466"}, {"id": "ref-for-cssomstring\u2462\u2467"}], "title": "2.1. \nThe Constructor"}, {"refs": [{"id": "ref-for-cssomstring\u2462\u2468"}, {"id": "ref-for-cssomstring\u2463\u24ea"}, {"id": "ref-for-cssomstring\u2463\u2460"}, {"id": "ref-for-cssomstring\u2463\u2461"}, {"id": "ref-for-cssomstring\u2463\u2462"}], "title": "3. \nThe FontFaceSet Interface"}], "external": true};
-window.dfnpanelData['4cd9ca96'] = {"dfnID": "4cd9ca96", "url": "https://drafts.csswg.org/cssom-1/#documentorshadowroot-document-or-shadow-root-css-style-sheets", "dfnText": "document or shadow root css style sheets", "refSections": [{"refs": [{"id": "ref-for-documentorshadowroot-document-or-shadow-root-css-style-sheets"}], "title": "4.2. \nInteraction with CSS\u2019s @font-face Rule"}], "external": true};
-window.dfnpanelData['85394472'] = {"dfnID": "85394472", "url": "https://dom.spec.whatwg.org/#document", "dfnText": "Document", "refSections": [{"refs": [{"id": "ref-for-document"}], "title": "3.5. \nInteraction with CSS Font Loading and Matching"}, {"refs": [{"id": "ref-for-document\u2460"}], "title": "4. \nThe FontFaceSource Mixin"}], "external": true};
-window.dfnpanelData['129bdae8'] = {"dfnID": "129bdae8", "url": "https://dom.spec.whatwg.org/#event", "dfnText": "Event", "refSections": [{"refs": [{"id": "ref-for-event"}], "title": "3. \nThe FontFaceSet Interface"}], "external": true};
-window.dfnpanelData['44a7708c'] = {"dfnID": "44a7708c", "url": "https://dom.spec.whatwg.org/#dictdef-eventinit", "dfnText": "EventInit", "refSections": [{"refs": [{"id": "ref-for-dictdef-eventinit"}], "title": "3. \nThe FontFaceSet Interface"}], "external": true};
-window.dfnpanelData['2bc0cdf4'] = {"dfnID": "2bc0cdf4", "url": "https://dom.spec.whatwg.org/#eventtarget", "dfnText": "EventTarget", "refSections": [{"refs": [{"id": "ref-for-eventtarget"}], "title": "3. \nThe FontFaceSet Interface"}], "external": true};
-window.dfnpanelData['f0951476'] = {"dfnID": "f0951476", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler", "dfnText": "EventHandler", "refSections": [{"refs": [{"id": "ref-for-eventhandler"}, {"id": "ref-for-eventhandler\u2460"}, {"id": "ref-for-eventhandler\u2461"}], "title": "3. \nThe FontFaceSet Interface"}], "external": true};
-window.dfnpanelData['804aab85'] = {"dfnID": "804aab85", "url": "https://html.spec.whatwg.org/multipage/canvas.html#offscreencanvas", "dfnText": "OffscreenCanvas", "refSections": [{"refs": [{"id": "ref-for-offscreencanvas"}], "title": "4.1. \nWorker FontFaceSources"}], "external": true};
-window.dfnpanelData['83c59a3a'] = {"dfnID": "83c59a3a", "url": "https://html.spec.whatwg.org/multipage/workers.html#workerglobalscope", "dfnText": "WorkerGlobalScope", "refSections": [{"refs": [{"id": "ref-for-workerglobalscope"}], "title": "4. \nThe FontFaceSource Mixin"}], "external": true};
-window.dfnpanelData['2f8afbfe'] = {"dfnID": "2f8afbfe", "url": "https://webidl.spec.whatwg.org/#idl-ArrayBuffer", "dfnText": "ArrayBuffer", "refSections": [{"refs": [{"id": "ref-for-idl-ArrayBuffer"}], "title": "2. \nThe FontFace Interface"}, {"refs": [{"id": "ref-for-idl-ArrayBuffer\u2460"}], "title": "2.1. \nThe Constructor"}], "external": true};
-window.dfnpanelData['6c9ab516'] = {"dfnID": "6c9ab516", "url": "https://webidl.spec.whatwg.org/#ArrayBufferView", "dfnText": "ArrayBufferView", "refSections": [{"refs": [{"id": "ref-for-ArrayBufferView"}], "title": "2. \nThe FontFace Interface"}, {"refs": [{"id": "ref-for-ArrayBufferView\u2460"}], "title": "2.1. \nThe Constructor"}], "external": true};
-window.dfnpanelData['889e932f'] = {"dfnID": "889e932f", "url": "https://webidl.spec.whatwg.org/#Exposed", "dfnText": "Exposed", "refSections": [{"refs": [{"id": "ref-for-Exposed"}], "title": "2. \nThe FontFace Interface"}, {"refs": [{"id": "ref-for-Exposed\u2460"}, {"id": "ref-for-Exposed\u2461"}], "title": "3. \nThe FontFaceSet Interface"}], "external": true};
-window.dfnpanelData['dcf5fafa'] = {"dfnID": "dcf5fafa", "url": "https://webidl.spec.whatwg.org/#idl-frozen-array", "dfnText": "FrozenArray", "refSections": [{"refs": [{"id": "ref-for-idl-frozen-array"}], "title": "3. \nThe FontFaceSet Interface"}], "external": true};
-window.dfnpanelData['cae6bf57'] = {"dfnID": "cae6bf57", "url": "https://webidl.spec.whatwg.org/#invalidmodificationerror", "dfnText": "InvalidModificationError", "refSections": [{"refs": [{"id": "ref-for-invalidmodificationerror"}], "title": "3. \nThe FontFaceSet Interface"}, {"refs": [{"id": "ref-for-invalidmodificationerror\u2460"}], "title": "4.2. \nInteraction with CSS\u2019s @font-face Rule"}], "external": true};
-window.dfnpanelData['bdbd19d1'] = {"dfnID": "bdbd19d1", "url": "https://webidl.spec.whatwg.org/#idl-promise", "dfnText": "Promise", "refSections": [{"refs": [{"id": "ref-for-idl-promise"}], "title": "1.1. \nValues"}, {"refs": [{"id": "ref-for-idl-promise\u2460"}, {"id": "ref-for-idl-promise\u2461"}], "title": "2. \nThe FontFace Interface"}, {"refs": [{"id": "ref-for-idl-promise\u2462"}], "title": "2.1. \nThe Constructor"}, {"refs": [{"id": "ref-for-idl-promise\u2463"}, {"id": "ref-for-idl-promise\u2464"}, {"id": "ref-for-idl-promise\u2465"}, {"id": "ref-for-idl-promise\u2466"}], "title": "3. \nThe FontFaceSet Interface"}, {"refs": [{"id": "ref-for-idl-promise\u2467"}], "title": "3.4. \nThe ready attribute"}], "external": true};
-window.dfnpanelData['a5c91173'] = {"dfnID": "a5c91173", "url": "https://webidl.spec.whatwg.org/#SameObject", "dfnText": "SameObject", "refSections": [{"refs": [{"id": "ref-for-SameObject"}], "title": "3. \nThe FontFaceSet Interface"}], "external": true};
-window.dfnpanelData['be2d2b4c'] = {"dfnID": "be2d2b4c", "url": "https://webidl.spec.whatwg.org/#syntaxerror", "dfnText": "SyntaxError", "refSections": [{"refs": [{"id": "ref-for-syntaxerror"}, {"id": "ref-for-syntaxerror\u2460"}], "title": "2. \nThe FontFace Interface"}], "external": true};
-window.dfnpanelData['5372cca8'] = {"dfnID": "5372cca8", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "dfnText": "boolean", "refSections": [{"refs": [{"id": "ref-for-idl-boolean"}, {"id": "ref-for-idl-boolean\u2460"}], "title": "3. \nThe FontFaceSet Interface"}], "external": true};
-window.dfnpanelData['9cce47fd'] = {"dfnID": "9cce47fd", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "dfnText": "sequence", "refSections": [{"refs": [{"id": "ref-for-idl-sequence"}, {"id": "ref-for-idl-sequence\u2460"}, {"id": "ref-for-idl-sequence\u2461"}], "title": "3. \nThe FontFaceSet Interface"}], "external": true};
-window.dfnpanelData['f1195e5b'] = {"dfnID": "f1195e5b", "url": "https://webidl.spec.whatwg.org/#dfn-set-entries", "dfnText": "set entries", "refSections": [{"refs": [{"id": "ref-for-dfn-set-entries"}, {"id": "ref-for-dfn-set-entries\u2460"}], "title": "3. \nThe FontFaceSet Interface"}], "external": true};
-window.dfnpanelData['5f90bbfb'] = {"dfnID": "5f90bbfb", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "dfnText": "undefined", "refSections": [{"refs": [{"id": "ref-for-idl-undefined"}], "title": "3. \nThe FontFaceSet Interface"}], "external": true};
-window.dfnpanelData['typedefdef-binarydata'] = {"dfnID": "typedefdef-binarydata", "url": "#typedefdef-binarydata", "dfnText": "BinaryData", "refSections": [{"refs": [{"id": "ref-for-typedefdef-binarydata"}], "title": "2. \nThe FontFace Interface"}, {"refs": [{"id": "ref-for-typedefdef-binarydata\u2460"}], "title": "2.1. \nThe Constructor"}], "external": false};
-window.dfnpanelData['dictdef-fontfacedescriptors'] = {"dfnID": "dictdef-fontfacedescriptors", "url": "#dictdef-fontfacedescriptors", "dfnText": "FontFaceDescriptors", "refSections": [{"refs": [{"id": "ref-for-dictdef-fontfacedescriptors"}], "title": "2. \nThe FontFace Interface"}], "external": false};
-window.dfnpanelData['enumdef-fontfaceloadstatus'] = {"dfnID": "enumdef-fontfaceloadstatus", "url": "#enumdef-fontfaceloadstatus", "dfnText": "FontFaceLoadStatus", "refSections": [{"refs": [{"id": "ref-for-enumdef-fontfaceloadstatus"}, {"id": "ref-for-enumdef-fontfaceloadstatus\u2460"}], "title": "2. \nThe FontFace Interface"}], "external": false};
-window.dfnpanelData['fontface'] = {"dfnID": "fontface", "url": "#fontface", "dfnText": "FontFace", "refSections": [{"refs": [{"id": "ref-for-fontface"}], "title": "1. \nIntroduction"}, {"refs": [{"id": "ref-for-fontface\u2460"}, {"id": "ref-for-fontface\u2461"}, {"id": "ref-for-fontface\u2462"}, {"id": "ref-for-fontface\u2463"}, {"id": "ref-for-fontface\u2464"}, {"id": "ref-for-fontface\u2465"}, {"id": "ref-for-fontface\u2466"}, {"id": "ref-for-fontface\u2467"}, {"id": "ref-for-fontface\u2468"}], "title": "2. \nThe FontFace Interface"}, {"refs": [{"id": "ref-for-fontface\u2460\u24ea"}, {"id": "ref-for-fontface\u2460\u2460"}], "title": "2.1. \nThe Constructor"}, {"refs": [{"id": "ref-for-fontface\u2460\u2461"}, {"id": "ref-for-fontface\u2460\u2462"}, {"id": "ref-for-fontface\u2460\u2463"}, {"id": "ref-for-fontface\u2460\u2464"}, {"id": "ref-for-fontface\u2460\u2465"}, {"id": "ref-for-fontface\u2460\u2466"}], "title": "2.2. \nThe load() method"}, {"refs": [{"id": "ref-for-fontface\u2460\u2467"}, {"id": "ref-for-fontface\u2460\u2468"}, {"id": "ref-for-fontface\u2461\u24ea"}, {"id": "ref-for-fontface\u2461\u2460"}, {"id": "ref-for-fontface\u2461\u2461"}, {"id": "ref-for-fontface\u2461\u2462"}, {"id": "ref-for-fontface\u2461\u2463"}, {"id": "ref-for-fontface\u2461\u2464"}, {"id": "ref-for-fontface\u2461\u2465"}, {"id": "ref-for-fontface\u2461\u2466"}, {"id": "ref-for-fontface\u2461\u2467"}], "title": "2.3. \nInteraction with CSS\u2019s @font-face Rule"}, {"refs": [{"id": "ref-for-fontface\u2461\u2468"}, {"id": "ref-for-fontface\u2462\u24ea"}, {"id": "ref-for-fontface\u2462\u2460"}, {"id": "ref-for-fontface\u2462\u2461"}, {"id": "ref-for-fontface\u2462\u2462"}, {"id": "ref-for-fontface\u2462\u2463"}, {"id": "ref-for-fontface\u2462\u2464"}, {"id": "ref-for-fontface\u2462\u2465"}, {"id": "ref-for-fontface\u2462\u2466"}], "title": "3. \nThe FontFaceSet Interface"}, {"refs": [{"id": "ref-for-fontface\u2462\u2467"}], "title": "3.1. \nEvents"}, {"refs": [{"id": "ref-for-fontface\u2462\u2468"}], "title": "3.4. \nThe ready attribute"}, {"refs": [{"id": "ref-for-fontface\u2463\u24ea"}, {"id": "ref-for-fontface\u2463\u2460"}, {"id": "ref-for-fontface\u2463\u2461"}, {"id": "ref-for-fontface\u2463\u2462"}], "title": "3.5. \nInteraction with CSS Font Loading and Matching"}, {"refs": [{"id": "ref-for-fontface\u2463\u2463"}], "title": "4. \nThe FontFaceSource Mixin"}, {"refs": [{"id": "ref-for-fontface\u2463\u2464"}], "title": "4.1. \nWorker FontFaceSources"}, {"refs": [{"id": "ref-for-fontface\u2463\u2465"}, {"id": "ref-for-fontface\u2463\u2466"}, {"id": "ref-for-fontface\u2463\u2467"}, {"id": "ref-for-fontface\u2463\u2468"}, {"id": "ref-for-fontface\u2464\u24ea"}, {"id": "ref-for-fontface\u2464\u2460"}, {"id": "ref-for-fontface\u2464\u2461"}], "title": "4.2. \nInteraction with CSS\u2019s @font-face Rule"}], "external": false};
-window.dfnpanelData['dom-fontface-fontface-family-source-descriptors-family'] = {"dfnID": "dom-fontface-fontface-family-source-descriptors-family", "url": "#dom-fontface-fontface-family-source-descriptors-family", "dfnText": "family", "refSections": [{"refs": [{"id": "ref-for-dom-fontface-fontface-family-source-descriptors-family"}], "title": "2.1. \nThe Constructor"}], "external": false};
-window.dfnpanelData['dom-fontface-fontface-family-source-descriptors-source'] = {"dfnID": "dom-fontface-fontface-family-source-descriptors-source", "url": "#dom-fontface-fontface-family-source-descriptors-source", "dfnText": "source", "refSections": [{"refs": [{"id": "ref-for-dom-fontface-fontface-family-source-descriptors-source"}, {"id": "ref-for-dom-fontface-fontface-family-source-descriptors-source\u2460"}, {"id": "ref-for-dom-fontface-fontface-family-source-descriptors-source\u2461"}], "title": "2.1. \nThe Constructor"}], "external": false};
-window.dfnpanelData['dom-fontface-fontface-family-source-descriptors-descriptors'] = {"dfnID": "dom-fontface-fontface-family-source-descriptors-descriptors", "url": "#dom-fontface-fontface-family-source-descriptors-descriptors", "dfnText": "descriptors", "refSections": [{"refs": [{"id": "ref-for-dom-fontface-fontface-family-source-descriptors-descriptors"}], "title": "2.1. \nThe Constructor"}], "external": false};
-window.dfnpanelData['dom-fontface-family'] = {"dfnID": "dom-fontface-family", "url": "#dom-fontface-family", "dfnText": "family", "refSections": [{"refs": [{"id": "ref-for-dom-fontface-family"}], "title": "2. \nThe FontFace Interface"}, {"refs": [{"id": "ref-for-dom-fontface-family\u2460"}], "title": "2.3. \nInteraction with CSS\u2019s @font-face Rule"}], "external": false};
-window.dfnpanelData['dom-fontface-style'] = {"dfnID": "dom-fontface-style", "url": "#dom-fontface-style", "dfnText": "style", "refSections": [{"refs": [{"id": "ref-for-dom-fontface-style"}, {"id": "ref-for-dom-fontface-style\u2460"}], "title": "2. \nThe FontFace Interface"}, {"refs": [{"id": "ref-for-dom-fontface-style\u2461"}], "title": "2.3. \nInteraction with CSS\u2019s @font-face Rule"}], "external": false};
-window.dfnpanelData['dom-fontface-weight'] = {"dfnID": "dom-fontface-weight", "url": "#dom-fontface-weight", "dfnText": "weight", "refSections": [{"refs": [{"id": "ref-for-dom-fontface-weight"}], "title": "2. \nThe FontFace Interface"}, {"refs": [{"id": "ref-for-dom-fontface-weight\u2460"}], "title": "2.3. \nInteraction with CSS\u2019s @font-face Rule"}], "external": false};
-window.dfnpanelData['dom-fontface-stretch'] = {"dfnID": "dom-fontface-stretch", "url": "#dom-fontface-stretch", "dfnText": "stretch", "refSections": [{"refs": [{"id": "ref-for-dom-fontface-stretch"}], "title": "2. \nThe FontFace Interface"}, {"refs": [{"id": "ref-for-dom-fontface-stretch\u2460"}], "title": "2.3. \nInteraction with CSS\u2019s @font-face Rule"}], "external": false};
-window.dfnpanelData['dom-fontface-unicoderange'] = {"dfnID": "dom-fontface-unicoderange", "url": "#dom-fontface-unicoderange", "dfnText": "unicodeRange", "refSections": [{"refs": [{"id": "ref-for-dom-fontface-unicoderange"}], "title": "2. \nThe FontFace Interface"}, {"refs": [{"id": "ref-for-dom-fontface-unicoderange\u2460"}], "title": "2.3. \nInteraction with CSS\u2019s @font-face Rule"}, {"refs": [{"id": "ref-for-dom-fontface-unicoderange\u2461"}], "title": "3.1. \nEvents"}], "external": false};
-window.dfnpanelData['dom-fontface-variant'] = {"dfnID": "dom-fontface-variant", "url": "#dom-fontface-variant", "dfnText": "variant", "refSections": [{"refs": [{"id": "ref-for-dom-fontface-variant"}], "title": "2. \nThe FontFace Interface"}, {"refs": [{"id": "ref-for-dom-fontface-variant\u2460"}], "title": "2.3. \nInteraction with CSS\u2019s @font-face Rule"}], "external": false};
-window.dfnpanelData['dom-fontface-featuresettings'] = {"dfnID": "dom-fontface-featuresettings", "url": "#dom-fontface-featuresettings", "dfnText": "featureSettings", "refSections": [{"refs": [{"id": "ref-for-dom-fontface-featuresettings"}], "title": "2. \nThe FontFace Interface"}, {"refs": [{"id": "ref-for-dom-fontface-featuresettings\u2460"}], "title": "2.3. \nInteraction with CSS\u2019s @font-face Rule"}], "external": false};
-window.dfnpanelData['dom-fontface-variationsettings'] = {"dfnID": "dom-fontface-variationsettings", "url": "#dom-fontface-variationsettings", "dfnText": "variationSettings", "refSections": [{"refs": [{"id": "ref-for-dom-fontface-variationsettings"}], "title": "2. \nThe FontFace Interface"}, {"refs": [{"id": "ref-for-dom-fontface-variationsettings\u2460"}], "title": "Changes"}], "external": false};
-window.dfnpanelData['dom-fontface-display'] = {"dfnID": "dom-fontface-display", "url": "#dom-fontface-display", "dfnText": "display", "refSections": [{"refs": [{"id": "ref-for-dom-fontface-display"}], "title": "2. \nThe FontFace Interface"}, {"refs": [{"id": "ref-for-dom-fontface-display\u2460"}], "title": "Changes"}], "external": false};
-window.dfnpanelData['dom-fontface-ascentoverride'] = {"dfnID": "dom-fontface-ascentoverride", "url": "#dom-fontface-ascentoverride", "dfnText": "ascentOverride", "refSections": [{"refs": [{"id": "ref-for-dom-fontface-ascentoverride"}], "title": "2. \nThe FontFace Interface"}], "external": false};
-window.dfnpanelData['dom-fontface-descentoverride'] = {"dfnID": "dom-fontface-descentoverride", "url": "#dom-fontface-descentoverride", "dfnText": "descentOverride", "refSections": [{"refs": [{"id": "ref-for-dom-fontface-descentoverride"}], "title": "2. \nThe FontFace Interface"}], "external": false};
-window.dfnpanelData['dom-fontface-linegapoverride'] = {"dfnID": "dom-fontface-linegapoverride", "url": "#dom-fontface-linegapoverride", "dfnText": "lineGapOverride", "refSections": [{"refs": [{"id": "ref-for-dom-fontface-linegapoverride"}], "title": "2. \nThe FontFace Interface"}], "external": false};
-window.dfnpanelData['dom-fontface-status'] = {"dfnID": "dom-fontface-status", "url": "#dom-fontface-status", "dfnText": "status", "refSections": [{"refs": [{"id": "ref-for-dom-fontface-status"}], "title": "2. \nThe FontFace Interface"}, {"refs": [{"id": "ref-for-dom-fontface-status\u2460"}, {"id": "ref-for-dom-fontface-status\u2461"}, {"id": "ref-for-dom-fontface-status\u2462"}, {"id": "ref-for-dom-fontface-status\u2463"}, {"id": "ref-for-dom-fontface-status\u2464"}, {"id": "ref-for-dom-fontface-status\u2465"}], "title": "2.1. \nThe Constructor"}, {"refs": [{"id": "ref-for-dom-fontface-status\u2466"}, {"id": "ref-for-dom-fontface-status\u2467"}, {"id": "ref-for-dom-fontface-status\u2468"}, {"id": "ref-for-dom-fontface-status\u2460\u24ea"}], "title": "2.2. \nThe load() method"}, {"refs": [{"id": "ref-for-dom-fontface-status\u2460\u2460"}], "title": "3. \nThe FontFaceSet Interface"}, {"refs": [{"id": "ref-for-dom-fontface-status\u2460\u2461"}], "title": "3.3. \nThe check() method"}], "external": false};
-window.dfnpanelData['dom-fontface-loaded'] = {"dfnID": "dom-fontface-loaded", "url": "#dom-fontface-loaded", "dfnText": "loaded", "refSections": [{"refs": [{"id": "ref-for-dom-fontface-loaded"}], "title": "2. \nThe FontFace Interface"}], "external": false};
-window.dfnpanelData['dom-fontface-fontstatuspromise-slot'] = {"dfnID": "dom-fontface-fontstatuspromise-slot", "url": "#dom-fontface-fontstatuspromise-slot", "dfnText": "[[FontStatusPromise]]", "refSections": [{"refs": [{"id": "ref-for-dom-fontface-fontstatuspromise-slot"}], "title": "2. \nThe FontFace Interface"}, {"refs": [{"id": "ref-for-dom-fontface-fontstatuspromise-slot\u2460"}, {"id": "ref-for-dom-fontface-fontstatuspromise-slot\u2461"}, {"id": "ref-for-dom-fontface-fontstatuspromise-slot\u2462"}, {"id": "ref-for-dom-fontface-fontstatuspromise-slot\u2463"}], "title": "2.1. \nThe Constructor"}, {"refs": [{"id": "ref-for-dom-fontface-fontstatuspromise-slot\u2464"}, {"id": "ref-for-dom-fontface-fontstatuspromise-slot\u2465"}, {"id": "ref-for-dom-fontface-fontstatuspromise-slot\u2466"}, {"id": "ref-for-dom-fontface-fontstatuspromise-slot\u2467"}], "title": "2.2. \nThe load() method"}, {"refs": [{"id": "ref-for-dom-fontface-fontstatuspromise-slot\u2468"}], "title": "3.2. \nThe load() method"}], "external": false};
-window.dfnpanelData['dom-fontface-urls-slot'] = {"dfnID": "dom-fontface-urls-slot", "url": "#dom-fontface-urls-slot", "dfnText": "[[Urls]]", "refSections": [{"refs": [{"id": "ref-for-dom-fontface-urls-slot"}], "title": "2.1. \nThe Constructor"}, {"refs": [{"id": "ref-for-dom-fontface-urls-slot\u2460"}, {"id": "ref-for-dom-fontface-urls-slot\u2461"}], "title": "2.2. \nThe load() method"}, {"refs": [{"id": "ref-for-dom-fontface-urls-slot\u2462"}], "title": "2.3. \nInteraction with CSS\u2019s @font-face Rule"}], "external": false};
-window.dfnpanelData['dom-fontface-data-slot'] = {"dfnID": "dom-fontface-data-slot", "url": "#dom-fontface-data-slot", "dfnText": "[[Data]]", "refSections": [{"refs": [{"id": "ref-for-dom-fontface-data-slot"}, {"id": "ref-for-dom-fontface-data-slot\u2460"}], "title": "2.1. \nThe Constructor"}], "external": false};
-window.dfnpanelData['dom-fontface-fontface'] = {"dfnID": "dom-fontface-fontface", "url": "#dom-fontface-fontface", "dfnText": "FontFace(family, source, descriptors)", "refSections": [{"refs": [{"id": "ref-for-dom-fontface-fontface"}], "title": "2. \nThe FontFace Interface"}], "external": false};
-window.dfnpanelData['dom-fontface-load'] = {"dfnID": "dom-fontface-load", "url": "#dom-fontface-load", "dfnText": "load()", "refSections": [{"refs": [{"id": "ref-for-dom-fontface-load"}, {"id": "ref-for-dom-fontface-load\u2460"}], "title": "2. \nThe FontFace Interface"}, {"refs": [{"id": "ref-for-dom-fontface-load\u2461"}, {"id": "ref-for-dom-fontface-load\u2462"}], "title": "2.2. \nThe load() method"}, {"refs": [{"id": "ref-for-dom-fontface-load\u2463"}], "title": "3.2. \nThe load() method"}, {"refs": [{"id": "ref-for-dom-fontface-load\u2464"}], "title": "3.4. \nThe ready attribute"}, {"refs": [{"id": "ref-for-dom-fontface-load\u2465"}], "title": "3.5. \nInteraction with CSS Font Loading and Matching"}], "external": false};
-window.dfnpanelData['css-connected'] = {"dfnID": "css-connected", "url": "#css-connected", "dfnText": "CSS-connected", "refSections": [{"refs": [{"id": "ref-for-css-connected"}, {"id": "ref-for-css-connected\u2460"}, {"id": "ref-for-css-connected\u2461"}, {"id": "ref-for-css-connected\u2462"}], "title": "2.3. \nInteraction with CSS\u2019s @font-face Rule"}, {"refs": [{"id": "ref-for-css-connected\u2463"}, {"id": "ref-for-css-connected\u2464"}, {"id": "ref-for-css-connected\u2465"}, {"id": "ref-for-css-connected\u2466"}], "title": "3. \nThe FontFaceSet Interface"}, {"refs": [{"id": "ref-for-css-connected\u2467"}, {"id": "ref-for-css-connected\u2468"}, {"id": "ref-for-css-connected\u2460\u24ea"}, {"id": "ref-for-css-connected\u2460\u2460"}, {"id": "ref-for-css-connected\u2460\u2461"}, {"id": "ref-for-css-connected\u2460\u2462"}], "title": "4.2. \nInteraction with CSS\u2019s @font-face Rule"}], "external": false};
-window.dfnpanelData['dictdef-fontfacesetloadeventinit'] = {"dfnID": "dictdef-fontfacesetloadeventinit", "url": "#dictdef-fontfacesetloadeventinit", "dfnText": "FontFaceSetLoadEventInit", "refSections": [{"refs": [{"id": "ref-for-dictdef-fontfacesetloadeventinit"}], "title": "3. \nThe FontFaceSet Interface"}], "external": false};
-window.dfnpanelData['fontfacesetloadevent'] = {"dfnID": "fontfacesetloadevent", "url": "#fontfacesetloadevent", "dfnText": "FontFaceSetLoadEvent", "refSections": [{"refs": [{"id": "ref-for-fontfacesetloadevent"}], "title": "3.1. \nEvents"}], "external": false};
-window.dfnpanelData['dom-fontfacesetloadevent-fontfaces'] = {"dfnID": "dom-fontfacesetloadevent-fontfaces", "url": "#dom-fontfacesetloadevent-fontfaces", "dfnText": "fontfaces", "refSections": [{"refs": [{"id": "ref-for-dom-fontfacesetloadevent-fontfaces"}], "title": "3.1. \nEvents"}, {"refs": [{"id": "ref-for-dom-fontfacesetloadevent-fontfaces\u2460"}], "title": "Changes"}], "external": false};
-window.dfnpanelData['enumdef-fontfacesetloadstatus'] = {"dfnID": "enumdef-fontfacesetloadstatus", "url": "#enumdef-fontfacesetloadstatus", "dfnText": "FontFaceSetLoadStatus", "refSections": [{"refs": [{"id": "ref-for-enumdef-fontfacesetloadstatus"}], "title": "3. \nThe FontFaceSet Interface"}], "external": false};
-window.dfnpanelData['fontfaceset'] = {"dfnID": "fontfaceset", "url": "#fontfaceset", "dfnText": "FontFaceSet", "refSections": [{"refs": [{"id": "ref-for-fontfaceset"}, {"id": "ref-for-fontfaceset\u2460"}, {"id": "ref-for-fontfaceset\u2461"}, {"id": "ref-for-fontfaceset\u2462"}, {"id": "ref-for-fontfaceset\u2463"}, {"id": "ref-for-fontfaceset\u2464"}, {"id": "ref-for-fontfaceset\u2465"}, {"id": "ref-for-fontfaceset\u2466"}, {"id": "ref-for-fontfaceset\u2467"}], "title": "2.1. \nThe Constructor"}, {"refs": [{"id": "ref-for-fontfaceset\u2468"}, {"id": "ref-for-fontfaceset\u2460\u24ea"}, {"id": "ref-for-fontfaceset\u2460\u2460"}, {"id": "ref-for-fontfaceset\u2460\u2461"}, {"id": "ref-for-fontfaceset\u2460\u2462"}, {"id": "ref-for-fontfaceset\u2460\u2463"}, {"id": "ref-for-fontfaceset\u2460\u2464"}], "title": "2.2. \nThe load() method"}, {"refs": [{"id": "ref-for-fontfaceset\u2460\u2465"}, {"id": "ref-for-fontfaceset\u2460\u2466"}, {"id": "ref-for-fontfaceset\u2460\u2467"}, {"id": "ref-for-fontfaceset\u2460\u2468"}, {"id": "ref-for-fontfaceset\u2461\u24ea"}, {"id": "ref-for-fontfaceset\u2461\u2460"}, {"id": "ref-for-fontfaceset\u2461\u2461"}, {"id": "ref-for-fontfaceset\u2461\u2462"}, {"id": "ref-for-fontfaceset\u2461\u2463"}, {"id": "ref-for-fontfaceset\u2461\u2464"}, {"id": "ref-for-fontfaceset\u2461\u2465"}, {"id": "ref-for-fontfaceset\u2461\u2466"}, {"id": "ref-for-fontfaceset\u2461\u2467"}, {"id": "ref-for-fontfaceset\u2461\u2468"}, {"id": "ref-for-fontfaceset\u2462\u24ea"}, {"id": "ref-for-fontfaceset\u2462\u2460"}, {"id": "ref-for-fontfaceset\u2462\u2461"}, {"id": "ref-for-fontfaceset\u2462\u2462"}, {"id": "ref-for-fontfaceset\u2462\u2463"}], "title": "3. \nThe FontFaceSet Interface"}, {"refs": [{"id": "ref-for-fontfaceset\u2462\u2464"}, {"id": "ref-for-fontfaceset\u2462\u2465"}, {"id": "ref-for-fontfaceset\u2462\u2466"}, {"id": "ref-for-fontfaceset\u2462\u2467"}, {"id": "ref-for-fontfaceset\u2462\u2468"}, {"id": "ref-for-fontfaceset\u2463\u24ea"}, {"id": "ref-for-fontfaceset\u2463\u2460"}, {"id": "ref-for-fontfaceset\u2463\u2461"}], "title": "3.1. \nEvents"}, {"refs": [{"id": "ref-for-fontfaceset\u2463\u2462"}, {"id": "ref-for-fontfaceset\u2463\u2463"}], "title": "3.2. \nThe load() method"}, {"refs": [{"id": "ref-for-fontfaceset\u2463\u2464"}, {"id": "ref-for-fontfaceset\u2463\u2465"}], "title": "3.3. \nThe check() method"}, {"refs": [{"id": "ref-for-fontfaceset\u2463\u2466"}, {"id": "ref-for-fontfaceset\u2463\u2467"}, {"id": "ref-for-fontfaceset\u2463\u2468"}, {"id": "ref-for-fontfaceset\u2464\u24ea"}], "title": "3.5. \nInteraction with CSS Font Loading and Matching"}, {"refs": [{"id": "ref-for-fontfaceset\u2464\u2460"}], "title": "4. \nThe FontFaceSource Mixin"}, {"refs": [{"id": "ref-for-fontfaceset\u2464\u2461"}, {"id": "ref-for-fontfaceset\u2464\u2462"}], "title": "4.2. \nInteraction with CSS\u2019s @font-face Rule"}, {"refs": [{"id": "ref-for-fontfaceset\u2464\u2463"}], "title": "\nPrivacy & Security Considerations"}], "external": false};
-window.dfnpanelData['dom-fontfaceset-fontfaceset-initialfaces-initialfaces'] = {"dfnID": "dom-fontfaceset-fontfaceset-initialfaces-initialfaces", "url": "#dom-fontfaceset-fontfaceset-initialfaces-initialfaces", "dfnText": "initialFaces", "refSections": [{"refs": [{"id": "ref-for-dom-fontfaceset-fontfaceset-initialfaces-initialfaces"}], "title": "3. \nThe FontFaceSet Interface"}], "external": false};
-window.dfnpanelData['dom-fontfaceset-onloading'] = {"dfnID": "dom-fontfaceset-onloading", "url": "#dom-fontfaceset-onloading", "dfnText": "onloading", "refSections": [{"refs": [{"id": "ref-for-dom-fontfaceset-onloading"}], "title": "3.1. \nEvents"}], "external": false};
-window.dfnpanelData['dom-fontfaceset-onloadingdone'] = {"dfnID": "dom-fontfaceset-onloadingdone", "url": "#dom-fontfaceset-onloadingdone", "dfnText": "onloadingdone", "refSections": [{"refs": [{"id": "ref-for-dom-fontfaceset-onloadingdone"}], "title": "3.1. \nEvents"}], "external": false};
-window.dfnpanelData['dom-fontfaceset-onloadingerror'] = {"dfnID": "dom-fontfaceset-onloadingerror", "url": "#dom-fontfaceset-onloadingerror", "dfnText": "onloadingerror", "refSections": [{"refs": [{"id": "ref-for-dom-fontfaceset-onloadingerror"}], "title": "3.1. \nEvents"}], "external": false};
-window.dfnpanelData['dom-fontfaceset-status'] = {"dfnID": "dom-fontfaceset-status", "url": "#dom-fontfaceset-status", "dfnText": "status", "refSections": [{"refs": [{"id": "ref-for-dom-fontfaceset-status"}, {"id": "ref-for-dom-fontfaceset-status\u2460"}], "title": "3.1. \nEvents"}], "external": false};
-window.dfnpanelData['dom-fontfaceset-ready'] = {"dfnID": "dom-fontfaceset-ready", "url": "#dom-fontfaceset-ready", "dfnText": "ready", "refSections": [{"refs": [{"id": "ref-for-dom-fontfaceset-ready"}], "title": "3. \nThe FontFaceSet Interface"}, {"refs": [{"id": "ref-for-dom-fontfaceset-ready\u2460"}, {"id": "ref-for-dom-fontfaceset-ready\u2461"}, {"id": "ref-for-dom-fontfaceset-ready\u2462"}], "title": "3.4. \nThe ready attribute"}], "external": false};
-window.dfnpanelData['dom-fontfaceset-fontfaceset'] = {"dfnID": "dom-fontfaceset-fontfaceset", "url": "#dom-fontfaceset-fontfaceset", "dfnText": "FontFaceSet(initialFaces)", "refSections": [{"refs": [{"id": "ref-for-dom-fontfaceset-fontfaceset"}], "title": "3. \nThe FontFaceSet Interface"}], "external": false};
-window.dfnpanelData['fontfaceset-set-entries'] = {"dfnID": "fontfaceset-set-entries", "url": "#fontfaceset-set-entries", "dfnText": "set entries", "refSections": [{"refs": [{"id": "ref-for-fontfaceset-set-entries"}, {"id": "ref-for-fontfaceset-set-entries\u2460"}, {"id": "ref-for-fontfaceset-set-entries\u2461"}, {"id": "ref-for-fontfaceset-set-entries\u2462"}, {"id": "ref-for-fontfaceset-set-entries\u2463"}], "title": "3. \nThe FontFaceSet Interface"}, {"refs": [{"id": "ref-for-fontfaceset-set-entries\u2464"}], "title": "4.2. \nInteraction with CSS\u2019s @font-face Rule"}], "external": false};
-window.dfnpanelData['dom-fontfaceset-add'] = {"dfnID": "dom-fontfaceset-add", "url": "#dom-fontfaceset-add", "dfnText": "add(font)", "refSections": [{"refs": [{"id": "ref-for-dom-fontfaceset-add"}, {"id": "ref-for-dom-fontfaceset-add\u2460"}], "title": "3. \nThe FontFaceSet Interface"}, {"refs": [{"id": "ref-for-dom-fontfaceset-add\u2461"}], "title": "4.2. \nInteraction with CSS\u2019s @font-face Rule"}], "external": false};
-window.dfnpanelData['dom-fontfaceset-delete'] = {"dfnID": "dom-fontfaceset-delete", "url": "#dom-fontfaceset-delete", "dfnText": "delete(font)", "refSections": [{"refs": [{"id": "ref-for-dom-fontfaceset-delete"}, {"id": "ref-for-dom-fontfaceset-delete\u2460"}], "title": "3. \nThe FontFaceSet Interface"}, {"refs": [{"id": "ref-for-dom-fontfaceset-delete\u2461"}], "title": "4.2. \nInteraction with CSS\u2019s @font-face Rule"}], "external": false};
-window.dfnpanelData['dom-fontfaceset-clear'] = {"dfnID": "dom-fontfaceset-clear", "url": "#dom-fontfaceset-clear", "dfnText": "clear()", "refSections": [{"refs": [{"id": "ref-for-dom-fontfaceset-clear"}, {"id": "ref-for-dom-fontfaceset-clear\u2460"}], "title": "3. \nThe FontFaceSet Interface"}], "external": false};
-window.dfnpanelData['dom-fontfaceset-loadingfonts-slot'] = {"dfnID": "dom-fontfaceset-loadingfonts-slot", "url": "#dom-fontfaceset-loadingfonts-slot", "dfnText": "[[LoadingFonts]]", "refSections": [{"refs": [{"id": "ref-for-dom-fontfaceset-loadingfonts-slot"}, {"id": "ref-for-dom-fontfaceset-loadingfonts-slot\u2460"}, {"id": "ref-for-dom-fontfaceset-loadingfonts-slot\u2461"}, {"id": "ref-for-dom-fontfaceset-loadingfonts-slot\u2462"}], "title": "2.1. \nThe Constructor"}, {"refs": [{"id": "ref-for-dom-fontfaceset-loadingfonts-slot\u2463"}, {"id": "ref-for-dom-fontfaceset-loadingfonts-slot\u2464"}], "title": "2.2. \nThe load() method"}, {"refs": [{"id": "ref-for-dom-fontfaceset-loadingfonts-slot\u2465"}, {"id": "ref-for-dom-fontfaceset-loadingfonts-slot\u2466"}, {"id": "ref-for-dom-fontfaceset-loadingfonts-slot\u2467"}, {"id": "ref-for-dom-fontfaceset-loadingfonts-slot\u2468"}], "title": "3. \nThe FontFaceSet Interface"}, {"refs": [{"id": "ref-for-dom-fontfaceset-loadingfonts-slot\u2460\u24ea"}], "title": "3.1. \nEvents"}], "external": false};
-window.dfnpanelData['dom-fontfaceset-loadedfonts-slot'] = {"dfnID": "dom-fontfaceset-loadedfonts-slot", "url": "#dom-fontfaceset-loadedfonts-slot", "dfnText": "[[LoadedFonts]]", "refSections": [{"refs": [{"id": "ref-for-dom-fontfaceset-loadedfonts-slot"}], "title": "2.1. \nThe Constructor"}, {"refs": [{"id": "ref-for-dom-fontfaceset-loadedfonts-slot\u2460"}], "title": "2.2. \nThe load() method"}, {"refs": [{"id": "ref-for-dom-fontfaceset-loadedfonts-slot\u2461"}, {"id": "ref-for-dom-fontfaceset-loadedfonts-slot\u2462"}], "title": "3. \nThe FontFaceSet Interface"}, {"refs": [{"id": "ref-for-dom-fontfaceset-loadedfonts-slot\u2463"}, {"id": "ref-for-dom-fontfaceset-loadedfonts-slot\u2464"}], "title": "3.1. \nEvents"}], "external": false};
-window.dfnpanelData['dom-fontfaceset-failedfonts-slot'] = {"dfnID": "dom-fontfaceset-failedfonts-slot", "url": "#dom-fontfaceset-failedfonts-slot", "dfnText": "[[FailedFonts]]", "refSections": [{"refs": [{"id": "ref-for-dom-fontfaceset-failedfonts-slot"}], "title": "2.1. \nThe Constructor"}, {"refs": [{"id": "ref-for-dom-fontfaceset-failedfonts-slot\u2460"}], "title": "2.2. \nThe load() method"}, {"refs": [{"id": "ref-for-dom-fontfaceset-failedfonts-slot\u2461"}, {"id": "ref-for-dom-fontfaceset-failedfonts-slot\u2462"}], "title": "3. \nThe FontFaceSet Interface"}, {"refs": [{"id": "ref-for-dom-fontfaceset-failedfonts-slot\u2463"}, {"id": "ref-for-dom-fontfaceset-failedfonts-slot\u2464"}], "title": "3.1. \nEvents"}], "external": false};
-window.dfnpanelData['dom-fontfaceset-readypromise-slot'] = {"dfnID": "dom-fontfaceset-readypromise-slot", "url": "#dom-fontfaceset-readypromise-slot", "dfnText": "[[ReadyPromise]]", "refSections": [{"refs": [{"id": "ref-for-dom-fontfaceset-readypromise-slot"}], "title": "3. \nThe FontFaceSet Interface"}, {"refs": [{"id": "ref-for-dom-fontfaceset-readypromise-slot\u2460"}, {"id": "ref-for-dom-fontfaceset-readypromise-slot\u2461"}], "title": "3.1. \nEvents"}], "external": false};
-window.dfnpanelData['fontfaceset-pending-on-the-environment'] = {"dfnID": "fontfaceset-pending-on-the-environment", "url": "#fontfaceset-pending-on-the-environment", "dfnText": "pending on the environment", "refSections": [{"refs": [{"id": "ref-for-fontfaceset-pending-on-the-environment"}], "title": "3. \nThe FontFaceSet Interface"}, {"refs": [{"id": "ref-for-fontfaceset-pending-on-the-environment\u2460"}, {"id": "ref-for-fontfaceset-pending-on-the-environment\u2461"}, {"id": "ref-for-fontfaceset-pending-on-the-environment\u2462"}], "title": "3.1. \nEvents"}], "external": false};
-window.dfnpanelData['eventdef-fontfaceset-loading'] = {"dfnID": "eventdef-fontfaceset-loading", "url": "#eventdef-fontfaceset-loading", "dfnText": "loading", "refSections": [{"refs": [{"id": "ref-for-eventdef-fontfaceset-loading"}, {"id": "ref-for-eventdef-fontfaceset-loading\u2460"}], "title": "3.1. \nEvents"}], "external": false};
-window.dfnpanelData['eventdef-fontfaceset-loadingdone'] = {"dfnID": "eventdef-fontfaceset-loadingdone", "url": "#eventdef-fontfaceset-loadingdone", "dfnText": "loadingdone", "refSections": [{"refs": [{"id": "ref-for-eventdef-fontfaceset-loadingdone"}, {"id": "ref-for-eventdef-fontfaceset-loadingdone\u2460"}], "title": "3.1. \nEvents"}, {"refs": [{"id": "ref-for-eventdef-fontfaceset-loadingdone\u2461"}], "title": "3.4. \nThe ready attribute"}, {"refs": [{"id": "ref-for-eventdef-fontfaceset-loadingdone\u2462"}, {"id": "ref-for-eventdef-fontfaceset-loadingdone\u2463"}, {"id": "ref-for-eventdef-fontfaceset-loadingdone\u2464"}], "title": "5. \nAPI Examples"}], "external": false};
-window.dfnpanelData['eventdef-fontfaceset-loadingerror'] = {"dfnID": "eventdef-fontfaceset-loadingerror", "url": "#eventdef-fontfaceset-loadingerror", "dfnText": "loadingerror", "refSections": [{"refs": [{"id": "ref-for-eventdef-fontfaceset-loadingerror"}, {"id": "ref-for-eventdef-fontfaceset-loadingerror\u2460"}], "title": "3.1. \nEvents"}], "external": false};
-window.dfnpanelData['fire-a-font-load-event'] = {"dfnID": "fire-a-font-load-event", "url": "#fire-a-font-load-event", "dfnText": "fire a font load event", "refSections": [{"refs": [{"id": "ref-for-fire-a-font-load-event"}, {"id": "ref-for-fire-a-font-load-event\u2460"}, {"id": "ref-for-fire-a-font-load-event\u2461"}], "title": "3.1. \nEvents"}], "external": false};
-window.dfnpanelData['switch-the-fontfaceset-to-loading'] = {"dfnID": "switch-the-fontfaceset-to-loading", "url": "#switch-the-fontfaceset-to-loading", "dfnText": "switch the FontFaceSet to loading", "refSections": [{"refs": [{"id": "ref-for-switch-the-fontfaceset-to-loading"}], "title": "2.1. \nThe Constructor"}, {"refs": [{"id": "ref-for-switch-the-fontfaceset-to-loading\u2460"}], "title": "3. \nThe FontFaceSet Interface"}], "external": false};
-window.dfnpanelData['switch-the-fontfaceset-to-loaded'] = {"dfnID": "switch-the-fontfaceset-to-loaded", "url": "#switch-the-fontfaceset-to-loaded", "dfnText": "switch the FontFaceSet to loaded", "refSections": [{"refs": [{"id": "ref-for-switch-the-fontfaceset-to-loaded"}, {"id": "ref-for-switch-the-fontfaceset-to-loaded\u2460"}], "title": "2.1. \nThe Constructor"}, {"refs": [{"id": "ref-for-switch-the-fontfaceset-to-loaded\u2461"}, {"id": "ref-for-switch-the-fontfaceset-to-loaded\u2462"}], "title": "2.2. \nThe load() method"}, {"refs": [{"id": "ref-for-switch-the-fontfaceset-to-loaded\u2463"}, {"id": "ref-for-switch-the-fontfaceset-to-loaded\u2464"}], "title": "3. \nThe FontFaceSet Interface"}, {"refs": [{"id": "ref-for-switch-the-fontfaceset-to-loaded\u2465"}], "title": "3.1. \nEvents"}], "external": false};
-window.dfnpanelData['fontfaceset-stuck-on-the-environment'] = {"dfnID": "fontfaceset-stuck-on-the-environment", "url": "#fontfaceset-stuck-on-the-environment", "dfnText": "stuck on the environment", "refSections": [{"refs": [{"id": "ref-for-fontfaceset-stuck-on-the-environment"}, {"id": "ref-for-fontfaceset-stuck-on-the-environment\u2460"}], "title": "3.1. \nEvents"}], "external": false};
-window.dfnpanelData['find-the-matching-font-faces'] = {"dfnID": "find-the-matching-font-faces", "url": "#find-the-matching-font-faces", "dfnText": "find the matching font faces", "refSections": [{"refs": [{"id": "ref-for-find-the-matching-font-faces"}], "title": "3.2. \nThe load() method"}, {"refs": [{"id": "ref-for-find-the-matching-font-faces\u2460"}], "title": "3.3. \nThe check() method"}], "external": false};
-window.dfnpanelData['dom-fontfaceset-load'] = {"dfnID": "dom-fontfaceset-load", "url": "#dom-fontfaceset-load", "dfnText": "load", "refSections": [{"refs": [{"id": "ref-for-dom-fontfaceset-load"}, {"id": "ref-for-dom-fontfaceset-load\u2460"}], "title": "3. \nThe FontFaceSet Interface"}, {"refs": [{"id": "ref-for-dom-fontfaceset-load\u2461"}], "title": "3.2. \nThe load() method"}], "external": false};
-window.dfnpanelData['dom-fontfaceset-load-font-text-font'] = {"dfnID": "dom-fontfaceset-load-font-text-font", "url": "#dom-fontfaceset-load-font-text-font", "dfnText": "font", "refSections": [{"refs": [{"id": "ref-for-dom-fontfaceset-load-font-text-font"}], "title": "3. \nThe FontFaceSet Interface"}], "external": false};
-window.dfnpanelData['dom-fontfaceset-load-font-text-text'] = {"dfnID": "dom-fontfaceset-load-font-text-text", "url": "#dom-fontfaceset-load-font-text-text", "dfnText": "text", "refSections": [{"refs": [{"id": "ref-for-dom-fontfaceset-load-font-text-text"}], "title": "3. \nThe FontFaceSet Interface"}], "external": false};
-window.dfnpanelData['dom-fontfaceset-check'] = {"dfnID": "dom-fontfaceset-check", "url": "#dom-fontfaceset-check", "dfnText": "check", "refSections": [{"refs": [{"id": "ref-for-dom-fontfaceset-check"}], "title": "3. \nThe FontFaceSet Interface"}, {"refs": [{"id": "ref-for-dom-fontfaceset-check\u2460"}], "title": "3.3. \nThe check() method"}], "external": false};
-window.dfnpanelData['dom-fontfaceset-check-font-text-font'] = {"dfnID": "dom-fontfaceset-check-font-text-font", "url": "#dom-fontfaceset-check-font-text-font", "dfnText": "font", "refSections": [{"refs": [{"id": "ref-for-dom-fontfaceset-check-font-text-font"}], "title": "3. \nThe FontFaceSet Interface"}], "external": false};
-window.dfnpanelData['dom-fontfaceset-check-font-text-text'] = {"dfnID": "dom-fontfaceset-check-font-text-text", "url": "#dom-fontfaceset-check-font-text-text", "dfnText": "text", "refSections": [{"refs": [{"id": "ref-for-dom-fontfaceset-check-font-text-text"}], "title": "3. \nThe FontFaceSet Interface"}], "external": false};
-window.dfnpanelData['fontfacesource'] = {"dfnID": "fontfacesource", "url": "#fontfacesource", "dfnText": "FontFaceSource", "refSections": [{"refs": [{"id": "ref-for-fontfacesource"}, {"id": "ref-for-fontfacesource\u2460"}, {"id": "ref-for-fontfacesource\u2461"}], "title": "4. \nThe FontFaceSource Mixin"}], "external": false};
-window.dfnpanelData['dom-fontfacesource-fonts'] = {"dfnID": "dom-fontfacesource-fonts", "url": "#dom-fontfacesource-fonts", "dfnText": "fonts", "refSections": [{"refs": [{"id": "ref-for-dom-fontfacesource-fonts"}], "title": "4. \nThe FontFaceSource Mixin"}], "external": false};
-window.dfnpanelData['font-source'] = {"dfnID": "font-source", "url": "#font-source", "dfnText": "font source", "refSections": [{"refs": [{"id": "ref-for-font-source"}, {"id": "ref-for-font-source\u2460"}], "title": "2.3. \nInteraction with CSS\u2019s @font-face Rule"}, {"refs": [{"id": "ref-for-font-source\u2461"}], "title": "3. \nThe FontFaceSet Interface"}, {"refs": [{"id": "ref-for-font-source\u2462"}], "title": "3.5. \nInteraction with CSS Font Loading and Matching"}, {"refs": [{"id": "ref-for-font-source\u2463"}, {"id": "ref-for-font-source\u2464"}], "title": "4. \nThe FontFaceSource Mixin"}, {"refs": [{"id": "ref-for-font-source\u2465"}], "title": "4.1. \nWorker FontFaceSources"}, {"refs": [{"id": "ref-for-font-source\u2466"}, {"id": "ref-for-font-source\u2467"}, {"id": "ref-for-font-source\u2468"}], "title": "4.2. \nInteraction with CSS\u2019s @font-face Rule"}], "external": false};
-window.dfnpanelData['available-font-faces'] = {"dfnID": "available-font-faces", "url": "#available-font-faces", "dfnText": "available font faces", "refSections": [{"refs": [{"id": "ref-for-available-font-faces"}], "title": "3.1. \nEvents"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -3688,34 +3188,523 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"0497de86": {"dfnID":"0497de86","dfnText":"@font-face","external":true,"refSections":[{"refs":[{"id":"ref-for-at-font-face-rule"}],"title":"1. \nIntroduction"},{"refs":[{"id":"ref-for-at-font-face-rule\u2460"},{"id":"ref-for-at-font-face-rule\u2461"},{"id":"ref-for-at-font-face-rule\u2462"},{"id":"ref-for-at-font-face-rule\u2463"},{"id":"ref-for-at-font-face-rule\u2464"},{"id":"ref-for-at-font-face-rule\u2465"}],"title":"2. \nThe FontFace Interface"},{"refs":[{"id":"ref-for-at-font-face-rule\u2466"},{"id":"ref-for-at-font-face-rule\u2467"}],"title":"2.1. \nThe Constructor"},{"refs":[{"id":"ref-for-at-font-face-rule\u2468"}],"title":"2.2. \nThe load() method"},{"refs":[{"id":"ref-for-at-font-face-rule\u2460\u24ea"},{"id":"ref-for-at-font-face-rule\u2460\u2460"},{"id":"ref-for-at-font-face-rule\u2460\u2461"},{"id":"ref-for-at-font-face-rule\u2460\u2462"},{"id":"ref-for-at-font-face-rule\u2460\u2463"},{"id":"ref-for-at-font-face-rule\u2460\u2464"},{"id":"ref-for-at-font-face-rule\u2460\u2465"},{"id":"ref-for-at-font-face-rule\u2460\u2466"},{"id":"ref-for-at-font-face-rule\u2460\u2467"},{"id":"ref-for-at-font-face-rule\u2460\u2468"},{"id":"ref-for-at-font-face-rule\u2461\u24ea"}],"title":"2.3. \nInteraction with CSS\u2019s @font-face Rule"},{"refs":[{"id":"ref-for-at-font-face-rule\u2461\u2460"}],"title":"3. \nThe FontFaceSet Interface"},{"refs":[{"id":"ref-for-at-font-face-rule\u2461\u2461"},{"id":"ref-for-at-font-face-rule\u2461\u2462"},{"id":"ref-for-at-font-face-rule\u2461\u2463"}],"title":"3.5. \nInteraction with CSS Font Loading and Matching"},{"refs":[{"id":"ref-for-at-font-face-rule\u2461\u2464"},{"id":"ref-for-at-font-face-rule\u2461\u2465"},{"id":"ref-for-at-font-face-rule\u2461\u2466"},{"id":"ref-for-at-font-face-rule\u2461\u2467"}],"title":"4.2. \nInteraction with CSS\u2019s @font-face Rule"},{"refs":[{"id":"ref-for-at-font-face-rule\u2461\u2468"}],"title":"Changes"},{"refs":[{"id":"ref-for-at-font-face-rule\u2462\u24ea"}],"title":"\nPrivacy & Security Considerations"}],"url":"https://drafts.csswg.org/css-fonts-5/#at-font-face-rule"},
+"0d86ede8": {"dfnID":"0d86ede8","dfnText":"text (for FontFaceSet/check())","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-fontfacesetcheck-text"}],"title":"3.3. \nThe check() method"}],"url":"https://www.w3.org/TR/css-font-loading-3/#dom-fontfacesetcheck-text"},
+"129bdae8": {"dfnID":"129bdae8","dfnText":"Event","external":true,"refSections":[{"refs":[{"id":"ref-for-event"}],"title":"3. \nThe FontFaceSet Interface"}],"url":"https://dom.spec.whatwg.org/#event"},
+"1efc67e7": {"dfnID":"1efc67e7","dfnText":"font (for FontFaceSet/check())","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-fontfacesetcheck-font"}],"title":"3.3. \nThe check() method"}],"url":"https://www.w3.org/TR/css-font-loading-3/#dom-fontfacesetcheck-font"},
+"2bc0cdf4": {"dfnID":"2bc0cdf4","dfnText":"EventTarget","external":true,"refSections":[{"refs":[{"id":"ref-for-eventtarget"}],"title":"3. \nThe FontFaceSet Interface"}],"url":"https://dom.spec.whatwg.org/#eventtarget"},
+"2c57f900": {"dfnID":"2c57f900","dfnText":"font","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-font"}],"title":"3.1. \nEvents"}],"url":"https://drafts.csswg.org/css-fonts-4/#propdef-font"},
+"2ede577f": {"dfnID":"2ede577f","dfnText":"normal","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-font-weight-normal"}],"title":"3.1. \nEvents"}],"url":"https://drafts.csswg.org/css-fonts-4/#valdef-font-weight-normal"},
+"2f8afbfe": {"dfnID":"2f8afbfe","dfnText":"ArrayBuffer","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-ArrayBuffer"}],"title":"2. \nThe FontFace Interface"},{"refs":[{"id":"ref-for-idl-ArrayBuffer\u2460"}],"title":"2.1. \nThe Constructor"}],"url":"https://webidl.spec.whatwg.org/#idl-ArrayBuffer"},
+"358fd6ff": {"dfnID":"358fd6ff","dfnText":"css-wide keywords","external":true,"refSections":[{"refs":[{"id":"ref-for-css-wide-keywords"}],"title":"3.1. \nEvents"}],"url":"https://drafts.csswg.org/css-values-4/#css-wide-keywords"},
+"3c91be7d": {"dfnID":"3c91be7d","dfnText":"bolder","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-font-weight-bolder"}],"title":"3.1. \nEvents"}],"url":"https://drafts.csswg.org/css-fonts-4/#valdef-font-weight-bolder"},
+"3d1ecaad": {"dfnID":"3d1ecaad","dfnText":"font (for FontFaceSet/load())","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-fontfacesetload-font"}],"title":"3.2. \nThe load() method"}],"url":"https://www.w3.org/TR/css-font-loading-3/#dom-fontfacesetload-font"},
+"44a7708c": {"dfnID":"44a7708c","dfnText":"EventInit","external":true,"refSections":[{"refs":[{"id":"ref-for-dictdef-eventinit"}],"title":"3. \nThe FontFaceSet Interface"}],"url":"https://dom.spec.whatwg.org/#dictdef-eventinit"},
+"4cd9ca96": {"dfnID":"4cd9ca96","dfnText":"document or shadow root css style sheets","external":true,"refSections":[{"refs":[{"id":"ref-for-documentorshadowroot-document-or-shadow-root-css-style-sheets"}],"title":"4.2. \nInteraction with CSS\u2019s @font-face Rule"}],"url":"https://drafts.csswg.org/cssom-1/#documentorshadowroot-document-or-shadow-root-css-style-sheets"},
+"5372cca8": {"dfnID":"5372cca8","dfnText":"boolean","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-boolean"},{"id":"ref-for-idl-boolean\u2460"}],"title":"3. \nThe FontFaceSet Interface"}],"url":"https://webidl.spec.whatwg.org/#idl-boolean"},
+"5a2f7ea1": {"dfnID":"5a2f7ea1","dfnText":"url()","external":true,"refSections":[{"refs":[{"id":"ref-for-funcdef-url"}],"title":"2.1. \nThe Constructor"}],"url":"https://drafts.csswg.org/css-values-4/#funcdef-url"},
+"5f90bbfb": {"dfnID":"5f90bbfb","dfnText":"undefined","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-undefined"}],"title":"3. \nThe FontFaceSet Interface"}],"url":"https://webidl.spec.whatwg.org/#idl-undefined"},
+"5fced98b": {"dfnID":"5fced98b","dfnText":"CSSOMString","external":true,"refSections":[{"refs":[{"id":"ref-for-cssomstring"},{"id":"ref-for-cssomstring\u2460"},{"id":"ref-for-cssomstring\u2461"},{"id":"ref-for-cssomstring\u2462"},{"id":"ref-for-cssomstring\u2463"},{"id":"ref-for-cssomstring\u2464"},{"id":"ref-for-cssomstring\u2465"},{"id":"ref-for-cssomstring\u2466"},{"id":"ref-for-cssomstring\u2467"},{"id":"ref-for-cssomstring\u2468"},{"id":"ref-for-cssomstring\u2460\u24ea"},{"id":"ref-for-cssomstring\u2460\u2460"},{"id":"ref-for-cssomstring\u2460\u2461"},{"id":"ref-for-cssomstring\u2460\u2462"},{"id":"ref-for-cssomstring\u2460\u2463"},{"id":"ref-for-cssomstring\u2460\u2464"},{"id":"ref-for-cssomstring\u2460\u2465"},{"id":"ref-for-cssomstring\u2460\u2466"},{"id":"ref-for-cssomstring\u2460\u2467"},{"id":"ref-for-cssomstring\u2460\u2468"},{"id":"ref-for-cssomstring\u2461\u24ea"},{"id":"ref-for-cssomstring\u2461\u2460"},{"id":"ref-for-cssomstring\u2461\u2461"},{"id":"ref-for-cssomstring\u2461\u2462"},{"id":"ref-for-cssomstring\u2461\u2463"},{"id":"ref-for-cssomstring\u2461\u2464"},{"id":"ref-for-cssomstring\u2461\u2465"},{"id":"ref-for-cssomstring\u2461\u2466"},{"id":"ref-for-cssomstring\u2461\u2467"},{"id":"ref-for-cssomstring\u2461\u2468"},{"id":"ref-for-cssomstring\u2462\u24ea"},{"id":"ref-for-cssomstring\u2462\u2460"},{"id":"ref-for-cssomstring\u2462\u2461"},{"id":"ref-for-cssomstring\u2462\u2462"},{"id":"ref-for-cssomstring\u2462\u2463"},{"id":"ref-for-cssomstring\u2462\u2464"},{"id":"ref-for-cssomstring\u2462\u2465"}],"title":"2. \nThe FontFace Interface"},{"refs":[{"id":"ref-for-cssomstring\u2462\u2466"},{"id":"ref-for-cssomstring\u2462\u2467"}],"title":"2.1. \nThe Constructor"},{"refs":[{"id":"ref-for-cssomstring\u2462\u2468"},{"id":"ref-for-cssomstring\u2463\u24ea"},{"id":"ref-for-cssomstring\u2463\u2460"},{"id":"ref-for-cssomstring\u2463\u2461"},{"id":"ref-for-cssomstring\u2463\u2462"}],"title":"3. \nThe FontFaceSet Interface"}],"url":"https://drafts.csswg.org/cssom-1/#cssomstring"},
+"6c9ab516": {"dfnID":"6c9ab516","dfnText":"ArrayBufferView","external":true,"refSections":[{"refs":[{"id":"ref-for-ArrayBufferView"}],"title":"2. \nThe FontFace Interface"},{"refs":[{"id":"ref-for-ArrayBufferView\u2460"}],"title":"2.1. \nThe Constructor"}],"url":"https://webidl.spec.whatwg.org/#ArrayBufferView"},
+"76c4403d": {"dfnID":"76c4403d","dfnText":"parse","external":true,"refSections":[{"refs":[{"id":"ref-for-css-parse-something-according-to-a-css-grammar"},{"id":"ref-for-css-parse-something-according-to-a-css-grammar\u2460"}],"title":"2. \nThe FontFace Interface"},{"refs":[{"id":"ref-for-css-parse-something-according-to-a-css-grammar\u2461"}],"title":"2.1. \nThe Constructor"}],"url":"https://drafts.csswg.org/css-syntax-3/#css-parse-something-according-to-a-css-grammar"},
+"804aab85": {"dfnID":"804aab85","dfnText":"OffscreenCanvas","external":true,"refSections":[{"refs":[{"id":"ref-for-offscreencanvas"}],"title":"4.1. \nWorker FontFaceSources"}],"url":"https://html.spec.whatwg.org/multipage/canvas.html#offscreencanvas"},
+"83c59a3a": {"dfnID":"83c59a3a","dfnText":"WorkerGlobalScope","external":true,"refSections":[{"refs":[{"id":"ref-for-workerglobalscope"}],"title":"4. \nThe FontFaceSource Mixin"}],"url":"https://html.spec.whatwg.org/multipage/workers.html#workerglobalscope"},
+"85394472": {"dfnID":"85394472","dfnText":"Document","external":true,"refSections":[{"refs":[{"id":"ref-for-document"}],"title":"3.5. \nInteraction with CSS Font Loading and Matching"},{"refs":[{"id":"ref-for-document\u2460"}],"title":"4. \nThe FontFaceSource Mixin"}],"url":"https://dom.spec.whatwg.org/#document"},
+"86eccf79": {"dfnID":"86eccf79","dfnText":"text (for FontFaceSet/load())","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-fontfacesetload-text"}],"title":"3.2. \nThe load() method"}],"url":"https://www.w3.org/TR/css-font-loading-3/#dom-fontfacesetload-text"},
+"889e932f": {"dfnID":"889e932f","dfnText":"Exposed","external":true,"refSections":[{"refs":[{"id":"ref-for-Exposed"}],"title":"2. \nThe FontFace Interface"},{"refs":[{"id":"ref-for-Exposed\u2460"},{"id":"ref-for-Exposed\u2461"}],"title":"3. \nThe FontFaceSet Interface"}],"url":"https://webidl.spec.whatwg.org/#Exposed"},
+"9cce47fd": {"dfnID":"9cce47fd","dfnText":"sequence","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-sequence"},{"id":"ref-for-idl-sequence\u2460"},{"id":"ref-for-idl-sequence\u2461"}],"title":"3. \nThe FontFaceSet Interface"}],"url":"https://webidl.spec.whatwg.org/#idl-sequence"},
+"a5c91173": {"dfnID":"a5c91173","dfnText":"SameObject","external":true,"refSections":[{"refs":[{"id":"ref-for-SameObject"}],"title":"3. \nThe FontFaceSet Interface"}],"url":"https://webidl.spec.whatwg.org/#SameObject"},
+"available-font-faces": {"dfnID":"available-font-faces","dfnText":"available font faces","external":false,"refSections":[{"refs":[{"id":"ref-for-available-font-faces"}],"title":"3.1. \nEvents"}],"url":"#available-font-faces"},
+"bdbd19d1": {"dfnID":"bdbd19d1","dfnText":"Promise","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-promise"}],"title":"1.1. \nValues"},{"refs":[{"id":"ref-for-idl-promise\u2460"},{"id":"ref-for-idl-promise\u2461"}],"title":"2. \nThe FontFace Interface"},{"refs":[{"id":"ref-for-idl-promise\u2462"}],"title":"2.1. \nThe Constructor"},{"refs":[{"id":"ref-for-idl-promise\u2463"},{"id":"ref-for-idl-promise\u2464"},{"id":"ref-for-idl-promise\u2465"},{"id":"ref-for-idl-promise\u2466"}],"title":"3. \nThe FontFaceSet Interface"},{"refs":[{"id":"ref-for-idl-promise\u2467"}],"title":"3.4. \nThe ready attribute"}],"url":"https://webidl.spec.whatwg.org/#idl-promise"},
+"be2d2b4c": {"dfnID":"be2d2b4c","dfnText":"SyntaxError","external":true,"refSections":[{"refs":[{"id":"ref-for-syntaxerror"},{"id":"ref-for-syntaxerror\u2460"}],"title":"2. \nThe FontFace Interface"}],"url":"https://webidl.spec.whatwg.org/#syntaxerror"},
+"cae6bf57": {"dfnID":"cae6bf57","dfnText":"InvalidModificationError","external":true,"refSections":[{"refs":[{"id":"ref-for-invalidmodificationerror"}],"title":"3. \nThe FontFaceSet Interface"},{"refs":[{"id":"ref-for-invalidmodificationerror\u2460"}],"title":"4.2. \nInteraction with CSS\u2019s @font-face Rule"}],"url":"https://webidl.spec.whatwg.org/#invalidmodificationerror"},
+"css-connected": {"dfnID":"css-connected","dfnText":"CSS-connected","external":false,"refSections":[{"refs":[{"id":"ref-for-css-connected"},{"id":"ref-for-css-connected\u2460"},{"id":"ref-for-css-connected\u2461"},{"id":"ref-for-css-connected\u2462"}],"title":"2.3. \nInteraction with CSS\u2019s @font-face Rule"},{"refs":[{"id":"ref-for-css-connected\u2463"},{"id":"ref-for-css-connected\u2464"},{"id":"ref-for-css-connected\u2465"},{"id":"ref-for-css-connected\u2466"}],"title":"3. \nThe FontFaceSet Interface"},{"refs":[{"id":"ref-for-css-connected\u2467"},{"id":"ref-for-css-connected\u2468"},{"id":"ref-for-css-connected\u2460\u24ea"},{"id":"ref-for-css-connected\u2460\u2460"},{"id":"ref-for-css-connected\u2460\u2461"},{"id":"ref-for-css-connected\u2460\u2462"}],"title":"4.2. \nInteraction with CSS\u2019s @font-face Rule"}],"url":"#css-connected"},
+"dcf5fafa": {"dfnID":"dcf5fafa","dfnText":"FrozenArray","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-frozen-array"}],"title":"3. \nThe FontFaceSet Interface"}],"url":"https://webidl.spec.whatwg.org/#idl-frozen-array"},
+"dictdef-fontfacedescriptors": {"dfnID":"dictdef-fontfacedescriptors","dfnText":"FontFaceDescriptors","external":false,"refSections":[{"refs":[{"id":"ref-for-dictdef-fontfacedescriptors"}],"title":"2. \nThe FontFace Interface"}],"url":"#dictdef-fontfacedescriptors"},
+"dictdef-fontfacesetloadeventinit": {"dfnID":"dictdef-fontfacesetloadeventinit","dfnText":"FontFaceSetLoadEventInit","external":false,"refSections":[{"refs":[{"id":"ref-for-dictdef-fontfacesetloadeventinit"}],"title":"3. \nThe FontFaceSet Interface"}],"url":"#dictdef-fontfacesetloadeventinit"},
+"dom-fontface-ascentoverride": {"dfnID":"dom-fontface-ascentoverride","dfnText":"ascentOverride","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontface-ascentoverride"}],"title":"2. \nThe FontFace Interface"}],"url":"#dom-fontface-ascentoverride"},
+"dom-fontface-data-slot": {"dfnID":"dom-fontface-data-slot","dfnText":"[[Data]]","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontface-data-slot"},{"id":"ref-for-dom-fontface-data-slot\u2460"}],"title":"2.1. \nThe Constructor"}],"url":"#dom-fontface-data-slot"},
+"dom-fontface-descentoverride": {"dfnID":"dom-fontface-descentoverride","dfnText":"descentOverride","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontface-descentoverride"}],"title":"2. \nThe FontFace Interface"}],"url":"#dom-fontface-descentoverride"},
+"dom-fontface-display": {"dfnID":"dom-fontface-display","dfnText":"display","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontface-display"}],"title":"2. \nThe FontFace Interface"},{"refs":[{"id":"ref-for-dom-fontface-display\u2460"}],"title":"Changes"}],"url":"#dom-fontface-display"},
+"dom-fontface-family": {"dfnID":"dom-fontface-family","dfnText":"family","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontface-family"}],"title":"2. \nThe FontFace Interface"},{"refs":[{"id":"ref-for-dom-fontface-family\u2460"}],"title":"2.3. \nInteraction with CSS\u2019s @font-face Rule"}],"url":"#dom-fontface-family"},
+"dom-fontface-featuresettings": {"dfnID":"dom-fontface-featuresettings","dfnText":"featureSettings","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontface-featuresettings"}],"title":"2. \nThe FontFace Interface"},{"refs":[{"id":"ref-for-dom-fontface-featuresettings\u2460"}],"title":"2.3. \nInteraction with CSS\u2019s @font-face Rule"}],"url":"#dom-fontface-featuresettings"},
+"dom-fontface-fontface": {"dfnID":"dom-fontface-fontface","dfnText":"FontFace(family, source, descriptors)","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontface-fontface"}],"title":"2. \nThe FontFace Interface"}],"url":"#dom-fontface-fontface"},
+"dom-fontface-fontface-family-source-descriptors-descriptors": {"dfnID":"dom-fontface-fontface-family-source-descriptors-descriptors","dfnText":"descriptors","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontface-fontface-family-source-descriptors-descriptors"}],"title":"2.1. \nThe Constructor"}],"url":"#dom-fontface-fontface-family-source-descriptors-descriptors"},
+"dom-fontface-fontface-family-source-descriptors-family": {"dfnID":"dom-fontface-fontface-family-source-descriptors-family","dfnText":"family","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontface-fontface-family-source-descriptors-family"}],"title":"2.1. \nThe Constructor"}],"url":"#dom-fontface-fontface-family-source-descriptors-family"},
+"dom-fontface-fontface-family-source-descriptors-source": {"dfnID":"dom-fontface-fontface-family-source-descriptors-source","dfnText":"source","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontface-fontface-family-source-descriptors-source"},{"id":"ref-for-dom-fontface-fontface-family-source-descriptors-source\u2460"},{"id":"ref-for-dom-fontface-fontface-family-source-descriptors-source\u2461"}],"title":"2.1. \nThe Constructor"}],"url":"#dom-fontface-fontface-family-source-descriptors-source"},
+"dom-fontface-fontstatuspromise-slot": {"dfnID":"dom-fontface-fontstatuspromise-slot","dfnText":"[[FontStatusPromise]]","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontface-fontstatuspromise-slot"}],"title":"2. \nThe FontFace Interface"},{"refs":[{"id":"ref-for-dom-fontface-fontstatuspromise-slot\u2460"},{"id":"ref-for-dom-fontface-fontstatuspromise-slot\u2461"},{"id":"ref-for-dom-fontface-fontstatuspromise-slot\u2462"},{"id":"ref-for-dom-fontface-fontstatuspromise-slot\u2463"}],"title":"2.1. \nThe Constructor"},{"refs":[{"id":"ref-for-dom-fontface-fontstatuspromise-slot\u2464"},{"id":"ref-for-dom-fontface-fontstatuspromise-slot\u2465"},{"id":"ref-for-dom-fontface-fontstatuspromise-slot\u2466"},{"id":"ref-for-dom-fontface-fontstatuspromise-slot\u2467"}],"title":"2.2. \nThe load() method"},{"refs":[{"id":"ref-for-dom-fontface-fontstatuspromise-slot\u2468"}],"title":"3.2. \nThe load() method"}],"url":"#dom-fontface-fontstatuspromise-slot"},
+"dom-fontface-linegapoverride": {"dfnID":"dom-fontface-linegapoverride","dfnText":"lineGapOverride","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontface-linegapoverride"}],"title":"2. \nThe FontFace Interface"}],"url":"#dom-fontface-linegapoverride"},
+"dom-fontface-load": {"dfnID":"dom-fontface-load","dfnText":"load()","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontface-load"},{"id":"ref-for-dom-fontface-load\u2460"}],"title":"2. \nThe FontFace Interface"},{"refs":[{"id":"ref-for-dom-fontface-load\u2461"},{"id":"ref-for-dom-fontface-load\u2462"}],"title":"2.2. \nThe load() method"},{"refs":[{"id":"ref-for-dom-fontface-load\u2463"}],"title":"3.2. \nThe load() method"},{"refs":[{"id":"ref-for-dom-fontface-load\u2464"}],"title":"3.4. \nThe ready attribute"},{"refs":[{"id":"ref-for-dom-fontface-load\u2465"}],"title":"3.5. \nInteraction with CSS Font Loading and Matching"}],"url":"#dom-fontface-load"},
+"dom-fontface-loaded": {"dfnID":"dom-fontface-loaded","dfnText":"loaded","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontface-loaded"}],"title":"2. \nThe FontFace Interface"}],"url":"#dom-fontface-loaded"},
+"dom-fontface-status": {"dfnID":"dom-fontface-status","dfnText":"status","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontface-status"}],"title":"2. \nThe FontFace Interface"},{"refs":[{"id":"ref-for-dom-fontface-status\u2460"},{"id":"ref-for-dom-fontface-status\u2461"},{"id":"ref-for-dom-fontface-status\u2462"},{"id":"ref-for-dom-fontface-status\u2463"},{"id":"ref-for-dom-fontface-status\u2464"},{"id":"ref-for-dom-fontface-status\u2465"}],"title":"2.1. \nThe Constructor"},{"refs":[{"id":"ref-for-dom-fontface-status\u2466"},{"id":"ref-for-dom-fontface-status\u2467"},{"id":"ref-for-dom-fontface-status\u2468"},{"id":"ref-for-dom-fontface-status\u2460\u24ea"}],"title":"2.2. \nThe load() method"},{"refs":[{"id":"ref-for-dom-fontface-status\u2460\u2460"}],"title":"3. \nThe FontFaceSet Interface"},{"refs":[{"id":"ref-for-dom-fontface-status\u2460\u2461"}],"title":"3.3. \nThe check() method"}],"url":"#dom-fontface-status"},
+"dom-fontface-stretch": {"dfnID":"dom-fontface-stretch","dfnText":"stretch","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontface-stretch"}],"title":"2. \nThe FontFace Interface"},{"refs":[{"id":"ref-for-dom-fontface-stretch\u2460"}],"title":"2.3. \nInteraction with CSS\u2019s @font-face Rule"}],"url":"#dom-fontface-stretch"},
+"dom-fontface-style": {"dfnID":"dom-fontface-style","dfnText":"style","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontface-style"},{"id":"ref-for-dom-fontface-style\u2460"}],"title":"2. \nThe FontFace Interface"},{"refs":[{"id":"ref-for-dom-fontface-style\u2461"}],"title":"2.3. \nInteraction with CSS\u2019s @font-face Rule"}],"url":"#dom-fontface-style"},
+"dom-fontface-unicoderange": {"dfnID":"dom-fontface-unicoderange","dfnText":"unicodeRange","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontface-unicoderange"}],"title":"2. \nThe FontFace Interface"},{"refs":[{"id":"ref-for-dom-fontface-unicoderange\u2460"}],"title":"2.3. \nInteraction with CSS\u2019s @font-face Rule"},{"refs":[{"id":"ref-for-dom-fontface-unicoderange\u2461"}],"title":"3.1. \nEvents"}],"url":"#dom-fontface-unicoderange"},
+"dom-fontface-urls-slot": {"dfnID":"dom-fontface-urls-slot","dfnText":"[[Urls]]","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontface-urls-slot"}],"title":"2.1. \nThe Constructor"},{"refs":[{"id":"ref-for-dom-fontface-urls-slot\u2460"},{"id":"ref-for-dom-fontface-urls-slot\u2461"}],"title":"2.2. \nThe load() method"},{"refs":[{"id":"ref-for-dom-fontface-urls-slot\u2462"}],"title":"2.3. \nInteraction with CSS\u2019s @font-face Rule"}],"url":"#dom-fontface-urls-slot"},
+"dom-fontface-variant": {"dfnID":"dom-fontface-variant","dfnText":"variant","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontface-variant"}],"title":"2. \nThe FontFace Interface"},{"refs":[{"id":"ref-for-dom-fontface-variant\u2460"}],"title":"2.3. \nInteraction with CSS\u2019s @font-face Rule"}],"url":"#dom-fontface-variant"},
+"dom-fontface-variationsettings": {"dfnID":"dom-fontface-variationsettings","dfnText":"variationSettings","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontface-variationsettings"}],"title":"2. \nThe FontFace Interface"},{"refs":[{"id":"ref-for-dom-fontface-variationsettings\u2460"}],"title":"Changes"}],"url":"#dom-fontface-variationsettings"},
+"dom-fontface-weight": {"dfnID":"dom-fontface-weight","dfnText":"weight","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontface-weight"}],"title":"2. \nThe FontFace Interface"},{"refs":[{"id":"ref-for-dom-fontface-weight\u2460"}],"title":"2.3. \nInteraction with CSS\u2019s @font-face Rule"}],"url":"#dom-fontface-weight"},
+"dom-fontfaceset-add": {"dfnID":"dom-fontfaceset-add","dfnText":"add(font)","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontfaceset-add"},{"id":"ref-for-dom-fontfaceset-add\u2460"}],"title":"3. \nThe FontFaceSet Interface"},{"refs":[{"id":"ref-for-dom-fontfaceset-add\u2461"}],"title":"4.2. \nInteraction with CSS\u2019s @font-face Rule"}],"url":"#dom-fontfaceset-add"},
+"dom-fontfaceset-check": {"dfnID":"dom-fontfaceset-check","dfnText":"check","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontfaceset-check"}],"title":"3. \nThe FontFaceSet Interface"},{"refs":[{"id":"ref-for-dom-fontfaceset-check\u2460"}],"title":"3.3. \nThe check() method"}],"url":"#dom-fontfaceset-check"},
+"dom-fontfaceset-check-font-text-font": {"dfnID":"dom-fontfaceset-check-font-text-font","dfnText":"font","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontfaceset-check-font-text-font"}],"title":"3. \nThe FontFaceSet Interface"}],"url":"#dom-fontfaceset-check-font-text-font"},
+"dom-fontfaceset-check-font-text-text": {"dfnID":"dom-fontfaceset-check-font-text-text","dfnText":"text","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontfaceset-check-font-text-text"}],"title":"3. \nThe FontFaceSet Interface"}],"url":"#dom-fontfaceset-check-font-text-text"},
+"dom-fontfaceset-clear": {"dfnID":"dom-fontfaceset-clear","dfnText":"clear()","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontfaceset-clear"},{"id":"ref-for-dom-fontfaceset-clear\u2460"}],"title":"3. \nThe FontFaceSet Interface"}],"url":"#dom-fontfaceset-clear"},
+"dom-fontfaceset-delete": {"dfnID":"dom-fontfaceset-delete","dfnText":"delete(font)","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontfaceset-delete"},{"id":"ref-for-dom-fontfaceset-delete\u2460"}],"title":"3. \nThe FontFaceSet Interface"},{"refs":[{"id":"ref-for-dom-fontfaceset-delete\u2461"}],"title":"4.2. \nInteraction with CSS\u2019s @font-face Rule"}],"url":"#dom-fontfaceset-delete"},
+"dom-fontfaceset-failedfonts-slot": {"dfnID":"dom-fontfaceset-failedfonts-slot","dfnText":"[[FailedFonts]]","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontfaceset-failedfonts-slot"}],"title":"2.1. \nThe Constructor"},{"refs":[{"id":"ref-for-dom-fontfaceset-failedfonts-slot\u2460"}],"title":"2.2. \nThe load() method"},{"refs":[{"id":"ref-for-dom-fontfaceset-failedfonts-slot\u2461"},{"id":"ref-for-dom-fontfaceset-failedfonts-slot\u2462"}],"title":"3. \nThe FontFaceSet Interface"},{"refs":[{"id":"ref-for-dom-fontfaceset-failedfonts-slot\u2463"},{"id":"ref-for-dom-fontfaceset-failedfonts-slot\u2464"}],"title":"3.1. \nEvents"}],"url":"#dom-fontfaceset-failedfonts-slot"},
+"dom-fontfaceset-fontfaceset": {"dfnID":"dom-fontfaceset-fontfaceset","dfnText":"FontFaceSet(initialFaces)","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontfaceset-fontfaceset"}],"title":"3. \nThe FontFaceSet Interface"}],"url":"#dom-fontfaceset-fontfaceset"},
+"dom-fontfaceset-fontfaceset-initialfaces-initialfaces": {"dfnID":"dom-fontfaceset-fontfaceset-initialfaces-initialfaces","dfnText":"initialFaces","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontfaceset-fontfaceset-initialfaces-initialfaces"}],"title":"3. \nThe FontFaceSet Interface"}],"url":"#dom-fontfaceset-fontfaceset-initialfaces-initialfaces"},
+"dom-fontfaceset-load": {"dfnID":"dom-fontfaceset-load","dfnText":"load","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontfaceset-load"},{"id":"ref-for-dom-fontfaceset-load\u2460"}],"title":"3. \nThe FontFaceSet Interface"},{"refs":[{"id":"ref-for-dom-fontfaceset-load\u2461"}],"title":"3.2. \nThe load() method"}],"url":"#dom-fontfaceset-load"},
+"dom-fontfaceset-load-font-text-font": {"dfnID":"dom-fontfaceset-load-font-text-font","dfnText":"font","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontfaceset-load-font-text-font"}],"title":"3. \nThe FontFaceSet Interface"}],"url":"#dom-fontfaceset-load-font-text-font"},
+"dom-fontfaceset-load-font-text-text": {"dfnID":"dom-fontfaceset-load-font-text-text","dfnText":"text","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontfaceset-load-font-text-text"}],"title":"3. \nThe FontFaceSet Interface"}],"url":"#dom-fontfaceset-load-font-text-text"},
+"dom-fontfaceset-loadedfonts-slot": {"dfnID":"dom-fontfaceset-loadedfonts-slot","dfnText":"[[LoadedFonts]]","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontfaceset-loadedfonts-slot"}],"title":"2.1. \nThe Constructor"},{"refs":[{"id":"ref-for-dom-fontfaceset-loadedfonts-slot\u2460"}],"title":"2.2. \nThe load() method"},{"refs":[{"id":"ref-for-dom-fontfaceset-loadedfonts-slot\u2461"},{"id":"ref-for-dom-fontfaceset-loadedfonts-slot\u2462"}],"title":"3. \nThe FontFaceSet Interface"},{"refs":[{"id":"ref-for-dom-fontfaceset-loadedfonts-slot\u2463"},{"id":"ref-for-dom-fontfaceset-loadedfonts-slot\u2464"}],"title":"3.1. \nEvents"}],"url":"#dom-fontfaceset-loadedfonts-slot"},
+"dom-fontfaceset-loadingfonts-slot": {"dfnID":"dom-fontfaceset-loadingfonts-slot","dfnText":"[[LoadingFonts]]","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontfaceset-loadingfonts-slot"},{"id":"ref-for-dom-fontfaceset-loadingfonts-slot\u2460"},{"id":"ref-for-dom-fontfaceset-loadingfonts-slot\u2461"},{"id":"ref-for-dom-fontfaceset-loadingfonts-slot\u2462"}],"title":"2.1. \nThe Constructor"},{"refs":[{"id":"ref-for-dom-fontfaceset-loadingfonts-slot\u2463"},{"id":"ref-for-dom-fontfaceset-loadingfonts-slot\u2464"}],"title":"2.2. \nThe load() method"},{"refs":[{"id":"ref-for-dom-fontfaceset-loadingfonts-slot\u2465"},{"id":"ref-for-dom-fontfaceset-loadingfonts-slot\u2466"},{"id":"ref-for-dom-fontfaceset-loadingfonts-slot\u2467"},{"id":"ref-for-dom-fontfaceset-loadingfonts-slot\u2468"}],"title":"3. \nThe FontFaceSet Interface"},{"refs":[{"id":"ref-for-dom-fontfaceset-loadingfonts-slot\u2460\u24ea"}],"title":"3.1. \nEvents"}],"url":"#dom-fontfaceset-loadingfonts-slot"},
+"dom-fontfaceset-onloading": {"dfnID":"dom-fontfaceset-onloading","dfnText":"onloading","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontfaceset-onloading"}],"title":"3.1. \nEvents"}],"url":"#dom-fontfaceset-onloading"},
+"dom-fontfaceset-onloadingdone": {"dfnID":"dom-fontfaceset-onloadingdone","dfnText":"onloadingdone","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontfaceset-onloadingdone"}],"title":"3.1. \nEvents"}],"url":"#dom-fontfaceset-onloadingdone"},
+"dom-fontfaceset-onloadingerror": {"dfnID":"dom-fontfaceset-onloadingerror","dfnText":"onloadingerror","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontfaceset-onloadingerror"}],"title":"3.1. \nEvents"}],"url":"#dom-fontfaceset-onloadingerror"},
+"dom-fontfaceset-ready": {"dfnID":"dom-fontfaceset-ready","dfnText":"ready","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontfaceset-ready"}],"title":"3. \nThe FontFaceSet Interface"},{"refs":[{"id":"ref-for-dom-fontfaceset-ready\u2460"},{"id":"ref-for-dom-fontfaceset-ready\u2461"},{"id":"ref-for-dom-fontfaceset-ready\u2462"}],"title":"3.4. \nThe ready attribute"}],"url":"#dom-fontfaceset-ready"},
+"dom-fontfaceset-readypromise-slot": {"dfnID":"dom-fontfaceset-readypromise-slot","dfnText":"[[ReadyPromise]]","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontfaceset-readypromise-slot"}],"title":"3. \nThe FontFaceSet Interface"},{"refs":[{"id":"ref-for-dom-fontfaceset-readypromise-slot\u2460"},{"id":"ref-for-dom-fontfaceset-readypromise-slot\u2461"}],"title":"3.1. \nEvents"}],"url":"#dom-fontfaceset-readypromise-slot"},
+"dom-fontfaceset-status": {"dfnID":"dom-fontfaceset-status","dfnText":"status","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontfaceset-status"},{"id":"ref-for-dom-fontfaceset-status\u2460"}],"title":"3.1. \nEvents"}],"url":"#dom-fontfaceset-status"},
+"dom-fontfacesetloadevent-fontfaces": {"dfnID":"dom-fontfacesetloadevent-fontfaces","dfnText":"fontfaces","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontfacesetloadevent-fontfaces"}],"title":"3.1. \nEvents"},{"refs":[{"id":"ref-for-dom-fontfacesetloadevent-fontfaces\u2460"}],"title":"Changes"}],"url":"#dom-fontfacesetloadevent-fontfaces"},
+"dom-fontfacesource-fonts": {"dfnID":"dom-fontfacesource-fonts","dfnText":"fonts","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-fontfacesource-fonts"}],"title":"4. \nThe FontFaceSource Mixin"}],"url":"#dom-fontfacesource-fonts"},
+"enumdef-fontfaceloadstatus": {"dfnID":"enumdef-fontfaceloadstatus","dfnText":"FontFaceLoadStatus","external":false,"refSections":[{"refs":[{"id":"ref-for-enumdef-fontfaceloadstatus"},{"id":"ref-for-enumdef-fontfaceloadstatus\u2460"}],"title":"2. \nThe FontFace Interface"}],"url":"#enumdef-fontfaceloadstatus"},
+"enumdef-fontfacesetloadstatus": {"dfnID":"enumdef-fontfacesetloadstatus","dfnText":"FontFaceSetLoadStatus","external":false,"refSections":[{"refs":[{"id":"ref-for-enumdef-fontfacesetloadstatus"}],"title":"3. \nThe FontFaceSet Interface"}],"url":"#enumdef-fontfacesetloadstatus"},
+"eventdef-fontfaceset-loading": {"dfnID":"eventdef-fontfaceset-loading","dfnText":"loading","external":false,"refSections":[{"refs":[{"id":"ref-for-eventdef-fontfaceset-loading"},{"id":"ref-for-eventdef-fontfaceset-loading\u2460"}],"title":"3.1. \nEvents"}],"url":"#eventdef-fontfaceset-loading"},
+"eventdef-fontfaceset-loadingdone": {"dfnID":"eventdef-fontfaceset-loadingdone","dfnText":"loadingdone","external":false,"refSections":[{"refs":[{"id":"ref-for-eventdef-fontfaceset-loadingdone"},{"id":"ref-for-eventdef-fontfaceset-loadingdone\u2460"}],"title":"3.1. \nEvents"},{"refs":[{"id":"ref-for-eventdef-fontfaceset-loadingdone\u2461"}],"title":"3.4. \nThe ready attribute"},{"refs":[{"id":"ref-for-eventdef-fontfaceset-loadingdone\u2462"},{"id":"ref-for-eventdef-fontfaceset-loadingdone\u2463"},{"id":"ref-for-eventdef-fontfaceset-loadingdone\u2464"}],"title":"5. \nAPI Examples"}],"url":"#eventdef-fontfaceset-loadingdone"},
+"eventdef-fontfaceset-loadingerror": {"dfnID":"eventdef-fontfaceset-loadingerror","dfnText":"loadingerror","external":false,"refSections":[{"refs":[{"id":"ref-for-eventdef-fontfaceset-loadingerror"},{"id":"ref-for-eventdef-fontfaceset-loadingerror\u2460"}],"title":"3.1. \nEvents"}],"url":"#eventdef-fontfaceset-loadingerror"},
+"f0951476": {"dfnID":"f0951476","dfnText":"EventHandler","external":true,"refSections":[{"refs":[{"id":"ref-for-eventhandler"},{"id":"ref-for-eventhandler\u2460"},{"id":"ref-for-eventhandler\u2461"}],"title":"3. \nThe FontFaceSet Interface"}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler"},
+"f1195e5b": {"dfnID":"f1195e5b","dfnText":"set entries","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-set-entries"},{"id":"ref-for-dfn-set-entries\u2460"}],"title":"3. \nThe FontFaceSet Interface"}],"url":"https://webidl.spec.whatwg.org/#dfn-set-entries"},
+"find-the-matching-font-faces": {"dfnID":"find-the-matching-font-faces","dfnText":"find the matching font faces","external":false,"refSections":[{"refs":[{"id":"ref-for-find-the-matching-font-faces"}],"title":"3.2. \nThe load() method"},{"refs":[{"id":"ref-for-find-the-matching-font-faces\u2460"}],"title":"3.3. \nThe check() method"}],"url":"#find-the-matching-font-faces"},
+"fire-a-font-load-event": {"dfnID":"fire-a-font-load-event","dfnText":"fire a font load event","external":false,"refSections":[{"refs":[{"id":"ref-for-fire-a-font-load-event"},{"id":"ref-for-fire-a-font-load-event\u2460"},{"id":"ref-for-fire-a-font-load-event\u2461"}],"title":"3.1. \nEvents"}],"url":"#fire-a-font-load-event"},
+"font-source": {"dfnID":"font-source","dfnText":"font source","external":false,"refSections":[{"refs":[{"id":"ref-for-font-source"},{"id":"ref-for-font-source\u2460"}],"title":"2.3. \nInteraction with CSS\u2019s @font-face Rule"},{"refs":[{"id":"ref-for-font-source\u2461"}],"title":"3. \nThe FontFaceSet Interface"},{"refs":[{"id":"ref-for-font-source\u2462"}],"title":"3.5. \nInteraction with CSS Font Loading and Matching"},{"refs":[{"id":"ref-for-font-source\u2463"},{"id":"ref-for-font-source\u2464"}],"title":"4. \nThe FontFaceSource Mixin"},{"refs":[{"id":"ref-for-font-source\u2465"}],"title":"4.1. \nWorker FontFaceSources"},{"refs":[{"id":"ref-for-font-source\u2466"},{"id":"ref-for-font-source\u2467"},{"id":"ref-for-font-source\u2468"}],"title":"4.2. \nInteraction with CSS\u2019s @font-face Rule"}],"url":"#font-source"},
+"fontface": {"dfnID":"fontface","dfnText":"FontFace","external":false,"refSections":[{"refs":[{"id":"ref-for-fontface"}],"title":"1. \nIntroduction"},{"refs":[{"id":"ref-for-fontface\u2460"},{"id":"ref-for-fontface\u2461"},{"id":"ref-for-fontface\u2462"},{"id":"ref-for-fontface\u2463"},{"id":"ref-for-fontface\u2464"},{"id":"ref-for-fontface\u2465"},{"id":"ref-for-fontface\u2466"},{"id":"ref-for-fontface\u2467"},{"id":"ref-for-fontface\u2468"}],"title":"2. \nThe FontFace Interface"},{"refs":[{"id":"ref-for-fontface\u2460\u24ea"},{"id":"ref-for-fontface\u2460\u2460"}],"title":"2.1. \nThe Constructor"},{"refs":[{"id":"ref-for-fontface\u2460\u2461"},{"id":"ref-for-fontface\u2460\u2462"},{"id":"ref-for-fontface\u2460\u2463"},{"id":"ref-for-fontface\u2460\u2464"},{"id":"ref-for-fontface\u2460\u2465"},{"id":"ref-for-fontface\u2460\u2466"}],"title":"2.2. \nThe load() method"},{"refs":[{"id":"ref-for-fontface\u2460\u2467"},{"id":"ref-for-fontface\u2460\u2468"},{"id":"ref-for-fontface\u2461\u24ea"},{"id":"ref-for-fontface\u2461\u2460"},{"id":"ref-for-fontface\u2461\u2461"},{"id":"ref-for-fontface\u2461\u2462"},{"id":"ref-for-fontface\u2461\u2463"},{"id":"ref-for-fontface\u2461\u2464"},{"id":"ref-for-fontface\u2461\u2465"},{"id":"ref-for-fontface\u2461\u2466"},{"id":"ref-for-fontface\u2461\u2467"}],"title":"2.3. \nInteraction with CSS\u2019s @font-face Rule"},{"refs":[{"id":"ref-for-fontface\u2461\u2468"},{"id":"ref-for-fontface\u2462\u24ea"},{"id":"ref-for-fontface\u2462\u2460"},{"id":"ref-for-fontface\u2462\u2461"},{"id":"ref-for-fontface\u2462\u2462"},{"id":"ref-for-fontface\u2462\u2463"},{"id":"ref-for-fontface\u2462\u2464"},{"id":"ref-for-fontface\u2462\u2465"},{"id":"ref-for-fontface\u2462\u2466"}],"title":"3. \nThe FontFaceSet Interface"},{"refs":[{"id":"ref-for-fontface\u2462\u2467"}],"title":"3.1. \nEvents"},{"refs":[{"id":"ref-for-fontface\u2462\u2468"}],"title":"3.4. \nThe ready attribute"},{"refs":[{"id":"ref-for-fontface\u2463\u24ea"},{"id":"ref-for-fontface\u2463\u2460"},{"id":"ref-for-fontface\u2463\u2461"},{"id":"ref-for-fontface\u2463\u2462"}],"title":"3.5. \nInteraction with CSS Font Loading and Matching"},{"refs":[{"id":"ref-for-fontface\u2463\u2463"}],"title":"4. \nThe FontFaceSource Mixin"},{"refs":[{"id":"ref-for-fontface\u2463\u2464"}],"title":"4.1. \nWorker FontFaceSources"},{"refs":[{"id":"ref-for-fontface\u2463\u2465"},{"id":"ref-for-fontface\u2463\u2466"},{"id":"ref-for-fontface\u2463\u2467"},{"id":"ref-for-fontface\u2463\u2468"},{"id":"ref-for-fontface\u2464\u24ea"},{"id":"ref-for-fontface\u2464\u2460"},{"id":"ref-for-fontface\u2464\u2461"}],"title":"4.2. \nInteraction with CSS\u2019s @font-face Rule"}],"url":"#fontface"},
+"fontfaceset": {"dfnID":"fontfaceset","dfnText":"FontFaceSet","external":false,"refSections":[{"refs":[{"id":"ref-for-fontfaceset"},{"id":"ref-for-fontfaceset\u2460"},{"id":"ref-for-fontfaceset\u2461"},{"id":"ref-for-fontfaceset\u2462"},{"id":"ref-for-fontfaceset\u2463"},{"id":"ref-for-fontfaceset\u2464"},{"id":"ref-for-fontfaceset\u2465"},{"id":"ref-for-fontfaceset\u2466"},{"id":"ref-for-fontfaceset\u2467"}],"title":"2.1. \nThe Constructor"},{"refs":[{"id":"ref-for-fontfaceset\u2468"},{"id":"ref-for-fontfaceset\u2460\u24ea"},{"id":"ref-for-fontfaceset\u2460\u2460"},{"id":"ref-for-fontfaceset\u2460\u2461"},{"id":"ref-for-fontfaceset\u2460\u2462"},{"id":"ref-for-fontfaceset\u2460\u2463"},{"id":"ref-for-fontfaceset\u2460\u2464"}],"title":"2.2. \nThe load() method"},{"refs":[{"id":"ref-for-fontfaceset\u2460\u2465"},{"id":"ref-for-fontfaceset\u2460\u2466"},{"id":"ref-for-fontfaceset\u2460\u2467"},{"id":"ref-for-fontfaceset\u2460\u2468"},{"id":"ref-for-fontfaceset\u2461\u24ea"},{"id":"ref-for-fontfaceset\u2461\u2460"},{"id":"ref-for-fontfaceset\u2461\u2461"},{"id":"ref-for-fontfaceset\u2461\u2462"},{"id":"ref-for-fontfaceset\u2461\u2463"},{"id":"ref-for-fontfaceset\u2461\u2464"},{"id":"ref-for-fontfaceset\u2461\u2465"},{"id":"ref-for-fontfaceset\u2461\u2466"},{"id":"ref-for-fontfaceset\u2461\u2467"},{"id":"ref-for-fontfaceset\u2461\u2468"},{"id":"ref-for-fontfaceset\u2462\u24ea"},{"id":"ref-for-fontfaceset\u2462\u2460"},{"id":"ref-for-fontfaceset\u2462\u2461"},{"id":"ref-for-fontfaceset\u2462\u2462"},{"id":"ref-for-fontfaceset\u2462\u2463"}],"title":"3. \nThe FontFaceSet Interface"},{"refs":[{"id":"ref-for-fontfaceset\u2462\u2464"},{"id":"ref-for-fontfaceset\u2462\u2465"},{"id":"ref-for-fontfaceset\u2462\u2466"},{"id":"ref-for-fontfaceset\u2462\u2467"},{"id":"ref-for-fontfaceset\u2462\u2468"},{"id":"ref-for-fontfaceset\u2463\u24ea"},{"id":"ref-for-fontfaceset\u2463\u2460"},{"id":"ref-for-fontfaceset\u2463\u2461"}],"title":"3.1. \nEvents"},{"refs":[{"id":"ref-for-fontfaceset\u2463\u2462"},{"id":"ref-for-fontfaceset\u2463\u2463"}],"title":"3.2. \nThe load() method"},{"refs":[{"id":"ref-for-fontfaceset\u2463\u2464"},{"id":"ref-for-fontfaceset\u2463\u2465"}],"title":"3.3. \nThe check() method"},{"refs":[{"id":"ref-for-fontfaceset\u2463\u2466"},{"id":"ref-for-fontfaceset\u2463\u2467"},{"id":"ref-for-fontfaceset\u2463\u2468"},{"id":"ref-for-fontfaceset\u2464\u24ea"}],"title":"3.5. \nInteraction with CSS Font Loading and Matching"},{"refs":[{"id":"ref-for-fontfaceset\u2464\u2460"}],"title":"4. \nThe FontFaceSource Mixin"},{"refs":[{"id":"ref-for-fontfaceset\u2464\u2461"},{"id":"ref-for-fontfaceset\u2464\u2462"}],"title":"4.2. \nInteraction with CSS\u2019s @font-face Rule"},{"refs":[{"id":"ref-for-fontfaceset\u2464\u2463"}],"title":"\nPrivacy & Security Considerations"}],"url":"#fontfaceset"},
+"fontfaceset-pending-on-the-environment": {"dfnID":"fontfaceset-pending-on-the-environment","dfnText":"pending on the environment","external":false,"refSections":[{"refs":[{"id":"ref-for-fontfaceset-pending-on-the-environment"}],"title":"3. \nThe FontFaceSet Interface"},{"refs":[{"id":"ref-for-fontfaceset-pending-on-the-environment\u2460"},{"id":"ref-for-fontfaceset-pending-on-the-environment\u2461"},{"id":"ref-for-fontfaceset-pending-on-the-environment\u2462"}],"title":"3.1. \nEvents"}],"url":"#fontfaceset-pending-on-the-environment"},
+"fontfaceset-set-entries": {"dfnID":"fontfaceset-set-entries","dfnText":"set entries","external":false,"refSections":[{"refs":[{"id":"ref-for-fontfaceset-set-entries"},{"id":"ref-for-fontfaceset-set-entries\u2460"},{"id":"ref-for-fontfaceset-set-entries\u2461"},{"id":"ref-for-fontfaceset-set-entries\u2462"},{"id":"ref-for-fontfaceset-set-entries\u2463"}],"title":"3. \nThe FontFaceSet Interface"},{"refs":[{"id":"ref-for-fontfaceset-set-entries\u2464"}],"title":"4.2. \nInteraction with CSS\u2019s @font-face Rule"}],"url":"#fontfaceset-set-entries"},
+"fontfaceset-stuck-on-the-environment": {"dfnID":"fontfaceset-stuck-on-the-environment","dfnText":"stuck on the environment","external":false,"refSections":[{"refs":[{"id":"ref-for-fontfaceset-stuck-on-the-environment"},{"id":"ref-for-fontfaceset-stuck-on-the-environment\u2460"}],"title":"3.1. \nEvents"}],"url":"#fontfaceset-stuck-on-the-environment"},
+"fontfacesetloadevent": {"dfnID":"fontfacesetloadevent","dfnText":"FontFaceSetLoadEvent","external":false,"refSections":[{"refs":[{"id":"ref-for-fontfacesetloadevent"}],"title":"3.1. \nEvents"}],"url":"#fontfacesetloadevent"},
+"fontfacesource": {"dfnID":"fontfacesource","dfnText":"FontFaceSource","external":false,"refSections":[{"refs":[{"id":"ref-for-fontfacesource"},{"id":"ref-for-fontfacesource\u2460"},{"id":"ref-for-fontfacesource\u2461"}],"title":"4. \nThe FontFaceSource Mixin"}],"url":"#fontfacesource"},
+"switch-the-fontfaceset-to-loaded": {"dfnID":"switch-the-fontfaceset-to-loaded","dfnText":"switch the FontFaceSet to loaded","external":false,"refSections":[{"refs":[{"id":"ref-for-switch-the-fontfaceset-to-loaded"},{"id":"ref-for-switch-the-fontfaceset-to-loaded\u2460"}],"title":"2.1. \nThe Constructor"},{"refs":[{"id":"ref-for-switch-the-fontfaceset-to-loaded\u2461"},{"id":"ref-for-switch-the-fontfaceset-to-loaded\u2462"}],"title":"2.2. \nThe load() method"},{"refs":[{"id":"ref-for-switch-the-fontfaceset-to-loaded\u2463"},{"id":"ref-for-switch-the-fontfaceset-to-loaded\u2464"}],"title":"3. \nThe FontFaceSet Interface"},{"refs":[{"id":"ref-for-switch-the-fontfaceset-to-loaded\u2465"}],"title":"3.1. \nEvents"}],"url":"#switch-the-fontfaceset-to-loaded"},
+"switch-the-fontfaceset-to-loading": {"dfnID":"switch-the-fontfaceset-to-loading","dfnText":"switch the FontFaceSet to loading","external":false,"refSections":[{"refs":[{"id":"ref-for-switch-the-fontfaceset-to-loading"}],"title":"2.1. \nThe Constructor"},{"refs":[{"id":"ref-for-switch-the-fontfaceset-to-loading\u2460"}],"title":"3. \nThe FontFaceSet Interface"}],"url":"#switch-the-fontfaceset-to-loading"},
+"typedefdef-binarydata": {"dfnID":"typedefdef-binarydata","dfnText":"BinaryData","external":false,"refSections":[{"refs":[{"id":"ref-for-typedefdef-binarydata"}],"title":"2. \nThe FontFace Interface"},{"refs":[{"id":"ref-for-typedefdef-binarydata\u2460"}],"title":"2.1. \nThe Constructor"}],"url":"#typedefdef-binarydata"},
+};
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+});
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        dfn.panelData = panelData;
+        insertDfnPopupAction(dfn);
+    }
+}
+
+function genDfnPanel(dfn, { dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel on",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel({dfnPanel});
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.dfn = dfn;
+    dfn.dfnPanel = dfnPanel;
+    return dfnPanel;
+}
+
+
+
+function hideAllDfnPanels() {
+    // Delete the currently-active dfn panel.
+    queryAll(".dfn-panel").forEach(dfnPanel=>hideDfnPanel({dfnPanel}));
+}
+
+function showDfnPanel(dfn) {
+    hideAllDfnPanels(); // Only display one at a time.
+
+    dfn.setAttribute("aria-expanded", "true");
+
+    const dfnPanel = genDfnPanel(dfn, dfn.panelData);
+
+    // Give the dfn a unique tabindex, and then
+    // give all the tabbable panel bits successive indexes.
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+
+    append(document.body, dfnPanel);
+    positionDfnPanel(dfnPanel);
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.dfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }
+}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel({dfn, dfnPanel}) {
+    if(!dfnPanel) dfnPanel = dfn.dfnPanel;
+    if(!dfn) dfn = dfnPanel.dfn;
+    dfn.dfnPanel = undefined;
+    dfnPanel.dfn = undefined;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.remove()
+}
+
+function toggleDfnPanel(dfn) {
+    if(dfn.dfnPanel) {
+        hideDfnPanel(dfn);
+    } else {
+        showDfnPanel(dfn);
+    }
+}
+
+function insertDfnPopupAction(dfn) {
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        toggleDfnPanel(dfn);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+function needsFor(type) {
+    switch(type) {
+        case "descriptor":
+        case "value":
+        case "element-attr":
+        case "attr-value":
+        case "element-state":
+        case "method":
+        case "constructor":
+        case "argument":
+        case "attribute":
+        case "const":
+        case "dict-member":
+        case "event":
+        case "enum-value":
+        case "stringifier":
+        case "serializer":
+        case "iterator":
+        case "maplike":
+        case "setlike":
+        case "state":
+        case "mode":
+        case "context":
+        case "facet": return true;
+
+        default: return false;
+    }
+}
+function refusesFor(type) {
+    switch(type) {
+        case "property":
+        case "element":
+        case "interface":
+        case "namespace":
+        case "callback":
+        case "dictionary":
+        case "enum":
+        case "exception":
+        case "typedef":
+        case "http-header":
+        case "permission": return true;
+
+        default: return false;
+    }
+}
+function linkFormatterFromType(type) {
+    switch(type) {
+        case 'scheme':
+        case 'permission':
+        case 'dfn': return (text) => `[=${text}=]`;
+
+        case 'abstract-op': return (text) => `[\$${text}\$]`;
+
+        case 'function':
+        case 'at-rule':
+        case 'selector':
+        case 'value': return (text) => `''${text}''`;
+
+        case 'http-header': return (text) => `[:${text}:]`;
+
+        case 'interface':
+        case 'constructor':
+        case 'method':
+        case 'argument':
+        case 'attribute':
+        case 'callback':
+        case 'dictionary':
+        case 'dict-member':
+        case 'enum':
+        case 'enum-value':
+        case 'exception':
+        case 'const':
+        case 'typedef':
+        case 'stringifier':
+        case 'serializer':
+        case 'iterator':
+        case 'maplike':
+        case 'setlike':
+        case 'extended-attribute':
+        case 'event':
+        case 'idl': return (text) => `{{${text}}}`;
+
+        case 'element-state':
+        case 'element-attr':
+        case 'attr-value':
+        case 'element': return (element) => `<{${element}}>`;
+
+        case 'grammar': return (text) => `${text} (within a <pre class=prod>)`;
+
+        case 'type': return (text)=> `<<${text}>>`;
+
+        case 'descriptor':
+        case 'property': return (text) => `'${text}'`;
+
+        default: return;
+    };
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!needsFor(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!refusesFor(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
 }
 </script>
 <script>/* Boilerplate: script-position-annos */
 "use strict";
 {
-
 function repositionAnnoPanels(){
     const panels = [...document.querySelectorAll("[data-anno-for]")];
-    const main = document.querySelector("main");
-    let mainRect;
-    if(main) mainRect = main.getBoundingClientRect();
-    for(const panel of panels) {
-        const dfn = document.getElementById(panel.getAttribute("data-anno-for"));
-        if(!dfn) {
-            console.log("Can't find the annotation panel target:", panel);
-            continue;
-        }
-        const rect = dfn.getBoundingClientRect();
-        const top = window.scrollY + rect.top
-        panel.style.top = top + "px";
-        panel.top = top;
-        panel.height = rect.height;
-        panel.classList.remove("unpositioned");
-        const panelRect = panel.getBoundingClientRect()
-        if(main) {
-            panel.classList.toggle("overlapping-main", panelRect.left < mainRect.right)
-        }
-    }
+    hydratePanels(panels);
     let vSoFar = 0;
     for(const panel of panels.sort(cmpTops)) {
         if(panel.top < vSoFar) {
@@ -3723,6 +3712,39 @@ function repositionAnnoPanels(){
             panel.style.top = vSoFar + "px";
         }
         vSoFar = panel.top + panel.height + 15;
+    }
+}
+function hydratePanels(panels) {
+    const main = document.querySelector("main");
+    let mainRect;
+    if(main) mainRect = main.getBoundingClientRect();
+    // First display them all, if they're not already visible.
+    for(const panel of panels) {
+        panel.classList.remove("unpositioned");
+    }
+    // Measure them all
+    for(const panel of panels) {
+        const dfn = document.getElementById(panel.getAttribute("data-anno-for"));
+        if(!dfn) {
+            console.log("Can't find the annotation panel target:", panel);
+            continue;
+        }
+        panel.dfn = dfn;
+        panel.top = window.scrollY + dfn.getBoundingClientRect().top;
+        let panelRect = panel.getBoundingClientRect();
+        panel.height = panelRect.height;
+        if(main) {
+            panel.overlappingMain = panelRect.left < mainRect.right;
+        } else {
+            panel.overlappingMain = false;
+        }
+    }
+    // And finally position them
+    for(const panel of panels) {
+        const dfn = panel.dfn;
+        if(!dfn) continue;
+        panel.style.top = panel.top + "px";
+        panel.classList.toggle("overlapping-main", panel.overlappingMain);
     }
 }
 
@@ -3737,310 +3759,299 @@ window.addEventListener("resize", repositionAnnoPanels);
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
-                mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
+let refsData = {
+"#available-font-faces": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"available font faces","type":"dfn","url":"#available-font-faces"},
+"#css-connected": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"css-connected","type":"dfn","url":"#css-connected"},
+"#dictdef-fontfacedescriptors": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"FontFaceDescriptors","type":"dictionary","url":"#dictdef-fontfacedescriptors"},
+"#dictdef-fontfacesetloadeventinit": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"FontFaceSetLoadEventInit","type":"dictionary","url":"#dictdef-fontfacesetloadeventinit"},
+"#dom-fontface-ascentoverride": {"export":true,"for_":["FontFace"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"ascentOverride","type":"attribute","url":"#dom-fontface-ascentoverride"},
+"#dom-fontface-data-slot": {"export":true,"for_":["FontFace"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"[[Data]]","type":"attribute","url":"#dom-fontface-data-slot"},
+"#dom-fontface-descentoverride": {"export":true,"for_":["FontFace"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"descentOverride","type":"attribute","url":"#dom-fontface-descentoverride"},
+"#dom-fontface-display": {"export":true,"for_":["FontFace"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"display","type":"attribute","url":"#dom-fontface-display"},
+"#dom-fontface-family": {"export":true,"for_":["FontFace"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"family","type":"attribute","url":"#dom-fontface-family"},
+"#dom-fontface-featuresettings": {"export":true,"for_":["FontFace"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"featureSettings","type":"attribute","url":"#dom-fontface-featuresettings"},
+"#dom-fontface-fontface": {"export":true,"for_":["FontFace"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"FontFace(family, source, descriptors)","type":"constructor","url":"#dom-fontface-fontface"},
+"#dom-fontface-fontface-family-source-descriptors-descriptors": {"export":true,"for_":["FontFace/FontFace(family, source)","FontFace/FontFace(family, source, descriptors)","FontFace/constructor(family, source)","FontFace/constructor(family, source, descriptors)"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"descriptors","type":"argument","url":"#dom-fontface-fontface-family-source-descriptors-descriptors"},
+"#dom-fontface-fontface-family-source-descriptors-family": {"export":true,"for_":["FontFace/FontFace(family, source)","FontFace/FontFace(family, source, descriptors)","FontFace/constructor(family, source)","FontFace/constructor(family, source, descriptors)"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"family","type":"argument","url":"#dom-fontface-fontface-family-source-descriptors-family"},
+"#dom-fontface-fontface-family-source-descriptors-source": {"export":true,"for_":["FontFace/FontFace(family, source)","FontFace/FontFace(family, source, descriptors)","FontFace/constructor(family, source)","FontFace/constructor(family, source, descriptors)"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"source","type":"argument","url":"#dom-fontface-fontface-family-source-descriptors-source"},
+"#dom-fontface-fontstatuspromise-slot": {"export":true,"for_":["FontFace"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"[[FontStatusPromise]]","type":"attribute","url":"#dom-fontface-fontstatuspromise-slot"},
+"#dom-fontface-linegapoverride": {"export":true,"for_":["FontFace"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"lineGapOverride","type":"attribute","url":"#dom-fontface-linegapoverride"},
+"#dom-fontface-load": {"export":true,"for_":["FontFace"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"load()","type":"method","url":"#dom-fontface-load"},
+"#dom-fontface-loaded": {"export":true,"for_":["FontFace"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"loaded","type":"attribute","url":"#dom-fontface-loaded"},
+"#dom-fontface-status": {"export":true,"for_":["FontFace"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"status","type":"attribute","url":"#dom-fontface-status"},
+"#dom-fontface-stretch": {"export":true,"for_":["FontFace"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"stretch","type":"attribute","url":"#dom-fontface-stretch"},
+"#dom-fontface-style": {"export":true,"for_":["FontFace"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"style","type":"attribute","url":"#dom-fontface-style"},
+"#dom-fontface-unicoderange": {"export":true,"for_":["FontFace"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"unicodeRange","type":"attribute","url":"#dom-fontface-unicoderange"},
+"#dom-fontface-urls-slot": {"export":true,"for_":["FontFace"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"[[Urls]]","type":"attribute","url":"#dom-fontface-urls-slot"},
+"#dom-fontface-variant": {"export":true,"for_":["FontFace"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"variant","type":"attribute","url":"#dom-fontface-variant"},
+"#dom-fontface-variationsettings": {"export":true,"for_":["FontFace"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"variationSettings","type":"attribute","url":"#dom-fontface-variationsettings"},
+"#dom-fontface-weight": {"export":true,"for_":["FontFace"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"weight","type":"attribute","url":"#dom-fontface-weight"},
+"#dom-fontfaceset-add": {"export":true,"for_":["FontFaceSet"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"add(font)","type":"method","url":"#dom-fontfaceset-add"},
+"#dom-fontfaceset-check": {"export":true,"for_":["FontFaceSet"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"check(font, text)","type":"method","url":"#dom-fontfaceset-check"},
+"#dom-fontfaceset-check-font-text-font": {"export":true,"for_":["FontFaceSet/check(font, text)"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"font","type":"argument","url":"#dom-fontfaceset-check-font-text-font"},
+"#dom-fontfaceset-check-font-text-text": {"export":true,"for_":["FontFaceSet/check(font, text)"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"text","type":"argument","url":"#dom-fontfaceset-check-font-text-text"},
+"#dom-fontfaceset-clear": {"export":true,"for_":["FontFaceSet"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"clear()","type":"method","url":"#dom-fontfaceset-clear"},
+"#dom-fontfaceset-delete": {"export":true,"for_":["FontFaceSet"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"delete(font)","type":"method","url":"#dom-fontfaceset-delete"},
+"#dom-fontfaceset-failedfonts-slot": {"export":true,"for_":["FontFaceSet"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"[[FailedFonts]]","type":"attribute","url":"#dom-fontfaceset-failedfonts-slot"},
+"#dom-fontfaceset-fontfaceset": {"export":true,"for_":["FontFaceSet"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"FontFaceSet(initialFaces)","type":"constructor","url":"#dom-fontfaceset-fontfaceset"},
+"#dom-fontfaceset-fontfaceset-initialfaces-initialfaces": {"export":true,"for_":["FontFaceSet/FontFaceSet(initialFaces)","FontFaceSet/constructor(initialFaces)"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"initialFaces","type":"argument","url":"#dom-fontfaceset-fontfaceset-initialfaces-initialfaces"},
+"#dom-fontfaceset-load": {"export":true,"for_":["FontFaceSet"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"load(font, text)","type":"method","url":"#dom-fontfaceset-load"},
+"#dom-fontfaceset-load-font-text-font": {"export":true,"for_":["FontFaceSet/load(font, text)"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"font","type":"argument","url":"#dom-fontfaceset-load-font-text-font"},
+"#dom-fontfaceset-load-font-text-text": {"export":true,"for_":["FontFaceSet/load(font, text)"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"text","type":"argument","url":"#dom-fontfaceset-load-font-text-text"},
+"#dom-fontfaceset-loadedfonts-slot": {"export":true,"for_":["FontFaceSet"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"[[LoadedFonts]]","type":"attribute","url":"#dom-fontfaceset-loadedfonts-slot"},
+"#dom-fontfaceset-loadingfonts-slot": {"export":true,"for_":["FontFaceSet"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"[[LoadingFonts]]","type":"attribute","url":"#dom-fontfaceset-loadingfonts-slot"},
+"#dom-fontfaceset-onloading": {"export":true,"for_":["FontFaceSet"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"onloading","type":"attribute","url":"#dom-fontfaceset-onloading"},
+"#dom-fontfaceset-onloadingdone": {"export":true,"for_":["FontFaceSet"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"onloadingdone","type":"attribute","url":"#dom-fontfaceset-onloadingdone"},
+"#dom-fontfaceset-onloadingerror": {"export":true,"for_":["FontFaceSet"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"onloadingerror","type":"attribute","url":"#dom-fontfaceset-onloadingerror"},
+"#dom-fontfaceset-ready": {"export":true,"for_":["FontFaceSet"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"ready","type":"attribute","url":"#dom-fontfaceset-ready"},
+"#dom-fontfaceset-readypromise-slot": {"export":true,"for_":["FontFaceSet"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"[[ReadyPromise]]","type":"attribute","url":"#dom-fontfaceset-readypromise-slot"},
+"#dom-fontfaceset-status": {"export":true,"for_":["FontFaceSet"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"status","type":"attribute","url":"#dom-fontfaceset-status"},
+"#dom-fontfacesetloadevent-fontfaces": {"export":true,"for_":["FontFaceSetLoadEvent"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"fontfaces","type":"attribute","url":"#dom-fontfacesetloadevent-fontfaces"},
+"#dom-fontfacesource-fonts": {"export":true,"for_":["FontFaceSource"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"fonts","type":"attribute","url":"#dom-fontfacesource-fonts"},
+"#enumdef-fontfaceloadstatus": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"FontFaceLoadStatus","type":"enum","url":"#enumdef-fontfaceloadstatus"},
+"#enumdef-fontfacesetloadstatus": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"FontFaceSetLoadStatus","type":"enum","url":"#enumdef-fontfacesetloadstatus"},
+"#eventdef-fontfaceset-loading": {"export":true,"for_":["FontFaceSet"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"loading","type":"event","url":"#eventdef-fontfaceset-loading"},
+"#eventdef-fontfaceset-loadingdone": {"export":true,"for_":["FontFaceSet"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"loadingdone","type":"event","url":"#eventdef-fontfaceset-loadingdone"},
+"#eventdef-fontfaceset-loadingerror": {"export":true,"for_":["FontFaceSet"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"loadingerror","type":"event","url":"#eventdef-fontfaceset-loadingerror"},
+"#find-the-matching-font-faces": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"find the matching font faces","type":"dfn","url":"#find-the-matching-font-faces"},
+"#fire-a-font-load-event": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"fire a font load event","type":"dfn","url":"#fire-a-font-load-event"},
+"#font-source": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"font source","type":"dfn","url":"#font-source"},
+"#fontface": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"FontFace","type":"interface","url":"#fontface"},
+"#fontfaceset": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"FontFaceSet","type":"interface","url":"#fontfaceset"},
+"#fontfaceset-pending-on-the-environment": {"export":true,"for_":["FontFaceSet"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"pending on the environment","type":"dfn","url":"#fontfaceset-pending-on-the-environment"},
+"#fontfaceset-set-entries": {"export":true,"for_":["FontFaceSet"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"set entries","type":"dfn","url":"#fontfaceset-set-entries"},
+"#fontfaceset-stuck-on-the-environment": {"export":true,"for_":["FontFaceSet"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"stuck on the environment","type":"dfn","url":"#fontfaceset-stuck-on-the-environment"},
+"#fontfacesetloadevent": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"FontFaceSetLoadEvent","type":"interface","url":"#fontfacesetloadevent"},
+"#fontfacesource": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"FontFaceSource","type":"interface","url":"#fontfacesource"},
+"#switch-the-fontfaceset-to-loaded": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"switch the fontfaceset to loaded","type":"dfn","url":"#switch-the-fontfaceset-to-loaded"},
+"#switch-the-fontfaceset-to-loading": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"switch the fontfaceset to loading","type":"dfn","url":"#switch-the-fontfaceset-to-loading"},
+"#typedefdef-binarydata": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"local","text":"BinaryData","type":"typedef","url":"#typedefdef-binarydata"},
+"https://dom.spec.whatwg.org/#dictdef-eventinit": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"EventInit","type":"dictionary","url":"https://dom.spec.whatwg.org/#dictdef-eventinit"},
+"https://dom.spec.whatwg.org/#document": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"Document","type":"interface","url":"https://dom.spec.whatwg.org/#document"},
+"https://dom.spec.whatwg.org/#event": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"Event","type":"interface","url":"https://dom.spec.whatwg.org/#event"},
+"https://dom.spec.whatwg.org/#eventtarget": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"EventTarget","type":"interface","url":"https://dom.spec.whatwg.org/#eventtarget"},
+"https://drafts.csswg.org/css-fonts-4/#propdef-font": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-fonts","spec":"css-fonts-4","status":"current","text":"font","type":"property","url":"https://drafts.csswg.org/css-fonts-4/#propdef-font"},
+"https://drafts.csswg.org/css-fonts-4/#valdef-font-weight-bolder": {"export":true,"for_":["font-weight"],"level":"4","normative":true,"shortname":"css-fonts","spec":"css-fonts-4","status":"current","text":"bolder","type":"value","url":"https://drafts.csswg.org/css-fonts-4/#valdef-font-weight-bolder"},
+"https://drafts.csswg.org/css-fonts-4/#valdef-font-weight-normal": {"export":true,"for_":["font-weight"],"level":"4","normative":true,"shortname":"css-fonts","spec":"css-fonts-4","status":"current","text":"normal","type":"value","url":"https://drafts.csswg.org/css-fonts-4/#valdef-font-weight-normal"},
+"https://drafts.csswg.org/css-fonts-5/#at-font-face-rule": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-fonts","spec":"css-fonts-5","status":"current","text":"@font-face","type":"at-rule","url":"https://drafts.csswg.org/css-fonts-5/#at-font-face-rule"},
+"https://drafts.csswg.org/css-syntax-3/#css-parse-something-according-to-a-css-grammar": {"export":true,"for_":["CSS"],"level":"3","normative":true,"shortname":"css-syntax","spec":"css-syntax-3","status":"current","text":"parse","type":"dfn","url":"https://drafts.csswg.org/css-syntax-3/#css-parse-something-according-to-a-css-grammar"},
+"https://drafts.csswg.org/css-values-4/#css-wide-keywords": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"css-wide keywords","type":"dfn","url":"https://drafts.csswg.org/css-values-4/#css-wide-keywords"},
+"https://drafts.csswg.org/css-values-4/#funcdef-url": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"url()","type":"function","url":"https://drafts.csswg.org/css-values-4/#funcdef-url"},
+"https://drafts.csswg.org/cssom-1/#cssomstring": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"CSSOMString","type":"interface","url":"https://drafts.csswg.org/cssom-1/#cssomstring"},
+"https://drafts.csswg.org/cssom-1/#documentorshadowroot-document-or-shadow-root-css-style-sheets": {"export":true,"for_":["DocumentOrShadowRoot"],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"document or shadow root css style sheets","type":"dfn","url":"https://drafts.csswg.org/cssom-1/#documentorshadowroot-document-or-shadow-root-css-style-sheets"},
+"https://html.spec.whatwg.org/multipage/canvas.html#offscreencanvas": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"OffscreenCanvas","type":"interface","url":"https://html.spec.whatwg.org/multipage/canvas.html#offscreencanvas"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"EventHandler","type":"typedef","url":"https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler"},
+"https://html.spec.whatwg.org/multipage/workers.html#workerglobalscope": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"WorkerGlobalScope","type":"interface","url":"https://html.spec.whatwg.org/multipage/workers.html#workerglobalscope"},
+"https://webidl.spec.whatwg.org/#ArrayBufferView": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"ArrayBufferView","type":"typedef","url":"https://webidl.spec.whatwg.org/#ArrayBufferView"},
+"https://webidl.spec.whatwg.org/#Exposed": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"Exposed","type":"extended-attribute","url":"https://webidl.spec.whatwg.org/#Exposed"},
+"https://webidl.spec.whatwg.org/#SameObject": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"SameObject","type":"extended-attribute","url":"https://webidl.spec.whatwg.org/#SameObject"},
+"https://webidl.spec.whatwg.org/#dfn-set-entries": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"set entries","type":"dfn","url":"https://webidl.spec.whatwg.org/#dfn-set-entries"},
+"https://webidl.spec.whatwg.org/#idl-ArrayBuffer": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"ArrayBuffer","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-ArrayBuffer"},
+"https://webidl.spec.whatwg.org/#idl-boolean": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"boolean","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-boolean"},
+"https://webidl.spec.whatwg.org/#idl-frozen-array": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"FrozenArray","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-frozen-array"},
+"https://webidl.spec.whatwg.org/#idl-promise": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"Promise","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-promise"},
+"https://webidl.spec.whatwg.org/#idl-sequence": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"sequence","type":"dfn","url":"https://webidl.spec.whatwg.org/#idl-sequence"},
+"https://webidl.spec.whatwg.org/#idl-undefined": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"undefined","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-undefined"},
+"https://webidl.spec.whatwg.org/#invalidmodificationerror": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"InvalidModificationError","type":"exception","url":"https://webidl.spec.whatwg.org/#invalidmodificationerror"},
+"https://webidl.spec.whatwg.org/#syntaxerror": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"SyntaxError","type":"exception","url":"https://webidl.spec.whatwg.org/#syntaxerror"},
+"https://www.w3.org/TR/css-font-loading-3/#dom-fontfacesetcheck-font": {"export":true,"for_":["FontFaceSet/check()"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"snapshot","text":"font","type":"argument","url":"https://www.w3.org/TR/css-font-loading-3/#dom-fontfacesetcheck-font"},
+"https://www.w3.org/TR/css-font-loading-3/#dom-fontfacesetcheck-text": {"export":true,"for_":["FontFaceSet/check()"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"snapshot","text":"text","type":"argument","url":"https://www.w3.org/TR/css-font-loading-3/#dom-fontfacesetcheck-text"},
+"https://www.w3.org/TR/css-font-loading-3/#dom-fontfacesetload-font": {"export":true,"for_":["FontFaceSet/load()"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"snapshot","text":"font","type":"argument","url":"https://www.w3.org/TR/css-font-loading-3/#dom-fontfacesetload-font"},
+"https://www.w3.org/TR/css-font-loading-3/#dom-fontfacesetload-text": {"export":true,"for_":["FontFaceSet/load()"],"level":"3","normative":true,"shortname":"css-font-loading","spec":"css-font-loading-3","status":"snapshot","text":"text","type":"argument","url":"https://www.w3.org/TR/css-font-loading-3/#dom-fontfacesetload-text"},
+};
+
+function mkRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "Term: "),
+                mk.span({}, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    let forListElements;
+    if(forList.length == 0) {
+        forListElements = [];
+    } else if(forList.length == 1) {
+        forListElements = mk.li({},
+            mk.b({}, "For: "),
+            mk.span({}, forList[0]),
+        );
+    } else {
+        forListElements = mk.li({},
             mk.b({}, "For: "),
             mk.ul({},
                 ...forList.map(forItem =>
                     mk.li({},
-                        mk.span({}, `${forItem}`)
+                        mk.span({}, forItem)
                     ),
                 ),
             ),
         );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+    }
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    setupRefHintEventListeners(link, hintPanel);
+    return hintPanel;
+}
+
+function hideAllRefHints() {
+    queryAll(".ref-hint").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    if(refHint.teardownEventListeners) {
+        refHint.teardownEventListeners();
     }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+    refHint.remove();
+}
+
+function showRefHint(link) {
+    if(link.classList.contains("dfn-link")) return;
+    const url = link.getAttribute("href");
+    const ref = refsData[url];
+    if(!ref) return;
+
+    hideAllRefHints(); // Only display one at this time.
+
+    const refHint = mkRefHint(link, ref);
+    append(document.body, refHint);
+    link.setAttribute("aria-expanded", "true");
+    positionRefHint(refHint);
+}
+
+function setupRefHintEventListeners(link, refHint) {
+    if (refHint.teardownEventListeners) return;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
+
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
-
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
-    }
-
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
-        }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
-
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
-    }
-
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+document.addEventListener("DOMContentLoaded", () => {
+    document.body.addEventListener("mouseover", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
+    });
+    document.body.addEventListener("focus", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
     });
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['https://drafts.csswg.org/css-fonts-5/#at-font-face-rule'] = {"text": "@font-face", "type": "at-rule", "spec": "css-fonts-5", "shortname": "css-fonts", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-fonts-5/#at-font-face-rule", "export": true, "normative": true, "for_": []};
-window.refsData['#fontface'] = {"text": "FontFace", "type": "interface", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#fontface", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-promise'] = {"text": "Promise", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-promise", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-ArrayBuffer'] = {"text": "ArrayBuffer", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-ArrayBuffer", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#ArrayBufferView'] = {"text": "ArrayBufferView", "type": "typedef", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#ArrayBufferView", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/cssom-1/#cssomstring'] = {"text": "CSSOMString", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#cssomstring", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-fontface-fontface'] = {"text": "FontFace(family, source, descriptors)", "type": "constructor", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-fontface", "export": true, "normative": true, "for_": ["FontFace"]};
-window.refsData['#typedefdef-binarydata'] = {"text": "BinaryData", "type": "typedef", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#typedefdef-binarydata", "export": true, "normative": true, "for_": []};
-window.refsData['#dictdef-fontfacedescriptors'] = {"text": "FontFaceDescriptors", "type": "dictionary", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dictdef-fontfacedescriptors", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-fontface-family'] = {"text": "family", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-family", "export": true, "normative": true, "for_": ["FontFace"]};
-window.refsData['#dom-fontface-style'] = {"text": "style", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-style", "export": true, "normative": true, "for_": ["FontFace"]};
-window.refsData['#dom-fontface-weight'] = {"text": "weight", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-weight", "export": true, "normative": true, "for_": ["FontFace"]};
-window.refsData['#dom-fontface-stretch'] = {"text": "stretch", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-stretch", "export": true, "normative": true, "for_": ["FontFace"]};
-window.refsData['#dom-fontface-unicoderange'] = {"text": "unicodeRange", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-unicoderange", "export": true, "normative": true, "for_": ["FontFace"]};
-window.refsData['#dom-fontface-variant'] = {"text": "variant", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-variant", "export": true, "normative": true, "for_": ["FontFace"]};
-window.refsData['#dom-fontface-featuresettings'] = {"text": "featureSettings", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-featuresettings", "export": true, "normative": true, "for_": ["FontFace"]};
-window.refsData['#dom-fontface-variationsettings'] = {"text": "variationSettings", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-variationsettings", "export": true, "normative": true, "for_": ["FontFace"]};
-window.refsData['#dom-fontface-display'] = {"text": "display", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-display", "export": true, "normative": true, "for_": ["FontFace"]};
-window.refsData['#dom-fontface-ascentoverride'] = {"text": "ascentOverride", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-ascentoverride", "export": true, "normative": true, "for_": ["FontFace"]};
-window.refsData['#dom-fontface-descentoverride'] = {"text": "descentOverride", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-descentoverride", "export": true, "normative": true, "for_": ["FontFace"]};
-window.refsData['#dom-fontface-linegapoverride'] = {"text": "lineGapOverride", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-linegapoverride", "export": true, "normative": true, "for_": ["FontFace"]};
-window.refsData['#enumdef-fontfaceloadstatus'] = {"text": "FontFaceLoadStatus", "type": "enum", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#enumdef-fontfaceloadstatus", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-fontface-status'] = {"text": "status", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-status", "export": true, "normative": true, "for_": ["FontFace"]};
-window.refsData['#dom-fontface-load'] = {"text": "load()", "type": "method", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-load", "export": true, "normative": true, "for_": ["FontFace"]};
-window.refsData['#dom-fontface-loaded'] = {"text": "loaded", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-loaded", "export": true, "normative": true, "for_": ["FontFace"]};
-window.refsData['https://drafts.csswg.org/css-syntax-3/#css-parse-something-according-to-a-css-grammar'] = {"text": "parse", "type": "dfn", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#css-parse-something-according-to-a-css-grammar", "export": true, "normative": true, "for_": ["CSS"]};
-window.refsData['https://webidl.spec.whatwg.org/#syntaxerror'] = {"text": "SyntaxError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#syntaxerror", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-fontface-fontstatuspromise-slot'] = {"text": "[[FontStatusPromise]]", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-fontstatuspromise-slot", "export": true, "normative": true, "for_": ["FontFace"]};
-window.refsData['#dom-fontface-fontface-family-source-descriptors-family'] = {"text": "family", "type": "argument", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-fontface-family-source-descriptors-family", "export": true, "normative": true, "for_": ["FontFace/FontFace(family, source)", "FontFace/FontFace(family, source, descriptors)", "FontFace/constructor(family, source)", "FontFace/constructor(family, source, descriptors)"]};
-window.refsData['#dom-fontface-fontface-family-source-descriptors-descriptors'] = {"text": "descriptors", "type": "argument", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-fontface-family-source-descriptors-descriptors", "export": true, "normative": true, "for_": ["FontFace/FontFace(family, source)", "FontFace/FontFace(family, source, descriptors)", "FontFace/constructor(family, source)", "FontFace/constructor(family, source, descriptors)"]};
-window.refsData['#dom-fontface-fontface-family-source-descriptors-source'] = {"text": "source", "type": "argument", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-fontface-family-source-descriptors-source", "export": true, "normative": true, "for_": ["FontFace/FontFace(family, source)", "FontFace/FontFace(family, source, descriptors)", "FontFace/constructor(family, source)", "FontFace/constructor(family, source, descriptors)"]};
-window.refsData['https://drafts.csswg.org/css-values-4/#funcdef-url'] = {"text": "url()", "type": "function", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#funcdef-url", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-fontface-urls-slot'] = {"text": "[[Urls]]", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-urls-slot", "export": true, "normative": true, "for_": ["FontFace"]};
-window.refsData['#dom-fontface-data-slot'] = {"text": "[[Data]]", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-data-slot", "export": true, "normative": true, "for_": ["FontFace"]};
-window.refsData['#fontfaceset'] = {"text": "FontFaceSet", "type": "interface", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#fontfaceset", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-fontfaceset-loadingfonts-slot'] = {"text": "[[LoadingFonts]]", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-loadingfonts-slot", "export": true, "normative": true, "for_": ["FontFaceSet"]};
-window.refsData['#switch-the-fontfaceset-to-loading'] = {"text": "switch the fontfaceset to loading", "type": "dfn", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#switch-the-fontfaceset-to-loading", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-fontfaceset-loadedfonts-slot'] = {"text": "[[LoadedFonts]]", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-loadedfonts-slot", "export": true, "normative": true, "for_": ["FontFaceSet"]};
-window.refsData['#switch-the-fontfaceset-to-loaded'] = {"text": "switch the fontfaceset to loaded", "type": "dfn", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#switch-the-fontfaceset-to-loaded", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-fontfaceset-failedfonts-slot'] = {"text": "[[FailedFonts]]", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-failedfonts-slot", "export": true, "normative": true, "for_": ["FontFaceSet"]};
-window.refsData['#font-source'] = {"text": "font source", "type": "dfn", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#font-source", "export": true, "normative": true, "for_": []};
-window.refsData['#css-connected'] = {"text": "css-connected", "type": "dfn", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#css-connected", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#dictdef-eventinit'] = {"text": "EventInit", "type": "dictionary", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dictdef-eventinit", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#event'] = {"text": "Event", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#event", "export": true, "normative": true, "for_": []};
-window.refsData['#dictdef-fontfacesetloadeventinit'] = {"text": "FontFaceSetLoadEventInit", "type": "dictionary", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dictdef-fontfacesetloadeventinit", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#SameObject'] = {"text": "SameObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SameObject", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-frozen-array'] = {"text": "FrozenArray", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-frozen-array", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#eventtarget'] = {"text": "EventTarget", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#eventtarget", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-fontfaceset-fontfaceset'] = {"text": "FontFaceSet(initialFaces)", "type": "constructor", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-fontfaceset", "export": true, "normative": true, "for_": ["FontFaceSet"]};
-window.refsData['#dom-fontfaceset-add'] = {"text": "add(font)", "type": "method", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-add", "export": true, "normative": true, "for_": ["FontFaceSet"]};
-window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-fontfaceset-delete'] = {"text": "delete(font)", "type": "method", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-delete", "export": true, "normative": true, "for_": ["FontFaceSet"]};
-window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-fontfaceset-clear'] = {"text": "clear()", "type": "method", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-clear", "export": true, "normative": true, "for_": ["FontFaceSet"]};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler'] = {"text": "EventHandler", "type": "typedef", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-fontfaceset-load'] = {"text": "load(font, text)", "type": "method", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-load", "export": true, "normative": true, "for_": ["FontFaceSet"]};
-window.refsData['#dom-fontfaceset-load-font-text-font'] = {"text": "font", "type": "argument", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-load-font-text-font", "export": true, "normative": true, "for_": ["FontFaceSet/load(font, text)"]};
-window.refsData['#dom-fontfaceset-load-font-text-text'] = {"text": "text", "type": "argument", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-load-font-text-text", "export": true, "normative": true, "for_": ["FontFaceSet/load(font, text)"]};
-window.refsData['#dom-fontfaceset-check'] = {"text": "check(font, text)", "type": "method", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-check", "export": true, "normative": true, "for_": ["FontFaceSet"]};
-window.refsData['#dom-fontfaceset-check-font-text-font'] = {"text": "font", "type": "argument", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-check-font-text-font", "export": true, "normative": true, "for_": ["FontFaceSet/check(font, text)"]};
-window.refsData['#dom-fontfaceset-check-font-text-text'] = {"text": "text", "type": "argument", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-check-font-text-text", "export": true, "normative": true, "for_": ["FontFaceSet/check(font, text)"]};
-window.refsData['#dom-fontfaceset-ready'] = {"text": "ready", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-ready", "export": true, "normative": true, "for_": ["FontFaceSet"]};
-window.refsData['#enumdef-fontfacesetloadstatus'] = {"text": "FontFaceSetLoadStatus", "type": "enum", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#enumdef-fontfacesetloadstatus", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-fontfaceset-readypromise-slot'] = {"text": "[[ReadyPromise]]", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-readypromise-slot", "export": true, "normative": true, "for_": ["FontFaceSet"]};
-window.refsData['#dom-fontfaceset-fontfaceset-initialfaces-initialfaces'] = {"text": "initialFaces", "type": "argument", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-fontfaceset-initialfaces-initialfaces", "export": true, "normative": true, "for_": ["FontFaceSet/FontFaceSet(initialFaces)", "FontFaceSet/constructor(initialFaces)"]};
-window.refsData['#fontfaceset-set-entries'] = {"text": "set entries", "type": "dfn", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#fontfaceset-set-entries", "export": true, "normative": true, "for_": ["FontFaceSet"]};
-window.refsData['https://webidl.spec.whatwg.org/#dfn-set-entries'] = {"text": "set entries", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-set-entries", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#invalidmodificationerror'] = {"text": "InvalidModificationError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invalidmodificationerror", "export": true, "normative": true, "for_": []};
-window.refsData['#fontfaceset-pending-on-the-environment'] = {"text": "pending on the environment", "type": "dfn", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#fontfaceset-pending-on-the-environment", "export": true, "normative": true, "for_": ["FontFaceSet"]};
-window.refsData['#dom-fontfaceset-onloading'] = {"text": "onloading", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-onloading", "export": true, "normative": true, "for_": ["FontFaceSet"]};
-window.refsData['#eventdef-fontfaceset-loading'] = {"text": "loading", "type": "event", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#eventdef-fontfaceset-loading", "export": true, "normative": true, "for_": ["FontFaceSet"]};
-window.refsData['#dom-fontfaceset-onloadingdone'] = {"text": "onloadingdone", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-onloadingdone", "export": true, "normative": true, "for_": ["FontFaceSet"]};
-window.refsData['#eventdef-fontfaceset-loadingdone'] = {"text": "loadingdone", "type": "event", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#eventdef-fontfaceset-loadingdone", "export": true, "normative": true, "for_": ["FontFaceSet"]};
-window.refsData['#dom-fontfaceset-onloadingerror'] = {"text": "onloadingerror", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-onloadingerror", "export": true, "normative": true, "for_": ["FontFaceSet"]};
-window.refsData['#eventdef-fontfaceset-loadingerror'] = {"text": "loadingerror", "type": "event", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#eventdef-fontfaceset-loadingerror", "export": true, "normative": true, "for_": ["FontFaceSet"]};
-window.refsData['#fontfacesetloadevent'] = {"text": "FontFaceSetLoadEvent", "type": "interface", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#fontfacesetloadevent", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-fontfacesetloadevent-fontfaces'] = {"text": "fontfaces", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfacesetloadevent-fontfaces", "export": true, "normative": true, "for_": ["FontFaceSetLoadEvent"]};
-window.refsData['#dom-fontfaceset-status'] = {"text": "status", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-status", "export": true, "normative": true, "for_": ["FontFaceSet"]};
-window.refsData['#fire-a-font-load-event'] = {"text": "fire a font load event", "type": "dfn", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#fire-a-font-load-event", "export": true, "normative": true, "for_": []};
-window.refsData['#fontfaceset-stuck-on-the-environment'] = {"text": "stuck on the environment", "type": "dfn", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#fontfaceset-stuck-on-the-environment", "export": true, "normative": true, "for_": ["FontFaceSet"]};
-window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font'] = {"text": "font", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#css-wide-keywords'] = {"text": "css-wide keywords", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-fonts-4/#valdef-font-weight-bolder'] = {"text": "bolder", "type": "value", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#valdef-font-weight-bolder", "export": true, "normative": true, "for_": ["font-weight"]};
-window.refsData['https://drafts.csswg.org/css-fonts-4/#valdef-font-weight-normal'] = {"text": "normal", "type": "value", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#valdef-font-weight-normal", "export": true, "normative": true, "for_": ["font-weight"]};
-window.refsData['#available-font-faces'] = {"text": "available font faces", "type": "dfn", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#available-font-faces", "export": true, "normative": true, "for_": []};
-window.refsData['#find-the-matching-font-faces'] = {"text": "find the matching font faces", "type": "dfn", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#find-the-matching-font-faces", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-font-loading-3/#dom-fontfacesetload-font'] = {"text": "font", "type": "argument", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-font-loading-3/#dom-fontfacesetload-font", "export": true, "normative": true, "for_": ["FontFaceSet/load()"]};
-window.refsData['https://www.w3.org/TR/css-font-loading-3/#dom-fontfacesetload-text'] = {"text": "text", "type": "argument", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-font-loading-3/#dom-fontfacesetload-text", "export": true, "normative": true, "for_": ["FontFaceSet/load()"]};
-window.refsData['https://www.w3.org/TR/css-font-loading-3/#dom-fontfacesetcheck-font'] = {"text": "font", "type": "argument", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-font-loading-3/#dom-fontfacesetcheck-font", "export": true, "normative": true, "for_": ["FontFaceSet/check()"]};
-window.refsData['https://www.w3.org/TR/css-font-loading-3/#dom-fontfacesetcheck-text'] = {"text": "text", "type": "argument", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-font-loading-3/#dom-fontfacesetcheck-text", "export": true, "normative": true, "for_": ["FontFaceSet/check()"]};
-window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
-window.refsData['#fontfacesource'] = {"text": "FontFaceSource", "type": "interface", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#fontfacesource", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/workers.html#workerglobalscope'] = {"text": "WorkerGlobalScope", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/workers.html#workerglobalscope", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-fontfacesource-fonts'] = {"text": "fonts", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfacesource-fonts", "export": true, "normative": true, "for_": ["FontFaceSource"]};
-window.refsData['https://html.spec.whatwg.org/multipage/canvas.html#offscreencanvas'] = {"text": "OffscreenCanvas", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/canvas.html#offscreencanvas", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/cssom-1/#documentorshadowroot-document-or-shadow-root-css-style-sheets'] = {"text": "document or shadow root css style sheets", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#documentorshadowroot-document-or-shadow-root-css-style-sheets", "export": true, "normative": true, "for_": ["DocumentOrShadowRoot"]};
 </script>

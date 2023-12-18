@@ -78,7 +78,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -452,6 +451,11 @@ figcaption:not(.no-marker)::before {
     }
 }
 </style>
+<style>/* Boilerplate: style-idl-highlighting */
+pre.idl.highlight {
+    background: var(--borderedblock-bg, var(--def-bg));
+}
+</style>
 <style>/* Boilerplate: style-issues */
 a[href].issue-return {
     float: right;
@@ -704,7 +708,7 @@ a[href].issue-return {
 }
 
 .ref-hint {
-    display: none;
+    display: inline-block;
     position: absolute;
     z-index: 35;
     width: 20em;
@@ -720,16 +724,11 @@ a[href].issue-return {
     white-space: normal; /* in case it's moved into a pre */
 }
 
-.ref-hint.on {
-    display: inline-block;
-}
-
 .ref-hint * { margin: 0; padding: 0; text-indent: 0; }
 
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -789,7 +788,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -846,7 +844,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -923,14 +920,14 @@ D50 2deg illuminant, L in [0,100], a and b in [-128, 128]
 5 = lab(85,-10,-50)
 6 = lab(85,35,-15)
 */
-var { cursor: pointer; }
-var.selected0 { background-color: #F4D200; box-shadow: 0 0 0 2px #F4D200; }
-var.selected1 { background-color: #FF87A2; box-shadow: 0 0 0 2px #FF87A2; }
-var.selected2 { background-color: #96E885; box-shadow: 0 0 0 2px #96E885; }
-var.selected3 { background-color: #3EEED2; box-shadow: 0 0 0 2px #3EEED2; }
-var.selected4 { background-color: #EACFB6; box-shadow: 0 0 0 2px #EACFB6; }
-var.selected5 { background-color: #82DDFF; box-shadow: 0 0 0 2px #82DDFF; }
-var.selected6 { background-color: #FFBCF2; box-shadow: 0 0 0 2px #FFBCF2; }
+[data-algorithm] var { cursor: pointer; }
+var[data-var-color="0"] { background-color: #F4D200; box-shadow: 0 0 0 2px #F4D200; }
+var[data-var-color="1"] { background-color: #FF87A2; box-shadow: 0 0 0 2px #FF87A2; }
+var[data-var-color="2"] { background-color: #96E885; box-shadow: 0 0 0 2px #96E885; }
+var[data-var-color="3"] { background-color: #3EEED2; box-shadow: 0 0 0 2px #3EEED2; }
+var[data-var-color="4"] { background-color: #EACFB6; box-shadow: 0 0 0 2px #EACFB6; }
+var[data-var-color="5"] { background-color: #82DDFF; box-shadow: 0 0 0 2px #82DDFF; }
+var[data-var-color="6"] { background-color: #FFBCF2; box-shadow: 0 0 0 2px #FFBCF2; }
 </style>
  <body class="h-entry">
   <div class="head">
@@ -1424,471 +1421,8 @@ specification.</p>
     </div>
    </div>
   </details>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['53275e46'] = {"dfnID": "53275e46", "url": "https://infra.spec.whatwg.org/#list-append", "dfnText": "append", "refSections": [{"refs": [{"id": "ref-for-list-append"}], "title": "4.1.3. Report paint timing"}], "external": true};
-window.dfnpanelData['160b3687'] = {"dfnID": "160b3687", "url": "https://html.spec.whatwg.org/multipage/images.html#img-available", "dfnText": "available", "refSections": [{"refs": [{"id": "ref-for-img-available"}, {"id": "ref-for-img-available\u2460"}], "title": "2. Terminology"}], "external": true};
-window.dfnpanelData['f8434dee'] = {"dfnID": "f8434dee", "url": "https://html.spec.whatwg.org/multipage/rendering.html#being-rendered", "dfnText": "being rendered", "refSections": [{"refs": [{"id": "ref-for-being-rendered"}], "title": "2. Terminology"}], "external": true};
-window.dfnpanelData['faf954d6'] = {"dfnID": "faf954d6", "url": "https://html.spec.whatwg.org/multipage/browsers.html#browsing-context", "dfnText": "browsing context", "refSections": [{"refs": [{"id": "ref-for-browsing-context"}], "title": "2. Terminology"}, {"refs": [{"id": "ref-for-browsing-context\u2460"}], "title": "3. The PerformancePaintTiming interface"}], "external": true};
-window.dfnpanelData['0fc40460'] = {"dfnID": "0fc40460", "url": "https://html.spec.whatwg.org/multipage/canvas.html#canvas", "dfnText": "canvas", "refSections": [{"refs": [{"id": "ref-for-canvas"}], "title": "2. Terminology"}], "external": true};
-window.dfnpanelData['7e0ffe19'] = {"dfnID": "7e0ffe19", "url": "https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-context-mode", "dfnText": "context mode", "refSections": [{"refs": [{"id": "ref-for-concept-canvas-context-mode"}], "title": "2. Terminology"}], "external": true};
-window.dfnpanelData['fff24064'] = {"dfnID": "fff24064", "url": "https://www.w3.org/TR/css-images-3/#typedef-image", "dfnText": "css image", "refSections": [{"refs": [{"id": "ref-for-typedef-image"}], "title": "2. Terminology"}], "external": true};
-window.dfnpanelData['f5620dd7'] = {"dfnID": "f5620dd7", "url": "https://html.spec.whatwg.org/multipage/dom.html#element", "dfnText": "element", "refSections": [{"refs": [{"id": "ref-for-element"}, {"id": "ref-for-element\u2460"}, {"id": "ref-for-element\u2461"}, {"id": "ref-for-element\u2462"}, {"id": "ref-for-element\u2463"}, {"id": "ref-for-element\u2464"}], "title": "2. Terminology"}, {"refs": [{"id": "ref-for-element\u2465"}], "title": "4.1.1. First Contentful Paint"}], "external": true};
-window.dfnpanelData['192b2479'] = {"dfnID": "192b2479", "url": "https://drafts.csswg.org/css-pseudo-4#generated-content", "dfnText": "generated content pseudo-element", "refSections": [{"refs": [{"id": "ref-for-generated-content"}], "title": "2. Terminology"}], "external": true};
-window.dfnpanelData['482a6636'] = {"dfnID": "482a6636", "url": "https://www.w3.org/TR/cssom-view#dom-element-getboundingclientrect", "dfnText": "getboundingclientrect", "refSections": [{"refs": [{"id": "ref-for-dom-element-getboundingclientrect"}], "title": "2. Terminology"}], "external": true};
-window.dfnpanelData['168f1b6e'] = {"dfnID": "168f1b6e", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-realm-global", "dfnText": "global object", "refSections": [{"refs": [{"id": "ref-for-concept-realm-global"}], "title": "3. The PerformancePaintTiming interface"}], "external": true};
-window.dfnpanelData['70bf9cbc'] = {"dfnID": "70bf9cbc", "url": "https://html.spec.whatwg.org/multipage/images.html#images", "dfnText": "image", "refSections": [{"refs": [{"id": "ref-for-images"}], "title": "2. Terminology"}], "external": true};
-window.dfnpanelData['d7d642a2'] = {"dfnID": "d7d642a2", "url": "https://html.spec.whatwg.org/multipage/input.html#the-input-element", "dfnText": "input", "refSections": [{"refs": [{"id": "ref-for-the-input-element"}], "title": "2. Terminology"}], "external": true};
-window.dfnpanelData['25d33108'] = {"dfnID": "25d33108", "url": "https://html.spec.whatwg.org/multipage/browsers.html#nested-browsing-context", "dfnText": "nested browsing context", "refSections": [{"refs": [{"id": "ref-for-nested-browsing-context"}], "title": "2. Terminology"}], "external": true};
-window.dfnpanelData['565ece29'] = {"dfnID": "565ece29", "url": "https://html.spec.whatwg.org/multipage/media.html#poster-frame", "dfnText": "poster frame", "refSections": [{"refs": [{"id": "ref-for-poster-frame"}], "title": "2. Terminology"}], "external": true};
-window.dfnpanelData['22aa20e3'] = {"dfnID": "22aa20e3", "url": "https://html.spec.whatwg.org/multipage/rendering.html#replaced-elements", "dfnText": "replaced element", "refSections": [{"refs": [{"id": "ref-for-replaced-elements"}], "title": "2. Terminology"}], "external": true};
-window.dfnpanelData['fe811c8e'] = {"dfnID": "fe811c8e", "url": "https://html.spec.whatwg.org/multipage/dom.html#represents", "dfnText": "represents", "refSections": [{"refs": [{"id": "ref-for-represents"}], "title": "2. Terminology"}], "external": true};
-window.dfnpanelData['6b28585b'] = {"dfnID": "6b28585b", "url": "https://www.w3.org/TR/cssom-view#scrolling-area", "dfnText": "scrolling area", "refSections": [{"refs": [{"id": "ref-for-scrolling-area"}, {"id": "ref-for-scrolling-area\u2460"}], "title": "2. Terminology"}], "external": true};
-window.dfnpanelData['3a3a8e72'] = {"dfnID": "3a3a8e72", "url": "https://infra.spec.whatwg.org/#sets", "dfnText": "set", "refSections": [{"refs": [{"id": "ref-for-sets"}, {"id": "ref-for-sets\u2460"}], "title": "4.1. Reporting paint timing"}], "external": true};
-window.dfnpanelData['dba0f673'] = {"dfnID": "dba0f673", "url": "https://drafts.csswg.org/css-pseudo-4#typographic-pseudos", "dfnText": "typographical pseudo-element", "refSections": [{"refs": [{"id": "ref-for-typographic-pseudos"}], "title": "2. Terminology"}], "external": true};
-window.dfnpanelData['b8604be9'] = {"dfnID": "b8604be9", "url": "https://www.w3.org/TR/css3-values/#url-value", "dfnText": "url valued", "refSections": [{"refs": [{"id": "ref-for-url-value"}], "title": "2. Terminology"}], "external": true};
-window.dfnpanelData['89951682'] = {"dfnID": "89951682", "url": "https://drafts.csswg.org/css-cascade-4/#used", "dfnText": "used", "refSections": [{"refs": [{"id": "ref-for-used"}, {"id": "ref-for-used\u2460"}, {"id": "ref-for-used\u2461"}, {"id": "ref-for-used\u2462"}, {"id": "ref-for-used\u2463"}, {"id": "ref-for-used\u2464"}], "title": "2. Terminology"}], "external": true};
-window.dfnpanelData['c5fe8a5f'] = {"dfnID": "c5fe8a5f", "url": "https://html.spec.whatwg.org/multipage/input.html#attr-input-value", "dfnText": "value attribute", "refSections": [{"refs": [{"id": "ref-for-attr-input-value"}], "title": "2. Terminology"}], "external": true};
-window.dfnpanelData['f4c14791'] = {"dfnID": "f4c14791", "url": "https://html.spec.whatwg.org/multipage/media.html#the-video-element", "dfnText": "video element", "refSections": [{"refs": [{"id": "ref-for-the-video-element"}], "title": "2. Terminology"}], "external": true};
-window.dfnpanelData['9a155e4d'] = {"dfnID": "9a155e4d", "url": "https://www.w3.org/TR/SVG2/render.html#Rendered-vs-NonRendered", "dfnText": "svg element with rendered descendants", "refSections": [{"refs": [{"id": "ref-for-Rendered-vs-NonRendered"}], "title": "2. Terminology"}], "external": true};
-window.dfnpanelData['5d5f4fe6'] = {"dfnID": "5d5f4fe6", "url": "https://www.w3.org/TR/CSS22/visufx.html#propdef-visibility", "dfnText": "visibility", "refSections": [{"refs": [{"id": "ref-for-propdef-visibility"}, {"id": "ref-for-propdef-visibility\u2460"}], "title": "2. Terminology"}], "external": true};
-window.dfnpanelData['5ced56d0'] = {"dfnID": "5ced56d0", "url": "https://www.w3.org/TR/css-backgrounds-3/#propdef-background-image", "dfnText": "background-image", "refSections": [{"refs": [{"id": "ref-for-propdef-background-image"}], "title": "2. Terminology"}], "external": true};
-window.dfnpanelData['d4119dee'] = {"dfnID": "d4119dee", "url": "https://www.w3.org/TR/css-backgrounds-3/#background-size", "dfnText": "background-size", "refSections": [{"refs": [{"id": "ref-for-background-size"}], "title": "2. Terminology"}], "external": true};
-window.dfnpanelData['e245a8cf'] = {"dfnID": "e245a8cf", "url": "https://www.w3.org/TR/css-color-3#opacity", "dfnText": "opacity", "refSections": [{"refs": [{"id": "ref-for-opacity"}, {"id": "ref-for-opacity\u2460"}, {"id": "ref-for-opacity\u2461"}], "title": "2. Terminology"}], "external": true};
-window.dfnpanelData['881c2f72'] = {"dfnID": "881c2f72", "url": "https://drafts.csswg.org/css-display-4/#box", "dfnText": "box", "refSections": [{"refs": [{"id": "ref-for-box"}], "title": "2. Terminology"}], "external": true};
-window.dfnpanelData['b30820a7'] = {"dfnID": "b30820a7", "url": "https://drafts.csswg.org/css-display-4/#text-nodes", "dfnText": "text node", "refSections": [{"refs": [{"id": "ref-for-text-nodes"}], "title": "2. Terminology"}], "external": true};
-window.dfnpanelData['a963f9ba'] = {"dfnID": "a963f9ba", "url": "https://drafts.csswg.org/css-text-4/#white-space", "dfnText": "document white space characters", "refSections": [{"refs": [{"id": "ref-for-white-space"}], "title": "2. Terminology"}], "external": true};
-window.dfnpanelData['a973e0fe'] = {"dfnID": "a973e0fe", "url": "https://dom.spec.whatwg.org/#concept-document", "dfnText": "document", "refSections": [{"refs": [{"id": "ref-for-concept-document"}, {"id": "ref-for-concept-document\u2460"}], "title": "2. Terminology"}, {"refs": [{"id": "ref-for-concept-document\u2461"}], "title": "4.1. Reporting paint timing"}, {"refs": [{"id": "ref-for-concept-document\u2462"}], "title": "4.1.1. First Contentful Paint"}, {"refs": [{"id": "ref-for-concept-document\u2463"}, {"id": "ref-for-concept-document\u2464"}, {"id": "ref-for-concept-document\u2465"}, {"id": "ref-for-concept-document\u2466"}, {"id": "ref-for-concept-document\u2467"}], "title": "4.1.2. Mark paint timing"}], "external": true};
-window.dfnpanelData['f6ca3498'] = {"dfnID": "f6ca3498", "url": "https://www.w3.org/TR/hr-time-2/#idl-def-domhighrestimestampdomhighrestimestamp", "dfnText": "DOMHighResTimeStamp", "refSections": [{"refs": [{"id": "ref-for-idl-def-domhighrestimestampdomhighrestimestamp"}], "title": "2. Terminology"}, {"refs": [{"id": "ref-for-idl-def-domhighrestimestampdomhighrestimestamp\u2460"}], "title": "3. The PerformancePaintTiming interface"}], "external": true};
-window.dfnpanelData['7e7cc1d8'] = {"dfnID": "7e7cc1d8", "url": "https://w3c.github.io/hr-time/#dfn-current-high-resolution-time", "dfnText": "current high resolution time", "refSections": [{"refs": [{"id": "ref-for-dfn-current-high-resolution-time"}], "title": "4.1.2. Mark paint timing"}], "external": true};
-window.dfnpanelData['3b2ff63e'] = {"dfnID": "3b2ff63e", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#concept-document-bc", "dfnText": "browsing context (for Document)", "refSections": [{"refs": [{"id": "ref-for-concept-document-bc"}], "title": "4.1.2. Mark paint timing"}], "external": true};
-window.dfnpanelData['6d88ab2e'] = {"dfnID": "6d88ab2e", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window-bc", "dfnText": "browsing context (for Window)", "refSections": [{"refs": [{"id": "ref-for-window-bc"}], "title": "3. The PerformancePaintTiming interface"}], "external": true};
-window.dfnpanelData['5991ccfb'] = {"dfnID": "5991ccfb", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-realm", "dfnText": "relevant realm", "refSections": [{"refs": [{"id": "ref-for-concept-relevant-realm"}], "title": "4.1.3. Report paint timing"}], "external": true};
-window.dfnpanelData['ae2a6342'] = {"dfnID": "ae2a6342", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context", "dfnText": "top-level browsing context", "refSections": [{"refs": [{"id": "ref-for-top-level-browsing-context"}], "title": "2. Terminology"}], "external": true};
-window.dfnpanelData['b815f411'] = {"dfnID": "b815f411", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#update-the-rendering", "dfnText": "update the rendering", "refSections": [{"refs": [{"id": "ref-for-update-the-rendering"}], "title": "2. Terminology"}], "external": true};
-window.dfnpanelData['37902782'] = {"dfnID": "37902782", "url": "https://www.w3.org/TR/performance-timeline-2/#the-performanceentry-interface", "dfnText": "PerformanceEntry", "refSections": [{"refs": [{"id": "ref-for-the-performanceentry-interface"}, {"id": "ref-for-the-performanceentry-interface\u2460"}], "title": "3. The PerformancePaintTiming interface"}], "external": true};
-window.dfnpanelData['6ebdd8a5'] = {"dfnID": "6ebdd8a5", "url": "https://www.w3.org/TR/performance-timeline-2/#dom-performanceentry-duration", "dfnText": "duration", "refSections": [{"refs": [{"id": "ref-for-dom-performanceentry-duration"}], "title": "3. The PerformancePaintTiming interface"}, {"refs": [{"id": "ref-for-dom-performanceentry-duration\u2460"}], "title": "4.1.3. Report paint timing"}], "external": true};
-window.dfnpanelData['77c0e741'] = {"dfnID": "77c0e741", "url": "https://www.w3.org/TR/performance-timeline-2/#dom-performanceentry-entrytype", "dfnText": "entryType", "refSections": [{"refs": [{"id": "ref-for-dom-performanceentry-entrytype"}], "title": "3. The PerformancePaintTiming interface"}, {"refs": [{"id": "ref-for-dom-performanceentry-entrytype\u2460"}], "title": "4.1.3. Report paint timing"}], "external": true};
-window.dfnpanelData['6ba0e62b'] = {"dfnID": "6ba0e62b", "url": "https://www.w3.org/TR/performance-timeline-2/#dom-performanceentry-name", "dfnText": "name", "refSections": [{"refs": [{"id": "ref-for-dom-performanceentry-name"}], "title": "3. The PerformancePaintTiming interface"}, {"refs": [{"id": "ref-for-dom-performanceentry-name\u2460"}], "title": "4.1.3. Report paint timing"}], "external": true};
-window.dfnpanelData['b59765de'] = {"dfnID": "b59765de", "url": "https://www.w3.org/TR/performance-timeline-2/#dom-performanceentry-starttime", "dfnText": "startTime", "refSections": [{"refs": [{"id": "ref-for-dom-performanceentry-starttime"}], "title": "3. The PerformancePaintTiming interface"}, {"refs": [{"id": "ref-for-dom-performanceentry-starttime\u2460"}], "title": "4.1.3. Report paint timing"}], "external": true};
-window.dfnpanelData['6d93ebaa'] = {"dfnID": "6d93ebaa", "url": "https://www.w3.org/TR/performance-timeline-2/#supportedentrytypes-attribute", "dfnText": "supportedEntryTypes", "refSections": [{"refs": [{"id": "ref-for-supportedentrytypes-attribute"}], "title": "3. The PerformancePaintTiming interface"}], "external": true};
-window.dfnpanelData['82805a4e'] = {"dfnID": "82805a4e", "url": "https://drafts.csswg.org/selectors-4/#originating-element", "dfnText": "originating element", "refSections": [{"refs": [{"id": "ref-for-originating-element"}], "title": "2. Terminology"}], "external": true};
-window.dfnpanelData['8855a9aa'] = {"dfnID": "8855a9aa", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "dfnText": "DOMString", "refSections": [{"refs": [{"id": "ref-for-idl-DOMString"}], "title": "2. Terminology"}, {"refs": [{"id": "ref-for-idl-DOMString\u2460"}], "title": "3. The PerformancePaintTiming interface"}], "external": true};
-window.dfnpanelData['889e932f'] = {"dfnID": "889e932f", "url": "https://webidl.spec.whatwg.org/#Exposed", "dfnText": "Exposed", "refSections": [{"refs": [{"id": "ref-for-Exposed"}], "title": "3. The PerformancePaintTiming interface"}], "external": true};
-window.dfnpanelData['56f81a8e'] = {"dfnID": "56f81a8e", "url": "https://webidl.spec.whatwg.org/#new", "dfnText": "new", "refSections": [{"refs": [{"id": "ref-for-new"}], "title": "4.1.3. Report paint timing"}], "external": true};
-window.dfnpanelData['paintable-pseudo-element'] = {"dfnID": "paintable-pseudo-element", "url": "#paintable-pseudo-element", "dfnText": "paintable pseudo-element", "refSections": [{"refs": [{"id": "ref-for-paintable-pseudo-element"}], "title": "2. Terminology"}], "external": false};
-window.dfnpanelData['contentful-image'] = {"dfnID": "contentful-image", "url": "#contentful-image", "dfnText": "contentful image", "refSections": [{"refs": [{"id": "ref-for-contentful-image"}, {"id": "ref-for-contentful-image\u2460"}], "title": "2. Terminology"}], "external": false};
-window.dfnpanelData['non-empty'] = {"dfnID": "non-empty", "url": "#non-empty", "dfnText": "non-empty", "refSections": [{"refs": [{"id": "ref-for-non-empty"}, {"id": "ref-for-non-empty\u2460"}, {"id": "ref-for-non-empty\u2461"}], "title": "2. Terminology"}], "external": false};
-window.dfnpanelData['contentful'] = {"dfnID": "contentful", "url": "#contentful", "dfnText": "contentful", "refSections": [{"refs": [{"id": "ref-for-contentful"}], "title": "4.1.1. First Contentful Paint"}, {"refs": [{"id": "ref-for-contentful\u2460"}], "title": "4.1.2. Mark paint timing"}], "external": false};
-window.dfnpanelData['paintable-bounding-rect'] = {"dfnID": "paintable-bounding-rect", "url": "#paintable-bounding-rect", "dfnText": "paintable bounding rect", "refSections": [{"refs": [{"id": "ref-for-paintable-bounding-rect"}, {"id": "ref-for-paintable-bounding-rect\u2460"}], "title": "2. Terminology"}], "external": false};
-window.dfnpanelData['paintable'] = {"dfnID": "paintable", "url": "#paintable", "dfnText": "paintable", "refSections": [{"refs": [{"id": "ref-for-paintable"}], "title": "4.1.1. First Contentful Paint"}], "external": false};
-window.dfnpanelData['first-paint'] = {"dfnID": "first-paint", "url": "#first-paint", "dfnText": "First paint", "refSections": [{"refs": [{"id": "ref-for-first-paint"}], "title": "3. The PerformancePaintTiming interface"}, {"refs": [{"id": "ref-for-first-paint\u2460"}, {"id": "ref-for-first-paint\u2461"}, {"id": "ref-for-first-paint\u2462"}, {"id": "ref-for-first-paint\u2463"}, {"id": "ref-for-first-paint\u2464"}], "title": "4.1.2. Mark paint timing"}], "external": false};
-window.dfnpanelData['paint-timing-eligible'] = {"dfnID": "paint-timing-eligible", "url": "#paint-timing-eligible", "dfnText": "paint-timing eligible", "refSections": [{"refs": [{"id": "ref-for-paint-timing-eligible"}], "title": "3. The PerformancePaintTiming interface"}, {"refs": [{"id": "ref-for-paint-timing-eligible\u2460"}], "title": "4.1.2. Mark paint timing"}], "external": false};
-window.dfnpanelData['performancepainttiming'] = {"dfnID": "performancepainttiming", "url": "#performancepainttiming", "dfnText": "PerformancePaintTiming", "refSections": [{"refs": [{"id": "ref-for-performancepainttiming"}, {"id": "ref-for-performancepainttiming\u2460"}, {"id": "ref-for-performancepainttiming\u2461"}], "title": "3. The PerformancePaintTiming interface"}, {"refs": [{"id": "ref-for-performancepainttiming\u2462"}], "title": "4.1.3. Report paint timing"}], "external": false};
-window.dfnpanelData['previously-reported-paints'] = {"dfnID": "previously-reported-paints", "url": "#previously-reported-paints", "dfnText": "previously reported paints", "refSections": [{"refs": [{"id": "ref-for-previously-reported-paints"}], "title": "4.1.1. First Contentful Paint"}, {"refs": [{"id": "ref-for-previously-reported-paints\u2460"}], "title": "4.1.2. Mark paint timing"}, {"refs": [{"id": "ref-for-previously-reported-paints\u2461"}], "title": "4.1.3. Report paint timing"}], "external": false};
-window.dfnpanelData['first-contentful-paint'] = {"dfnID": "first-contentful-paint", "url": "#first-contentful-paint", "dfnText": "4.1.1. First Contentful Paint", "refSections": [{"refs": [{"id": "ref-for-first-contentful-paint"}], "title": "2. Terminology"}, {"refs": [{"id": "ref-for-first-contentful-paint\u2460"}], "title": "3. The PerformancePaintTiming interface"}, {"refs": [{"id": "ref-for-first-contentful-paint"}], "title": "4.1.1. First Contentful Paint"}, {"refs": [{"id": "ref-for-first-contentful-paint\u2461"}, {"id": "ref-for-first-contentful-paint\u2462"}, {"id": "ref-for-first-contentful-paint\u2463"}], "title": "4.1.2. Mark paint timing"}], "external": false};
-window.dfnpanelData['should-report-first-contentful-paint'] = {"dfnID": "should-report-first-contentful-paint", "url": "#should-report-first-contentful-paint", "dfnText": "should report first contentful paint", "refSections": [{"refs": [{"id": "ref-for-should-report-first-contentful-paint"}], "title": "4.1.2. Mark paint timing"}], "external": false};
-window.dfnpanelData['mark-paint-timing'] = {"dfnID": "mark-paint-timing", "url": "#mark-paint-timing", "dfnText": "4.1.2. Mark paint timing", "refSections": [{"refs": [{"id": "ref-for-mark-paint-timing"}, {"id": "ref-for-mark-paint-timing"}], "title": "4.1.2. Mark paint timing"}], "external": false};
-window.dfnpanelData['report-paint-timing'] = {"dfnID": "report-paint-timing", "url": "#report-paint-timing", "dfnText": "4.1.3. Report paint timing", "refSections": [{"refs": [{"id": "ref-for-report-paint-timing"}, {"id": "ref-for-report-paint-timing"}], "title": "4.1.2. Mark paint timing"}, {"refs": [{"id": "ref-for-report-paint-timing"}, {"id": "ref-for-report-paint-timing"}], "title": "4.1.3. Report paint timing"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -2082,34 +1616,489 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"0fc40460": {"dfnID":"0fc40460","dfnText":"canvas","external":true,"refSections":[{"refs":[{"id":"ref-for-canvas"}],"title":"2. Terminology"}],"url":"https://html.spec.whatwg.org/multipage/canvas.html#canvas"},
+"160b3687": {"dfnID":"160b3687","dfnText":"available","external":true,"refSections":[{"refs":[{"id":"ref-for-img-available"},{"id":"ref-for-img-available\u2460"}],"title":"2. Terminology"}],"url":"https://html.spec.whatwg.org/multipage/images.html#img-available"},
+"168f1b6e": {"dfnID":"168f1b6e","dfnText":"global object","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-realm-global"}],"title":"3. The PerformancePaintTiming interface"}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#concept-realm-global"},
+"192b2479": {"dfnID":"192b2479","dfnText":"generated content pseudo-element","external":true,"refSections":[{"refs":[{"id":"ref-for-generated-content"}],"title":"2. Terminology"}],"url":"https://drafts.csswg.org/css-pseudo-4#generated-content"},
+"22aa20e3": {"dfnID":"22aa20e3","dfnText":"replaced element","external":true,"refSections":[{"refs":[{"id":"ref-for-replaced-elements"}],"title":"2. Terminology"}],"url":"https://html.spec.whatwg.org/multipage/rendering.html#replaced-elements"},
+"25d33108": {"dfnID":"25d33108","dfnText":"nested browsing context","external":true,"refSections":[{"refs":[{"id":"ref-for-nested-browsing-context"}],"title":"2. Terminology"}],"url":"https://html.spec.whatwg.org/multipage/browsers.html#nested-browsing-context"},
+"37902782": {"dfnID":"37902782","dfnText":"PerformanceEntry","external":true,"refSections":[{"refs":[{"id":"ref-for-the-performanceentry-interface"},{"id":"ref-for-the-performanceentry-interface\u2460"}],"title":"3. The PerformancePaintTiming interface"}],"url":"https://www.w3.org/TR/performance-timeline-2/#the-performanceentry-interface"},
+"3a3a8e72": {"dfnID":"3a3a8e72","dfnText":"set","external":true,"refSections":[{"refs":[{"id":"ref-for-sets"},{"id":"ref-for-sets\u2460"}],"title":"4.1. Reporting paint timing"}],"url":"https://infra.spec.whatwg.org/#sets"},
+"3b2ff63e": {"dfnID":"3b2ff63e","dfnText":"browsing context (for Document)","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-document-bc"}],"title":"4.1.2. Mark paint timing"}],"url":"https://html.spec.whatwg.org/multipage/document-sequences.html#concept-document-bc"},
+"482a6636": {"dfnID":"482a6636","dfnText":"getboundingclientrect","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-element-getboundingclientrect"}],"title":"2. Terminology"}],"url":"https://www.w3.org/TR/cssom-view#dom-element-getboundingclientrect"},
+"53275e46": {"dfnID":"53275e46","dfnText":"append","external":true,"refSections":[{"refs":[{"id":"ref-for-list-append"}],"title":"4.1.3. Report paint timing"}],"url":"https://infra.spec.whatwg.org/#list-append"},
+"565ece29": {"dfnID":"565ece29","dfnText":"poster frame","external":true,"refSections":[{"refs":[{"id":"ref-for-poster-frame"}],"title":"2. Terminology"}],"url":"https://html.spec.whatwg.org/multipage/media.html#poster-frame"},
+"56f81a8e": {"dfnID":"56f81a8e","dfnText":"new","external":true,"refSections":[{"refs":[{"id":"ref-for-new"}],"title":"4.1.3. Report paint timing"}],"url":"https://webidl.spec.whatwg.org/#new"},
+"5991ccfb": {"dfnID":"5991ccfb","dfnText":"relevant realm","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-relevant-realm"}],"title":"4.1.3. Report paint timing"}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-realm"},
+"5ced56d0": {"dfnID":"5ced56d0","dfnText":"background-image","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-background-image"}],"title":"2. Terminology"}],"url":"https://www.w3.org/TR/css-backgrounds-3/#propdef-background-image"},
+"5d5f4fe6": {"dfnID":"5d5f4fe6","dfnText":"visibility","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-visibility"},{"id":"ref-for-propdef-visibility\u2460"}],"title":"2. Terminology"}],"url":"https://www.w3.org/TR/CSS22/visufx.html#propdef-visibility"},
+"6b28585b": {"dfnID":"6b28585b","dfnText":"scrolling area","external":true,"refSections":[{"refs":[{"id":"ref-for-scrolling-area"},{"id":"ref-for-scrolling-area\u2460"}],"title":"2. Terminology"}],"url":"https://www.w3.org/TR/cssom-view#scrolling-area"},
+"6ba0e62b": {"dfnID":"6ba0e62b","dfnText":"name","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-performanceentry-name"}],"title":"3. The PerformancePaintTiming interface"},{"refs":[{"id":"ref-for-dom-performanceentry-name\u2460"}],"title":"4.1.3. Report paint timing"}],"url":"https://www.w3.org/TR/performance-timeline-2/#dom-performanceentry-name"},
+"6d88ab2e": {"dfnID":"6d88ab2e","dfnText":"browsing context (for Window)","external":true,"refSections":[{"refs":[{"id":"ref-for-window-bc"}],"title":"3. The PerformancePaintTiming interface"}],"url":"https://html.spec.whatwg.org/multipage/nav-history-apis.html#window-bc"},
+"6d93ebaa": {"dfnID":"6d93ebaa","dfnText":"supportedEntryTypes","external":true,"refSections":[{"refs":[{"id":"ref-for-supportedentrytypes-attribute"}],"title":"3. The PerformancePaintTiming interface"}],"url":"https://www.w3.org/TR/performance-timeline-2/#supportedentrytypes-attribute"},
+"6ebdd8a5": {"dfnID":"6ebdd8a5","dfnText":"duration","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-performanceentry-duration"}],"title":"3. The PerformancePaintTiming interface"},{"refs":[{"id":"ref-for-dom-performanceentry-duration\u2460"}],"title":"4.1.3. Report paint timing"}],"url":"https://www.w3.org/TR/performance-timeline-2/#dom-performanceentry-duration"},
+"70bf9cbc": {"dfnID":"70bf9cbc","dfnText":"image","external":true,"refSections":[{"refs":[{"id":"ref-for-images"}],"title":"2. Terminology"}],"url":"https://html.spec.whatwg.org/multipage/images.html#images"},
+"77c0e741": {"dfnID":"77c0e741","dfnText":"entryType","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-performanceentry-entrytype"}],"title":"3. The PerformancePaintTiming interface"},{"refs":[{"id":"ref-for-dom-performanceentry-entrytype\u2460"}],"title":"4.1.3. Report paint timing"}],"url":"https://www.w3.org/TR/performance-timeline-2/#dom-performanceentry-entrytype"},
+"7e0ffe19": {"dfnID":"7e0ffe19","dfnText":"context mode","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-canvas-context-mode"}],"title":"2. Terminology"}],"url":"https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-context-mode"},
+"7e7cc1d8": {"dfnID":"7e7cc1d8","dfnText":"current high resolution time","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-current-high-resolution-time"}],"title":"4.1.2. Mark paint timing"}],"url":"https://w3c.github.io/hr-time/#dfn-current-high-resolution-time"},
+"82805a4e": {"dfnID":"82805a4e","dfnText":"originating element","external":true,"refSections":[{"refs":[{"id":"ref-for-originating-element"}],"title":"2. Terminology"}],"url":"https://drafts.csswg.org/selectors-4/#originating-element"},
+"881c2f72": {"dfnID":"881c2f72","dfnText":"box","external":true,"refSections":[{"refs":[{"id":"ref-for-box"}],"title":"2. Terminology"}],"url":"https://drafts.csswg.org/css-display-4/#box"},
+"8855a9aa": {"dfnID":"8855a9aa","dfnText":"DOMString","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-DOMString"}],"title":"2. Terminology"},{"refs":[{"id":"ref-for-idl-DOMString\u2460"}],"title":"3. The PerformancePaintTiming interface"}],"url":"https://webidl.spec.whatwg.org/#idl-DOMString"},
+"889e932f": {"dfnID":"889e932f","dfnText":"Exposed","external":true,"refSections":[{"refs":[{"id":"ref-for-Exposed"}],"title":"3. The PerformancePaintTiming interface"}],"url":"https://webidl.spec.whatwg.org/#Exposed"},
+"89951682": {"dfnID":"89951682","dfnText":"used","external":true,"refSections":[{"refs":[{"id":"ref-for-used"},{"id":"ref-for-used\u2460"},{"id":"ref-for-used\u2461"},{"id":"ref-for-used\u2462"},{"id":"ref-for-used\u2463"},{"id":"ref-for-used\u2464"}],"title":"2. Terminology"}],"url":"https://drafts.csswg.org/css-cascade-4/#used"},
+"9a155e4d": {"dfnID":"9a155e4d","dfnText":"svg element with rendered descendants","external":true,"refSections":[{"refs":[{"id":"ref-for-Rendered-vs-NonRendered"}],"title":"2. Terminology"}],"url":"https://www.w3.org/TR/SVG2/render.html#Rendered-vs-NonRendered"},
+"a963f9ba": {"dfnID":"a963f9ba","dfnText":"document white space characters","external":true,"refSections":[{"refs":[{"id":"ref-for-white-space"}],"title":"2. Terminology"}],"url":"https://drafts.csswg.org/css-text-4/#white-space"},
+"a973e0fe": {"dfnID":"a973e0fe","dfnText":"document","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-document"},{"id":"ref-for-concept-document\u2460"}],"title":"2. Terminology"},{"refs":[{"id":"ref-for-concept-document\u2461"}],"title":"4.1. Reporting paint timing"},{"refs":[{"id":"ref-for-concept-document\u2462"}],"title":"4.1.1. First Contentful Paint"},{"refs":[{"id":"ref-for-concept-document\u2463"},{"id":"ref-for-concept-document\u2464"},{"id":"ref-for-concept-document\u2465"},{"id":"ref-for-concept-document\u2466"},{"id":"ref-for-concept-document\u2467"}],"title":"4.1.2. Mark paint timing"}],"url":"https://dom.spec.whatwg.org/#concept-document"},
+"ae2a6342": {"dfnID":"ae2a6342","dfnText":"top-level browsing context","external":true,"refSections":[{"refs":[{"id":"ref-for-top-level-browsing-context"}],"title":"2. Terminology"}],"url":"https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context"},
+"b30820a7": {"dfnID":"b30820a7","dfnText":"text node","external":true,"refSections":[{"refs":[{"id":"ref-for-text-nodes"}],"title":"2. Terminology"}],"url":"https://drafts.csswg.org/css-display-4/#text-nodes"},
+"b59765de": {"dfnID":"b59765de","dfnText":"startTime","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-performanceentry-starttime"}],"title":"3. The PerformancePaintTiming interface"},{"refs":[{"id":"ref-for-dom-performanceentry-starttime\u2460"}],"title":"4.1.3. Report paint timing"}],"url":"https://www.w3.org/TR/performance-timeline-2/#dom-performanceentry-starttime"},
+"b815f411": {"dfnID":"b815f411","dfnText":"update the rendering","external":true,"refSections":[{"refs":[{"id":"ref-for-update-the-rendering"}],"title":"2. Terminology"}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#update-the-rendering"},
+"b8604be9": {"dfnID":"b8604be9","dfnText":"url valued","external":true,"refSections":[{"refs":[{"id":"ref-for-url-value"}],"title":"2. Terminology"}],"url":"https://www.w3.org/TR/css3-values/#url-value"},
+"c5fe8a5f": {"dfnID":"c5fe8a5f","dfnText":"value attribute","external":true,"refSections":[{"refs":[{"id":"ref-for-attr-input-value"}],"title":"2. Terminology"}],"url":"https://html.spec.whatwg.org/multipage/input.html#attr-input-value"},
+"contentful": {"dfnID":"contentful","dfnText":"contentful","external":false,"refSections":[{"refs":[{"id":"ref-for-contentful"}],"title":"4.1.1. First Contentful Paint"},{"refs":[{"id":"ref-for-contentful\u2460"}],"title":"4.1.2. Mark paint timing"}],"url":"#contentful"},
+"contentful-image": {"dfnID":"contentful-image","dfnText":"contentful image","external":false,"refSections":[{"refs":[{"id":"ref-for-contentful-image"},{"id":"ref-for-contentful-image\u2460"}],"title":"2. Terminology"}],"url":"#contentful-image"},
+"d4119dee": {"dfnID":"d4119dee","dfnText":"background-size","external":true,"refSections":[{"refs":[{"id":"ref-for-background-size"}],"title":"2. Terminology"}],"url":"https://www.w3.org/TR/css-backgrounds-3/#background-size"},
+"d7d642a2": {"dfnID":"d7d642a2","dfnText":"input","external":true,"refSections":[{"refs":[{"id":"ref-for-the-input-element"}],"title":"2. Terminology"}],"url":"https://html.spec.whatwg.org/multipage/input.html#the-input-element"},
+"dba0f673": {"dfnID":"dba0f673","dfnText":"typographical pseudo-element","external":true,"refSections":[{"refs":[{"id":"ref-for-typographic-pseudos"}],"title":"2. Terminology"}],"url":"https://drafts.csswg.org/css-pseudo-4#typographic-pseudos"},
+"e245a8cf": {"dfnID":"e245a8cf","dfnText":"opacity","external":true,"refSections":[{"refs":[{"id":"ref-for-opacity"},{"id":"ref-for-opacity\u2460"},{"id":"ref-for-opacity\u2461"}],"title":"2. Terminology"}],"url":"https://www.w3.org/TR/css-color-3#opacity"},
+"f4c14791": {"dfnID":"f4c14791","dfnText":"video element","external":true,"refSections":[{"refs":[{"id":"ref-for-the-video-element"}],"title":"2. Terminology"}],"url":"https://html.spec.whatwg.org/multipage/media.html#the-video-element"},
+"f5620dd7": {"dfnID":"f5620dd7","dfnText":"element","external":true,"refSections":[{"refs":[{"id":"ref-for-element"},{"id":"ref-for-element\u2460"},{"id":"ref-for-element\u2461"},{"id":"ref-for-element\u2462"},{"id":"ref-for-element\u2463"},{"id":"ref-for-element\u2464"}],"title":"2. Terminology"},{"refs":[{"id":"ref-for-element\u2465"}],"title":"4.1.1. First Contentful Paint"}],"url":"https://html.spec.whatwg.org/multipage/dom.html#element"},
+"f6ca3498": {"dfnID":"f6ca3498","dfnText":"DOMHighResTimeStamp","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-def-domhighrestimestampdomhighrestimestamp"}],"title":"2. Terminology"},{"refs":[{"id":"ref-for-idl-def-domhighrestimestampdomhighrestimestamp\u2460"}],"title":"3. The PerformancePaintTiming interface"}],"url":"https://www.w3.org/TR/hr-time-2/#idl-def-domhighrestimestampdomhighrestimestamp"},
+"f8434dee": {"dfnID":"f8434dee","dfnText":"being rendered","external":true,"refSections":[{"refs":[{"id":"ref-for-being-rendered"}],"title":"2. Terminology"}],"url":"https://html.spec.whatwg.org/multipage/rendering.html#being-rendered"},
+"faf954d6": {"dfnID":"faf954d6","dfnText":"browsing context","external":true,"refSections":[{"refs":[{"id":"ref-for-browsing-context"}],"title":"2. Terminology"},{"refs":[{"id":"ref-for-browsing-context\u2460"}],"title":"3. The PerformancePaintTiming interface"}],"url":"https://html.spec.whatwg.org/multipage/browsers.html#browsing-context"},
+"fe811c8e": {"dfnID":"fe811c8e","dfnText":"represents","external":true,"refSections":[{"refs":[{"id":"ref-for-represents"}],"title":"2. Terminology"}],"url":"https://html.spec.whatwg.org/multipage/dom.html#represents"},
+"fff24064": {"dfnID":"fff24064","dfnText":"css image","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-image"}],"title":"2. Terminology"}],"url":"https://www.w3.org/TR/css-images-3/#typedef-image"},
+"first-contentful-paint": {"dfnID":"first-contentful-paint","dfnText":"4.1.1. First Contentful Paint","external":false,"refSections":[{"refs":[{"id":"ref-for-first-contentful-paint"}],"title":"2. Terminology"},{"refs":[{"id":"ref-for-first-contentful-paint\u2460"}],"title":"3. The PerformancePaintTiming interface"},{"refs":[{"id":"ref-for-first-contentful-paint"}],"title":"4.1.1. First Contentful Paint"},{"refs":[{"id":"ref-for-first-contentful-paint\u2461"},{"id":"ref-for-first-contentful-paint\u2462"},{"id":"ref-for-first-contentful-paint\u2463"}],"title":"4.1.2. Mark paint timing"}],"url":"#first-contentful-paint"},
+"first-paint": {"dfnID":"first-paint","dfnText":"First paint","external":false,"refSections":[{"refs":[{"id":"ref-for-first-paint"}],"title":"3. The PerformancePaintTiming interface"},{"refs":[{"id":"ref-for-first-paint\u2460"},{"id":"ref-for-first-paint\u2461"},{"id":"ref-for-first-paint\u2462"},{"id":"ref-for-first-paint\u2463"},{"id":"ref-for-first-paint\u2464"}],"title":"4.1.2. Mark paint timing"}],"url":"#first-paint"},
+"mark-paint-timing": {"dfnID":"mark-paint-timing","dfnText":"4.1.2. Mark paint timing","external":false,"refSections":[{"refs":[{"id":"ref-for-mark-paint-timing"},{"id":"ref-for-mark-paint-timing"}],"title":"4.1.2. Mark paint timing"}],"url":"#mark-paint-timing"},
+"non-empty": {"dfnID":"non-empty","dfnText":"non-empty","external":false,"refSections":[{"refs":[{"id":"ref-for-non-empty"},{"id":"ref-for-non-empty\u2460"},{"id":"ref-for-non-empty\u2461"}],"title":"2. Terminology"}],"url":"#non-empty"},
+"paint-timing-eligible": {"dfnID":"paint-timing-eligible","dfnText":"paint-timing eligible","external":false,"refSections":[{"refs":[{"id":"ref-for-paint-timing-eligible"}],"title":"3. The PerformancePaintTiming interface"},{"refs":[{"id":"ref-for-paint-timing-eligible\u2460"}],"title":"4.1.2. Mark paint timing"}],"url":"#paint-timing-eligible"},
+"paintable": {"dfnID":"paintable","dfnText":"paintable","external":false,"refSections":[{"refs":[{"id":"ref-for-paintable"}],"title":"4.1.1. First Contentful Paint"}],"url":"#paintable"},
+"paintable-bounding-rect": {"dfnID":"paintable-bounding-rect","dfnText":"paintable bounding rect","external":false,"refSections":[{"refs":[{"id":"ref-for-paintable-bounding-rect"},{"id":"ref-for-paintable-bounding-rect\u2460"}],"title":"2. Terminology"}],"url":"#paintable-bounding-rect"},
+"paintable-pseudo-element": {"dfnID":"paintable-pseudo-element","dfnText":"paintable pseudo-element","external":false,"refSections":[{"refs":[{"id":"ref-for-paintable-pseudo-element"}],"title":"2. Terminology"}],"url":"#paintable-pseudo-element"},
+"performancepainttiming": {"dfnID":"performancepainttiming","dfnText":"PerformancePaintTiming","external":false,"refSections":[{"refs":[{"id":"ref-for-performancepainttiming"},{"id":"ref-for-performancepainttiming\u2460"},{"id":"ref-for-performancepainttiming\u2461"}],"title":"3. The PerformancePaintTiming interface"},{"refs":[{"id":"ref-for-performancepainttiming\u2462"}],"title":"4.1.3. Report paint timing"}],"url":"#performancepainttiming"},
+"previously-reported-paints": {"dfnID":"previously-reported-paints","dfnText":"previously reported paints","external":false,"refSections":[{"refs":[{"id":"ref-for-previously-reported-paints"}],"title":"4.1.1. First Contentful Paint"},{"refs":[{"id":"ref-for-previously-reported-paints\u2460"}],"title":"4.1.2. Mark paint timing"},{"refs":[{"id":"ref-for-previously-reported-paints\u2461"}],"title":"4.1.3. Report paint timing"}],"url":"#previously-reported-paints"},
+"report-paint-timing": {"dfnID":"report-paint-timing","dfnText":"4.1.3. Report paint timing","external":false,"refSections":[{"refs":[{"id":"ref-for-report-paint-timing"},{"id":"ref-for-report-paint-timing"}],"title":"4.1.2. Mark paint timing"},{"refs":[{"id":"ref-for-report-paint-timing"},{"id":"ref-for-report-paint-timing"}],"title":"4.1.3. Report paint timing"}],"url":"#report-paint-timing"},
+"should-report-first-contentful-paint": {"dfnID":"should-report-first-contentful-paint","dfnText":"should report first contentful paint","external":false,"refSections":[{"refs":[{"id":"ref-for-should-report-first-contentful-paint"}],"title":"4.1.2. Mark paint timing"}],"url":"#should-report-first-contentful-paint"},
+};
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+});
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        dfn.panelData = panelData;
+        insertDfnPopupAction(dfn);
+    }
+}
+
+function genDfnPanel(dfn, { dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel on",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel({dfnPanel});
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.dfn = dfn;
+    dfn.dfnPanel = dfnPanel;
+    return dfnPanel;
+}
+
+
+
+function hideAllDfnPanels() {
+    // Delete the currently-active dfn panel.
+    queryAll(".dfn-panel").forEach(dfnPanel=>hideDfnPanel({dfnPanel}));
+}
+
+function showDfnPanel(dfn) {
+    hideAllDfnPanels(); // Only display one at a time.
+
+    dfn.setAttribute("aria-expanded", "true");
+
+    const dfnPanel = genDfnPanel(dfn, dfn.panelData);
+
+    // Give the dfn a unique tabindex, and then
+    // give all the tabbable panel bits successive indexes.
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+
+    append(document.body, dfnPanel);
+    positionDfnPanel(dfnPanel);
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.dfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }
+}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel({dfn, dfnPanel}) {
+    if(!dfnPanel) dfnPanel = dfn.dfnPanel;
+    if(!dfn) dfn = dfnPanel.dfn;
+    dfn.dfnPanel = undefined;
+    dfnPanel.dfn = undefined;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.remove()
+}
+
+function toggleDfnPanel(dfn) {
+    if(dfn.dfnPanel) {
+        hideDfnPanel(dfn);
+    } else {
+        showDfnPanel(dfn);
+    }
+}
+
+function insertDfnPopupAction(dfn) {
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        toggleDfnPanel(dfn);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+function needsFor(type) {
+    switch(type) {
+        case "descriptor":
+        case "value":
+        case "element-attr":
+        case "attr-value":
+        case "element-state":
+        case "method":
+        case "constructor":
+        case "argument":
+        case "attribute":
+        case "const":
+        case "dict-member":
+        case "event":
+        case "enum-value":
+        case "stringifier":
+        case "serializer":
+        case "iterator":
+        case "maplike":
+        case "setlike":
+        case "state":
+        case "mode":
+        case "context":
+        case "facet": return true;
+
+        default: return false;
+    }
+}
+function refusesFor(type) {
+    switch(type) {
+        case "property":
+        case "element":
+        case "interface":
+        case "namespace":
+        case "callback":
+        case "dictionary":
+        case "enum":
+        case "exception":
+        case "typedef":
+        case "http-header":
+        case "permission": return true;
+
+        default: return false;
+    }
+}
+function linkFormatterFromType(type) {
+    switch(type) {
+        case 'scheme':
+        case 'permission':
+        case 'dfn': return (text) => `[=${text}=]`;
+
+        case 'abstract-op': return (text) => `[\$${text}\$]`;
+
+        case 'function':
+        case 'at-rule':
+        case 'selector':
+        case 'value': return (text) => `''${text}''`;
+
+        case 'http-header': return (text) => `[:${text}:]`;
+
+        case 'interface':
+        case 'constructor':
+        case 'method':
+        case 'argument':
+        case 'attribute':
+        case 'callback':
+        case 'dictionary':
+        case 'dict-member':
+        case 'enum':
+        case 'enum-value':
+        case 'exception':
+        case 'const':
+        case 'typedef':
+        case 'stringifier':
+        case 'serializer':
+        case 'iterator':
+        case 'maplike':
+        case 'setlike':
+        case 'extended-attribute':
+        case 'event':
+        case 'idl': return (text) => `{{${text}}}`;
+
+        case 'element-state':
+        case 'element-attr':
+        case 'attr-value':
+        case 'element': return (element) => `<{${element}}>`;
+
+        case 'grammar': return (text) => `${text} (within a <pre class=prod>)`;
+
+        case 'type': return (text)=> `<<${text}>>`;
+
+        case 'descriptor':
+        case 'property': return (text) => `'${text}'`;
+
+        default: return;
+    };
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!needsFor(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!refusesFor(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
 }
 </script>
 <script>/* Boilerplate: script-position-annos */
 "use strict";
 {
-
 function repositionAnnoPanels(){
     const panels = [...document.querySelectorAll("[data-anno-for]")];
-    const main = document.querySelector("main");
-    let mainRect;
-    if(main) mainRect = main.getBoundingClientRect();
-    for(const panel of panels) {
-        const dfn = document.getElementById(panel.getAttribute("data-anno-for"));
-        if(!dfn) {
-            console.log("Can't find the annotation panel target:", panel);
-            continue;
-        }
-        const rect = dfn.getBoundingClientRect();
-        const top = window.scrollY + rect.top
-        panel.style.top = top + "px";
-        panel.top = top;
-        panel.height = rect.height;
-        panel.classList.remove("unpositioned");
-        const panelRect = panel.getBoundingClientRect()
-        if(main) {
-            panel.classList.toggle("overlapping-main", panelRect.left < mainRect.right)
-        }
-    }
+    hydratePanels(panels);
     let vSoFar = 0;
     for(const panel of panels.sort(cmpTops)) {
         if(panel.top < vSoFar) {
@@ -2117,6 +2106,39 @@ function repositionAnnoPanels(){
             panel.style.top = vSoFar + "px";
         }
         vSoFar = panel.top + panel.height + 15;
+    }
+}
+function hydratePanels(panels) {
+    const main = document.querySelector("main");
+    let mainRect;
+    if(main) mainRect = main.getBoundingClientRect();
+    // First display them all, if they're not already visible.
+    for(const panel of panels) {
+        panel.classList.remove("unpositioned");
+    }
+    // Measure them all
+    for(const panel of panels) {
+        const dfn = document.getElementById(panel.getAttribute("data-anno-for"));
+        if(!dfn) {
+            console.log("Can't find the annotation panel target:", panel);
+            continue;
+        }
+        panel.dfn = dfn;
+        panel.top = window.scrollY + dfn.getBoundingClientRect().top;
+        let panelRect = panel.getBoundingClientRect();
+        panel.height = panelRect.height;
+        if(main) {
+            panel.overlappingMain = panelRect.left < mainRect.right;
+        } else {
+            panel.overlappingMain = false;
+        }
+    }
+    // And finally position them
+    for(const panel of panels) {
+        const dfn = panel.dfn;
+        if(!dfn) continue;
+        panel.style.top = panel.top + "px";
+        panel.classList.toggle("overlapping-main", panel.overlappingMain);
     }
 }
 
@@ -2131,374 +2153,352 @@ window.addEventListener("resize", repositionAnnoPanels);
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
-                mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
+let refsData = {
+"#contentful": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"paint-timing-1","status":"local","text":"contentful","type":"dfn","url":"#contentful"},
+"#contentful-image": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"paint-timing-1","status":"local","text":"contentful image","type":"dfn","url":"#contentful-image"},
+"#first-contentful-paint": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"paint-timing-1","status":"local","text":"first contentful paint","type":"dfn","url":"#first-contentful-paint"},
+"#first-paint": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"paint-timing-1","status":"local","text":"first paint","type":"dfn","url":"#first-paint"},
+"#mark-paint-timing": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"paint-timing-1","status":"local","text":"mark paint timing","type":"dfn","url":"#mark-paint-timing"},
+"#non-empty": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"paint-timing-1","status":"local","text":"non-empty","type":"dfn","url":"#non-empty"},
+"#paint-timing-eligible": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"paint-timing-1","status":"local","text":"paint-timing eligible","type":"dfn","url":"#paint-timing-eligible"},
+"#paintable": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"paint-timing-1","status":"local","text":"paintable","type":"dfn","url":"#paintable"},
+"#paintable-bounding-rect": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"paint-timing-1","status":"local","text":"paintable bounding rect","type":"dfn","url":"#paintable-bounding-rect"},
+"#paintable-pseudo-element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"paint-timing-1","status":"local","text":"paintable pseudo-element","type":"dfn","url":"#paintable-pseudo-element"},
+"#performancepainttiming": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"paint-timing-1","status":"local","text":"PerformancePaintTiming","type":"interface","url":"#performancepainttiming"},
+"#previously-reported-paints": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"paint-timing-1","status":"local","text":"previously reported paints","type":"dfn","url":"#previously-reported-paints"},
+"#report-paint-timing": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"paint-timing-1","status":"local","text":"report paint timing","type":"dfn","url":"#report-paint-timing"},
+"#should-report-first-contentful-paint": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"paint-timing-1","status":"local","text":"should report first contentful paint","type":"dfn","url":"#should-report-first-contentful-paint"},
+"https://dom.spec.whatwg.org/#concept-document": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"document","type":"dfn","url":"https://dom.spec.whatwg.org/#concept-document"},
+"https://drafts.csswg.org/css-cascade-4/#used": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"","status":"anchor-block","text":"used","type":"dfn","url":"https://drafts.csswg.org/css-cascade-4/#used"},
+"https://drafts.csswg.org/css-display-4/#box": {"export":true,"for_":["CSS"],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"box","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#box"},
+"https://drafts.csswg.org/css-display-4/#text-nodes": {"export":true,"for_":["CSS"],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"text node","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#text-nodes"},
+"https://drafts.csswg.org/css-pseudo-4#generated-content": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"","status":"anchor-block","text":"generated content pseudo-element","type":"dfn","url":"https://drafts.csswg.org/css-pseudo-4#generated-content"},
+"https://drafts.csswg.org/css-pseudo-4#typographic-pseudos": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"","status":"anchor-block","text":"typographical pseudo-element","type":"dfn","url":"https://drafts.csswg.org/css-pseudo-4#typographic-pseudos"},
+"https://drafts.csswg.org/css-text-4/#white-space": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-text","spec":"css-text-4","status":"current","text":"document white space characters","type":"dfn","url":"https://drafts.csswg.org/css-text-4/#white-space"},
+"https://drafts.csswg.org/selectors-4/#originating-element": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"selectors","spec":"selectors-4","status":"current","text":"originating element","type":"dfn","url":"https://drafts.csswg.org/selectors-4/#originating-element"},
+"https://html.spec.whatwg.org/multipage/browsers.html#browsing-context": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"","status":"anchor-block","text":"browsing context","type":"dfn","url":"https://html.spec.whatwg.org/multipage/browsers.html#browsing-context"},
+"https://html.spec.whatwg.org/multipage/browsers.html#nested-browsing-context": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"","status":"anchor-block","text":"nested browsing context","type":"dfn","url":"https://html.spec.whatwg.org/multipage/browsers.html#nested-browsing-context"},
+"https://html.spec.whatwg.org/multipage/canvas.html#canvas": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"","status":"anchor-block","text":"canvas","type":"dfn","url":"https://html.spec.whatwg.org/multipage/canvas.html#canvas"},
+"https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-context-mode": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"","status":"anchor-block","text":"context mode","type":"dfn","url":"https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-context-mode"},
+"https://html.spec.whatwg.org/multipage/document-sequences.html#concept-document-bc": {"export":true,"for_":["Document"],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"browsing context","type":"dfn","url":"https://html.spec.whatwg.org/multipage/document-sequences.html#concept-document-bc"},
+"https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"top-level browsing context","type":"dfn","url":"https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context"},
+"https://html.spec.whatwg.org/multipage/dom.html#element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"","status":"anchor-block","text":"element","type":"dfn","url":"https://html.spec.whatwg.org/multipage/dom.html#element"},
+"https://html.spec.whatwg.org/multipage/dom.html#represents": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"","status":"anchor-block","text":"represents","type":"dfn","url":"https://html.spec.whatwg.org/multipage/dom.html#represents"},
+"https://html.spec.whatwg.org/multipage/images.html#images": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"","status":"anchor-block","text":"image","type":"dfn","url":"https://html.spec.whatwg.org/multipage/images.html#images"},
+"https://html.spec.whatwg.org/multipage/images.html#img-available": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"","status":"anchor-block","text":"available","type":"dfn","url":"https://html.spec.whatwg.org/multipage/images.html#img-available"},
+"https://html.spec.whatwg.org/multipage/input.html#attr-input-value": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"","status":"anchor-block","text":"value attribute","type":"dfn","url":"https://html.spec.whatwg.org/multipage/input.html#attr-input-value"},
+"https://html.spec.whatwg.org/multipage/input.html#the-input-element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"","status":"anchor-block","text":"input","type":"dfn","url":"https://html.spec.whatwg.org/multipage/input.html#the-input-element"},
+"https://html.spec.whatwg.org/multipage/media.html#poster-frame": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"","status":"anchor-block","text":"poster frame","type":"dfn","url":"https://html.spec.whatwg.org/multipage/media.html#poster-frame"},
+"https://html.spec.whatwg.org/multipage/media.html#the-video-element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"","status":"anchor-block","text":"video element","type":"dfn","url":"https://html.spec.whatwg.org/multipage/media.html#the-video-element"},
+"https://html.spec.whatwg.org/multipage/nav-history-apis.html#window-bc": {"export":true,"for_":["Window"],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"browsing context","type":"dfn","url":"https://html.spec.whatwg.org/multipage/nav-history-apis.html#window-bc"},
+"https://html.spec.whatwg.org/multipage/rendering.html#being-rendered": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"","status":"anchor-block","text":"being rendered","type":"dfn","url":"https://html.spec.whatwg.org/multipage/rendering.html#being-rendered"},
+"https://html.spec.whatwg.org/multipage/rendering.html#replaced-elements": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"","status":"anchor-block","text":"replaced element","type":"dfn","url":"https://html.spec.whatwg.org/multipage/rendering.html#replaced-elements"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#concept-realm-global": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"","status":"anchor-block","text":"global object","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#concept-realm-global"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-realm": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"relevant realm","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-realm"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#update-the-rendering": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"update the rendering","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#update-the-rendering"},
+"https://infra.spec.whatwg.org/#list-append": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"","status":"anchor-block","text":"append","type":"dfn","url":"https://infra.spec.whatwg.org/#list-append"},
+"https://infra.spec.whatwg.org/#sets": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"","status":"anchor-block","text":"set","type":"dfn","url":"https://infra.spec.whatwg.org/#sets"},
+"https://w3c.github.io/hr-time/#dfn-current-high-resolution-time": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"hr-time","spec":"hr-time-3","status":"current","text":"current high resolution time","type":"dfn","url":"https://w3c.github.io/hr-time/#dfn-current-high-resolution-time"},
+"https://webidl.spec.whatwg.org/#Exposed": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"Exposed","type":"extended-attribute","url":"https://webidl.spec.whatwg.org/#Exposed"},
+"https://webidl.spec.whatwg.org/#idl-DOMString": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"DOMString","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-DOMString"},
+"https://webidl.spec.whatwg.org/#new": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"new","type":"dfn","url":"https://webidl.spec.whatwg.org/#new"},
+"https://www.w3.org/TR/CSS22/visufx.html#propdef-visibility": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css","spec":"css-2","status":"anchor-block","text":"visibility","type":"dfn","url":"https://www.w3.org/TR/CSS22/visufx.html#propdef-visibility"},
+"https://www.w3.org/TR/SVG2/render.html#Rendered-vs-NonRendered": {"export":true,"for_":[],"level":"","normative":true,"shortname":"cr-svg2","spec":"cr-svg2","status":"anchor-block","text":"svg element with rendered descendants","type":"dfn","url":"https://www.w3.org/TR/SVG2/render.html#Rendered-vs-NonRendered"},
+"https://www.w3.org/TR/css-backgrounds-3/#background-size": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"anchor-block","text":"background-size","type":"dfn","url":"https://www.w3.org/TR/css-backgrounds-3/#background-size"},
+"https://www.w3.org/TR/css-backgrounds-3/#propdef-background-image": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"anchor-block","text":"background-image","type":"dfn","url":"https://www.w3.org/TR/css-backgrounds-3/#propdef-background-image"},
+"https://www.w3.org/TR/css-color-3#opacity": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-color","spec":"css-color-3","status":"anchor-block","text":"opacity","type":"dfn","url":"https://www.w3.org/TR/css-color-3#opacity"},
+"https://www.w3.org/TR/css-images-3/#typedef-image": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"","status":"anchor-block","text":"css image","type":"dfn","url":"https://www.w3.org/TR/css-images-3/#typedef-image"},
+"https://www.w3.org/TR/css3-values/#url-value": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"","status":"anchor-block","text":"url valued","type":"dfn","url":"https://www.w3.org/TR/css3-values/#url-value"},
+"https://www.w3.org/TR/cssom-view#dom-element-getboundingclientrect": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"","status":"anchor-block","text":"getboundingclientrect","type":"dfn","url":"https://www.w3.org/TR/cssom-view#dom-element-getboundingclientrect"},
+"https://www.w3.org/TR/cssom-view#scrolling-area": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"paint-timing","spec":"","status":"anchor-block","text":"scrolling area","type":"dfn","url":"https://www.w3.org/TR/cssom-view#scrolling-area"},
+"https://www.w3.org/TR/hr-time-2/#idl-def-domhighrestimestampdomhighrestimestamp": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"hr-time","spec":"hr-time-2","status":"anchor-block","text":"DOMHighResTimeStamp","type":"typedef","url":"https://www.w3.org/TR/hr-time-2/#idl-def-domhighrestimestampdomhighrestimestamp"},
+"https://www.w3.org/TR/performance-timeline-2/#dom-performanceentry-duration": {"export":true,"for_":["PerformanceEntry"],"level":"2","normative":true,"shortname":"performance-timeline","spec":"performance-timeline-2","status":"anchor-block","text":"duration","type":"attribute","url":"https://www.w3.org/TR/performance-timeline-2/#dom-performanceentry-duration"},
+"https://www.w3.org/TR/performance-timeline-2/#dom-performanceentry-entrytype": {"export":true,"for_":["PerformanceEntry"],"level":"2","normative":true,"shortname":"performance-timeline","spec":"performance-timeline-2","status":"anchor-block","text":"entryType","type":"attribute","url":"https://www.w3.org/TR/performance-timeline-2/#dom-performanceentry-entrytype"},
+"https://www.w3.org/TR/performance-timeline-2/#dom-performanceentry-name": {"export":true,"for_":["PerformanceEntry"],"level":"2","normative":true,"shortname":"performance-timeline","spec":"performance-timeline-2","status":"anchor-block","text":"name","type":"attribute","url":"https://www.w3.org/TR/performance-timeline-2/#dom-performanceentry-name"},
+"https://www.w3.org/TR/performance-timeline-2/#dom-performanceentry-starttime": {"export":true,"for_":["PerformanceEntry"],"level":"2","normative":true,"shortname":"performance-timeline","spec":"performance-timeline-2","status":"anchor-block","text":"startTime","type":"attribute","url":"https://www.w3.org/TR/performance-timeline-2/#dom-performanceentry-starttime"},
+"https://www.w3.org/TR/performance-timeline-2/#supportedentrytypes-attribute": {"export":true,"for_":["PerformanceObserver"],"level":"2","normative":true,"shortname":"performance-timeline","spec":"performance-timeline-2","status":"anchor-block","text":"supportedEntryTypes","type":"attribute","url":"https://www.w3.org/TR/performance-timeline-2/#supportedentrytypes-attribute"},
+"https://www.w3.org/TR/performance-timeline-2/#the-performanceentry-interface": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"performance-timeline","spec":"performance-timeline-2","status":"anchor-block","text":"PerformanceEntry","type":"interface","url":"https://www.w3.org/TR/performance-timeline-2/#the-performanceentry-interface"},
+};
+
+function mkRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "Term: "),
+                mk.span({}, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    let forListElements;
+    if(forList.length == 0) {
+        forListElements = [];
+    } else if(forList.length == 1) {
+        forListElements = mk.li({},
+            mk.b({}, "For: "),
+            mk.span({}, forList[0]),
+        );
+    } else {
+        forListElements = mk.li({},
             mk.b({}, "For: "),
             mk.ul({},
                 ...forList.map(forItem =>
                     mk.li({},
-                        mk.span({}, `${forItem}`)
+                        mk.span({}, forItem)
                     ),
                 ),
             ),
         );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+    }
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    setupRefHintEventListeners(link, hintPanel);
+    return hintPanel;
+}
+
+function hideAllRefHints() {
+    queryAll(".ref-hint").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    if(refHint.teardownEventListeners) {
+        refHint.teardownEventListeners();
     }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+    refHint.remove();
+}
+
+function showRefHint(link) {
+    if(link.classList.contains("dfn-link")) return;
+    const url = link.getAttribute("href");
+    const ref = refsData[url];
+    if(!ref) return;
+
+    hideAllRefHints(); // Only display one at this time.
+
+    const refHint = mkRefHint(link, ref);
+    append(document.body, refHint);
+    link.setAttribute("aria-expanded", "true");
+    positionRefHint(refHint);
+}
+
+function setupRefHintEventListeners(link, refHint) {
+    if (refHint.teardownEventListeners) return;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
+
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
-
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
-    }
-
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
-        }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
-
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
-    }
-
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+document.addEventListener("DOMContentLoaded", () => {
+    document.body.addEventListener("mouseover", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
+    });
+    document.body.addEventListener("focus", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
     });
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
 </script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#update-the-rendering'] = {"text": "update the rendering", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#update-the-rendering", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-pseudo-4#generated-content'] = {"text": "generated content pseudo-element", "type": "dfn", "spec": "", "shortname": "paint-timing", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/css-pseudo-4#generated-content", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-cascade-4/#used'] = {"text": "used", "type": "dfn", "spec": "", "shortname": "paint-timing", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/css-cascade-4/#used", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/CSS22/visufx.html#propdef-visibility'] = {"text": "visibility", "type": "dfn", "spec": "css-2", "shortname": "css", "level": "2", "status": "anchor-block", "url": "https://www.w3.org/TR/CSS22/visufx.html#propdef-visibility", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-color-3#opacity'] = {"text": "opacity", "type": "dfn", "spec": "css-color-3", "shortname": "css-color", "level": "3", "status": "anchor-block", "url": "https://www.w3.org/TR/css-color-3#opacity", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#box'] = {"text": "box", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#box", "export": true, "normative": true, "for_": ["CSS"]};
-window.refsData['https://www.w3.org/TR/css-images-3/#typedef-image'] = {"text": "css image", "type": "dfn", "spec": "", "shortname": "paint-timing", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/css-images-3/#typedef-image", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css3-values/#url-value'] = {"text": "url valued", "type": "dfn", "spec": "", "shortname": "paint-timing", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/css3-values/#url-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/images.html#img-available'] = {"text": "available", "type": "dfn", "spec": "", "shortname": "paint-timing", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/images.html#img-available", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-text-4/#white-space'] = {"text": "document white space characters", "type": "dfn", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#white-space", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/dom.html#element'] = {"text": "element", "type": "dfn", "spec": "", "shortname": "paint-timing", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/dom.html#element", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#text-nodes'] = {"text": "text node", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#text-nodes", "export": true, "normative": true, "for_": ["CSS"]};
-window.refsData['#non-empty'] = {"text": "non-empty", "type": "dfn", "spec": "paint-timing-1", "shortname": "paint-timing", "level": "1", "status": "local", "url": "#non-empty", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-pseudo-4#typographic-pseudos'] = {"text": "typographical pseudo-element", "type": "dfn", "spec": "", "shortname": "paint-timing", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/css-pseudo-4#typographic-pseudos", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/rendering.html#replaced-elements'] = {"text": "replaced element", "type": "dfn", "spec": "", "shortname": "paint-timing", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/rendering.html#replaced-elements", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/images.html#images'] = {"text": "image", "type": "dfn", "spec": "", "shortname": "paint-timing", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/images.html#images", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-backgrounds-3/#propdef-background-image'] = {"text": "background-image", "type": "dfn", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "anchor-block", "url": "https://www.w3.org/TR/css-backgrounds-3/#propdef-background-image", "export": true, "normative": true, "for_": []};
-window.refsData['#contentful-image'] = {"text": "contentful image", "type": "dfn", "spec": "paint-timing-1", "shortname": "paint-timing", "level": "1", "status": "local", "url": "#contentful-image", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/css-backgrounds-3/#background-size'] = {"text": "background-size", "type": "dfn", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "anchor-block", "url": "https://www.w3.org/TR/css-backgrounds-3/#background-size", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/canvas.html#canvas'] = {"text": "canvas", "type": "dfn", "spec": "", "shortname": "paint-timing", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/canvas.html#canvas", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-context-mode'] = {"text": "context mode", "type": "dfn", "spec": "", "shortname": "paint-timing", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-context-mode", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/media.html#the-video-element'] = {"text": "video element", "type": "dfn", "spec": "", "shortname": "paint-timing", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/media.html#the-video-element", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/dom.html#represents'] = {"text": "represents", "type": "dfn", "spec": "", "shortname": "paint-timing", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/dom.html#represents", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/media.html#poster-frame'] = {"text": "poster frame", "type": "dfn", "spec": "", "shortname": "paint-timing", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/media.html#poster-frame", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/SVG2/render.html#Rendered-vs-NonRendered'] = {"text": "svg element with rendered descendants", "type": "dfn", "spec": "cr-svg2", "shortname": "cr-svg2", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/SVG2/render.html#Rendered-vs-NonRendered", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/input.html#the-input-element'] = {"text": "input", "type": "dfn", "spec": "", "shortname": "paint-timing", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/input.html#the-input-element", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/input.html#attr-input-value'] = {"text": "value attribute", "type": "dfn", "spec": "", "shortname": "paint-timing", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/input.html#attr-input-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/selectors-4/#originating-element'] = {"text": "originating element", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "current", "url": "https://drafts.csswg.org/selectors-4/#originating-element", "export": true, "normative": true, "for_": []};
-window.refsData['#paintable-pseudo-element'] = {"text": "paintable pseudo-element", "type": "dfn", "spec": "paint-timing-1", "shortname": "paint-timing", "level": "1", "status": "local", "url": "#paintable-pseudo-element", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/cssom-view#dom-element-getboundingclientrect'] = {"text": "getboundingclientrect", "type": "dfn", "spec": "", "shortname": "paint-timing", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/cssom-view#dom-element-getboundingclientrect", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#concept-document'] = {"text": "document", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-document", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/cssom-view#scrolling-area'] = {"text": "scrolling area", "type": "dfn", "spec": "", "shortname": "paint-timing", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/cssom-view#scrolling-area", "export": true, "normative": true, "for_": []};
-window.refsData['#paintable-bounding-rect'] = {"text": "paintable bounding rect", "type": "dfn", "spec": "paint-timing-1", "shortname": "paint-timing", "level": "1", "status": "local", "url": "#paintable-bounding-rect", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/rendering.html#being-rendered'] = {"text": "being rendered", "type": "dfn", "spec": "", "shortname": "paint-timing", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/rendering.html#being-rendered", "export": true, "normative": true, "for_": []};
-window.refsData['#first-contentful-paint'] = {"text": "first contentful paint", "type": "dfn", "spec": "paint-timing-1", "shortname": "paint-timing", "level": "1", "status": "local", "url": "#first-contentful-paint", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/hr-time-2/#idl-def-domhighrestimestampdomhighrestimestamp'] = {"text": "DOMHighResTimeStamp", "type": "typedef", "spec": "hr-time-2", "shortname": "hr-time", "level": "2", "status": "anchor-block", "url": "https://www.w3.org/TR/hr-time-2/#idl-def-domhighrestimestampdomhighrestimestamp", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#browsing-context'] = {"text": "browsing context", "type": "dfn", "spec": "", "shortname": "paint-timing", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#browsing-context", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context'] = {"text": "top-level browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#nested-browsing-context'] = {"text": "nested browsing context", "type": "dfn", "spec": "", "shortname": "paint-timing", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#nested-browsing-context", "export": true, "normative": true, "for_": []};
-window.refsData['#performancepainttiming'] = {"text": "PerformancePaintTiming", "type": "interface", "spec": "paint-timing-1", "shortname": "paint-timing", "level": "1", "status": "local", "url": "#performancepainttiming", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/performance-timeline-2/#the-performanceentry-interface'] = {"text": "PerformanceEntry", "type": "interface", "spec": "performance-timeline-2", "shortname": "performance-timeline", "level": "2", "status": "anchor-block", "url": "https://www.w3.org/TR/performance-timeline-2/#the-performanceentry-interface", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/performance-timeline-2/#dom-performanceentry-name'] = {"text": "name", "type": "attribute", "spec": "performance-timeline-2", "shortname": "performance-timeline", "level": "2", "status": "anchor-block", "url": "https://www.w3.org/TR/performance-timeline-2/#dom-performanceentry-name", "export": true, "normative": true, "for_": ["PerformanceEntry"]};
-window.refsData['#first-paint'] = {"text": "first paint", "type": "dfn", "spec": "paint-timing-1", "shortname": "paint-timing", "level": "1", "status": "local", "url": "#first-paint", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/performance-timeline-2/#dom-performanceentry-entrytype'] = {"text": "entryType", "type": "attribute", "spec": "performance-timeline-2", "shortname": "performance-timeline", "level": "2", "status": "anchor-block", "url": "https://www.w3.org/TR/performance-timeline-2/#dom-performanceentry-entrytype", "export": true, "normative": true, "for_": ["PerformanceEntry"]};
-window.refsData['https://www.w3.org/TR/performance-timeline-2/#dom-performanceentry-starttime'] = {"text": "startTime", "type": "attribute", "spec": "performance-timeline-2", "shortname": "performance-timeline", "level": "2", "status": "anchor-block", "url": "https://www.w3.org/TR/performance-timeline-2/#dom-performanceentry-starttime", "export": true, "normative": true, "for_": ["PerformanceEntry"]};
-window.refsData['https://www.w3.org/TR/performance-timeline-2/#dom-performanceentry-duration'] = {"text": "duration", "type": "attribute", "spec": "performance-timeline-2", "shortname": "performance-timeline", "level": "2", "status": "anchor-block", "url": "https://www.w3.org/TR/performance-timeline-2/#dom-performanceentry-duration", "export": true, "normative": true, "for_": ["PerformanceEntry"]};
-window.refsData['https://www.w3.org/TR/performance-timeline-2/#supportedentrytypes-attribute'] = {"text": "supportedEntryTypes", "type": "attribute", "spec": "performance-timeline-2", "shortname": "performance-timeline", "level": "2", "status": "anchor-block", "url": "https://www.w3.org/TR/performance-timeline-2/#supportedentrytypes-attribute", "export": true, "normative": true, "for_": ["PerformanceObserver"]};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-realm-global'] = {"text": "global object", "type": "dfn", "spec": "", "shortname": "paint-timing", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-realm-global", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#window-bc'] = {"text": "browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window-bc", "export": true, "normative": true, "for_": ["Window"]};
-window.refsData['#paint-timing-eligible'] = {"text": "paint-timing eligible", "type": "dfn", "spec": "paint-timing-1", "shortname": "paint-timing", "level": "1", "status": "local", "url": "#paint-timing-eligible", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#sets'] = {"text": "set", "type": "dfn", "spec": "", "shortname": "paint-timing", "level": "1", "status": "anchor-block", "url": "https://infra.spec.whatwg.org/#sets", "export": true, "normative": true, "for_": []};
-window.refsData['#previously-reported-paints'] = {"text": "previously reported paints", "type": "dfn", "spec": "paint-timing-1", "shortname": "paint-timing", "level": "1", "status": "local", "url": "#previously-reported-paints", "export": true, "normative": true, "for_": []};
-window.refsData['#paintable'] = {"text": "paintable", "type": "dfn", "spec": "paint-timing-1", "shortname": "paint-timing", "level": "1", "status": "local", "url": "#paintable", "export": true, "normative": true, "for_": []};
-window.refsData['#contentful'] = {"text": "contentful", "type": "dfn", "spec": "paint-timing-1", "shortname": "paint-timing", "level": "1", "status": "local", "url": "#contentful", "export": true, "normative": true, "for_": []};
-window.refsData['#mark-paint-timing'] = {"text": "mark paint timing", "type": "dfn", "spec": "paint-timing-1", "shortname": "paint-timing", "level": "1", "status": "local", "url": "#mark-paint-timing", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#concept-document-bc'] = {"text": "browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#concept-document-bc", "export": true, "normative": true, "for_": ["Document"]};
-window.refsData['https://w3c.github.io/hr-time/#dfn-current-high-resolution-time'] = {"text": "current high resolution time", "type": "dfn", "spec": "hr-time-3", "shortname": "hr-time", "level": "3", "status": "current", "url": "https://w3c.github.io/hr-time/#dfn-current-high-resolution-time", "export": true, "normative": true, "for_": []};
-window.refsData['#should-report-first-contentful-paint'] = {"text": "should report first contentful paint", "type": "dfn", "spec": "paint-timing-1", "shortname": "paint-timing", "level": "1", "status": "local", "url": "#should-report-first-contentful-paint", "export": true, "normative": true, "for_": []};
-window.refsData['#report-paint-timing'] = {"text": "report paint timing", "type": "dfn", "spec": "paint-timing-1", "shortname": "paint-timing", "level": "1", "status": "local", "url": "#report-paint-timing", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#new'] = {"text": "new", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#new", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-realm'] = {"text": "relevant realm", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-realm", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#list-append'] = {"text": "append", "type": "dfn", "spec": "", "shortname": "paint-timing", "level": "1", "status": "anchor-block", "url": "https://infra.spec.whatwg.org/#list-append", "export": true, "normative": true, "for_": []};
-</script>
 <script>/* Boilerplate: script-var-click-highlighting */
+"use strict";
+{
 /*
 Color-choosing design:
 
-Colors are ordered by goodness.
-Each color has a usage count (initially zero).
-Each variable has a last-used color.
-
-* If the var has a last-used color, and that color's usage is 0,
-    return that color.
-* Otherwise, return the lowest-indexed color with the lowest usage.
-    Increment the color's usage and set it as the last-used color
-    for that var.
-* On unclicking, decrement usage of the color.
+* Colors are ordered by goodness.
+* On clicking a var, give it the earliest color
+    with the lowest usage in the algorithm.
+* On re-clicking, re-use the var's most recent color
+    if that's not currently being used elsewhere.
 */
-"use strict";
-{
-    document.addEventListener("click", e=>{
-        if(e.target.nodeName == "VAR") {
-            highlightSameAlgoVars(e.target);
-        }
-    });
-    const indexCounts = new Map();
-    const indexNames = new Map();
-    function highlightSameAlgoVars(v) {
-        // Find the algorithm container.
-        let algoContainer = null;
-        let searchEl = v;
-        while(algoContainer == null && searchEl != document.body) {
-            searchEl = searchEl.parentNode;
-            if(searchEl.hasAttribute("data-algorithm")) {
-                algoContainer = searchEl;
-            }
-        }
 
-        // Not highlighting document-global vars,
-        // too likely to be unrelated.
-        if(algoContainer == null) return;
+const COLOR_COUNT = 7;
 
-        const algoName = algoContainer.getAttribute("data-algorithm");
-        const varName = getVarName(v);
-        const addClass = !v.classList.contains("selected");
-        let highlightClass = null;
-        if(addClass) {
-            const index = chooseHighlightIndex(algoName, varName);
-            indexCounts.get(algoName)[index] += 1;
-            indexNames.set(algoName+"///"+varName, index);
-            highlightClass = nameFromIndex(index);
-        } else {
-            const index = previousHighlightIndex(algoName, varName);
-            indexCounts.get(algoName)[index] -= 1;
-            highlightClass = nameFromIndex(index);
-        }
+document.addEventListener("click", e=>{
+    if(e.target.nodeName == "VAR") {
+        highlightSameAlgoVars(e.target);
+    }
+});
 
-        // Find all same-name vars, and toggle their class appropriately.
+function highlightSameAlgoVars(v) {
+    // Find the algorithm container.
+    let algoContainer = findAlgoContainer(v);
+
+    // Not highlighting document-global vars,
+    // too likely to be unrelated.
+    if(algoContainer == null) return;
+
+    const varName = nameFromVar(v);
+    if(!v.hasAttribute("data-var-color")) {
+        const newColor = chooseHighlightColor(algoContainer, v);
         for(const el of algoContainer.querySelectorAll("var")) {
-            if(getVarName(el) == varName) {
-                el.classList.toggle("selected", addClass);
-                el.classList.toggle(highlightClass, addClass);
+            if(nameFromVar(el) == varName) {
+                el.setAttribute("data-var-color", newColor);
+                el.setAttribute("data-var-last-color", newColor);
+            }
+        }
+    } else {
+        for(const el of algoContainer.querySelectorAll("var")) {
+            if(nameFromVar(el) == varName) {
+                el.removeAttribute("data-var-color");
             }
         }
     }
-    function getVarName(el) {
-        return el.textContent.replace(/(\s|\xa0)+/, " ").trim();
+}
+function findAlgoContainer(el) {
+    while(el != document.body) {
+        if(el.hasAttribute("data-algorithm")) return el;
+        el = el.parentNode;
     }
-    function chooseHighlightIndex(algoName, varName) {
-        let indexes = null;
-        if(indexCounts.has(algoName)) {
-            indexes = indexCounts.get(algoName);
-        } else {
-            // 7 classes right now
-            indexes = [0,0,0,0,0,0,0];
-            indexCounts.set(algoName, indexes);
-        }
+    return null;
+}
+function nameFromVar(el) {
+    return el.textContent.replace(/(\s|\xa0)+/, " ").trim();
+}
+function colorCountsFromContainer(container) {
+    const namesFromColor = Array.from({length:COLOR_COUNT}, x=>new Set());
+    for(let v of container.querySelectorAll("var[data-var-color]")) {
+        let color = +v.getAttribute("data-var-color");
+        namesFromColor[color].add(nameFromVar(v));
+    }
 
-        // If the element was recently unclicked,
-        // *and* that color is still unclaimed,
-        // give it back the same color.
-        const lastIndex = previousHighlightIndex(algoName, varName);
-        if(indexes[lastIndex] === 0) return lastIndex;
-
-        // Find the earliest index with the lowest count.
-        const minCount = Math.min.apply(null, indexes);
-        let index = null;
-        for(var i = 0; i < indexes.length; i++) {
-            if(indexes[i] == minCount) {
-                return i;
-            }
+    return namesFromColor.map(x=>x.size);
+}
+function leastUsedColor(colors) {
+    // Find the earliest color with the lowest count.
+    let minCount = Infinity;
+    let minColor = null;
+    for(var i = 0; i < colors.length; i++) {
+        if(colors[i] < minCount) {
+            minColor = i;
+            minCount = colors[i];
         }
     }
-    function previousHighlightIndex(algoName, varName) {
-        return indexNames.get(algoName+"///"+varName);
+    return minColor;
+}
+function chooseHighlightColor(container, v) {
+    const colorCounts = colorCountsFromContainer(container);
+    if(v.hasAttribute("data-var-last-color")) {
+        let color = +v.getAttribute("data-var-last-color");
+        if(colorCounts[color] == 0) return color;
     }
-    function nameFromIndex(index) {
-        return "selected" + index;
-    }
+    return leastUsedColor(colorCounts);
+}
 }
 </script>

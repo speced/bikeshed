@@ -79,7 +79,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -705,7 +704,7 @@ a[href].issue-return {
 }
 
 .ref-hint {
-    display: none;
+    display: inline-block;
     position: absolute;
     z-index: 35;
     width: 20em;
@@ -721,16 +720,11 @@ a[href].issue-return {
     white-space: normal; /* in case it's moved into a pre */
 }
 
-.ref-hint.on {
-    display: inline-block;
-}
-
 .ref-hint * { margin: 0; padding: 0; text-indent: 0; }
 
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -1982,496 +1976,8 @@ body { padding: 1em 2em 3em } /* top=1em, right=2em, bottom=3em, left=2em */
     </div>
    </div>
   </details>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['f5eca8c9'] = {"dfnID": "f5eca8c9", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background", "dfnText": "background", "refSections": [{"refs": [{"id": "ref-for-propdef-background"}], "title": "2. The CSS Box Model"}], "external": true};
-window.dfnpanelData['9b0fa0e9'] = {"dfnID": "9b0fa0e9", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background-clip", "dfnText": "background-clip", "refSections": [{"refs": [{"id": "ref-for-propdef-background-clip"}], "title": "2.1. Box-edge Keywords"}, {"refs": [{"id": "ref-for-propdef-background-clip\u2460"}], "title": "4. Padding"}], "external": true};
-window.dfnpanelData['3b1682d5'] = {"dfnID": "3b1682d5", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background-origin", "dfnText": "background-origin", "refSections": [{"refs": [{"id": "ref-for-propdef-background-origin"}], "title": "4. Padding"}], "external": true};
-window.dfnpanelData['a9734ee4'] = {"dfnID": "a9734ee4", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border", "dfnText": "border", "refSections": [{"refs": [{"id": "ref-for-propdef-border"}], "title": "1. Introduction"}, {"refs": [{"id": "ref-for-propdef-border\u2460"}], "title": "2. The CSS Box Model"}], "external": true};
-window.dfnpanelData['c3bd6e1d'] = {"dfnID": "c3bd6e1d", "url": "https://drafts.csswg.org/css-break-4/#box-fragment", "dfnText": "box fragment", "refSections": [{"refs": [{"id": "ref-for-box-fragment"}], "title": "2. The CSS Box Model"}], "external": true};
-window.dfnpanelData['0cab481d'] = {"dfnID": "0cab481d", "url": "https://drafts.csswg.org/css-break-4/#propdef-box-decoration-break", "dfnText": "box-decoration-break", "refSections": [{"refs": [{"id": "ref-for-propdef-box-decoration-break"}], "title": "2. The CSS Box Model"}], "external": true};
-window.dfnpanelData['6458a3ef'] = {"dfnID": "6458a3ef", "url": "https://drafts.csswg.org/css-break-4/#fragmentation-break", "dfnText": "fragmentation break", "refSections": [{"refs": [{"id": "ref-for-fragmentation-break"}], "title": "3. Margins"}, {"refs": [{"id": "ref-for-fragmentation-break\u2460"}], "title": "3.3. Margins at Container Edges: the margin-trim property"}], "external": true};
-window.dfnpanelData['a270c80d'] = {"dfnID": "a270c80d", "url": "https://drafts.csswg.org/css-break-4/#fragmentation-context", "dfnText": "fragmentation context", "refSections": [{"refs": [{"id": "ref-for-fragmentation-context"}], "title": "3.3. Margins at Container Edges: the margin-trim property"}], "external": true};
-window.dfnpanelData['0fcbe446'] = {"dfnID": "0fcbe446", "url": "https://drafts.csswg.org/css-break-4/#propdef-margin-break", "dfnText": "margin-break", "refSections": [{"refs": [{"id": "ref-for-propdef-margin-break"}], "title": "3.3. Margins at Container Edges: the margin-trim property"}], "external": true};
-window.dfnpanelData['9e066e76'] = {"dfnID": "9e066e76", "url": "https://drafts.csswg.org/css-cascade-5/#longhand", "dfnText": "longhand", "refSections": [{"refs": [{"id": "ref-for-longhand"}, {"id": "ref-for-longhand\u2460"}, {"id": "ref-for-longhand\u2461"}], "title": "3. Margins"}, {"refs": [{"id": "ref-for-longhand\u2462"}, {"id": "ref-for-longhand\u2463"}, {"id": "ref-for-longhand\u2464"}], "title": "4. Padding"}, {"refs": [{"id": "ref-for-longhand\u2465"}], "title": "5. Borders"}], "external": true};
-window.dfnpanelData['31ccd1a9'] = {"dfnID": "31ccd1a9", "url": "https://drafts.csswg.org/css-cascade-5/#longhand", "dfnText": "longhand property", "refSections": [{"refs": [{"id": "ref-for-longhand"}, {"id": "ref-for-longhand\u2460"}, {"id": "ref-for-longhand\u2461"}], "title": "3. Margins"}, {"refs": [{"id": "ref-for-longhand\u2462"}, {"id": "ref-for-longhand\u2463"}, {"id": "ref-for-longhand\u2464"}], "title": "4. Padding"}, {"refs": [{"id": "ref-for-longhand\u2465"}], "title": "5. Borders"}], "external": true};
-window.dfnpanelData['8ca0c013'] = {"dfnID": "8ca0c013", "url": "https://drafts.csswg.org/css-cascade-5/#shorthand-property", "dfnText": "shorthand property", "refSections": [{"refs": [{"id": "ref-for-shorthand-property"}], "title": "3. Margins"}, {"refs": [{"id": "ref-for-shorthand-property\u2460"}], "title": "4. Padding"}], "external": true};
-window.dfnpanelData['9f3d4f17'] = {"dfnID": "9f3d4f17", "url": "https://drafts.csswg.org/css-display-4/#block-container", "dfnText": "block container", "refSections": [{"refs": [{"id": "ref-for-block-container"}, {"id": "ref-for-block-container\u2460"}, {"id": "ref-for-block-container\u2461"}], "title": "3.3. Margins at Container Edges: the margin-trim property"}], "external": true};
-window.dfnpanelData['92c1cc6f'] = {"dfnID": "92c1cc6f", "url": "https://drafts.csswg.org/css-display-4/#block-formatting-context-root", "dfnText": "block formatting context root", "refSections": [{"refs": [{"id": "ref-for-block-formatting-context-root"}], "title": "3.3. Margins at Container Edges: the margin-trim property"}], "external": true};
-window.dfnpanelData['eaa4fbeb'] = {"dfnID": "eaa4fbeb", "url": "https://drafts.csswg.org/css-display-4/#block-layout", "dfnText": "block layout", "refSections": [{"refs": [{"id": "ref-for-block-layout"}], "title": "3. Margins"}], "external": true};
-window.dfnpanelData['881c2f72'] = {"dfnID": "881c2f72", "url": "https://drafts.csswg.org/css-display-4/#box", "dfnText": "box", "refSections": [{"refs": [{"id": "ref-for-box"}, {"id": "ref-for-box\u2460"}], "title": "1. Introduction"}, {"refs": [{"id": "ref-for-box\u2461"}], "title": "2. The CSS Box Model"}, {"refs": [{"id": "ref-for-box\u2462"}], "title": "3.1. Page-relative (Physical) Margin Properties: the margin-top, margin-right, margin-bottom, and margin-left properties"}, {"refs": [{"id": "ref-for-box\u2463"}], "title": "4.1. Page-relative (Physical) Padding Properties: the padding-top, padding-right, padding-bottom, and padding-left properties"}], "external": true};
-window.dfnpanelData['df19338c'] = {"dfnID": "df19338c", "url": "https://drafts.csswg.org/css-display-4/#box-tree", "dfnText": "box tree", "refSections": [{"refs": [{"id": "ref-for-box-tree"}], "title": "1. Introduction"}], "external": true};
-window.dfnpanelData['ea663a43'] = {"dfnID": "ea663a43", "url": "https://drafts.csswg.org/css-display-4/#containing-block", "dfnText": "containing block", "refSections": [{"refs": [{"id": "ref-for-containing-block"}], "title": "2. The CSS Box Model"}, {"refs": [{"id": "ref-for-containing-block\u2460"}], "title": "3.3. Margins at Container Edges: the margin-trim property"}], "external": true};
-window.dfnpanelData['6d0d9897'] = {"dfnID": "6d0d9897", "url": "https://drafts.csswg.org/css-display-4/#internal-table-element", "dfnText": "internal table element", "refSections": [{"refs": [{"id": "ref-for-internal-table-element"}], "title": "3.1. Page-relative (Physical) Margin Properties: the margin-top, margin-right, margin-bottom, and margin-left properties"}, {"refs": [{"id": "ref-for-internal-table-element\u2460"}], "title": "3.2. Margin Shorthand: the margin property"}, {"refs": [{"id": "ref-for-internal-table-element\u2461"}], "title": "4.1. Page-relative (Physical) Padding Properties: the padding-top, padding-right, padding-bottom, and padding-left properties"}, {"refs": [{"id": "ref-for-internal-table-element\u2462"}], "title": "4.2. Padding Shorthand: the padding property"}], "external": true};
-window.dfnpanelData['a8485ff4'] = {"dfnID": "a8485ff4", "url": "https://drafts.csswg.org/css-display-4/#replaced-element", "dfnText": "replaced element", "refSections": [{"refs": [{"id": "ref-for-replaced-element"}], "title": "2. The CSS Box Model"}], "external": true};
-window.dfnpanelData['24285d87'] = {"dfnID": "24285d87", "url": "https://drafts.csswg.org/css-flexbox-1/#flex-container", "dfnText": "flex container", "refSections": [{"refs": [{"id": "ref-for-flex-container"}], "title": "3.3. Margins at Container Edges: the margin-trim property"}], "external": true};
-window.dfnpanelData['f005b2f6'] = {"dfnID": "f005b2f6", "url": "https://drafts.csswg.org/css-grid-2/#grid-container", "dfnText": "grid container", "refSections": [{"refs": [{"id": "ref-for-grid-container"}], "title": "3.3. Margins at Container Edges: the margin-trim property"}], "external": true};
-window.dfnpanelData['521eb6d4'] = {"dfnID": "521eb6d4", "url": "https://drafts.csswg.org/css-multicol-1/#multi-column-container", "dfnText": "multi-column container", "refSections": [{"refs": [{"id": "ref-for-multi-column-container"}], "title": "3.3. Margins at Container Edges: the margin-trim property"}], "external": true};
-window.dfnpanelData['a1addf6c'] = {"dfnID": "a1addf6c", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-first-letter", "dfnText": "::first-letter", "refSections": [{"refs": [{"id": "ref-for-selectordef-first-letter"}], "title": "1.2. \nModule Interactions"}], "external": true};
-window.dfnpanelData['75bfa627'] = {"dfnID": "75bfa627", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-first-line", "dfnText": "::first-line", "refSections": [{"refs": [{"id": "ref-for-selectordef-first-line"}], "title": "1.2. \nModule Interactions"}], "external": true};
-window.dfnpanelData['2ebd6278'] = {"dfnID": "2ebd6278", "url": "https://drafts.csswg.org/css-ruby-1/#ruby-annotation-container-box", "dfnText": "ruby annotation container", "refSections": [{"refs": [{"id": "ref-for-ruby-annotation-container-box"}], "title": "3.1. Page-relative (Physical) Margin Properties: the margin-top, margin-right, margin-bottom, and margin-left properties"}, {"refs": [{"id": "ref-for-ruby-annotation-container-box\u2460"}], "title": "3.2. Margin Shorthand: the margin property"}, {"refs": [{"id": "ref-for-ruby-annotation-container-box\u2461"}], "title": "4.1. Page-relative (Physical) Padding Properties: the padding-top, padding-right, padding-bottom, and padding-left properties"}, {"refs": [{"id": "ref-for-ruby-annotation-container-box\u2462"}], "title": "4.2. Padding Shorthand: the padding property"}, {"refs": [{"id": "ref-for-ruby-annotation-container-box\u2463"}], "title": "7. Changes Since CSS Level 2"}], "external": true};
-window.dfnpanelData['03f3b228'] = {"dfnID": "03f3b228", "url": "https://drafts.csswg.org/css-ruby-1/#ruby-base-container-box", "dfnText": "ruby base container", "refSections": [{"refs": [{"id": "ref-for-ruby-base-container-box"}], "title": "3.1. Page-relative (Physical) Margin Properties: the margin-top, margin-right, margin-bottom, and margin-left properties"}, {"refs": [{"id": "ref-for-ruby-base-container-box\u2460"}], "title": "3.2. Margin Shorthand: the margin property"}, {"refs": [{"id": "ref-for-ruby-base-container-box\u2461"}], "title": "4.1. Page-relative (Physical) Padding Properties: the padding-top, padding-right, padding-bottom, and padding-left properties"}, {"refs": [{"id": "ref-for-ruby-base-container-box\u2462"}], "title": "4.2. Padding Shorthand: the padding property"}, {"refs": [{"id": "ref-for-ruby-base-container-box\u2463"}], "title": "7. Changes Since CSS Level 2"}], "external": true};
-window.dfnpanelData['97cc51ce'] = {"dfnID": "97cc51ce", "url": "https://drafts.csswg.org/css-sizing-3/#intrinsic-size-contribution", "dfnText": "intrinsic size contribution", "refSections": [{"refs": [{"id": "ref-for-intrinsic-size-contribution"}], "title": "3.3. Margins at Container Edges: the margin-trim property"}], "external": true};
-window.dfnpanelData['0b8b3969'] = {"dfnID": "0b8b3969", "url": "https://drafts.csswg.org/css-sizing-3/#size", "dfnText": "size", "refSections": [{"refs": [{"id": "ref-for-size"}], "title": "3.3. Margins at Container Edges: the margin-trim property"}], "external": true};
-window.dfnpanelData['a0e35b6d'] = {"dfnID": "a0e35b6d", "url": "https://drafts.csswg.org/css-sizing-3/#sizing-property", "dfnText": "sizing property", "refSections": [{"refs": [{"id": "ref-for-sizing-property"}], "title": "1. Introduction"}], "external": true};
-window.dfnpanelData['a1cb86c7'] = {"dfnID": "a1cb86c7", "url": "https://drafts.csswg.org/css-transforms-1/#propdef-transform-box", "dfnText": "transform-box", "refSections": [{"refs": [{"id": "ref-for-propdef-transform-box"}], "title": "2.1. Box-edge Keywords"}], "external": true};
-window.dfnpanelData['18222566'] = {"dfnID": "18222566", "url": "https://drafts.csswg.org/css-values-4/#typedef-length-percentage", "dfnText": "<length-percentage>", "refSections": [{"refs": [{"id": "ref-for-typedef-length-percentage"}, {"id": "ref-for-typedef-length-percentage\u2460"}], "title": "3.1. Page-relative (Physical) Margin Properties: the margin-top, margin-right, margin-bottom, and margin-left properties"}, {"refs": [{"id": "ref-for-typedef-length-percentage\u2461"}, {"id": "ref-for-typedef-length-percentage\u2462"}], "title": "4.1. Page-relative (Physical) Padding Properties: the padding-top, padding-right, padding-bottom, and padding-left properties"}], "external": true};
-window.dfnpanelData['358fd6ff'] = {"dfnID": "358fd6ff", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "dfnText": "css-wide keywords", "refSections": [{"refs": [{"id": "ref-for-css-wide-keywords"}], "title": "1.1. \nValue Definitions"}], "external": true};
-window.dfnpanelData['938ba280'] = {"dfnID": "938ba280", "url": "https://drafts.csswg.org/css-values-4/#mult-num-range", "dfnText": "{a,b}", "refSections": [{"refs": [{"id": "ref-for-mult-num-range"}], "title": "3.2. Margin Shorthand: the margin property"}, {"refs": [{"id": "ref-for-mult-num-range\u2460"}], "title": "4.2. Padding Shorthand: the padding property"}], "external": true};
-window.dfnpanelData['6ec67710'] = {"dfnID": "6ec67710", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "dfnText": "|", "refSections": [{"refs": [{"id": "ref-for-comb-one"}], "title": "3.1. Page-relative (Physical) Margin Properties: the margin-top, margin-right, margin-bottom, and margin-left properties"}, {"refs": [{"id": "ref-for-comb-one\u2460"}, {"id": "ref-for-comb-one\u2461"}], "title": "3.3. Margins at Container Edges: the margin-trim property"}], "external": true};
-window.dfnpanelData['190183bb'] = {"dfnID": "190183bb", "url": "https://drafts.csswg.org/css-writing-modes-4/#block-size", "dfnText": "block size", "refSections": [{"refs": [{"id": "ref-for-block-size"}], "title": "3.3. Margins at Container Edges: the margin-trim property"}], "external": true};
-window.dfnpanelData['37c3d179'] = {"dfnID": "37c3d179", "url": "https://drafts.csswg.org/css-writing-modes-4/#block-end", "dfnText": "block-end", "refSections": [{"refs": [{"id": "ref-for-block-end"}], "title": "3.3. Margins at Container Edges: the margin-trim property"}], "external": true};
-window.dfnpanelData['1370dad0'] = {"dfnID": "1370dad0", "url": "https://drafts.csswg.org/css-writing-modes-4/#block-start", "dfnText": "block-start", "refSections": [{"refs": [{"id": "ref-for-block-start"}, {"id": "ref-for-block-start\u2460"}, {"id": "ref-for-block-start\u2461"}], "title": "3.3. Margins at Container Edges: the margin-trim property"}], "external": true};
-window.dfnpanelData['5eff29c1'] = {"dfnID": "5eff29c1", "url": "https://drafts.csswg.org/css-writing-modes-4/#flow-relative", "dfnText": "flow-relative", "refSections": [{"refs": [{"id": "ref-for-flow-relative"}], "title": "3. Margins"}, {"refs": [{"id": "ref-for-flow-relative\u2460"}], "title": "4. Padding"}, {"refs": [{"id": "ref-for-flow-relative\u2461"}], "title": "5. Borders"}], "external": true};
-window.dfnpanelData['43667deb'] = {"dfnID": "43667deb", "url": "https://drafts.csswg.org/css-writing-modes-4/#inline-axis", "dfnText": "inline axis", "refSections": [{"refs": [{"id": "ref-for-inline-axis"}, {"id": "ref-for-inline-axis\u2460"}], "title": "3.3. Margins at Container Edges: the margin-trim property"}], "external": true};
-window.dfnpanelData['8f96f376'] = {"dfnID": "8f96f376", "url": "https://drafts.csswg.org/css-writing-modes-4/#inline-axis", "dfnText": "inline-axis", "refSections": [{"refs": [{"id": "ref-for-inline-axis"}, {"id": "ref-for-inline-axis\u2460"}], "title": "3.3. Margins at Container Edges: the margin-trim property"}], "external": true};
-window.dfnpanelData['f4a5f1c1'] = {"dfnID": "f4a5f1c1", "url": "https://drafts.csswg.org/css-writing-modes-4/#inline-end", "dfnText": "inline-end", "refSections": [{"refs": [{"id": "ref-for-inline-end"}, {"id": "ref-for-inline-end\u2460"}], "title": "3.3. Margins at Container Edges: the margin-trim property"}], "external": true};
-window.dfnpanelData['466b2ed9'] = {"dfnID": "466b2ed9", "url": "https://drafts.csswg.org/css-writing-modes-4/#inline-start", "dfnText": "inline-start", "refSections": [{"refs": [{"id": "ref-for-inline-start"}, {"id": "ref-for-inline-start\u2460"}], "title": "3.3. Margins at Container Edges: the margin-trim property"}], "external": true};
-window.dfnpanelData['8feba1a1'] = {"dfnID": "8feba1a1", "url": "https://drafts.csswg.org/css-writing-modes-4/#logical-width", "dfnText": "logical width", "refSections": [{"refs": [{"id": "ref-for-logical-width"}], "title": "3.1. Page-relative (Physical) Margin Properties: the margin-top, margin-right, margin-bottom, and margin-left properties"}, {"refs": [{"id": "ref-for-logical-width\u2460"}], "title": "3.2. Margin Shorthand: the margin property"}, {"refs": [{"id": "ref-for-logical-width\u2461"}], "title": "4.1. Page-relative (Physical) Padding Properties: the padding-top, padding-right, padding-bottom, and padding-left properties"}, {"refs": [{"id": "ref-for-logical-width\u2462"}], "title": "4.2. Padding Shorthand: the padding property"}], "external": true};
-window.dfnpanelData['d9c76793'] = {"dfnID": "d9c76793", "url": "https://drafts.csswg.org/css-writing-modes-4/#physical", "dfnText": "physical", "refSections": [{"refs": [{"id": "ref-for-physical"}], "title": "3. Margins"}, {"refs": [{"id": "ref-for-physical\u2460"}], "title": "4. Padding"}], "external": true};
-window.dfnpanelData['a73617e0'] = {"dfnID": "a73617e0", "url": "https://drafts.csswg.org/css-writing-modes-4/#writing-mode", "dfnText": "writing mode", "refSections": [{"refs": [{"id": "ref-for-writing-mode"}], "title": "7. Changes Since CSS Level 2"}], "external": true};
-window.dfnpanelData['7bf10631'] = {"dfnID": "7bf10631", "url": "https://dom.spec.whatwg.org/#concept-document-tree", "dfnText": "document tree", "refSections": [{"refs": [{"id": "ref-for-concept-document-tree"}, {"id": "ref-for-concept-document-tree\u2460"}], "title": "1. Introduction"}], "external": true};
-window.dfnpanelData['1b9e57ee'] = {"dfnID": "1b9e57ee", "url": "https://svgwg.org/svg2-draft/coords.html#TermCanvas", "dfnText": "canvas", "refSections": [{"refs": [{"id": "ref-for-TermCanvas"}], "title": "1. Introduction"}], "external": true};
-window.dfnpanelData['ff72fec7'] = {"dfnID": "ff72fec7", "url": "https://svgwg.org/svg2-draft/coords.html#TermObjectBoundingBox", "dfnText": "object bounding box", "refSections": [{"refs": [{"id": "ref-for-TermObjectBoundingBox"}], "title": "2.1. Box-edge Keywords"}], "external": true};
-window.dfnpanelData['19d42a6f'] = {"dfnID": "19d42a6f", "url": "https://svgwg.org/svg2-draft/coords.html#TermStrokeBoundingBox", "dfnText": "stroke bounding box", "refSections": [{"refs": [{"id": "ref-for-TermStrokeBoundingBox"}], "title": "2.1. Box-edge Keywords"}], "external": true};
-window.dfnpanelData['45ea65d2'] = {"dfnID": "45ea65d2", "url": "https://svgwg.org/svg2-draft/coords.html#TermSVGViewport", "dfnText": "svg viewports", "refSections": [{"refs": [{"id": "ref-for-TermSVGViewport"}, {"id": "ref-for-TermSVGViewport\u2460"}, {"id": "ref-for-TermSVGViewport\u2461"}, {"id": "ref-for-TermSVGViewport\u2462"}], "title": "2.1. Box-edge Keywords"}], "external": true};
-window.dfnpanelData['content-area'] = {"dfnID": "content-area", "url": "#content-area", "dfnText": "content area", "refSections": [{"refs": [{"id": "ref-for-content-area"}, {"id": "ref-for-content-area\u2460"}, {"id": "ref-for-content-area\u2461"}], "title": "2. The CSS Box Model"}], "external": false};
-window.dfnpanelData['padding-area'] = {"dfnID": "padding-area", "url": "#padding-area", "dfnText": "padding", "refSections": [{"refs": [{"id": "ref-for-padding-area"}, {"id": "ref-for-padding-area\u2460"}, {"id": "ref-for-padding-area\u2461"}], "title": "2. The CSS Box Model"}, {"refs": [{"id": "ref-for-padding-area\u2462"}], "title": "4. Padding"}], "external": false};
-window.dfnpanelData['border-area'] = {"dfnID": "border-area", "url": "#border-area", "dfnText": "border", "refSections": [{"refs": [{"id": "ref-for-border-area"}, {"id": "ref-for-border-area\u2460"}], "title": "2. The CSS Box Model"}, {"refs": [{"id": "ref-for-border-area\u2461"}], "title": "4. Padding"}, {"refs": [{"id": "ref-for-border-area\u2462"}, {"id": "ref-for-border-area\u2463"}], "title": "5. Borders"}], "external": false};
-window.dfnpanelData['margin-area'] = {"dfnID": "margin-area", "url": "#margin-area", "dfnText": "margin areas", "refSections": [{"refs": [{"id": "ref-for-margin-area"}], "title": "2. The CSS Box Model"}, {"refs": [{"id": "ref-for-margin-area\u2460"}], "title": "3. Margins"}], "external": false};
-window.dfnpanelData['box-edge'] = {"dfnID": "box-edge", "url": "#box-edge", "dfnText": "edge", "refSections": [{"refs": [{"id": "ref-for-box-edge"}, {"id": "ref-for-box-edge\u2460"}], "title": "2. The CSS Box Model"}], "external": false};
-window.dfnpanelData['content-edge'] = {"dfnID": "content-edge", "url": "#content-edge", "dfnText": "content edge", "refSections": [{"refs": [{"id": "ref-for-content-edge"}], "title": "2. The CSS Box Model"}, {"refs": [{"id": "ref-for-content-edge\u2460"}], "title": "2.1. Box-edge Keywords"}, {"refs": [{"id": "ref-for-content-edge\u2461"}], "title": "3.3. Margins at Container Edges: the margin-trim property"}], "external": false};
-window.dfnpanelData['inner-edge'] = {"dfnID": "inner-edge", "url": "#inner-edge", "dfnText": "inner edge", "refSections": [{"refs": [{"id": "ref-for-inner-edge"}, {"id": "ref-for-inner-edge\u2460"}], "title": "3.3. Margins at Container Edges: the margin-trim property"}], "external": false};
-window.dfnpanelData['content-box'] = {"dfnID": "content-box", "url": "#content-box", "dfnText": "content box", "refSections": [{"refs": [{"id": "ref-for-content-box"}], "title": "2. The CSS Box Model"}, {"refs": [{"id": "ref-for-content-box\u2460"}], "title": "2.1. Box-edge Keywords"}], "external": false};
-window.dfnpanelData['padding-edge'] = {"dfnID": "padding-edge", "url": "#padding-edge", "dfnText": "padding edge", "refSections": [{"refs": [{"id": "ref-for-padding-edge"}], "title": "2. The CSS Box Model"}, {"refs": [{"id": "ref-for-padding-edge\u2460"}], "title": "2.1. Box-edge Keywords"}], "external": false};
-window.dfnpanelData['padding-box'] = {"dfnID": "padding-box", "url": "#padding-box", "dfnText": "padding box", "refSections": [{"refs": [{"id": "ref-for-padding-box"}], "title": "2. The CSS Box Model"}, {"refs": [{"id": "ref-for-padding-box\u2460"}], "title": "2.1. Box-edge Keywords"}], "external": false};
-window.dfnpanelData['border-edge'] = {"dfnID": "border-edge", "url": "#border-edge", "dfnText": "border edge", "refSections": [{"refs": [{"id": "ref-for-border-edge"}], "title": "2. The CSS Box Model"}, {"refs": [{"id": "ref-for-border-edge\u2460"}], "title": "2.1. Box-edge Keywords"}], "external": false};
-window.dfnpanelData['border-box'] = {"dfnID": "border-box", "url": "#border-box", "dfnText": "border box", "refSections": [{"refs": [{"id": "ref-for-border-box"}], "title": "2. The CSS Box Model"}, {"refs": [{"id": "ref-for-border-box\u2460"}], "title": "2.1. Box-edge Keywords"}], "external": false};
-window.dfnpanelData['margin-edge'] = {"dfnID": "margin-edge", "url": "#margin-edge", "dfnText": "margin edge", "refSections": [{"refs": [{"id": "ref-for-margin-edge"}], "title": "2. The CSS Box Model"}, {"refs": [{"id": "ref-for-margin-edge\u2460"}], "title": "2.1. Box-edge Keywords"}, {"refs": [{"id": "ref-for-margin-edge\u2461"}], "title": "3.3. Margins at Container Edges: the margin-trim property"}], "external": false};
-window.dfnpanelData['outer-edge'] = {"dfnID": "outer-edge", "url": "#outer-edge", "dfnText": "outer edge", "refSections": [{"refs": [{"id": "ref-for-outer-edge"}, {"id": "ref-for-outer-edge\u2460"}], "title": "3.3. Margins at Container Edges: the margin-trim property"}], "external": false};
-window.dfnpanelData['margin-box'] = {"dfnID": "margin-box", "url": "#margin-box", "dfnText": "margin box", "refSections": [{"refs": [{"id": "ref-for-margin-box"}], "title": "2. The CSS Box Model"}, {"refs": [{"id": "ref-for-margin-box\u2460"}], "title": "2.1. Box-edge Keywords"}], "external": false};
-window.dfnpanelData['valdef-box-content-box'] = {"dfnID": "valdef-box-content-box", "url": "#valdef-box-content-box", "dfnText": "content-box", "refSections": [{"refs": [{"id": "ref-for-valdef-box-content-box"}], "title": "2.1. Box-edge Keywords"}], "external": false};
-window.dfnpanelData['valdef-box-border-box'] = {"dfnID": "valdef-box-border-box", "url": "#valdef-box-border-box", "dfnText": "border-box", "refSections": [{"refs": [{"id": "ref-for-valdef-box-border-box"}, {"id": "ref-for-valdef-box-border-box\u2460"}], "title": "2.1. Box-edge Keywords"}], "external": false};
-window.dfnpanelData['valdef-box-fill-box'] = {"dfnID": "valdef-box-fill-box", "url": "#valdef-box-fill-box", "dfnText": "fill-box", "refSections": [{"refs": [{"id": "ref-for-valdef-box-fill-box"}, {"id": "ref-for-valdef-box-fill-box\u2460"}], "title": "2.1. Box-edge Keywords"}], "external": false};
-window.dfnpanelData['valdef-box-stroke-box'] = {"dfnID": "valdef-box-stroke-box", "url": "#valdef-box-stroke-box", "dfnText": "stroke-box", "refSections": [{"refs": [{"id": "ref-for-valdef-box-stroke-box"}, {"id": "ref-for-valdef-box-stroke-box\u2460"}], "title": "2.1. Box-edge Keywords"}], "external": false};
-window.dfnpanelData['box-svg-viewport-origin-box'] = {"dfnID": "box-svg-viewport-origin-box", "url": "#box-svg-viewport-origin-box", "dfnText": "origin box", "refSections": [{"refs": [{"id": "ref-for-box-svg-viewport-origin-box"}], "title": "2.1. Box-edge Keywords"}], "external": false};
-window.dfnpanelData['typedef-visual-box'] = {"dfnID": "typedef-visual-box", "url": "#typedef-visual-box", "dfnText": "<visual-box>", "refSections": [{"refs": [{"id": "ref-for-typedef-visual-box"}], "title": "2.1. Box-edge Keywords"}], "external": false};
-window.dfnpanelData['typedef-layout-box'] = {"dfnID": "typedef-layout-box", "url": "#typedef-layout-box", "dfnText": "<layout-box>", "refSections": [{"refs": [{"id": "ref-for-typedef-layout-box"}], "title": "2.1. Box-edge Keywords"}], "external": false};
-window.dfnpanelData['typedef-paint-box'] = {"dfnID": "typedef-paint-box", "url": "#typedef-paint-box", "dfnText": "<paint-box>", "refSections": [{"refs": [{"id": "ref-for-typedef-paint-box"}], "title": "2.1. Box-edge Keywords"}], "external": false};
-window.dfnpanelData['typedef-coord-box'] = {"dfnID": "typedef-coord-box", "url": "#typedef-coord-box", "dfnText": "<coord-box>", "refSections": [{"refs": [{"id": "ref-for-typedef-coord-box"}], "title": "2.1. Box-edge Keywords"}], "external": false};
-window.dfnpanelData['margin'] = {"dfnID": "margin", "url": "#margin", "dfnText": "Margins", "refSections": [{"refs": [{"id": "ref-for-margin"}], "title": "3.1. Page-relative (Physical) Margin Properties: the margin-top, margin-right, margin-bottom, and margin-left properties"}, {"refs": [{"id": "ref-for-margin\u2460"}, {"id": "ref-for-margin\u2461"}], "title": "3.3. Margins at Container Edges: the margin-trim property"}], "external": false};
-window.dfnpanelData['propdef-margin-top'] = {"dfnID": "propdef-margin-top", "url": "#propdef-margin-top", "dfnText": "margin-top", "refSections": [{"refs": [{"id": "ref-for-propdef-margin-top"}], "title": "3.1. Page-relative (Physical) Margin Properties: the margin-top, margin-right, margin-bottom, and margin-left properties"}, {"refs": [{"id": "ref-for-propdef-margin-top\u2460"}, {"id": "ref-for-propdef-margin-top\u2461"}], "title": "3.2. Margin Shorthand: the margin property"}], "external": false};
-window.dfnpanelData['propdef-margin-right'] = {"dfnID": "propdef-margin-right", "url": "#propdef-margin-right", "dfnText": "margin-right", "refSections": [{"refs": [{"id": "ref-for-propdef-margin-right"}], "title": "3.1. Page-relative (Physical) Margin Properties: the margin-top, margin-right, margin-bottom, and margin-left properties"}, {"refs": [{"id": "ref-for-propdef-margin-right\u2460"}], "title": "3.2. Margin Shorthand: the margin property"}], "external": false};
-window.dfnpanelData['propdef-margin-bottom'] = {"dfnID": "propdef-margin-bottom", "url": "#propdef-margin-bottom", "dfnText": "margin-bottom", "refSections": [{"refs": [{"id": "ref-for-propdef-margin-bottom"}], "title": "3.1. Page-relative (Physical) Margin Properties: the margin-top, margin-right, margin-bottom, and margin-left properties"}, {"refs": [{"id": "ref-for-propdef-margin-bottom\u2460"}], "title": "3.2. Margin Shorthand: the margin property"}], "external": false};
-window.dfnpanelData['propdef-margin-left'] = {"dfnID": "propdef-margin-left", "url": "#propdef-margin-left", "dfnText": "margin-left", "refSections": [{"refs": [{"id": "ref-for-propdef-margin-left"}], "title": "3.1. Page-relative (Physical) Margin Properties: the margin-top, margin-right, margin-bottom, and margin-left properties"}, {"refs": [{"id": "ref-for-propdef-margin-left\u2460"}], "title": "3.2. Margin Shorthand: the margin property"}], "external": false};
-window.dfnpanelData['propdef-margin'] = {"dfnID": "propdef-margin", "url": "#propdef-margin", "dfnText": "margin", "refSections": [{"refs": [{"id": "ref-for-propdef-margin"}], "title": "1. Introduction"}, {"refs": [{"id": "ref-for-propdef-margin\u2460"}, {"id": "ref-for-propdef-margin\u2461"}, {"id": "ref-for-propdef-margin\u2462"}], "title": "3. Margins"}, {"refs": [{"id": "ref-for-propdef-margin\u2463"}, {"id": "ref-for-propdef-margin\u2464"}, {"id": "ref-for-propdef-margin\u2465"}], "title": "3.2. Margin Shorthand: the margin property"}, {"refs": [{"id": "ref-for-propdef-margin\u2466"}], "title": "7. Changes Since CSS Level 2"}], "external": false};
-window.dfnpanelData['propdef-margin-trim'] = {"dfnID": "propdef-margin-trim", "url": "#propdef-margin-trim", "dfnText": "margin-trim", "refSections": [{"refs": [{"id": "ref-for-propdef-margin-trim"}, {"id": "ref-for-propdef-margin-trim\u2460"}, {"id": "ref-for-propdef-margin-trim\u2461"}, {"id": "ref-for-propdef-margin-trim\u2462"}], "title": "3.3. Margins at Container Edges: the margin-trim property"}, {"refs": [{"id": "ref-for-propdef-margin-trim\u2463"}], "title": "6. Changes Since CSS Level 3"}], "external": false};
-window.dfnpanelData['valdef-margin-trim-in-flow'] = {"dfnID": "valdef-margin-trim-in-flow", "url": "#valdef-margin-trim-in-flow", "dfnText": "in-flow", "refSections": [{"refs": [{"id": "ref-for-valdef-margin-trim-in-flow"}], "title": "3.3. Margins at Container Edges: the margin-trim property"}], "external": false};
-window.dfnpanelData['padding'] = {"dfnID": "padding", "url": "#padding", "dfnText": "Padding", "refSections": [{"refs": [{"id": "ref-for-padding"}], "title": "4.1. Page-relative (Physical) Padding Properties: the padding-top, padding-right, padding-bottom, and padding-left properties"}], "external": false};
-window.dfnpanelData['propdef-padding-top'] = {"dfnID": "propdef-padding-top", "url": "#propdef-padding-top", "dfnText": "padding-top", "refSections": [{"refs": [{"id": "ref-for-propdef-padding-top"}], "title": "4.1. Page-relative (Physical) Padding Properties: the padding-top, padding-right, padding-bottom, and padding-left properties"}, {"refs": [{"id": "ref-for-propdef-padding-top\u2460"}, {"id": "ref-for-propdef-padding-top\u2461"}], "title": "4.2. Padding Shorthand: the padding property"}], "external": false};
-window.dfnpanelData['propdef-padding-right'] = {"dfnID": "propdef-padding-right", "url": "#propdef-padding-right", "dfnText": "padding-right", "refSections": [{"refs": [{"id": "ref-for-propdef-padding-right"}], "title": "4.1. Page-relative (Physical) Padding Properties: the padding-top, padding-right, padding-bottom, and padding-left properties"}, {"refs": [{"id": "ref-for-propdef-padding-right\u2460"}], "title": "4.2. Padding Shorthand: the padding property"}], "external": false};
-window.dfnpanelData['propdef-padding-bottom'] = {"dfnID": "propdef-padding-bottom", "url": "#propdef-padding-bottom", "dfnText": "padding-bottom", "refSections": [{"refs": [{"id": "ref-for-propdef-padding-bottom"}], "title": "4.1. Page-relative (Physical) Padding Properties: the padding-top, padding-right, padding-bottom, and padding-left properties"}, {"refs": [{"id": "ref-for-propdef-padding-bottom\u2460"}], "title": "4.2. Padding Shorthand: the padding property"}], "external": false};
-window.dfnpanelData['propdef-padding-left'] = {"dfnID": "propdef-padding-left", "url": "#propdef-padding-left", "dfnText": "padding-left", "refSections": [{"refs": [{"id": "ref-for-propdef-padding-left"}], "title": "4.1. Page-relative (Physical) Padding Properties: the padding-top, padding-right, padding-bottom, and padding-left properties"}, {"refs": [{"id": "ref-for-propdef-padding-left\u2460"}], "title": "4.2. Padding Shorthand: the padding property"}], "external": false};
-window.dfnpanelData['propdef-padding'] = {"dfnID": "propdef-padding", "url": "#propdef-padding", "dfnText": "padding", "refSections": [{"refs": [{"id": "ref-for-propdef-padding"}], "title": "1. Introduction"}, {"refs": [{"id": "ref-for-propdef-padding\u2460"}, {"id": "ref-for-propdef-padding\u2461"}, {"id": "ref-for-propdef-padding\u2462"}], "title": "4. Padding"}, {"refs": [{"id": "ref-for-propdef-padding\u2463"}, {"id": "ref-for-propdef-padding\u2464"}, {"id": "ref-for-propdef-padding\u2465"}], "title": "4.2. Padding Shorthand: the padding property"}, {"refs": [{"id": "ref-for-propdef-padding\u2466"}], "title": "7. Changes Since CSS Level 2"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -2665,34 +2171,514 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"03f3b228": {"dfnID":"03f3b228","dfnText":"ruby base container","external":true,"refSections":[{"refs":[{"id":"ref-for-ruby-base-container-box"}],"title":"3.1. Page-relative (Physical) Margin Properties: the margin-top, margin-right, margin-bottom, and margin-left properties"},{"refs":[{"id":"ref-for-ruby-base-container-box\u2460"}],"title":"3.2. Margin Shorthand: the margin property"},{"refs":[{"id":"ref-for-ruby-base-container-box\u2461"}],"title":"4.1. Page-relative (Physical) Padding Properties: the padding-top, padding-right, padding-bottom, and padding-left properties"},{"refs":[{"id":"ref-for-ruby-base-container-box\u2462"}],"title":"4.2. Padding Shorthand: the padding property"},{"refs":[{"id":"ref-for-ruby-base-container-box\u2463"}],"title":"7. Changes Since CSS Level 2"}],"url":"https://drafts.csswg.org/css-ruby-1/#ruby-base-container-box"},
+"0b8b3969": {"dfnID":"0b8b3969","dfnText":"size","external":true,"refSections":[{"refs":[{"id":"ref-for-size"}],"title":"3.3. Margins at Container Edges: the margin-trim property"}],"url":"https://drafts.csswg.org/css-sizing-3/#size"},
+"0cab481d": {"dfnID":"0cab481d","dfnText":"box-decoration-break","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-box-decoration-break"}],"title":"2. The CSS Box Model"}],"url":"https://drafts.csswg.org/css-break-4/#propdef-box-decoration-break"},
+"0fcbe446": {"dfnID":"0fcbe446","dfnText":"margin-break","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-margin-break"}],"title":"3.3. Margins at Container Edges: the margin-trim property"}],"url":"https://drafts.csswg.org/css-break-4/#propdef-margin-break"},
+"1370dad0": {"dfnID":"1370dad0","dfnText":"block-start","external":true,"refSections":[{"refs":[{"id":"ref-for-block-start"},{"id":"ref-for-block-start\u2460"},{"id":"ref-for-block-start\u2461"}],"title":"3.3. Margins at Container Edges: the margin-trim property"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#block-start"},
+"18222566": {"dfnID":"18222566","dfnText":"<length-percentage>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-length-percentage"},{"id":"ref-for-typedef-length-percentage\u2460"}],"title":"3.1. Page-relative (Physical) Margin Properties: the margin-top, margin-right, margin-bottom, and margin-left properties"},{"refs":[{"id":"ref-for-typedef-length-percentage\u2461"},{"id":"ref-for-typedef-length-percentage\u2462"}],"title":"4.1. Page-relative (Physical) Padding Properties: the padding-top, padding-right, padding-bottom, and padding-left properties"}],"url":"https://drafts.csswg.org/css-values-4/#typedef-length-percentage"},
+"190183bb": {"dfnID":"190183bb","dfnText":"block size","external":true,"refSections":[{"refs":[{"id":"ref-for-block-size"}],"title":"3.3. Margins at Container Edges: the margin-trim property"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#block-size"},
+"19d42a6f": {"dfnID":"19d42a6f","dfnText":"stroke bounding box","external":true,"refSections":[{"refs":[{"id":"ref-for-TermStrokeBoundingBox"}],"title":"2.1. Box-edge Keywords"}],"url":"https://svgwg.org/svg2-draft/coords.html#TermStrokeBoundingBox"},
+"1b9e57ee": {"dfnID":"1b9e57ee","dfnText":"canvas","external":true,"refSections":[{"refs":[{"id":"ref-for-TermCanvas"}],"title":"1. Introduction"}],"url":"https://svgwg.org/svg2-draft/coords.html#TermCanvas"},
+"24285d87": {"dfnID":"24285d87","dfnText":"flex container","external":true,"refSections":[{"refs":[{"id":"ref-for-flex-container"}],"title":"3.3. Margins at Container Edges: the margin-trim property"}],"url":"https://drafts.csswg.org/css-flexbox-1/#flex-container"},
+"2ebd6278": {"dfnID":"2ebd6278","dfnText":"ruby annotation container","external":true,"refSections":[{"refs":[{"id":"ref-for-ruby-annotation-container-box"}],"title":"3.1. Page-relative (Physical) Margin Properties: the margin-top, margin-right, margin-bottom, and margin-left properties"},{"refs":[{"id":"ref-for-ruby-annotation-container-box\u2460"}],"title":"3.2. Margin Shorthand: the margin property"},{"refs":[{"id":"ref-for-ruby-annotation-container-box\u2461"}],"title":"4.1. Page-relative (Physical) Padding Properties: the padding-top, padding-right, padding-bottom, and padding-left properties"},{"refs":[{"id":"ref-for-ruby-annotation-container-box\u2462"}],"title":"4.2. Padding Shorthand: the padding property"},{"refs":[{"id":"ref-for-ruby-annotation-container-box\u2463"}],"title":"7. Changes Since CSS Level 2"}],"url":"https://drafts.csswg.org/css-ruby-1/#ruby-annotation-container-box"},
+"31ccd1a9": {"dfnID":"31ccd1a9","dfnText":"longhand property","external":true,"refSections":[{"refs":[{"id":"ref-for-longhand"},{"id":"ref-for-longhand\u2460"},{"id":"ref-for-longhand\u2461"}],"title":"3. Margins"},{"refs":[{"id":"ref-for-longhand\u2462"},{"id":"ref-for-longhand\u2463"},{"id":"ref-for-longhand\u2464"}],"title":"4. Padding"},{"refs":[{"id":"ref-for-longhand\u2465"}],"title":"5. Borders"}],"url":"https://drafts.csswg.org/css-cascade-5/#longhand"},
+"358fd6ff": {"dfnID":"358fd6ff","dfnText":"css-wide keywords","external":true,"refSections":[{"refs":[{"id":"ref-for-css-wide-keywords"}],"title":"1.1. \nValue Definitions"}],"url":"https://drafts.csswg.org/css-values-4/#css-wide-keywords"},
+"37c3d179": {"dfnID":"37c3d179","dfnText":"block-end","external":true,"refSections":[{"refs":[{"id":"ref-for-block-end"}],"title":"3.3. Margins at Container Edges: the margin-trim property"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#block-end"},
+"3b1682d5": {"dfnID":"3b1682d5","dfnText":"background-origin","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-background-origin"}],"title":"4. Padding"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-background-origin"},
+"43667deb": {"dfnID":"43667deb","dfnText":"inline axis","external":true,"refSections":[{"refs":[{"id":"ref-for-inline-axis"},{"id":"ref-for-inline-axis\u2460"}],"title":"3.3. Margins at Container Edges: the margin-trim property"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#inline-axis"},
+"45ea65d2": {"dfnID":"45ea65d2","dfnText":"svg viewports","external":true,"refSections":[{"refs":[{"id":"ref-for-TermSVGViewport"},{"id":"ref-for-TermSVGViewport\u2460"},{"id":"ref-for-TermSVGViewport\u2461"},{"id":"ref-for-TermSVGViewport\u2462"}],"title":"2.1. Box-edge Keywords"}],"url":"https://svgwg.org/svg2-draft/coords.html#TermSVGViewport"},
+"466b2ed9": {"dfnID":"466b2ed9","dfnText":"inline-start","external":true,"refSections":[{"refs":[{"id":"ref-for-inline-start"},{"id":"ref-for-inline-start\u2460"}],"title":"3.3. Margins at Container Edges: the margin-trim property"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#inline-start"},
+"521eb6d4": {"dfnID":"521eb6d4","dfnText":"multi-column container","external":true,"refSections":[{"refs":[{"id":"ref-for-multi-column-container"}],"title":"3.3. Margins at Container Edges: the margin-trim property"}],"url":"https://drafts.csswg.org/css-multicol-1/#multi-column-container"},
+"5eff29c1": {"dfnID":"5eff29c1","dfnText":"flow-relative","external":true,"refSections":[{"refs":[{"id":"ref-for-flow-relative"}],"title":"3. Margins"},{"refs":[{"id":"ref-for-flow-relative\u2460"}],"title":"4. Padding"},{"refs":[{"id":"ref-for-flow-relative\u2461"}],"title":"5. Borders"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#flow-relative"},
+"6458a3ef": {"dfnID":"6458a3ef","dfnText":"fragmentation break","external":true,"refSections":[{"refs":[{"id":"ref-for-fragmentation-break"}],"title":"3. Margins"},{"refs":[{"id":"ref-for-fragmentation-break\u2460"}],"title":"3.3. Margins at Container Edges: the margin-trim property"}],"url":"https://drafts.csswg.org/css-break-4/#fragmentation-break"},
+"6d0d9897": {"dfnID":"6d0d9897","dfnText":"internal table element","external":true,"refSections":[{"refs":[{"id":"ref-for-internal-table-element"}],"title":"3.1. Page-relative (Physical) Margin Properties: the margin-top, margin-right, margin-bottom, and margin-left properties"},{"refs":[{"id":"ref-for-internal-table-element\u2460"}],"title":"3.2. Margin Shorthand: the margin property"},{"refs":[{"id":"ref-for-internal-table-element\u2461"}],"title":"4.1. Page-relative (Physical) Padding Properties: the padding-top, padding-right, padding-bottom, and padding-left properties"},{"refs":[{"id":"ref-for-internal-table-element\u2462"}],"title":"4.2. Padding Shorthand: the padding property"}],"url":"https://drafts.csswg.org/css-display-4/#internal-table-element"},
+"6ec67710": {"dfnID":"6ec67710","dfnText":"|","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-one"}],"title":"3.1. Page-relative (Physical) Margin Properties: the margin-top, margin-right, margin-bottom, and margin-left properties"},{"refs":[{"id":"ref-for-comb-one\u2460"},{"id":"ref-for-comb-one\u2461"}],"title":"3.3. Margins at Container Edges: the margin-trim property"}],"url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"75bfa627": {"dfnID":"75bfa627","dfnText":"::first-line","external":true,"refSections":[{"refs":[{"id":"ref-for-selectordef-first-line"}],"title":"1.2. \nModule Interactions"}],"url":"https://drafts.csswg.org/css-pseudo-4/#selectordef-first-line"},
+"7bf10631": {"dfnID":"7bf10631","dfnText":"document tree","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-document-tree"},{"id":"ref-for-concept-document-tree\u2460"}],"title":"1. Introduction"}],"url":"https://dom.spec.whatwg.org/#concept-document-tree"},
+"881c2f72": {"dfnID":"881c2f72","dfnText":"box","external":true,"refSections":[{"refs":[{"id":"ref-for-box"},{"id":"ref-for-box\u2460"}],"title":"1. Introduction"},{"refs":[{"id":"ref-for-box\u2461"}],"title":"2. The CSS Box Model"},{"refs":[{"id":"ref-for-box\u2462"}],"title":"3.1. Page-relative (Physical) Margin Properties: the margin-top, margin-right, margin-bottom, and margin-left properties"},{"refs":[{"id":"ref-for-box\u2463"}],"title":"4.1. Page-relative (Physical) Padding Properties: the padding-top, padding-right, padding-bottom, and padding-left properties"}],"url":"https://drafts.csswg.org/css-display-4/#box"},
+"8ca0c013": {"dfnID":"8ca0c013","dfnText":"shorthand property","external":true,"refSections":[{"refs":[{"id":"ref-for-shorthand-property"}],"title":"3. Margins"},{"refs":[{"id":"ref-for-shorthand-property\u2460"}],"title":"4. Padding"}],"url":"https://drafts.csswg.org/css-cascade-5/#shorthand-property"},
+"8f96f376": {"dfnID":"8f96f376","dfnText":"inline-axis","external":true,"refSections":[{"refs":[{"id":"ref-for-inline-axis"},{"id":"ref-for-inline-axis\u2460"}],"title":"3.3. Margins at Container Edges: the margin-trim property"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#inline-axis"},
+"8feba1a1": {"dfnID":"8feba1a1","dfnText":"logical width","external":true,"refSections":[{"refs":[{"id":"ref-for-logical-width"}],"title":"3.1. Page-relative (Physical) Margin Properties: the margin-top, margin-right, margin-bottom, and margin-left properties"},{"refs":[{"id":"ref-for-logical-width\u2460"}],"title":"3.2. Margin Shorthand: the margin property"},{"refs":[{"id":"ref-for-logical-width\u2461"}],"title":"4.1. Page-relative (Physical) Padding Properties: the padding-top, padding-right, padding-bottom, and padding-left properties"},{"refs":[{"id":"ref-for-logical-width\u2462"}],"title":"4.2. Padding Shorthand: the padding property"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#logical-width"},
+"92c1cc6f": {"dfnID":"92c1cc6f","dfnText":"block formatting context root","external":true,"refSections":[{"refs":[{"id":"ref-for-block-formatting-context-root"}],"title":"3.3. Margins at Container Edges: the margin-trim property"}],"url":"https://drafts.csswg.org/css-display-4/#block-formatting-context-root"},
+"938ba280": {"dfnID":"938ba280","dfnText":"{a,b}","external":true,"refSections":[{"refs":[{"id":"ref-for-mult-num-range"}],"title":"3.2. Margin Shorthand: the margin property"},{"refs":[{"id":"ref-for-mult-num-range\u2460"}],"title":"4.2. Padding Shorthand: the padding property"}],"url":"https://drafts.csswg.org/css-values-4/#mult-num-range"},
+"97cc51ce": {"dfnID":"97cc51ce","dfnText":"intrinsic size contribution","external":true,"refSections":[{"refs":[{"id":"ref-for-intrinsic-size-contribution"}],"title":"3.3. Margins at Container Edges: the margin-trim property"}],"url":"https://drafts.csswg.org/css-sizing-3/#intrinsic-size-contribution"},
+"9b0fa0e9": {"dfnID":"9b0fa0e9","dfnText":"background-clip","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-background-clip"}],"title":"2.1. Box-edge Keywords"},{"refs":[{"id":"ref-for-propdef-background-clip\u2460"}],"title":"4. Padding"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-background-clip"},
+"9e066e76": {"dfnID":"9e066e76","dfnText":"longhand","external":true,"refSections":[{"refs":[{"id":"ref-for-longhand"},{"id":"ref-for-longhand\u2460"},{"id":"ref-for-longhand\u2461"}],"title":"3. Margins"},{"refs":[{"id":"ref-for-longhand\u2462"},{"id":"ref-for-longhand\u2463"},{"id":"ref-for-longhand\u2464"}],"title":"4. Padding"},{"refs":[{"id":"ref-for-longhand\u2465"}],"title":"5. Borders"}],"url":"https://drafts.csswg.org/css-cascade-5/#longhand"},
+"9f3d4f17": {"dfnID":"9f3d4f17","dfnText":"block container","external":true,"refSections":[{"refs":[{"id":"ref-for-block-container"},{"id":"ref-for-block-container\u2460"},{"id":"ref-for-block-container\u2461"}],"title":"3.3. Margins at Container Edges: the margin-trim property"}],"url":"https://drafts.csswg.org/css-display-4/#block-container"},
+"a0e35b6d": {"dfnID":"a0e35b6d","dfnText":"sizing property","external":true,"refSections":[{"refs":[{"id":"ref-for-sizing-property"}],"title":"1. Introduction"}],"url":"https://drafts.csswg.org/css-sizing-3/#sizing-property"},
+"a1addf6c": {"dfnID":"a1addf6c","dfnText":"::first-letter","external":true,"refSections":[{"refs":[{"id":"ref-for-selectordef-first-letter"}],"title":"1.2. \nModule Interactions"}],"url":"https://drafts.csswg.org/css-pseudo-4/#selectordef-first-letter"},
+"a1cb86c7": {"dfnID":"a1cb86c7","dfnText":"transform-box","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-transform-box"}],"title":"2.1. Box-edge Keywords"}],"url":"https://drafts.csswg.org/css-transforms-1/#propdef-transform-box"},
+"a270c80d": {"dfnID":"a270c80d","dfnText":"fragmentation context","external":true,"refSections":[{"refs":[{"id":"ref-for-fragmentation-context"}],"title":"3.3. Margins at Container Edges: the margin-trim property"}],"url":"https://drafts.csswg.org/css-break-4/#fragmentation-context"},
+"a73617e0": {"dfnID":"a73617e0","dfnText":"writing mode","external":true,"refSections":[{"refs":[{"id":"ref-for-writing-mode"}],"title":"7. Changes Since CSS Level 2"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#writing-mode"},
+"a8485ff4": {"dfnID":"a8485ff4","dfnText":"replaced element","external":true,"refSections":[{"refs":[{"id":"ref-for-replaced-element"}],"title":"2. The CSS Box Model"}],"url":"https://drafts.csswg.org/css-display-4/#replaced-element"},
+"a9734ee4": {"dfnID":"a9734ee4","dfnText":"border","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-border"}],"title":"1. Introduction"},{"refs":[{"id":"ref-for-propdef-border\u2460"}],"title":"2. The CSS Box Model"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-border"},
+"border-area": {"dfnID":"border-area","dfnText":"border","external":false,"refSections":[{"refs":[{"id":"ref-for-border-area"},{"id":"ref-for-border-area\u2460"}],"title":"2. The CSS Box Model"},{"refs":[{"id":"ref-for-border-area\u2461"}],"title":"4. Padding"},{"refs":[{"id":"ref-for-border-area\u2462"},{"id":"ref-for-border-area\u2463"}],"title":"5. Borders"}],"url":"#border-area"},
+"border-box": {"dfnID":"border-box","dfnText":"border box","external":false,"refSections":[{"refs":[{"id":"ref-for-border-box"}],"title":"2. The CSS Box Model"},{"refs":[{"id":"ref-for-border-box\u2460"}],"title":"2.1. Box-edge Keywords"}],"url":"#border-box"},
+"border-edge": {"dfnID":"border-edge","dfnText":"border edge","external":false,"refSections":[{"refs":[{"id":"ref-for-border-edge"}],"title":"2. The CSS Box Model"},{"refs":[{"id":"ref-for-border-edge\u2460"}],"title":"2.1. Box-edge Keywords"}],"url":"#border-edge"},
+"box-edge": {"dfnID":"box-edge","dfnText":"edge","external":false,"refSections":[{"refs":[{"id":"ref-for-box-edge"},{"id":"ref-for-box-edge\u2460"}],"title":"2. The CSS Box Model"}],"url":"#box-edge"},
+"box-svg-viewport-origin-box": {"dfnID":"box-svg-viewport-origin-box","dfnText":"origin box","external":false,"refSections":[{"refs":[{"id":"ref-for-box-svg-viewport-origin-box"}],"title":"2.1. Box-edge Keywords"}],"url":"#box-svg-viewport-origin-box"},
+"c3bd6e1d": {"dfnID":"c3bd6e1d","dfnText":"box fragment","external":true,"refSections":[{"refs":[{"id":"ref-for-box-fragment"}],"title":"2. The CSS Box Model"}],"url":"https://drafts.csswg.org/css-break-4/#box-fragment"},
+"content-area": {"dfnID":"content-area","dfnText":"content area","external":false,"refSections":[{"refs":[{"id":"ref-for-content-area"},{"id":"ref-for-content-area\u2460"},{"id":"ref-for-content-area\u2461"}],"title":"2. The CSS Box Model"}],"url":"#content-area"},
+"content-box": {"dfnID":"content-box","dfnText":"content box","external":false,"refSections":[{"refs":[{"id":"ref-for-content-box"}],"title":"2. The CSS Box Model"},{"refs":[{"id":"ref-for-content-box\u2460"}],"title":"2.1. Box-edge Keywords"}],"url":"#content-box"},
+"content-edge": {"dfnID":"content-edge","dfnText":"content edge","external":false,"refSections":[{"refs":[{"id":"ref-for-content-edge"}],"title":"2. The CSS Box Model"},{"refs":[{"id":"ref-for-content-edge\u2460"}],"title":"2.1. Box-edge Keywords"},{"refs":[{"id":"ref-for-content-edge\u2461"}],"title":"3.3. Margins at Container Edges: the margin-trim property"}],"url":"#content-edge"},
+"d9c76793": {"dfnID":"d9c76793","dfnText":"physical","external":true,"refSections":[{"refs":[{"id":"ref-for-physical"}],"title":"3. Margins"},{"refs":[{"id":"ref-for-physical\u2460"}],"title":"4. Padding"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#physical"},
+"df19338c": {"dfnID":"df19338c","dfnText":"box tree","external":true,"refSections":[{"refs":[{"id":"ref-for-box-tree"}],"title":"1. Introduction"}],"url":"https://drafts.csswg.org/css-display-4/#box-tree"},
+"ea663a43": {"dfnID":"ea663a43","dfnText":"containing block","external":true,"refSections":[{"refs":[{"id":"ref-for-containing-block"}],"title":"2. The CSS Box Model"},{"refs":[{"id":"ref-for-containing-block\u2460"}],"title":"3.3. Margins at Container Edges: the margin-trim property"}],"url":"https://drafts.csswg.org/css-display-4/#containing-block"},
+"eaa4fbeb": {"dfnID":"eaa4fbeb","dfnText":"block layout","external":true,"refSections":[{"refs":[{"id":"ref-for-block-layout"}],"title":"3. Margins"}],"url":"https://drafts.csswg.org/css-display-4/#block-layout"},
+"f005b2f6": {"dfnID":"f005b2f6","dfnText":"grid container","external":true,"refSections":[{"refs":[{"id":"ref-for-grid-container"}],"title":"3.3. Margins at Container Edges: the margin-trim property"}],"url":"https://drafts.csswg.org/css-grid-2/#grid-container"},
+"f4a5f1c1": {"dfnID":"f4a5f1c1","dfnText":"inline-end","external":true,"refSections":[{"refs":[{"id":"ref-for-inline-end"},{"id":"ref-for-inline-end\u2460"}],"title":"3.3. Margins at Container Edges: the margin-trim property"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#inline-end"},
+"f5eca8c9": {"dfnID":"f5eca8c9","dfnText":"background","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-background"}],"title":"2. The CSS Box Model"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-background"},
+"ff72fec7": {"dfnID":"ff72fec7","dfnText":"object bounding box","external":true,"refSections":[{"refs":[{"id":"ref-for-TermObjectBoundingBox"}],"title":"2.1. Box-edge Keywords"}],"url":"https://svgwg.org/svg2-draft/coords.html#TermObjectBoundingBox"},
+"inner-edge": {"dfnID":"inner-edge","dfnText":"inner edge","external":false,"refSections":[{"refs":[{"id":"ref-for-inner-edge"},{"id":"ref-for-inner-edge\u2460"}],"title":"3.3. Margins at Container Edges: the margin-trim property"}],"url":"#inner-edge"},
+"margin": {"dfnID":"margin","dfnText":"Margins","external":false,"refSections":[{"refs":[{"id":"ref-for-margin"}],"title":"3.1. Page-relative (Physical) Margin Properties: the margin-top, margin-right, margin-bottom, and margin-left properties"},{"refs":[{"id":"ref-for-margin\u2460"},{"id":"ref-for-margin\u2461"}],"title":"3.3. Margins at Container Edges: the margin-trim property"}],"url":"#margin"},
+"margin-area": {"dfnID":"margin-area","dfnText":"margin areas","external":false,"refSections":[{"refs":[{"id":"ref-for-margin-area"}],"title":"2. The CSS Box Model"},{"refs":[{"id":"ref-for-margin-area\u2460"}],"title":"3. Margins"}],"url":"#margin-area"},
+"margin-box": {"dfnID":"margin-box","dfnText":"margin box","external":false,"refSections":[{"refs":[{"id":"ref-for-margin-box"}],"title":"2. The CSS Box Model"},{"refs":[{"id":"ref-for-margin-box\u2460"}],"title":"2.1. Box-edge Keywords"}],"url":"#margin-box"},
+"margin-edge": {"dfnID":"margin-edge","dfnText":"margin edge","external":false,"refSections":[{"refs":[{"id":"ref-for-margin-edge"}],"title":"2. The CSS Box Model"},{"refs":[{"id":"ref-for-margin-edge\u2460"}],"title":"2.1. Box-edge Keywords"},{"refs":[{"id":"ref-for-margin-edge\u2461"}],"title":"3.3. Margins at Container Edges: the margin-trim property"}],"url":"#margin-edge"},
+"outer-edge": {"dfnID":"outer-edge","dfnText":"outer edge","external":false,"refSections":[{"refs":[{"id":"ref-for-outer-edge"},{"id":"ref-for-outer-edge\u2460"}],"title":"3.3. Margins at Container Edges: the margin-trim property"}],"url":"#outer-edge"},
+"padding": {"dfnID":"padding","dfnText":"Padding","external":false,"refSections":[{"refs":[{"id":"ref-for-padding"}],"title":"4.1. Page-relative (Physical) Padding Properties: the padding-top, padding-right, padding-bottom, and padding-left properties"}],"url":"#padding"},
+"padding-area": {"dfnID":"padding-area","dfnText":"padding","external":false,"refSections":[{"refs":[{"id":"ref-for-padding-area"},{"id":"ref-for-padding-area\u2460"},{"id":"ref-for-padding-area\u2461"}],"title":"2. The CSS Box Model"},{"refs":[{"id":"ref-for-padding-area\u2462"}],"title":"4. Padding"}],"url":"#padding-area"},
+"padding-box": {"dfnID":"padding-box","dfnText":"padding box","external":false,"refSections":[{"refs":[{"id":"ref-for-padding-box"}],"title":"2. The CSS Box Model"},{"refs":[{"id":"ref-for-padding-box\u2460"}],"title":"2.1. Box-edge Keywords"}],"url":"#padding-box"},
+"padding-edge": {"dfnID":"padding-edge","dfnText":"padding edge","external":false,"refSections":[{"refs":[{"id":"ref-for-padding-edge"}],"title":"2. The CSS Box Model"},{"refs":[{"id":"ref-for-padding-edge\u2460"}],"title":"2.1. Box-edge Keywords"}],"url":"#padding-edge"},
+"propdef-margin": {"dfnID":"propdef-margin","dfnText":"margin","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-margin"}],"title":"1. Introduction"},{"refs":[{"id":"ref-for-propdef-margin\u2460"},{"id":"ref-for-propdef-margin\u2461"},{"id":"ref-for-propdef-margin\u2462"}],"title":"3. Margins"},{"refs":[{"id":"ref-for-propdef-margin\u2463"},{"id":"ref-for-propdef-margin\u2464"},{"id":"ref-for-propdef-margin\u2465"}],"title":"3.2. Margin Shorthand: the margin property"},{"refs":[{"id":"ref-for-propdef-margin\u2466"}],"title":"7. Changes Since CSS Level 2"}],"url":"#propdef-margin"},
+"propdef-margin-bottom": {"dfnID":"propdef-margin-bottom","dfnText":"margin-bottom","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-margin-bottom"}],"title":"3.1. Page-relative (Physical) Margin Properties: the margin-top, margin-right, margin-bottom, and margin-left properties"},{"refs":[{"id":"ref-for-propdef-margin-bottom\u2460"}],"title":"3.2. Margin Shorthand: the margin property"}],"url":"#propdef-margin-bottom"},
+"propdef-margin-left": {"dfnID":"propdef-margin-left","dfnText":"margin-left","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-margin-left"}],"title":"3.1. Page-relative (Physical) Margin Properties: the margin-top, margin-right, margin-bottom, and margin-left properties"},{"refs":[{"id":"ref-for-propdef-margin-left\u2460"}],"title":"3.2. Margin Shorthand: the margin property"}],"url":"#propdef-margin-left"},
+"propdef-margin-right": {"dfnID":"propdef-margin-right","dfnText":"margin-right","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-margin-right"}],"title":"3.1. Page-relative (Physical) Margin Properties: the margin-top, margin-right, margin-bottom, and margin-left properties"},{"refs":[{"id":"ref-for-propdef-margin-right\u2460"}],"title":"3.2. Margin Shorthand: the margin property"}],"url":"#propdef-margin-right"},
+"propdef-margin-top": {"dfnID":"propdef-margin-top","dfnText":"margin-top","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-margin-top"}],"title":"3.1. Page-relative (Physical) Margin Properties: the margin-top, margin-right, margin-bottom, and margin-left properties"},{"refs":[{"id":"ref-for-propdef-margin-top\u2460"},{"id":"ref-for-propdef-margin-top\u2461"}],"title":"3.2. Margin Shorthand: the margin property"}],"url":"#propdef-margin-top"},
+"propdef-margin-trim": {"dfnID":"propdef-margin-trim","dfnText":"margin-trim","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-margin-trim"},{"id":"ref-for-propdef-margin-trim\u2460"},{"id":"ref-for-propdef-margin-trim\u2461"},{"id":"ref-for-propdef-margin-trim\u2462"}],"title":"3.3. Margins at Container Edges: the margin-trim property"},{"refs":[{"id":"ref-for-propdef-margin-trim\u2463"}],"title":"6. Changes Since CSS Level 3"}],"url":"#propdef-margin-trim"},
+"propdef-padding": {"dfnID":"propdef-padding","dfnText":"padding","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-padding"}],"title":"1. Introduction"},{"refs":[{"id":"ref-for-propdef-padding\u2460"},{"id":"ref-for-propdef-padding\u2461"},{"id":"ref-for-propdef-padding\u2462"}],"title":"4. Padding"},{"refs":[{"id":"ref-for-propdef-padding\u2463"},{"id":"ref-for-propdef-padding\u2464"},{"id":"ref-for-propdef-padding\u2465"}],"title":"4.2. Padding Shorthand: the padding property"},{"refs":[{"id":"ref-for-propdef-padding\u2466"}],"title":"7. Changes Since CSS Level 2"}],"url":"#propdef-padding"},
+"propdef-padding-bottom": {"dfnID":"propdef-padding-bottom","dfnText":"padding-bottom","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-padding-bottom"}],"title":"4.1. Page-relative (Physical) Padding Properties: the padding-top, padding-right, padding-bottom, and padding-left properties"},{"refs":[{"id":"ref-for-propdef-padding-bottom\u2460"}],"title":"4.2. Padding Shorthand: the padding property"}],"url":"#propdef-padding-bottom"},
+"propdef-padding-left": {"dfnID":"propdef-padding-left","dfnText":"padding-left","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-padding-left"}],"title":"4.1. Page-relative (Physical) Padding Properties: the padding-top, padding-right, padding-bottom, and padding-left properties"},{"refs":[{"id":"ref-for-propdef-padding-left\u2460"}],"title":"4.2. Padding Shorthand: the padding property"}],"url":"#propdef-padding-left"},
+"propdef-padding-right": {"dfnID":"propdef-padding-right","dfnText":"padding-right","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-padding-right"}],"title":"4.1. Page-relative (Physical) Padding Properties: the padding-top, padding-right, padding-bottom, and padding-left properties"},{"refs":[{"id":"ref-for-propdef-padding-right\u2460"}],"title":"4.2. Padding Shorthand: the padding property"}],"url":"#propdef-padding-right"},
+"propdef-padding-top": {"dfnID":"propdef-padding-top","dfnText":"padding-top","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-padding-top"}],"title":"4.1. Page-relative (Physical) Padding Properties: the padding-top, padding-right, padding-bottom, and padding-left properties"},{"refs":[{"id":"ref-for-propdef-padding-top\u2460"},{"id":"ref-for-propdef-padding-top\u2461"}],"title":"4.2. Padding Shorthand: the padding property"}],"url":"#propdef-padding-top"},
+"typedef-coord-box": {"dfnID":"typedef-coord-box","dfnText":"<coord-box>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-coord-box"}],"title":"2.1. Box-edge Keywords"}],"url":"#typedef-coord-box"},
+"typedef-layout-box": {"dfnID":"typedef-layout-box","dfnText":"<layout-box>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-layout-box"}],"title":"2.1. Box-edge Keywords"}],"url":"#typedef-layout-box"},
+"typedef-paint-box": {"dfnID":"typedef-paint-box","dfnText":"<paint-box>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-paint-box"}],"title":"2.1. Box-edge Keywords"}],"url":"#typedef-paint-box"},
+"typedef-visual-box": {"dfnID":"typedef-visual-box","dfnText":"<visual-box>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-visual-box"}],"title":"2.1. Box-edge Keywords"}],"url":"#typedef-visual-box"},
+"valdef-box-border-box": {"dfnID":"valdef-box-border-box","dfnText":"border-box","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-box-border-box"},{"id":"ref-for-valdef-box-border-box\u2460"}],"title":"2.1. Box-edge Keywords"}],"url":"#valdef-box-border-box"},
+"valdef-box-content-box": {"dfnID":"valdef-box-content-box","dfnText":"content-box","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-box-content-box"}],"title":"2.1. Box-edge Keywords"}],"url":"#valdef-box-content-box"},
+"valdef-box-fill-box": {"dfnID":"valdef-box-fill-box","dfnText":"fill-box","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-box-fill-box"},{"id":"ref-for-valdef-box-fill-box\u2460"}],"title":"2.1. Box-edge Keywords"}],"url":"#valdef-box-fill-box"},
+"valdef-box-stroke-box": {"dfnID":"valdef-box-stroke-box","dfnText":"stroke-box","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-box-stroke-box"},{"id":"ref-for-valdef-box-stroke-box\u2460"}],"title":"2.1. Box-edge Keywords"}],"url":"#valdef-box-stroke-box"},
+"valdef-margin-trim-in-flow": {"dfnID":"valdef-margin-trim-in-flow","dfnText":"in-flow","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-margin-trim-in-flow"}],"title":"3.3. Margins at Container Edges: the margin-trim property"}],"url":"#valdef-margin-trim-in-flow"},
+};
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+});
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        dfn.panelData = panelData;
+        insertDfnPopupAction(dfn);
+    }
+}
+
+function genDfnPanel(dfn, { dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel on",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel({dfnPanel});
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.dfn = dfn;
+    dfn.dfnPanel = dfnPanel;
+    return dfnPanel;
+}
+
+
+
+function hideAllDfnPanels() {
+    // Delete the currently-active dfn panel.
+    queryAll(".dfn-panel").forEach(dfnPanel=>hideDfnPanel({dfnPanel}));
+}
+
+function showDfnPanel(dfn) {
+    hideAllDfnPanels(); // Only display one at a time.
+
+    dfn.setAttribute("aria-expanded", "true");
+
+    const dfnPanel = genDfnPanel(dfn, dfn.panelData);
+
+    // Give the dfn a unique tabindex, and then
+    // give all the tabbable panel bits successive indexes.
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+
+    append(document.body, dfnPanel);
+    positionDfnPanel(dfnPanel);
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.dfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }
+}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel({dfn, dfnPanel}) {
+    if(!dfnPanel) dfnPanel = dfn.dfnPanel;
+    if(!dfn) dfn = dfnPanel.dfn;
+    dfn.dfnPanel = undefined;
+    dfnPanel.dfn = undefined;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.remove()
+}
+
+function toggleDfnPanel(dfn) {
+    if(dfn.dfnPanel) {
+        hideDfnPanel(dfn);
+    } else {
+        showDfnPanel(dfn);
+    }
+}
+
+function insertDfnPopupAction(dfn) {
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        toggleDfnPanel(dfn);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+function needsFor(type) {
+    switch(type) {
+        case "descriptor":
+        case "value":
+        case "element-attr":
+        case "attr-value":
+        case "element-state":
+        case "method":
+        case "constructor":
+        case "argument":
+        case "attribute":
+        case "const":
+        case "dict-member":
+        case "event":
+        case "enum-value":
+        case "stringifier":
+        case "serializer":
+        case "iterator":
+        case "maplike":
+        case "setlike":
+        case "state":
+        case "mode":
+        case "context":
+        case "facet": return true;
+
+        default: return false;
+    }
+}
+function refusesFor(type) {
+    switch(type) {
+        case "property":
+        case "element":
+        case "interface":
+        case "namespace":
+        case "callback":
+        case "dictionary":
+        case "enum":
+        case "exception":
+        case "typedef":
+        case "http-header":
+        case "permission": return true;
+
+        default: return false;
+    }
+}
+function linkFormatterFromType(type) {
+    switch(type) {
+        case 'scheme':
+        case 'permission':
+        case 'dfn': return (text) => `[=${text}=]`;
+
+        case 'abstract-op': return (text) => `[\$${text}\$]`;
+
+        case 'function':
+        case 'at-rule':
+        case 'selector':
+        case 'value': return (text) => `''${text}''`;
+
+        case 'http-header': return (text) => `[:${text}:]`;
+
+        case 'interface':
+        case 'constructor':
+        case 'method':
+        case 'argument':
+        case 'attribute':
+        case 'callback':
+        case 'dictionary':
+        case 'dict-member':
+        case 'enum':
+        case 'enum-value':
+        case 'exception':
+        case 'const':
+        case 'typedef':
+        case 'stringifier':
+        case 'serializer':
+        case 'iterator':
+        case 'maplike':
+        case 'setlike':
+        case 'extended-attribute':
+        case 'event':
+        case 'idl': return (text) => `{{${text}}}`;
+
+        case 'element-state':
+        case 'element-attr':
+        case 'attr-value':
+        case 'element': return (element) => `<{${element}}>`;
+
+        case 'grammar': return (text) => `${text} (within a <pre class=prod>)`;
+
+        case 'type': return (text)=> `<<${text}>>`;
+
+        case 'descriptor':
+        case 'property': return (text) => `'${text}'`;
+
+        default: return;
+    };
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!needsFor(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!refusesFor(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
 }
 </script>
 <script>/* Boilerplate: script-position-annos */
 "use strict";
 {
-
 function repositionAnnoPanels(){
     const panels = [...document.querySelectorAll("[data-anno-for]")];
-    const main = document.querySelector("main");
-    let mainRect;
-    if(main) mainRect = main.getBoundingClientRect();
-    for(const panel of panels) {
-        const dfn = document.getElementById(panel.getAttribute("data-anno-for"));
-        if(!dfn) {
-            console.log("Can't find the annotation panel target:", panel);
-            continue;
-        }
-        const rect = dfn.getBoundingClientRect();
-        const top = window.scrollY + rect.top
-        panel.style.top = top + "px";
-        panel.top = top;
-        panel.height = rect.height;
-        panel.classList.remove("unpositioned");
-        const panelRect = panel.getBoundingClientRect()
-        if(main) {
-            panel.classList.toggle("overlapping-main", panelRect.left < mainRect.right)
-        }
-    }
+    hydratePanels(panels);
     let vSoFar = 0;
     for(const panel of panels.sort(cmpTops)) {
         if(panel.top < vSoFar) {
@@ -2700,6 +2686,39 @@ function repositionAnnoPanels(){
             panel.style.top = vSoFar + "px";
         }
         vSoFar = panel.top + panel.height + 15;
+    }
+}
+function hydratePanels(panels) {
+    const main = document.querySelector("main");
+    let mainRect;
+    if(main) mainRect = main.getBoundingClientRect();
+    // First display them all, if they're not already visible.
+    for(const panel of panels) {
+        panel.classList.remove("unpositioned");
+    }
+    // Measure them all
+    for(const panel of panels) {
+        const dfn = document.getElementById(panel.getAttribute("data-anno-for"));
+        if(!dfn) {
+            console.log("Can't find the annotation panel target:", panel);
+            continue;
+        }
+        panel.dfn = dfn;
+        panel.top = window.scrollY + dfn.getBoundingClientRect().top;
+        let panelRect = panel.getBoundingClientRect();
+        panel.height = panelRect.height;
+        if(main) {
+            panel.overlappingMain = panelRect.left < mainRect.right;
+        } else {
+            panel.overlappingMain = false;
+        }
+    }
+    // And finally position them
+    for(const panel of panels) {
+        const dfn = panel.dfn;
+        if(!dfn) continue;
+        panel.style.top = panel.top + "px";
+        panel.classList.toggle("overlapping-main", panel.overlappingMain);
     }
 }
 
@@ -2714,309 +2733,288 @@ window.addEventListener("resize", repositionAnnoPanels);
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
-                mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
+let refsData = {
+"#border-area": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"border area","type":"dfn","url":"#border-area"},
+"#border-box": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"border box","type":"dfn","url":"#border-box"},
+"#border-edge": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"border edge","type":"dfn","url":"#border-edge"},
+"#box-edge": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"edge","type":"dfn","url":"#box-edge"},
+"#box-svg-viewport-origin-box": {"export":true,"for_":["<box>","<geometry-box>","<shape-box>"],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"origin box","type":"dfn","url":"#box-svg-viewport-origin-box"},
+"#content-area": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"content area","type":"dfn","url":"#content-area"},
+"#content-box": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"content box","type":"dfn","url":"#content-box"},
+"#content-edge": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"content edge","type":"dfn","url":"#content-edge"},
+"#inner-edge": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"inner edge","type":"dfn","url":"#inner-edge"},
+"#margin": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"margin","type":"dfn","url":"#margin"},
+"#margin-area": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"margin area","type":"dfn","url":"#margin-area"},
+"#margin-box": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"margin box","type":"dfn","url":"#margin-box"},
+"#margin-edge": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"margin edge","type":"dfn","url":"#margin-edge"},
+"#outer-edge": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"outer edge","type":"dfn","url":"#outer-edge"},
+"#padding": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"padding","type":"dfn","url":"#padding"},
+"#padding-area": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"padding area","type":"dfn","url":"#padding-area"},
+"#padding-box": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"padding box","type":"dfn","url":"#padding-box"},
+"#padding-edge": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"padding edge","type":"dfn","url":"#padding-edge"},
+"#propdef-margin": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"margin","type":"property","url":"#propdef-margin"},
+"#propdef-margin-bottom": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"margin-bottom","type":"property","url":"#propdef-margin-bottom"},
+"#propdef-margin-left": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"margin-left","type":"property","url":"#propdef-margin-left"},
+"#propdef-margin-right": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"margin-right","type":"property","url":"#propdef-margin-right"},
+"#propdef-margin-top": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"margin-top","type":"property","url":"#propdef-margin-top"},
+"#propdef-margin-trim": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"margin-trim","type":"property","url":"#propdef-margin-trim"},
+"#propdef-padding": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"padding","type":"property","url":"#propdef-padding"},
+"#propdef-padding-bottom": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"padding-bottom","type":"property","url":"#propdef-padding-bottom"},
+"#propdef-padding-left": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"padding-left","type":"property","url":"#propdef-padding-left"},
+"#propdef-padding-right": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"padding-right","type":"property","url":"#propdef-padding-right"},
+"#propdef-padding-top": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"padding-top","type":"property","url":"#propdef-padding-top"},
+"#typedef-coord-box": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"<coord-box>","type":"type","url":"#typedef-coord-box"},
+"#typedef-layout-box": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"<layout-box>","type":"type","url":"#typedef-layout-box"},
+"#typedef-paint-box": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"<paint-box>","type":"type","url":"#typedef-paint-box"},
+"#typedef-visual-box": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"<visual-box>","type":"type","url":"#typedef-visual-box"},
+"#valdef-box-border-box": {"export":true,"for_":["<box>","<geometry-box>","<shape-box>"],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"border-box","type":"value","url":"#valdef-box-border-box"},
+"#valdef-box-content-box": {"export":true,"for_":["<box>","<geometry-box>","<shape-box>"],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"content-box","type":"value","url":"#valdef-box-content-box"},
+"#valdef-box-fill-box": {"export":true,"for_":["<box>","<geometry-box>","<shape-box>"],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"fill-box","type":"value","url":"#valdef-box-fill-box"},
+"#valdef-box-stroke-box": {"export":true,"for_":["<box>","<geometry-box>","<shape-box>"],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"stroke-box","type":"value","url":"#valdef-box-stroke-box"},
+"#valdef-margin-trim-in-flow": {"export":true,"for_":["margin-trim"],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"local","text":"in-flow","type":"value","url":"#valdef-margin-trim-in-flow"},
+"https://dom.spec.whatwg.org/#concept-document-tree": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"document tree","type":"dfn","url":"https://dom.spec.whatwg.org/#concept-document-tree"},
+"https://drafts.csswg.org/css-backgrounds-3/#propdef-background": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"current","text":"background","type":"property","url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-background"},
+"https://drafts.csswg.org/css-backgrounds-3/#propdef-background-clip": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"current","text":"background-clip","type":"property","url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-background-clip"},
+"https://drafts.csswg.org/css-backgrounds-3/#propdef-background-origin": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"current","text":"background-origin","type":"property","url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-background-origin"},
+"https://drafts.csswg.org/css-backgrounds-3/#propdef-border": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"current","text":"border","type":"property","url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-border"},
+"https://drafts.csswg.org/css-break-4/#box-fragment": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"current","text":"box fragment","type":"dfn","url":"https://drafts.csswg.org/css-break-4/#box-fragment"},
+"https://drafts.csswg.org/css-break-4/#fragmentation-break": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"current","text":"fragmentation break","type":"dfn","url":"https://drafts.csswg.org/css-break-4/#fragmentation-break"},
+"https://drafts.csswg.org/css-break-4/#fragmentation-context": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"current","text":"fragmentation context","type":"dfn","url":"https://drafts.csswg.org/css-break-4/#fragmentation-context"},
+"https://drafts.csswg.org/css-break-4/#propdef-box-decoration-break": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"current","text":"box-decoration-break","type":"property","url":"https://drafts.csswg.org/css-break-4/#propdef-box-decoration-break"},
+"https://drafts.csswg.org/css-break-4/#propdef-margin-break": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"current","text":"margin-break","type":"property","url":"https://drafts.csswg.org/css-break-4/#propdef-margin-break"},
+"https://drafts.csswg.org/css-cascade-5/#longhand": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-cascade","spec":"css-cascade-5","status":"current","text":"longhand property","type":"dfn","url":"https://drafts.csswg.org/css-cascade-5/#longhand"},
+"https://drafts.csswg.org/css-cascade-5/#shorthand-property": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-cascade","spec":"css-cascade-5","status":"current","text":"shorthand property","type":"dfn","url":"https://drafts.csswg.org/css-cascade-5/#shorthand-property"},
+"https://drafts.csswg.org/css-display-4/#block-container": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"block container","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#block-container"},
+"https://drafts.csswg.org/css-display-4/#block-formatting-context-root": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"block formatting context root","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#block-formatting-context-root"},
+"https://drafts.csswg.org/css-display-4/#block-layout": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"block layout","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#block-layout"},
+"https://drafts.csswg.org/css-display-4/#box": {"export":true,"for_":["CSS"],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"box","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#box"},
+"https://drafts.csswg.org/css-display-4/#box-tree": {"export":true,"for_":["CSS"],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"box tree","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#box-tree"},
+"https://drafts.csswg.org/css-display-4/#containing-block": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"containing block","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#containing-block"},
+"https://drafts.csswg.org/css-display-4/#internal-table-element": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"internal table element","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#internal-table-element"},
+"https://drafts.csswg.org/css-display-4/#replaced-element": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"replaced element","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#replaced-element"},
+"https://drafts.csswg.org/css-flexbox-1/#flex-container": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-flexbox","spec":"css-flexbox-1","status":"current","text":"flex container","type":"dfn","url":"https://drafts.csswg.org/css-flexbox-1/#flex-container"},
+"https://drafts.csswg.org/css-grid-2/#grid-container": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-grid","spec":"css-grid-2","status":"current","text":"grid container","type":"dfn","url":"https://drafts.csswg.org/css-grid-2/#grid-container"},
+"https://drafts.csswg.org/css-multicol-1/#multi-column-container": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-multicol","spec":"css-multicol-1","status":"current","text":"multi-column container","type":"dfn","url":"https://drafts.csswg.org/css-multicol-1/#multi-column-container"},
+"https://drafts.csswg.org/css-pseudo-4/#selectordef-first-letter": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-pseudo","spec":"css-pseudo-4","status":"current","text":"::first-letter","type":"selector","url":"https://drafts.csswg.org/css-pseudo-4/#selectordef-first-letter"},
+"https://drafts.csswg.org/css-pseudo-4/#selectordef-first-line": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-pseudo","spec":"css-pseudo-4","status":"current","text":"::first-line","type":"selector","url":"https://drafts.csswg.org/css-pseudo-4/#selectordef-first-line"},
+"https://drafts.csswg.org/css-ruby-1/#ruby-annotation-container-box": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-ruby","spec":"css-ruby-1","status":"current","text":"ruby annotation container","type":"dfn","url":"https://drafts.csswg.org/css-ruby-1/#ruby-annotation-container-box"},
+"https://drafts.csswg.org/css-ruby-1/#ruby-base-container-box": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-ruby","spec":"css-ruby-1","status":"current","text":"ruby base container","type":"dfn","url":"https://drafts.csswg.org/css-ruby-1/#ruby-base-container-box"},
+"https://drafts.csswg.org/css-sizing-3/#intrinsic-size-contribution": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-sizing","spec":"css-sizing-3","status":"current","text":"intrinsic size contribution","type":"dfn","url":"https://drafts.csswg.org/css-sizing-3/#intrinsic-size-contribution"},
+"https://drafts.csswg.org/css-sizing-3/#size": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-sizing","spec":"css-sizing-3","status":"current","text":"size","type":"dfn","url":"https://drafts.csswg.org/css-sizing-3/#size"},
+"https://drafts.csswg.org/css-sizing-3/#sizing-property": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-sizing","spec":"css-sizing-3","status":"current","text":"sizing property","type":"dfn","url":"https://drafts.csswg.org/css-sizing-3/#sizing-property"},
+"https://drafts.csswg.org/css-transforms-1/#propdef-transform-box": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-transforms","spec":"css-transforms-1","status":"current","text":"transform-box","type":"property","url":"https://drafts.csswg.org/css-transforms-1/#propdef-transform-box"},
+"https://drafts.csswg.org/css-values-4/#comb-one": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"|","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"https://drafts.csswg.org/css-values-4/#css-wide-keywords": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"css-wide keywords","type":"dfn","url":"https://drafts.csswg.org/css-values-4/#css-wide-keywords"},
+"https://drafts.csswg.org/css-values-4/#mult-num-range": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"{a,b}","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#mult-num-range"},
+"https://drafts.csswg.org/css-values-4/#typedef-length-percentage": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<length-percentage>","type":"type","url":"https://drafts.csswg.org/css-values-4/#typedef-length-percentage"},
+"https://drafts.csswg.org/css-writing-modes-4/#block-end": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"block-end","type":"dfn","url":"https://drafts.csswg.org/css-writing-modes-4/#block-end"},
+"https://drafts.csswg.org/css-writing-modes-4/#block-size": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"block size","type":"dfn","url":"https://drafts.csswg.org/css-writing-modes-4/#block-size"},
+"https://drafts.csswg.org/css-writing-modes-4/#block-start": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"block-start","type":"dfn","url":"https://drafts.csswg.org/css-writing-modes-4/#block-start"},
+"https://drafts.csswg.org/css-writing-modes-4/#flow-relative": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"flow-relative","type":"dfn","url":"https://drafts.csswg.org/css-writing-modes-4/#flow-relative"},
+"https://drafts.csswg.org/css-writing-modes-4/#inline-axis": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"inline-axis","type":"dfn","url":"https://drafts.csswg.org/css-writing-modes-4/#inline-axis"},
+"https://drafts.csswg.org/css-writing-modes-4/#inline-end": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"inline-end","type":"dfn","url":"https://drafts.csswg.org/css-writing-modes-4/#inline-end"},
+"https://drafts.csswg.org/css-writing-modes-4/#inline-start": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"inline-start","type":"dfn","url":"https://drafts.csswg.org/css-writing-modes-4/#inline-start"},
+"https://drafts.csswg.org/css-writing-modes-4/#logical-width": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"logical width","type":"dfn","url":"https://drafts.csswg.org/css-writing-modes-4/#logical-width"},
+"https://drafts.csswg.org/css-writing-modes-4/#physical": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"physical","type":"dfn","url":"https://drafts.csswg.org/css-writing-modes-4/#physical"},
+"https://drafts.csswg.org/css-writing-modes-4/#writing-mode": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"writing mode","type":"dfn","url":"https://drafts.csswg.org/css-writing-modes-4/#writing-mode"},
+"https://svgwg.org/svg2-draft/coords.html#TermCanvas": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"canvas","type":"dfn","url":"https://svgwg.org/svg2-draft/coords.html#TermCanvas"},
+"https://svgwg.org/svg2-draft/coords.html#TermObjectBoundingBox": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"object bounding box","type":"dfn","url":"https://svgwg.org/svg2-draft/coords.html#TermObjectBoundingBox"},
+"https://svgwg.org/svg2-draft/coords.html#TermSVGViewport": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"svg viewports","type":"dfn","url":"https://svgwg.org/svg2-draft/coords.html#TermSVGViewport"},
+"https://svgwg.org/svg2-draft/coords.html#TermStrokeBoundingBox": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"stroke bounding box","type":"dfn","url":"https://svgwg.org/svg2-draft/coords.html#TermStrokeBoundingBox"},
+};
+
+function mkRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "Term: "),
+                mk.span({}, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    let forListElements;
+    if(forList.length == 0) {
+        forListElements = [];
+    } else if(forList.length == 1) {
+        forListElements = mk.li({},
+            mk.b({}, "For: "),
+            mk.span({}, forList[0]),
+        );
+    } else {
+        forListElements = mk.li({},
             mk.b({}, "For: "),
             mk.ul({},
                 ...forList.map(forItem =>
                     mk.li({},
-                        mk.span({}, `${forItem}`)
+                        mk.span({}, forItem)
                     ),
                 ),
             ),
         );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+    }
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    setupRefHintEventListeners(link, hintPanel);
+    return hintPanel;
+}
+
+function hideAllRefHints() {
+    queryAll(".ref-hint").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    if(refHint.teardownEventListeners) {
+        refHint.teardownEventListeners();
     }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+    refHint.remove();
+}
+
+function showRefHint(link) {
+    if(link.classList.contains("dfn-link")) return;
+    const url = link.getAttribute("href");
+    const ref = refsData[url];
+    if(!ref) return;
+
+    hideAllRefHints(); // Only display one at this time.
+
+    const refHint = mkRefHint(link, ref);
+    append(document.body, refHint);
+    link.setAttribute("aria-expanded", "true");
+    positionRefHint(refHint);
+}
+
+function setupRefHintEventListeners(link, refHint) {
+    if (refHint.teardownEventListeners) return;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
+
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
-
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
-    }
-
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
-        }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
-
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
-    }
-
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+document.addEventListener("DOMContentLoaded", () => {
+    document.body.addEventListener("mouseover", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
+    });
+    document.body.addEventListener("focus", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
     });
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['https://dom.spec.whatwg.org/#concept-document-tree'] = {"text": "document tree", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-document-tree", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#box'] = {"text": "box", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#box", "export": true, "normative": true, "for_": ["CSS"]};
-window.refsData['https://svgwg.org/svg2-draft/coords.html#TermCanvas'] = {"text": "canvas", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/coords.html#TermCanvas", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#box-tree'] = {"text": "box tree", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#box-tree", "export": true, "normative": true, "for_": ["CSS"]};
-window.refsData['https://drafts.csswg.org/css-sizing-3/#sizing-property'] = {"text": "sizing property", "type": "dfn", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#sizing-property", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-padding'] = {"text": "padding", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-padding", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border'] = {"text": "border", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-margin'] = {"text": "margin", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-margin", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#css-wide-keywords'] = {"text": "css-wide keywords", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-first-line'] = {"text": "::first-line", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-first-line", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-first-letter'] = {"text": "::first-letter", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-first-letter", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#replaced-element'] = {"text": "replaced element", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#replaced-element", "export": true, "normative": true, "for_": []};
-window.refsData['#box-edge'] = {"text": "edge", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#box-edge", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#containing-block'] = {"text": "containing block", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#containing-block", "export": true, "normative": true, "for_": []};
-window.refsData['#content-edge'] = {"text": "content edge", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#content-edge", "export": true, "normative": true, "for_": []};
-window.refsData['#padding-edge'] = {"text": "padding edge", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#padding-edge", "export": true, "normative": true, "for_": []};
-window.refsData['#content-area'] = {"text": "content area", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#content-area", "export": true, "normative": true, "for_": []};
-window.refsData['#padding-area'] = {"text": "padding area", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#padding-area", "export": true, "normative": true, "for_": []};
-window.refsData['#border-edge'] = {"text": "border edge", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#border-edge", "export": true, "normative": true, "for_": []};
-window.refsData['#border-area'] = {"text": "border area", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#border-area", "export": true, "normative": true, "for_": []};
-window.refsData['#margin-edge'] = {"text": "margin edge", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#margin-edge", "export": true, "normative": true, "for_": []};
-window.refsData['#margin-area'] = {"text": "margin area", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#margin-area", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-background'] = {"text": "background", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-break-4/#box-fragment'] = {"text": "box fragment", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-break-4/#box-fragment", "export": true, "normative": true, "for_": []};
-window.refsData['#content-box'] = {"text": "content box", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#content-box", "export": true, "normative": true, "for_": []};
-window.refsData['#padding-box'] = {"text": "padding box", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#padding-box", "export": true, "normative": true, "for_": []};
-window.refsData['#border-box'] = {"text": "border box", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#border-box", "export": true, "normative": true, "for_": []};
-window.refsData['#margin-box'] = {"text": "margin box", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#margin-box", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-break-4/#propdef-box-decoration-break'] = {"text": "box-decoration-break", "type": "property", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-break-4/#propdef-box-decoration-break", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-transforms-1/#propdef-transform-box'] = {"text": "transform-box", "type": "property", "spec": "css-transforms-1", "shortname": "css-transforms", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transforms-1/#propdef-transform-box", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-background-clip'] = {"text": "background-clip", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background-clip", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-box-fill-box'] = {"text": "fill-box", "type": "value", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#valdef-box-fill-box", "export": true, "normative": true, "for_": ["<box>", "<geometry-box>", "<shape-box>"]};
-window.refsData['#valdef-box-stroke-box'] = {"text": "stroke-box", "type": "value", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#valdef-box-stroke-box", "export": true, "normative": true, "for_": ["<box>", "<geometry-box>", "<shape-box>"]};
-window.refsData['https://svgwg.org/svg2-draft/coords.html#TermObjectBoundingBox'] = {"text": "object bounding box", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/coords.html#TermObjectBoundingBox", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-box-content-box'] = {"text": "content-box", "type": "value", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#valdef-box-content-box", "export": true, "normative": true, "for_": ["<box>", "<geometry-box>", "<shape-box>"]};
-window.refsData['https://svgwg.org/svg2-draft/coords.html#TermStrokeBoundingBox'] = {"text": "stroke bounding box", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/coords.html#TermStrokeBoundingBox", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-box-border-box'] = {"text": "border-box", "type": "value", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#valdef-box-border-box", "export": true, "normative": true, "for_": ["<box>", "<geometry-box>", "<shape-box>"]};
-window.refsData['https://svgwg.org/svg2-draft/coords.html#TermSVGViewport'] = {"text": "svg viewports", "type": "dfn", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/coords.html#TermSVGViewport", "export": true, "normative": true, "for_": []};
-window.refsData['#box-svg-viewport-origin-box'] = {"text": "origin box", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#box-svg-viewport-origin-box", "export": true, "normative": true, "for_": ["<box>", "<geometry-box>", "<shape-box>"]};
-window.refsData['#typedef-visual-box'] = {"text": "<visual-box>", "type": "type", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#typedef-visual-box", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-layout-box'] = {"text": "<layout-box>", "type": "type", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#typedef-layout-box", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-paint-box'] = {"text": "<paint-box>", "type": "type", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#typedef-paint-box", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-coord-box'] = {"text": "<coord-box>", "type": "type", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#typedef-coord-box", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-cascade-5/#shorthand-property'] = {"text": "shorthand property", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#shorthand-property", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-cascade-5/#longhand'] = {"text": "longhand property", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#longhand", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#physical'] = {"text": "physical", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#physical", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#flow-relative'] = {"text": "flow-relative", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#flow-relative", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#block-layout'] = {"text": "block layout", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#block-layout", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-break-4/#fragmentation-break'] = {"text": "fragmentation break", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-break-4/#fragmentation-break", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-margin-top'] = {"text": "margin-top", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-margin-top", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-margin-right'] = {"text": "margin-right", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-margin-right", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-margin-bottom'] = {"text": "margin-bottom", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-margin-bottom", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-margin-left'] = {"text": "margin-left", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-margin-left", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#typedef-length-percentage'] = {"text": "<length-percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#typedef-length-percentage", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#internal-table-element'] = {"text": "internal table element", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#internal-table-element", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-ruby-1/#ruby-base-container-box'] = {"text": "ruby base container", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-ruby-1/#ruby-base-container-box", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-ruby-1/#ruby-annotation-container-box'] = {"text": "ruby annotation container", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-ruby-1/#ruby-annotation-container-box", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#logical-width'] = {"text": "logical width", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#logical-width", "export": true, "normative": true, "for_": []};
-window.refsData['#margin'] = {"text": "margin", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#margin", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#mult-num-range'] = {"text": "{a,b}", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-num-range", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-margin-trim'] = {"text": "margin-trim", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-margin-trim", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#block-container'] = {"text": "block container", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#block-container", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-multicol-1/#multi-column-container'] = {"text": "multi-column container", "type": "dfn", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-multicol-1/#multi-column-container", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-margin-trim-in-flow'] = {"text": "in-flow", "type": "value", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#valdef-margin-trim-in-flow", "export": true, "normative": true, "for_": ["margin-trim"]};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#block-start'] = {"text": "block-start", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#block-start", "export": true, "normative": true, "for_": []};
-window.refsData['#outer-edge'] = {"text": "outer edge", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#outer-edge", "export": true, "normative": true, "for_": []};
-window.refsData['#inner-edge'] = {"text": "inner edge", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#inner-edge", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#inline-start'] = {"text": "inline-start", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#inline-start", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#inline-end'] = {"text": "inline-end", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#inline-end", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#inline-axis'] = {"text": "inline-axis", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#inline-axis", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-sizing-3/#intrinsic-size-contribution'] = {"text": "intrinsic size contribution", "type": "dfn", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#intrinsic-size-contribution", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-sizing-3/#size'] = {"text": "size", "type": "dfn", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#size", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#block-end'] = {"text": "block-end", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#block-end", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#block-size'] = {"text": "block size", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#block-size", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#block-formatting-context-root'] = {"text": "block formatting context root", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#block-formatting-context-root", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-flexbox-1/#flex-container'] = {"text": "flex container", "type": "dfn", "spec": "css-flexbox-1", "shortname": "css-flexbox", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-flexbox-1/#flex-container", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-grid-2/#grid-container'] = {"text": "grid container", "type": "dfn", "spec": "css-grid-2", "shortname": "css-grid", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-grid-2/#grid-container", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-break-4/#propdef-margin-break'] = {"text": "margin-break", "type": "property", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-break-4/#propdef-margin-break", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-break-4/#fragmentation-context'] = {"text": "fragmentation context", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-break-4/#fragmentation-context", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-background-origin'] = {"text": "background-origin", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background-origin", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-padding-top'] = {"text": "padding-top", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-padding-top", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-padding-right'] = {"text": "padding-right", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-padding-right", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-padding-bottom'] = {"text": "padding-bottom", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-padding-bottom", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-padding-left'] = {"text": "padding-left", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-padding-left", "export": true, "normative": true, "for_": []};
-window.refsData['#padding'] = {"text": "padding", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#padding", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#writing-mode'] = {"text": "writing mode", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#writing-mode", "export": true, "normative": true, "for_": []};window.refsData['#propdef-margin'] = {"text": "margin", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-margin", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-margin-bottom'] = {"text": "margin-bottom", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-margin-bottom", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-margin-left'] = {"text": "margin-left", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-margin-left", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-margin-right'] = {"text": "margin-right", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-margin-right", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-margin-top'] = {"text": "margin-top", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-margin-top", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-margin-trim'] = {"text": "margin-trim", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-margin-trim", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-padding'] = {"text": "padding", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-padding", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-padding-bottom'] = {"text": "padding-bottom", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-padding-bottom", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-padding-left'] = {"text": "padding-left", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-padding-left", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-padding-right'] = {"text": "padding-right", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-padding-right", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-padding-top'] = {"text": "padding-top", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "local", "url": "#propdef-padding-top", "export": true, "normative": true, "for_": []};
 </script>

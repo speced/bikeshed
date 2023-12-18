@@ -79,7 +79,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -485,7 +484,7 @@ a[href].issue-return {
 }
 
 .ref-hint {
-    display: none;
+    display: inline-block;
     position: absolute;
     z-index: 35;
     width: 20em;
@@ -501,16 +500,11 @@ a[href].issue-return {
     white-space: normal; /* in case it's moved into a pre */
 }
 
-.ref-hint.on {
-    display: inline-block;
-}
-
 .ref-hint * { margin: 0; padding: 0; text-indent: 0; }
 
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -570,7 +564,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -627,7 +620,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -2525,481 +2517,8 @@ Answers are provided below.</p>
       <td>specified keyword(s)the keyword none or one or more of size, layout, paint
    </table>
   </div>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['dcf09107'] = {"dfnID": "dcf09107", "url": "https://drafts.csswg.org/css-backgrounds-3/#corner-clipping", "dfnText": "corner clipping", "refSections": [{"refs": [{"id": "ref-for-corner-clipping"}], "title": "3.3. \nPaint Containment"}], "external": true};
-window.dfnpanelData['e21129ef'] = {"dfnID": "e21129ef", "url": "https://drafts.csswg.org/css-break-3/#forced-break", "dfnText": "forced break", "refSections": [{"refs": [{"id": "ref-for-forced-break"}, {"id": "ref-for-forced-break\u2460"}], "title": "3.2. \nLayout Containment"}], "external": true};
-window.dfnpanelData['85a355d8'] = {"dfnID": "85a355d8", "url": "https://drafts.csswg.org/css-break-3/#fragmentation", "dfnText": "fragmentation", "refSections": [{"refs": [{"id": "ref-for-fragmentation"}], "title": "3.2. \nLayout Containment"}], "external": true};
-window.dfnpanelData['c37816fe'] = {"dfnID": "c37816fe", "url": "https://drafts.csswg.org/css-break-3/#fragmentation-container", "dfnText": "fragmentation container", "refSections": [{"refs": [{"id": "ref-for-fragmentation-container"}, {"id": "ref-for-fragmentation-container\u2460"}, {"id": "ref-for-fragmentation-container\u2461"}, {"id": "ref-for-fragmentation-container\u2462"}, {"id": "ref-for-fragmentation-container\u2463"}, {"id": "ref-for-fragmentation-container\u2464"}, {"id": "ref-for-fragmentation-container\u2465"}, {"id": "ref-for-fragmentation-container\u2466"}], "title": "3.2. \nLayout Containment"}], "external": true};
-window.dfnpanelData['057714ca'] = {"dfnID": "057714ca", "url": "https://drafts.csswg.org/css-break-3/#fragmentation-context", "dfnText": "fragmentation context", "refSections": [{"refs": [{"id": "ref-for-fragmentation-context"}, {"id": "ref-for-fragmentation-context\u2460"}, {"id": "ref-for-fragmentation-context\u2461"}, {"id": "ref-for-fragmentation-context\u2462"}, {"id": "ref-for-fragmentation-context\u2463"}, {"id": "ref-for-fragmentation-context\u2464"}], "title": "3.2. \nLayout Containment"}], "external": true};
-window.dfnpanelData['f8e02f0a'] = {"dfnID": "f8e02f0a", "url": "https://drafts.csswg.org/css-break-3/#fragmented-flow", "dfnText": "fragmented flow", "refSections": [{"refs": [{"id": "ref-for-fragmented-flow"}, {"id": "ref-for-fragmented-flow\u2460"}, {"id": "ref-for-fragmented-flow\u2461"}], "title": "3.2. \nLayout Containment"}], "external": true};
-window.dfnpanelData['b5dfd3f6'] = {"dfnID": "b5dfd3f6", "url": "https://drafts.csswg.org/css-break-3/#monolithic", "dfnText": "monolithic", "refSections": [{"refs": [{"id": "ref-for-monolithic"}], "title": "3.1. \nSize Containment"}], "external": true};
-window.dfnpanelData['a4eb3c57'] = {"dfnID": "a4eb3c57", "url": "https://drafts.csswg.org/css-cascade-5/#used-value", "dfnText": "used value", "refSections": [{"refs": [{"id": "ref-for-used-value"}], "title": "3.1. \nSize Containment"}], "external": true};
-window.dfnpanelData['9b54ada7'] = {"dfnID": "9b54ada7", "url": "https://drafts.csswg.org/css-contain-2/#style-containment", "dfnText": "style containment", "refSections": [{"refs": [{"id": "ref-for-style-containment"}], "title": "Changes from the\nCandidate Recommendation of 08 November 2018"}], "external": true};
-window.dfnpanelData['640a9472'] = {"dfnID": "640a9472", "url": "https://drafts.csswg.org/css-display-3/#atomic-inline", "dfnText": "atomic inline", "refSections": [{"refs": [{"id": "ref-for-atomic-inline"}], "title": "3.1. \nSize Containment"}, {"refs": [{"id": "ref-for-atomic-inline\u2460"}], "title": "3.2. \nLayout Containment"}, {"refs": [{"id": "ref-for-atomic-inline\u2461"}], "title": "3.3. \nPaint Containment"}], "external": true};
-window.dfnpanelData['0e9419b9'] = {"dfnID": "0e9419b9", "url": "https://drafts.csswg.org/css-display-3/#propdef-display", "dfnText": "display", "refSections": [{"refs": [{"id": "ref-for-propdef-display"}, {"id": "ref-for-propdef-display\u2460"}], "title": "3.1. \nSize Containment"}, {"refs": [{"id": "ref-for-propdef-display\u2461"}], "title": "3.2. \nLayout Containment"}, {"refs": [{"id": "ref-for-propdef-display\u2462"}], "title": "3.3. \nPaint Containment"}], "external": true};
-window.dfnpanelData['c1d1ad8a'] = {"dfnID": "c1d1ad8a", "url": "https://drafts.csswg.org/css-display-3/#inline-level", "dfnText": "inline-level", "refSections": [{"refs": [{"id": "ref-for-inline-level"}], "title": "3.1. \nSize Containment"}, {"refs": [{"id": "ref-for-inline-level\u2460"}], "title": "3.2. \nLayout Containment"}, {"refs": [{"id": "ref-for-inline-level\u2461"}], "title": "3.3. \nPaint Containment"}], "external": true};
-window.dfnpanelData['a96baa0d'] = {"dfnID": "a96baa0d", "url": "https://drafts.csswg.org/css-display-3/#internal-ruby-box", "dfnText": "internal ruby box", "refSections": [{"refs": [{"id": "ref-for-internal-ruby-box"}], "title": "3.1. \nSize Containment"}, {"refs": [{"id": "ref-for-internal-ruby-box\u2460"}], "title": "3.2. \nLayout Containment"}, {"refs": [{"id": "ref-for-internal-ruby-box\u2461"}], "title": "3.3. \nPaint Containment"}], "external": true};
-window.dfnpanelData['fcfd637a'] = {"dfnID": "fcfd637a", "url": "https://drafts.csswg.org/css-display-3/#internal-table-box", "dfnText": "internal table box", "refSections": [{"refs": [{"id": "ref-for-internal-table-box"}], "title": "3.1. \nSize Containment"}, {"refs": [{"id": "ref-for-internal-table-box\u2460"}], "title": "3.2. \nLayout Containment"}, {"refs": [{"id": "ref-for-internal-table-box\u2461"}], "title": "3.3. \nPaint Containment"}], "external": true};
-window.dfnpanelData['9ee4a8b2'] = {"dfnID": "9ee4a8b2", "url": "https://drafts.csswg.org/css-display-4/#valdef-display-contents", "dfnText": "contents", "refSections": [{"refs": [{"id": "ref-for-valdef-display-contents"}], "title": "3.2. \nLayout Containment"}, {"refs": [{"id": "ref-for-valdef-display-contents\u2460"}], "title": "3.3. \nPaint Containment"}], "external": true};
-window.dfnpanelData['a758a91a'] = {"dfnID": "a758a91a", "url": "https://drafts.csswg.org/css-display-4/#establish-an-independent-formatting-context", "dfnText": "establishes an independent formatting context", "refSections": [{"refs": [{"id": "ref-for-establish-an-independent-formatting-context"}], "title": "3.2. \nLayout Containment"}, {"refs": [{"id": "ref-for-establish-an-independent-formatting-context\u2460"}], "title": "3.3. \nPaint Containment"}], "external": true};
-window.dfnpanelData['5e3e8101'] = {"dfnID": "5e3e8101", "url": "https://drafts.csswg.org/css-display-4/#inner-display-type", "dfnText": "inner display type", "refSections": [{"refs": [{"id": "ref-for-inner-display-type"}], "title": "3.1. \nSize Containment"}], "external": true};
-window.dfnpanelData['55e8f5de'] = {"dfnID": "55e8f5de", "url": "https://drafts.csswg.org/css-display-4/#valdef-display-none", "dfnText": "none", "refSections": [{"refs": [{"id": "ref-for-valdef-display-none"}], "title": "3.2. \nLayout Containment"}, {"refs": [{"id": "ref-for-valdef-display-none\u2460"}], "title": "3.3. \nPaint Containment"}], "external": true};
-window.dfnpanelData['80eb9508'] = {"dfnID": "80eb9508", "url": "https://drafts.csswg.org/css-display-4/#principal-box", "dfnText": "principal box", "refSections": [{"refs": [{"id": "ref-for-principal-box"}, {"id": "ref-for-principal-box\u2460"}], "title": "3.1. \nSize Containment"}, {"refs": [{"id": "ref-for-principal-box\u2461"}, {"id": "ref-for-principal-box\u2462"}, {"id": "ref-for-principal-box\u2463"}], "title": "3.2. \nLayout Containment"}, {"refs": [{"id": "ref-for-principal-box\u2464"}, {"id": "ref-for-principal-box\u2465"}, {"id": "ref-for-principal-box\u2466"}], "title": "3.3. \nPaint Containment"}], "external": true};
-window.dfnpanelData['a8485ff4'] = {"dfnID": "a8485ff4", "url": "https://drafts.csswg.org/css-display-4/#replaced-element", "dfnText": "replaced element", "refSections": [{"refs": [{"id": "ref-for-replaced-element"}], "title": "3.1. \nSize Containment"}], "external": true};
-window.dfnpanelData['abb2bed7'] = {"dfnID": "abb2bed7", "url": "https://drafts.csswg.org/css-display-4/#valdef-display-table", "dfnText": "table", "refSections": [{"refs": [{"id": "ref-for-valdef-display-table"}], "title": "3.1. \nSize Containment"}], "external": true};
-window.dfnpanelData['09057a05'] = {"dfnID": "09057a05", "url": "https://drafts.csswg.org/css-display-4/#valdef-display-table-cell", "dfnText": "table-cell", "refSections": [{"refs": [{"id": "ref-for-valdef-display-table-cell"}], "title": "3.2. \nLayout Containment"}, {"refs": [{"id": "ref-for-valdef-display-table-cell\u2460"}], "title": "3.3. \nPaint Containment"}], "external": true};
-window.dfnpanelData['79b8b44f'] = {"dfnID": "79b8b44f", "url": "https://drafts.csswg.org/css-grid-2/#grid-track", "dfnText": "grid track", "refSections": [{"refs": [{"id": "ref-for-grid-track"}], "title": "3.1. \nSize Containment"}], "external": true};
-window.dfnpanelData['23012643'] = {"dfnID": "23012643", "url": "https://drafts.csswg.org/css-images-3/#natural-aspect-ratio", "dfnText": "natural aspect ratio", "refSections": [{"refs": [{"id": "ref-for-natural-aspect-ratio"}, {"id": "ref-for-natural-aspect-ratio\u2460"}, {"id": "ref-for-natural-aspect-ratio\u2461"}], "title": "3.1. \nSize Containment"}], "external": true};
-window.dfnpanelData['d3936525'] = {"dfnID": "d3936525", "url": "https://drafts.csswg.org/css-images-3/#natural-dimensions", "dfnText": "natural dimension", "refSections": [{"refs": [{"id": "ref-for-natural-dimensions"}], "title": "3.1. \nSize Containment"}], "external": true};
-window.dfnpanelData['75563977'] = {"dfnID": "75563977", "url": "https://drafts.csswg.org/css-images-3/#natural-height", "dfnText": "natural height", "refSections": [{"refs": [{"id": "ref-for-natural-height"}], "title": "3.1. \nSize Containment"}], "external": true};
-window.dfnpanelData['33eda2d8'] = {"dfnID": "33eda2d8", "url": "https://drafts.csswg.org/css-overflow-3/#valdef-overflow-clip", "dfnText": "clip", "refSections": [{"refs": [{"id": "ref-for-valdef-overflow-clip"}], "title": "3.2. \nLayout Containment"}], "external": true};
-window.dfnpanelData['0812e39f'] = {"dfnID": "0812e39f", "url": "https://drafts.csswg.org/css-overflow-3/#ink-overflow", "dfnText": "ink overflow", "refSections": [{"refs": [{"id": "ref-for-ink-overflow"}], "title": "3.2. \nLayout Containment"}, {"refs": [{"id": "ref-for-ink-overflow\u2460"}], "title": "3.3. \nPaint Containment"}], "external": true};
-window.dfnpanelData['86928bde'] = {"dfnID": "86928bde", "url": "https://drafts.csswg.org/css-overflow-3/#propdef-overflow", "dfnText": "overflow", "refSections": [{"refs": [{"id": "ref-for-propdef-overflow"}], "title": "3.2. \nLayout Containment"}, {"refs": [{"id": "ref-for-propdef-overflow\u2460"}, {"id": "ref-for-propdef-overflow\u2461"}, {"id": "ref-for-propdef-overflow\u2462"}], "title": "3.3. \nPaint Containment"}], "external": true};
-window.dfnpanelData['24f4b323'] = {"dfnID": "24f4b323", "url": "https://drafts.csswg.org/css-overflow-3/#propdef-overflow-x", "dfnText": "overflow-x", "refSections": [{"refs": [{"id": "ref-for-propdef-overflow-x"}, {"id": "ref-for-propdef-overflow-x\u2460"}, {"id": "ref-for-propdef-overflow-x\u2461"}], "title": "3.3. \nPaint Containment"}], "external": true};
-window.dfnpanelData['9958418a'] = {"dfnID": "9958418a", "url": "https://drafts.csswg.org/css-overflow-3/#propdef-overflow-y", "dfnText": "overflow-y", "refSections": [{"refs": [{"id": "ref-for-propdef-overflow-y"}, {"id": "ref-for-propdef-overflow-y\u2460"}, {"id": "ref-for-propdef-overflow-y\u2461"}], "title": "3.3. \nPaint Containment"}], "external": true};
-window.dfnpanelData['b2a71e73'] = {"dfnID": "b2a71e73", "url": "https://drafts.csswg.org/css-overflow-3/#scrollable-overflow", "dfnText": "scrollable overflow", "refSections": [{"refs": [{"id": "ref-for-scrollable-overflow"}], "title": "3.3. \nPaint Containment"}], "external": true};
-window.dfnpanelData['2c3a36fb'] = {"dfnID": "2c3a36fb", "url": "https://drafts.csswg.org/css-overflow-3/#valdef-overflow-visible", "dfnText": "visible", "refSections": [{"refs": [{"id": "ref-for-valdef-overflow-visible"}], "title": "3.2. \nLayout Containment"}], "external": true};
-window.dfnpanelData['95378c29'] = {"dfnID": "95378c29", "url": "https://drafts.csswg.org/css-overflow-4/#selectordef-nth-fragment", "dfnText": "::nth-fragment()", "refSections": [{"refs": [{"id": "ref-for-selectordef-nth-fragment"}], "title": "3.2. \nLayout Containment"}], "external": true};
-window.dfnpanelData['01b92003'] = {"dfnID": "01b92003", "url": "https://drafts.csswg.org/css-overflow-4/#overflow-clip-edge", "dfnText": "overflow clip edge", "refSections": [{"refs": [{"id": "ref-for-overflow-clip-edge"}], "title": "3.3. \nPaint Containment"}], "external": true};
-window.dfnpanelData['7d2d5e05'] = {"dfnID": "7d2d5e05", "url": "https://drafts.csswg.org/css-overflow-4/#propdef-overflow-clip-margin", "dfnText": "overflow-clip-margin", "refSections": [{"refs": [{"id": "ref-for-propdef-overflow-clip-margin"}, {"id": "ref-for-propdef-overflow-clip-margin\u2460"}], "title": "3.3. \nPaint Containment"}], "external": true};
-window.dfnpanelData['b4485d57'] = {"dfnID": "b4485d57", "url": "https://drafts.csswg.org/css-position-3/#absolute-positioning-containing-block", "dfnText": "absolute positioning containing block", "refSections": [{"refs": [{"id": "ref-for-absolute-positioning-containing-block"}], "title": "3.2. \nLayout Containment"}, {"refs": [{"id": "ref-for-absolute-positioning-containing-block\u2460"}], "title": "3.3. \nPaint Containment"}], "external": true};
-window.dfnpanelData['c6027972'] = {"dfnID": "c6027972", "url": "https://drafts.csswg.org/css-position-3/#fixed-positioning-containing-block", "dfnText": "fixed positioning containing block", "refSections": [{"refs": [{"id": "ref-for-fixed-positioning-containing-block"}], "title": "3.2. \nLayout Containment"}, {"refs": [{"id": "ref-for-fixed-positioning-containing-block\u2460"}], "title": "3.3. \nPaint Containment"}], "external": true};
-window.dfnpanelData['fd0c9e35'] = {"dfnID": "fd0c9e35", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-after", "dfnText": "::after", "refSections": [{"refs": [{"id": "ref-for-selectordef-after"}], "title": "3.1. \nSize Containment"}], "external": true};
-window.dfnpanelData['5869f885'] = {"dfnID": "5869f885", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-before", "dfnText": "::before", "refSections": [{"refs": [{"id": "ref-for-selectordef-before"}], "title": "3.1. \nSize Containment"}], "external": true};
-window.dfnpanelData['5875aeb9'] = {"dfnID": "5875aeb9", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-marker", "dfnText": "::marker", "refSections": [{"refs": [{"id": "ref-for-selectordef-marker"}], "title": "3.1. \nSize Containment"}], "external": true};
-window.dfnpanelData['df8337f1'] = {"dfnID": "df8337f1", "url": "https://drafts.csswg.org/css-sizing-3/#fit-content-size", "dfnText": "fit-content size", "refSections": [{"refs": [{"id": "ref-for-fit-content-size"}], "title": "3.1. \nSize Containment"}], "external": true};
-window.dfnpanelData['68019d7a'] = {"dfnID": "68019d7a", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-height", "dfnText": "height", "refSections": [{"refs": [{"id": "ref-for-propdef-height"}, {"id": "ref-for-propdef-height\u2460"}], "title": "3.1. \nSize Containment"}], "external": true};
-window.dfnpanelData['aba62b39'] = {"dfnID": "aba62b39", "url": "https://drafts.csswg.org/css-sizing-3/#intrinsic-size", "dfnText": "intrinsic size", "refSections": [{"refs": [{"id": "ref-for-intrinsic-size"}], "title": "3.1. \nSize Containment"}], "external": true};
-window.dfnpanelData['18d57a4b'] = {"dfnID": "18d57a4b", "url": "https://drafts.csswg.org/css-sizing-3/#valdef-width-max-content", "dfnText": "max-content", "refSections": [{"refs": [{"id": "ref-for-valdef-width-max-content"}], "title": "3.1. \nSize Containment"}], "external": true};
-window.dfnpanelData['513590d3'] = {"dfnID": "513590d3", "url": "https://drafts.csswg.org/css-sizing-3/#valdef-width-min-content", "dfnText": "min-content", "refSections": [{"refs": [{"id": "ref-for-valdef-width-min-content"}], "title": "3.1. \nSize Containment"}], "external": true};
-window.dfnpanelData['a0e35b6d'] = {"dfnID": "a0e35b6d", "url": "https://drafts.csswg.org/css-sizing-3/#sizing-property", "dfnText": "sizing property", "refSections": [{"refs": [{"id": "ref-for-sizing-property"}, {"id": "ref-for-sizing-property\u2460"}], "title": "3.1. \nSize Containment"}], "external": true};
-window.dfnpanelData['88643fe0'] = {"dfnID": "88643fe0", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-width", "dfnText": "width", "refSections": [{"refs": [{"id": "ref-for-propdef-width"}, {"id": "ref-for-propdef-width\u2460"}], "title": "3.1. \nSize Containment"}], "external": true};
-window.dfnpanelData['36fd3b67'] = {"dfnID": "36fd3b67", "url": "https://drafts.csswg.org/css-sizing-4/#propdef-aspect-ratio", "dfnText": "aspect-ratio", "refSections": [{"refs": [{"id": "ref-for-propdef-aspect-ratio"}, {"id": "ref-for-propdef-aspect-ratio\u2460"}, {"id": "ref-for-propdef-aspect-ratio\u2461"}], "title": "3.1. \nSize Containment"}], "external": true};
-window.dfnpanelData['f9be6a15'] = {"dfnID": "f9be6a15", "url": "https://drafts.csswg.org/css-sizing-4/#preferred-aspect-ratio", "dfnText": "preferred aspect ratio", "refSections": [{"refs": [{"id": "ref-for-preferred-aspect-ratio"}], "title": "3.1. \nSize Containment"}], "external": true};
-window.dfnpanelData['02a233f2'] = {"dfnID": "02a233f2", "url": "https://drafts.csswg.org/css-ui-3/#propdef-text-overflow", "dfnText": "text-overflow", "refSections": [{"refs": [{"id": "ref-for-propdef-text-overflow"}, {"id": "ref-for-propdef-text-overflow\u2460"}], "title": "3.3. \nPaint Containment"}], "external": true};
-window.dfnpanelData['b218ce7c'] = {"dfnID": "b218ce7c", "url": "https://drafts.csswg.org/css-ui-4/#propdef-resize", "dfnText": "resize", "refSections": [{"refs": [{"id": "ref-for-propdef-resize"}, {"id": "ref-for-propdef-resize\u2460"}], "title": "3.3. \nPaint Containment"}], "external": true};
-window.dfnpanelData['358fd6ff'] = {"dfnID": "358fd6ff", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "dfnText": "css-wide keywords", "refSections": [{"refs": [{"id": "ref-for-css-wide-keywords"}], "title": "1.1. \nValue Definitions"}], "external": true};
-window.dfnpanelData['6ec67710'] = {"dfnID": "6ec67710", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "dfnText": "|", "refSections": [{"refs": [{"id": "ref-for-comb-one"}, {"id": "ref-for-comb-one\u2460"}, {"id": "ref-for-comb-one\u2461"}], "title": "2. \nStrong Containment: the contain property"}], "external": true};
-window.dfnpanelData['8a82fda1'] = {"dfnID": "8a82fda1", "url": "https://drafts.csswg.org/css-values-4/#comb-any", "dfnText": "||", "refSections": [{"refs": [{"id": "ref-for-comb-any"}, {"id": "ref-for-comb-any\u2460"}], "title": "2. \nStrong Containment: the contain property"}], "external": true};
-window.dfnpanelData['8e0289d3'] = {"dfnID": "8e0289d3", "url": "https://www.w3.org/TR/CSS2/box.html#padding-edge", "dfnText": "padding edge", "refSections": [{"refs": [{"id": "ref-for-padding-edge"}, {"id": "ref-for-padding-edge\u2460"}], "title": "3.3. \nPaint Containment"}], "external": true};
-window.dfnpanelData['5a3d5e86'] = {"dfnID": "5a3d5e86", "url": "https://www.w3.org/TR/CSS2/visudet.html#propdef-vertical-align", "dfnText": "vertical-align", "refSections": [{"refs": [{"id": "ref-for-propdef-vertical-align"}], "title": "3.2. \nLayout Containment"}], "external": true};
-window.dfnpanelData['4299a926'] = {"dfnID": "4299a926", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-svg", "dfnText": "svg", "refSections": [{"refs": [{"id": "ref-for-elementdef-svg"}], "title": "2. \nStrong Containment: the contain property"}], "external": true};
-window.dfnpanelData['propdef-contain'] = {"dfnID": "propdef-contain", "url": "#propdef-contain", "dfnText": "contain", "refSections": [{"refs": [{"id": "ref-for-propdef-contain\u2460"}], "title": "1. \nIntroduction"}, {"refs": [{"id": "ref-for-propdef-contain\u2461"}, {"id": "ref-for-propdef-contain\u2462"}, {"id": "ref-for-propdef-contain\u2463"}, {"id": "ref-for-propdef-contain\u2464"}, {"id": "ref-for-propdef-contain\u2465"}, {"id": "ref-for-propdef-contain\u2466"}, {"id": "ref-for-propdef-contain\u2467"}, {"id": "ref-for-propdef-contain\u2468"}, {"id": "ref-for-propdef-contain\u2460\u24ea"}, {"id": "ref-for-propdef-contain\u2460\u2460"}, {"id": "ref-for-propdef-contain\u2460\u2461"}, {"id": "ref-for-propdef-contain\u2460\u2462"}], "title": "2. \nStrong Containment: the contain property"}, {"refs": [{"id": "ref-for-propdef-contain\u2460\u2463"}, {"id": "ref-for-propdef-contain\u2460\u2464"}], "title": "Changes from the\nCandidate Recommendation of 08 November 2018"}], "external": false};
-window.dfnpanelData['valdef-contain-none'] = {"dfnID": "valdef-contain-none", "url": "#valdef-contain-none", "dfnText": "none", "refSections": [{"refs": [{"id": "ref-for-valdef-contain-none"}], "title": "2. \nStrong Containment: the contain property"}], "external": false};
-window.dfnpanelData['valdef-contain-strict'] = {"dfnID": "valdef-contain-strict", "url": "#valdef-contain-strict", "dfnText": "strict", "refSections": [{"refs": [{"id": "ref-for-valdef-contain-strict"}], "title": "2. \nStrong Containment: the contain property"}], "external": false};
-window.dfnpanelData['valdef-contain-content'] = {"dfnID": "valdef-contain-content", "url": "#valdef-contain-content", "dfnText": "content", "refSections": [{"refs": [{"id": "ref-for-valdef-contain-content"}], "title": "2. \nStrong Containment: the contain property"}], "external": false};
-window.dfnpanelData['valdef-contain-size'] = {"dfnID": "valdef-contain-size", "url": "#valdef-contain-size", "dfnText": "size", "refSections": [{"refs": [{"id": "ref-for-valdef-contain-size"}], "title": "2. \nStrong Containment: the contain property"}], "external": false};
-window.dfnpanelData['valdef-contain-layout'] = {"dfnID": "valdef-contain-layout", "url": "#valdef-contain-layout", "dfnText": "layout", "refSections": [{"refs": [{"id": "ref-for-valdef-contain-layout"}], "title": "2. \nStrong Containment: the contain property"}], "external": false};
-window.dfnpanelData['valdef-contain-paint'] = {"dfnID": "valdef-contain-paint", "url": "#valdef-contain-paint", "dfnText": "paint", "refSections": [{"refs": [{"id": "ref-for-valdef-contain-paint"}], "title": "2. \nStrong Containment: the contain property"}], "external": false};
-window.dfnpanelData['containment'] = {"dfnID": "containment", "url": "#containment", "dfnText": "containment", "refSections": [{"refs": [{"id": "ref-for-containment"}, {"id": "ref-for-containment\u2460"}], "title": "2. \nStrong Containment: the contain property"}, {"refs": [{"id": "ref-for-containment\u2461"}], "title": "3. \nTypes of Containment"}], "external": false};
-window.dfnpanelData['size-containment'] = {"dfnID": "size-containment", "url": "#size-containment", "dfnText": "size containment", "refSections": [{"refs": [{"id": "ref-for-size-containment"}, {"id": "ref-for-size-containment\u2460"}, {"id": "ref-for-size-containment\u2461"}], "title": "2. \nStrong Containment: the contain property"}, {"refs": [{"id": "ref-for-size-containment\u2462"}, {"id": "ref-for-size-containment\u2463"}, {"id": "ref-for-size-containment\u2464"}], "title": "3.1. \nSize Containment"}, {"refs": [{"id": "ref-for-size-containment\u2465"}], "title": "3.2. \nLayout Containment"}], "external": false};
-window.dfnpanelData['size-containment-box'] = {"dfnID": "size-containment-box", "url": "#size-containment-box", "dfnText": "size containment box", "refSections": [{"refs": [{"id": "ref-for-size-containment-box"}], "title": "2. \nStrong Containment: the contain property"}, {"refs": [{"id": "ref-for-size-containment-box\u2460"}, {"id": "ref-for-size-containment-box\u2461"}, {"id": "ref-for-size-containment-box\u2462"}, {"id": "ref-for-size-containment-box\u2463"}, {"id": "ref-for-size-containment-box\u2464"}, {"id": "ref-for-size-containment-box\u2465"}, {"id": "ref-for-size-containment-box\u2466"}, {"id": "ref-for-size-containment-box\u2467"}, {"id": "ref-for-size-containment-box\u2468"}, {"id": "ref-for-size-containment-box\u2460\u24ea"}, {"id": "ref-for-size-containment-box\u2460\u2460"}, {"id": "ref-for-size-containment-box\u2460\u2461"}, {"id": "ref-for-size-containment-box\u2460\u2462"}, {"id": "ref-for-size-containment-box\u2460\u2463"}, {"id": "ref-for-size-containment-box\u2460\u2464"}, {"id": "ref-for-size-containment-box\u2460\u2465"}, {"id": "ref-for-size-containment-box\u2460\u2466"}], "title": "3.1. \nSize Containment"}], "external": false};
-window.dfnpanelData['sizing-as-if-empty'] = {"dfnID": "sizing-as-if-empty", "url": "#sizing-as-if-empty", "dfnText": "Sizing as if empty", "refSections": [{"refs": [{"id": "ref-for-sizing-as-if-empty"}], "title": "3.1. \nSize Containment"}], "external": false};
-window.dfnpanelData['laying-out-in-place'] = {"dfnID": "laying-out-in-place", "url": "#laying-out-in-place", "dfnText": "Laying out in-place", "refSections": [{"refs": [{"id": "ref-for-laying-out-in-place"}], "title": "3.1. \nSize Containment"}], "external": false};
-window.dfnpanelData['layout-containment'] = {"dfnID": "layout-containment", "url": "#layout-containment", "dfnText": "layout containment", "refSections": [{"refs": [{"id": "ref-for-layout-containment"}], "title": "2. \nStrong Containment: the contain property"}, {"refs": [{"id": "ref-for-layout-containment\u2460"}, {"id": "ref-for-layout-containment\u2461"}, {"id": "ref-for-layout-containment\u2462"}], "title": "3.1. \nSize Containment"}, {"refs": [{"id": "ref-for-layout-containment\u2463"}, {"id": "ref-for-layout-containment\u2464"}, {"id": "ref-for-layout-containment\u2465"}, {"id": "ref-for-layout-containment\u2466"}, {"id": "ref-for-layout-containment\u2467"}], "title": "3.2. \nLayout Containment"}], "external": false};
-window.dfnpanelData['layout-containment-box'] = {"dfnID": "layout-containment-box", "url": "#layout-containment-box", "dfnText": "layout containment box", "refSections": [{"refs": [{"id": "ref-for-layout-containment-box"}], "title": "2. \nStrong Containment: the contain property"}, {"refs": [{"id": "ref-for-layout-containment-box\u2460"}, {"id": "ref-for-layout-containment-box\u2461"}, {"id": "ref-for-layout-containment-box\u2462"}, {"id": "ref-for-layout-containment-box\u2463"}, {"id": "ref-for-layout-containment-box\u2464"}, {"id": "ref-for-layout-containment-box\u2465"}, {"id": "ref-for-layout-containment-box\u2466"}, {"id": "ref-for-layout-containment-box\u2467"}, {"id": "ref-for-layout-containment-box\u2468"}, {"id": "ref-for-layout-containment-box\u2460\u24ea"}, {"id": "ref-for-layout-containment-box\u2460\u2460"}, {"id": "ref-for-layout-containment-box\u2460\u2461"}, {"id": "ref-for-layout-containment-box\u2460\u2462"}, {"id": "ref-for-layout-containment-box\u2460\u2463"}], "title": "3.2. \nLayout Containment"}], "external": false};
-window.dfnpanelData['paint-containment'] = {"dfnID": "paint-containment", "url": "#paint-containment", "dfnText": "paint containment", "refSections": [{"refs": [{"id": "ref-for-paint-containment"}], "title": "2. \nStrong Containment: the contain property"}, {"refs": [{"id": "ref-for-paint-containment\u2460"}], "title": "3.3. \nPaint Containment"}], "external": false};
-window.dfnpanelData['paint-containment-box'] = {"dfnID": "paint-containment-box", "url": "#paint-containment-box", "dfnText": "paint containment box", "refSections": [{"refs": [{"id": "ref-for-paint-containment-box"}], "title": "2. \nStrong Containment: the contain property"}, {"refs": [{"id": "ref-for-paint-containment-box\u2460"}, {"id": "ref-for-paint-containment-box\u2461"}, {"id": "ref-for-paint-containment-box\u2462"}, {"id": "ref-for-paint-containment-box\u2463"}, {"id": "ref-for-paint-containment-box\u2464"}], "title": "3.3. \nPaint Containment"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -3193,300 +2712,777 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"01b92003": {"dfnID":"01b92003","dfnText":"overflow clip edge","external":true,"refSections":[{"refs":[{"id":"ref-for-overflow-clip-edge"}],"title":"3.3. \nPaint Containment"}],"url":"https://drafts.csswg.org/css-overflow-4/#overflow-clip-edge"},
+"02a233f2": {"dfnID":"02a233f2","dfnText":"text-overflow","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-text-overflow"},{"id":"ref-for-propdef-text-overflow\u2460"}],"title":"3.3. \nPaint Containment"}],"url":"https://drafts.csswg.org/css-ui-3/#propdef-text-overflow"},
+"057714ca": {"dfnID":"057714ca","dfnText":"fragmentation context","external":true,"refSections":[{"refs":[{"id":"ref-for-fragmentation-context"},{"id":"ref-for-fragmentation-context\u2460"},{"id":"ref-for-fragmentation-context\u2461"},{"id":"ref-for-fragmentation-context\u2462"},{"id":"ref-for-fragmentation-context\u2463"},{"id":"ref-for-fragmentation-context\u2464"}],"title":"3.2. \nLayout Containment"}],"url":"https://drafts.csswg.org/css-break-3/#fragmentation-context"},
+"0812e39f": {"dfnID":"0812e39f","dfnText":"ink overflow","external":true,"refSections":[{"refs":[{"id":"ref-for-ink-overflow"}],"title":"3.2. \nLayout Containment"},{"refs":[{"id":"ref-for-ink-overflow\u2460"}],"title":"3.3. \nPaint Containment"}],"url":"https://drafts.csswg.org/css-overflow-3/#ink-overflow"},
+"09057a05": {"dfnID":"09057a05","dfnText":"table-cell","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-display-table-cell"}],"title":"3.2. \nLayout Containment"},{"refs":[{"id":"ref-for-valdef-display-table-cell\u2460"}],"title":"3.3. \nPaint Containment"}],"url":"https://drafts.csswg.org/css-display-4/#valdef-display-table-cell"},
+"0e9419b9": {"dfnID":"0e9419b9","dfnText":"display","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-display"},{"id":"ref-for-propdef-display\u2460"}],"title":"3.1. \nSize Containment"},{"refs":[{"id":"ref-for-propdef-display\u2461"}],"title":"3.2. \nLayout Containment"},{"refs":[{"id":"ref-for-propdef-display\u2462"}],"title":"3.3. \nPaint Containment"}],"url":"https://drafts.csswg.org/css-display-3/#propdef-display"},
+"18d57a4b": {"dfnID":"18d57a4b","dfnText":"max-content","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-width-max-content"}],"title":"3.1. \nSize Containment"}],"url":"https://drafts.csswg.org/css-sizing-3/#valdef-width-max-content"},
+"23012643": {"dfnID":"23012643","dfnText":"natural aspect ratio","external":true,"refSections":[{"refs":[{"id":"ref-for-natural-aspect-ratio"},{"id":"ref-for-natural-aspect-ratio\u2460"},{"id":"ref-for-natural-aspect-ratio\u2461"}],"title":"3.1. \nSize Containment"}],"url":"https://drafts.csswg.org/css-images-3/#natural-aspect-ratio"},
+"24f4b323": {"dfnID":"24f4b323","dfnText":"overflow-x","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-overflow-x"},{"id":"ref-for-propdef-overflow-x\u2460"},{"id":"ref-for-propdef-overflow-x\u2461"}],"title":"3.3. \nPaint Containment"}],"url":"https://drafts.csswg.org/css-overflow-3/#propdef-overflow-x"},
+"2c3a36fb": {"dfnID":"2c3a36fb","dfnText":"visible","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-overflow-visible"}],"title":"3.2. \nLayout Containment"}],"url":"https://drafts.csswg.org/css-overflow-3/#valdef-overflow-visible"},
+"33eda2d8": {"dfnID":"33eda2d8","dfnText":"clip","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-overflow-clip"}],"title":"3.2. \nLayout Containment"}],"url":"https://drafts.csswg.org/css-overflow-3/#valdef-overflow-clip"},
+"358fd6ff": {"dfnID":"358fd6ff","dfnText":"css-wide keywords","external":true,"refSections":[{"refs":[{"id":"ref-for-css-wide-keywords"}],"title":"1.1. \nValue Definitions"}],"url":"https://drafts.csswg.org/css-values-4/#css-wide-keywords"},
+"36fd3b67": {"dfnID":"36fd3b67","dfnText":"aspect-ratio","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-aspect-ratio"},{"id":"ref-for-propdef-aspect-ratio\u2460"},{"id":"ref-for-propdef-aspect-ratio\u2461"}],"title":"3.1. \nSize Containment"}],"url":"https://drafts.csswg.org/css-sizing-4/#propdef-aspect-ratio"},
+"4299a926": {"dfnID":"4299a926","dfnText":"svg","external":true,"refSections":[{"refs":[{"id":"ref-for-elementdef-svg"}],"title":"2. \nStrong Containment: the contain property"}],"url":"https://svgwg.org/svg2-draft/struct.html#elementdef-svg"},
+"513590d3": {"dfnID":"513590d3","dfnText":"min-content","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-width-min-content"}],"title":"3.1. \nSize Containment"}],"url":"https://drafts.csswg.org/css-sizing-3/#valdef-width-min-content"},
+"55e8f5de": {"dfnID":"55e8f5de","dfnText":"none","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-display-none"}],"title":"3.2. \nLayout Containment"},{"refs":[{"id":"ref-for-valdef-display-none\u2460"}],"title":"3.3. \nPaint Containment"}],"url":"https://drafts.csswg.org/css-display-4/#valdef-display-none"},
+"5869f885": {"dfnID":"5869f885","dfnText":"::before","external":true,"refSections":[{"refs":[{"id":"ref-for-selectordef-before"}],"title":"3.1. \nSize Containment"}],"url":"https://drafts.csswg.org/css-pseudo-4/#selectordef-before"},
+"5875aeb9": {"dfnID":"5875aeb9","dfnText":"::marker","external":true,"refSections":[{"refs":[{"id":"ref-for-selectordef-marker"}],"title":"3.1. \nSize Containment"}],"url":"https://drafts.csswg.org/css-pseudo-4/#selectordef-marker"},
+"5a3d5e86": {"dfnID":"5a3d5e86","dfnText":"vertical-align","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-vertical-align"}],"title":"3.2. \nLayout Containment"}],"url":"https://www.w3.org/TR/CSS2/visudet.html#propdef-vertical-align"},
+"5e3e8101": {"dfnID":"5e3e8101","dfnText":"inner display type","external":true,"refSections":[{"refs":[{"id":"ref-for-inner-display-type"}],"title":"3.1. \nSize Containment"}],"url":"https://drafts.csswg.org/css-display-4/#inner-display-type"},
+"640a9472": {"dfnID":"640a9472","dfnText":"atomic inline","external":true,"refSections":[{"refs":[{"id":"ref-for-atomic-inline"}],"title":"3.1. \nSize Containment"},{"refs":[{"id":"ref-for-atomic-inline\u2460"}],"title":"3.2. \nLayout Containment"},{"refs":[{"id":"ref-for-atomic-inline\u2461"}],"title":"3.3. \nPaint Containment"}],"url":"https://drafts.csswg.org/css-display-3/#atomic-inline"},
+"68019d7a": {"dfnID":"68019d7a","dfnText":"height","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-height"},{"id":"ref-for-propdef-height\u2460"}],"title":"3.1. \nSize Containment"}],"url":"https://drafts.csswg.org/css-sizing-3/#propdef-height"},
+"6ec67710": {"dfnID":"6ec67710","dfnText":"|","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-one"},{"id":"ref-for-comb-one\u2460"},{"id":"ref-for-comb-one\u2461"}],"title":"2. \nStrong Containment: the contain property"}],"url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"75563977": {"dfnID":"75563977","dfnText":"natural height","external":true,"refSections":[{"refs":[{"id":"ref-for-natural-height"}],"title":"3.1. \nSize Containment"}],"url":"https://drafts.csswg.org/css-images-3/#natural-height"},
+"79b8b44f": {"dfnID":"79b8b44f","dfnText":"grid track","external":true,"refSections":[{"refs":[{"id":"ref-for-grid-track"}],"title":"3.1. \nSize Containment"}],"url":"https://drafts.csswg.org/css-grid-2/#grid-track"},
+"7d2d5e05": {"dfnID":"7d2d5e05","dfnText":"overflow-clip-margin","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-overflow-clip-margin"},{"id":"ref-for-propdef-overflow-clip-margin\u2460"}],"title":"3.3. \nPaint Containment"}],"url":"https://drafts.csswg.org/css-overflow-4/#propdef-overflow-clip-margin"},
+"80eb9508": {"dfnID":"80eb9508","dfnText":"principal box","external":true,"refSections":[{"refs":[{"id":"ref-for-principal-box"},{"id":"ref-for-principal-box\u2460"}],"title":"3.1. \nSize Containment"},{"refs":[{"id":"ref-for-principal-box\u2461"},{"id":"ref-for-principal-box\u2462"},{"id":"ref-for-principal-box\u2463"}],"title":"3.2. \nLayout Containment"},{"refs":[{"id":"ref-for-principal-box\u2464"},{"id":"ref-for-principal-box\u2465"},{"id":"ref-for-principal-box\u2466"}],"title":"3.3. \nPaint Containment"}],"url":"https://drafts.csswg.org/css-display-4/#principal-box"},
+"85a355d8": {"dfnID":"85a355d8","dfnText":"fragmentation","external":true,"refSections":[{"refs":[{"id":"ref-for-fragmentation"}],"title":"3.2. \nLayout Containment"}],"url":"https://drafts.csswg.org/css-break-3/#fragmentation"},
+"86928bde": {"dfnID":"86928bde","dfnText":"overflow","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-overflow"}],"title":"3.2. \nLayout Containment"},{"refs":[{"id":"ref-for-propdef-overflow\u2460"},{"id":"ref-for-propdef-overflow\u2461"},{"id":"ref-for-propdef-overflow\u2462"}],"title":"3.3. \nPaint Containment"}],"url":"https://drafts.csswg.org/css-overflow-3/#propdef-overflow"},
+"88643fe0": {"dfnID":"88643fe0","dfnText":"width","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-width"},{"id":"ref-for-propdef-width\u2460"}],"title":"3.1. \nSize Containment"}],"url":"https://drafts.csswg.org/css-sizing-3/#propdef-width"},
+"8a82fda1": {"dfnID":"8a82fda1","dfnText":"||","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-any"},{"id":"ref-for-comb-any\u2460"}],"title":"2. \nStrong Containment: the contain property"}],"url":"https://drafts.csswg.org/css-values-4/#comb-any"},
+"8e0289d3": {"dfnID":"8e0289d3","dfnText":"padding edge","external":true,"refSections":[{"refs":[{"id":"ref-for-padding-edge"},{"id":"ref-for-padding-edge\u2460"}],"title":"3.3. \nPaint Containment"}],"url":"https://www.w3.org/TR/CSS2/box.html#padding-edge"},
+"95378c29": {"dfnID":"95378c29","dfnText":"::nth-fragment()","external":true,"refSections":[{"refs":[{"id":"ref-for-selectordef-nth-fragment"}],"title":"3.2. \nLayout Containment"}],"url":"https://drafts.csswg.org/css-overflow-4/#selectordef-nth-fragment"},
+"9958418a": {"dfnID":"9958418a","dfnText":"overflow-y","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-overflow-y"},{"id":"ref-for-propdef-overflow-y\u2460"},{"id":"ref-for-propdef-overflow-y\u2461"}],"title":"3.3. \nPaint Containment"}],"url":"https://drafts.csswg.org/css-overflow-3/#propdef-overflow-y"},
+"9b54ada7": {"dfnID":"9b54ada7","dfnText":"style containment","external":true,"refSections":[{"refs":[{"id":"ref-for-style-containment"}],"title":"Changes from the\nCandidate Recommendation of 08 November 2018"}],"url":"https://drafts.csswg.org/css-contain-2/#style-containment"},
+"9ee4a8b2": {"dfnID":"9ee4a8b2","dfnText":"contents","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-display-contents"}],"title":"3.2. \nLayout Containment"},{"refs":[{"id":"ref-for-valdef-display-contents\u2460"}],"title":"3.3. \nPaint Containment"}],"url":"https://drafts.csswg.org/css-display-4/#valdef-display-contents"},
+"a0e35b6d": {"dfnID":"a0e35b6d","dfnText":"sizing property","external":true,"refSections":[{"refs":[{"id":"ref-for-sizing-property"},{"id":"ref-for-sizing-property\u2460"}],"title":"3.1. \nSize Containment"}],"url":"https://drafts.csswg.org/css-sizing-3/#sizing-property"},
+"a4eb3c57": {"dfnID":"a4eb3c57","dfnText":"used value","external":true,"refSections":[{"refs":[{"id":"ref-for-used-value"}],"title":"3.1. \nSize Containment"}],"url":"https://drafts.csswg.org/css-cascade-5/#used-value"},
+"a758a91a": {"dfnID":"a758a91a","dfnText":"establishes an independent formatting context","external":true,"refSections":[{"refs":[{"id":"ref-for-establish-an-independent-formatting-context"}],"title":"3.2. \nLayout Containment"},{"refs":[{"id":"ref-for-establish-an-independent-formatting-context\u2460"}],"title":"3.3. \nPaint Containment"}],"url":"https://drafts.csswg.org/css-display-4/#establish-an-independent-formatting-context"},
+"a8485ff4": {"dfnID":"a8485ff4","dfnText":"replaced element","external":true,"refSections":[{"refs":[{"id":"ref-for-replaced-element"}],"title":"3.1. \nSize Containment"}],"url":"https://drafts.csswg.org/css-display-4/#replaced-element"},
+"a96baa0d": {"dfnID":"a96baa0d","dfnText":"internal ruby box","external":true,"refSections":[{"refs":[{"id":"ref-for-internal-ruby-box"}],"title":"3.1. \nSize Containment"},{"refs":[{"id":"ref-for-internal-ruby-box\u2460"}],"title":"3.2. \nLayout Containment"},{"refs":[{"id":"ref-for-internal-ruby-box\u2461"}],"title":"3.3. \nPaint Containment"}],"url":"https://drafts.csswg.org/css-display-3/#internal-ruby-box"},
+"aba62b39": {"dfnID":"aba62b39","dfnText":"intrinsic size","external":true,"refSections":[{"refs":[{"id":"ref-for-intrinsic-size"}],"title":"3.1. \nSize Containment"}],"url":"https://drafts.csswg.org/css-sizing-3/#intrinsic-size"},
+"abb2bed7": {"dfnID":"abb2bed7","dfnText":"table","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-display-table"}],"title":"3.1. \nSize Containment"}],"url":"https://drafts.csswg.org/css-display-4/#valdef-display-table"},
+"b218ce7c": {"dfnID":"b218ce7c","dfnText":"resize","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-resize"},{"id":"ref-for-propdef-resize\u2460"}],"title":"3.3. \nPaint Containment"}],"url":"https://drafts.csswg.org/css-ui-4/#propdef-resize"},
+"b2a71e73": {"dfnID":"b2a71e73","dfnText":"scrollable overflow","external":true,"refSections":[{"refs":[{"id":"ref-for-scrollable-overflow"}],"title":"3.3. \nPaint Containment"}],"url":"https://drafts.csswg.org/css-overflow-3/#scrollable-overflow"},
+"b4485d57": {"dfnID":"b4485d57","dfnText":"absolute positioning containing block","external":true,"refSections":[{"refs":[{"id":"ref-for-absolute-positioning-containing-block"}],"title":"3.2. \nLayout Containment"},{"refs":[{"id":"ref-for-absolute-positioning-containing-block\u2460"}],"title":"3.3. \nPaint Containment"}],"url":"https://drafts.csswg.org/css-position-3/#absolute-positioning-containing-block"},
+"b5dfd3f6": {"dfnID":"b5dfd3f6","dfnText":"monolithic","external":true,"refSections":[{"refs":[{"id":"ref-for-monolithic"}],"title":"3.1. \nSize Containment"}],"url":"https://drafts.csswg.org/css-break-3/#monolithic"},
+"c1d1ad8a": {"dfnID":"c1d1ad8a","dfnText":"inline-level","external":true,"refSections":[{"refs":[{"id":"ref-for-inline-level"}],"title":"3.1. \nSize Containment"},{"refs":[{"id":"ref-for-inline-level\u2460"}],"title":"3.2. \nLayout Containment"},{"refs":[{"id":"ref-for-inline-level\u2461"}],"title":"3.3. \nPaint Containment"}],"url":"https://drafts.csswg.org/css-display-3/#inline-level"},
+"c37816fe": {"dfnID":"c37816fe","dfnText":"fragmentation container","external":true,"refSections":[{"refs":[{"id":"ref-for-fragmentation-container"},{"id":"ref-for-fragmentation-container\u2460"},{"id":"ref-for-fragmentation-container\u2461"},{"id":"ref-for-fragmentation-container\u2462"},{"id":"ref-for-fragmentation-container\u2463"},{"id":"ref-for-fragmentation-container\u2464"},{"id":"ref-for-fragmentation-container\u2465"},{"id":"ref-for-fragmentation-container\u2466"}],"title":"3.2. \nLayout Containment"}],"url":"https://drafts.csswg.org/css-break-3/#fragmentation-container"},
+"c6027972": {"dfnID":"c6027972","dfnText":"fixed positioning containing block","external":true,"refSections":[{"refs":[{"id":"ref-for-fixed-positioning-containing-block"}],"title":"3.2. \nLayout Containment"},{"refs":[{"id":"ref-for-fixed-positioning-containing-block\u2460"}],"title":"3.3. \nPaint Containment"}],"url":"https://drafts.csswg.org/css-position-3/#fixed-positioning-containing-block"},
+"containment": {"dfnID":"containment","dfnText":"containment","external":false,"refSections":[{"refs":[{"id":"ref-for-containment"},{"id":"ref-for-containment\u2460"}],"title":"2. \nStrong Containment: the contain property"},{"refs":[{"id":"ref-for-containment\u2461"}],"title":"3. \nTypes of Containment"}],"url":"#containment"},
+"d3936525": {"dfnID":"d3936525","dfnText":"natural dimension","external":true,"refSections":[{"refs":[{"id":"ref-for-natural-dimensions"}],"title":"3.1. \nSize Containment"}],"url":"https://drafts.csswg.org/css-images-3/#natural-dimensions"},
+"dcf09107": {"dfnID":"dcf09107","dfnText":"corner clipping","external":true,"refSections":[{"refs":[{"id":"ref-for-corner-clipping"}],"title":"3.3. \nPaint Containment"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#corner-clipping"},
+"df8337f1": {"dfnID":"df8337f1","dfnText":"fit-content size","external":true,"refSections":[{"refs":[{"id":"ref-for-fit-content-size"}],"title":"3.1. \nSize Containment"}],"url":"https://drafts.csswg.org/css-sizing-3/#fit-content-size"},
+"e21129ef": {"dfnID":"e21129ef","dfnText":"forced break","external":true,"refSections":[{"refs":[{"id":"ref-for-forced-break"},{"id":"ref-for-forced-break\u2460"}],"title":"3.2. \nLayout Containment"}],"url":"https://drafts.csswg.org/css-break-3/#forced-break"},
+"f8e02f0a": {"dfnID":"f8e02f0a","dfnText":"fragmented flow","external":true,"refSections":[{"refs":[{"id":"ref-for-fragmented-flow"},{"id":"ref-for-fragmented-flow\u2460"},{"id":"ref-for-fragmented-flow\u2461"}],"title":"3.2. \nLayout Containment"}],"url":"https://drafts.csswg.org/css-break-3/#fragmented-flow"},
+"f9be6a15": {"dfnID":"f9be6a15","dfnText":"preferred aspect ratio","external":true,"refSections":[{"refs":[{"id":"ref-for-preferred-aspect-ratio"}],"title":"3.1. \nSize Containment"}],"url":"https://drafts.csswg.org/css-sizing-4/#preferred-aspect-ratio"},
+"fcfd637a": {"dfnID":"fcfd637a","dfnText":"internal table box","external":true,"refSections":[{"refs":[{"id":"ref-for-internal-table-box"}],"title":"3.1. \nSize Containment"},{"refs":[{"id":"ref-for-internal-table-box\u2460"}],"title":"3.2. \nLayout Containment"},{"refs":[{"id":"ref-for-internal-table-box\u2461"}],"title":"3.3. \nPaint Containment"}],"url":"https://drafts.csswg.org/css-display-3/#internal-table-box"},
+"fd0c9e35": {"dfnID":"fd0c9e35","dfnText":"::after","external":true,"refSections":[{"refs":[{"id":"ref-for-selectordef-after"}],"title":"3.1. \nSize Containment"}],"url":"https://drafts.csswg.org/css-pseudo-4/#selectordef-after"},
+"laying-out-in-place": {"dfnID":"laying-out-in-place","dfnText":"Laying out in-place","external":false,"refSections":[{"refs":[{"id":"ref-for-laying-out-in-place"}],"title":"3.1. \nSize Containment"}],"url":"#laying-out-in-place"},
+"layout-containment": {"dfnID":"layout-containment","dfnText":"layout containment","external":false,"refSections":[{"refs":[{"id":"ref-for-layout-containment"}],"title":"2. \nStrong Containment: the contain property"},{"refs":[{"id":"ref-for-layout-containment\u2460"},{"id":"ref-for-layout-containment\u2461"},{"id":"ref-for-layout-containment\u2462"}],"title":"3.1. \nSize Containment"},{"refs":[{"id":"ref-for-layout-containment\u2463"},{"id":"ref-for-layout-containment\u2464"},{"id":"ref-for-layout-containment\u2465"},{"id":"ref-for-layout-containment\u2466"},{"id":"ref-for-layout-containment\u2467"}],"title":"3.2. \nLayout Containment"}],"url":"#layout-containment"},
+"layout-containment-box": {"dfnID":"layout-containment-box","dfnText":"layout containment box","external":false,"refSections":[{"refs":[{"id":"ref-for-layout-containment-box"}],"title":"2. \nStrong Containment: the contain property"},{"refs":[{"id":"ref-for-layout-containment-box\u2460"},{"id":"ref-for-layout-containment-box\u2461"},{"id":"ref-for-layout-containment-box\u2462"},{"id":"ref-for-layout-containment-box\u2463"},{"id":"ref-for-layout-containment-box\u2464"},{"id":"ref-for-layout-containment-box\u2465"},{"id":"ref-for-layout-containment-box\u2466"},{"id":"ref-for-layout-containment-box\u2467"},{"id":"ref-for-layout-containment-box\u2468"},{"id":"ref-for-layout-containment-box\u2460\u24ea"},{"id":"ref-for-layout-containment-box\u2460\u2460"},{"id":"ref-for-layout-containment-box\u2460\u2461"},{"id":"ref-for-layout-containment-box\u2460\u2462"},{"id":"ref-for-layout-containment-box\u2460\u2463"}],"title":"3.2. \nLayout Containment"}],"url":"#layout-containment-box"},
+"paint-containment": {"dfnID":"paint-containment","dfnText":"paint containment","external":false,"refSections":[{"refs":[{"id":"ref-for-paint-containment"}],"title":"2. \nStrong Containment: the contain property"},{"refs":[{"id":"ref-for-paint-containment\u2460"}],"title":"3.3. \nPaint Containment"}],"url":"#paint-containment"},
+"paint-containment-box": {"dfnID":"paint-containment-box","dfnText":"paint containment box","external":false,"refSections":[{"refs":[{"id":"ref-for-paint-containment-box"}],"title":"2. \nStrong Containment: the contain property"},{"refs":[{"id":"ref-for-paint-containment-box\u2460"},{"id":"ref-for-paint-containment-box\u2461"},{"id":"ref-for-paint-containment-box\u2462"},{"id":"ref-for-paint-containment-box\u2463"},{"id":"ref-for-paint-containment-box\u2464"}],"title":"3.3. \nPaint Containment"}],"url":"#paint-containment-box"},
+"propdef-contain": {"dfnID":"propdef-contain","dfnText":"contain","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-contain\u2460"}],"title":"1. \nIntroduction"},{"refs":[{"id":"ref-for-propdef-contain\u2461"},{"id":"ref-for-propdef-contain\u2462"},{"id":"ref-for-propdef-contain\u2463"},{"id":"ref-for-propdef-contain\u2464"},{"id":"ref-for-propdef-contain\u2465"},{"id":"ref-for-propdef-contain\u2466"},{"id":"ref-for-propdef-contain\u2467"},{"id":"ref-for-propdef-contain\u2468"},{"id":"ref-for-propdef-contain\u2460\u24ea"},{"id":"ref-for-propdef-contain\u2460\u2460"},{"id":"ref-for-propdef-contain\u2460\u2461"},{"id":"ref-for-propdef-contain\u2460\u2462"}],"title":"2. \nStrong Containment: the contain property"},{"refs":[{"id":"ref-for-propdef-contain\u2460\u2463"},{"id":"ref-for-propdef-contain\u2460\u2464"}],"title":"Changes from the\nCandidate Recommendation of 08 November 2018"}],"url":"#propdef-contain"},
+"size-containment": {"dfnID":"size-containment","dfnText":"size containment","external":false,"refSections":[{"refs":[{"id":"ref-for-size-containment"},{"id":"ref-for-size-containment\u2460"},{"id":"ref-for-size-containment\u2461"}],"title":"2. \nStrong Containment: the contain property"},{"refs":[{"id":"ref-for-size-containment\u2462"},{"id":"ref-for-size-containment\u2463"},{"id":"ref-for-size-containment\u2464"}],"title":"3.1. \nSize Containment"},{"refs":[{"id":"ref-for-size-containment\u2465"}],"title":"3.2. \nLayout Containment"}],"url":"#size-containment"},
+"size-containment-box": {"dfnID":"size-containment-box","dfnText":"size containment box","external":false,"refSections":[{"refs":[{"id":"ref-for-size-containment-box"}],"title":"2. \nStrong Containment: the contain property"},{"refs":[{"id":"ref-for-size-containment-box\u2460"},{"id":"ref-for-size-containment-box\u2461"},{"id":"ref-for-size-containment-box\u2462"},{"id":"ref-for-size-containment-box\u2463"},{"id":"ref-for-size-containment-box\u2464"},{"id":"ref-for-size-containment-box\u2465"},{"id":"ref-for-size-containment-box\u2466"},{"id":"ref-for-size-containment-box\u2467"},{"id":"ref-for-size-containment-box\u2468"},{"id":"ref-for-size-containment-box\u2460\u24ea"},{"id":"ref-for-size-containment-box\u2460\u2460"},{"id":"ref-for-size-containment-box\u2460\u2461"},{"id":"ref-for-size-containment-box\u2460\u2462"},{"id":"ref-for-size-containment-box\u2460\u2463"},{"id":"ref-for-size-containment-box\u2460\u2464"},{"id":"ref-for-size-containment-box\u2460\u2465"},{"id":"ref-for-size-containment-box\u2460\u2466"}],"title":"3.1. \nSize Containment"}],"url":"#size-containment-box"},
+"sizing-as-if-empty": {"dfnID":"sizing-as-if-empty","dfnText":"Sizing as if empty","external":false,"refSections":[{"refs":[{"id":"ref-for-sizing-as-if-empty"}],"title":"3.1. \nSize Containment"}],"url":"#sizing-as-if-empty"},
+"valdef-contain-content": {"dfnID":"valdef-contain-content","dfnText":"content","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-contain-content"}],"title":"2. \nStrong Containment: the contain property"}],"url":"#valdef-contain-content"},
+"valdef-contain-layout": {"dfnID":"valdef-contain-layout","dfnText":"layout","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-contain-layout"}],"title":"2. \nStrong Containment: the contain property"}],"url":"#valdef-contain-layout"},
+"valdef-contain-none": {"dfnID":"valdef-contain-none","dfnText":"none","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-contain-none"}],"title":"2. \nStrong Containment: the contain property"}],"url":"#valdef-contain-none"},
+"valdef-contain-paint": {"dfnID":"valdef-contain-paint","dfnText":"paint","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-contain-paint"}],"title":"2. \nStrong Containment: the contain property"}],"url":"#valdef-contain-paint"},
+"valdef-contain-size": {"dfnID":"valdef-contain-size","dfnText":"size","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-contain-size"}],"title":"2. \nStrong Containment: the contain property"}],"url":"#valdef-contain-size"},
+"valdef-contain-strict": {"dfnID":"valdef-contain-strict","dfnText":"strict","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-contain-strict"}],"title":"2. \nStrong Containment: the contain property"}],"url":"#valdef-contain-strict"},
+};
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+});
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        dfn.panelData = panelData;
+        insertDfnPopupAction(dfn);
+    }
+}
+
+function genDfnPanel(dfn, { dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel on",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel({dfnPanel});
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.dfn = dfn;
+    dfn.dfnPanel = dfnPanel;
+    return dfnPanel;
+}
+
+
+
+function hideAllDfnPanels() {
+    // Delete the currently-active dfn panel.
+    queryAll(".dfn-panel").forEach(dfnPanel=>hideDfnPanel({dfnPanel}));
+}
+
+function showDfnPanel(dfn) {
+    hideAllDfnPanels(); // Only display one at a time.
+
+    dfn.setAttribute("aria-expanded", "true");
+
+    const dfnPanel = genDfnPanel(dfn, dfn.panelData);
+
+    // Give the dfn a unique tabindex, and then
+    // give all the tabbable panel bits successive indexes.
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+
+    append(document.body, dfnPanel);
+    positionDfnPanel(dfnPanel);
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.dfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }
+}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel({dfn, dfnPanel}) {
+    if(!dfnPanel) dfnPanel = dfn.dfnPanel;
+    if(!dfn) dfn = dfnPanel.dfn;
+    dfn.dfnPanel = undefined;
+    dfnPanel.dfn = undefined;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.remove()
+}
+
+function toggleDfnPanel(dfn) {
+    if(dfn.dfnPanel) {
+        hideDfnPanel(dfn);
+    } else {
+        showDfnPanel(dfn);
+    }
+}
+
+function insertDfnPopupAction(dfn) {
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        toggleDfnPanel(dfn);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+function needsFor(type) {
+    switch(type) {
+        case "descriptor":
+        case "value":
+        case "element-attr":
+        case "attr-value":
+        case "element-state":
+        case "method":
+        case "constructor":
+        case "argument":
+        case "attribute":
+        case "const":
+        case "dict-member":
+        case "event":
+        case "enum-value":
+        case "stringifier":
+        case "serializer":
+        case "iterator":
+        case "maplike":
+        case "setlike":
+        case "state":
+        case "mode":
+        case "context":
+        case "facet": return true;
+
+        default: return false;
+    }
+}
+function refusesFor(type) {
+    switch(type) {
+        case "property":
+        case "element":
+        case "interface":
+        case "namespace":
+        case "callback":
+        case "dictionary":
+        case "enum":
+        case "exception":
+        case "typedef":
+        case "http-header":
+        case "permission": return true;
+
+        default: return false;
+    }
+}
+function linkFormatterFromType(type) {
+    switch(type) {
+        case 'scheme':
+        case 'permission':
+        case 'dfn': return (text) => `[=${text}=]`;
+
+        case 'abstract-op': return (text) => `[\$${text}\$]`;
+
+        case 'function':
+        case 'at-rule':
+        case 'selector':
+        case 'value': return (text) => `''${text}''`;
+
+        case 'http-header': return (text) => `[:${text}:]`;
+
+        case 'interface':
+        case 'constructor':
+        case 'method':
+        case 'argument':
+        case 'attribute':
+        case 'callback':
+        case 'dictionary':
+        case 'dict-member':
+        case 'enum':
+        case 'enum-value':
+        case 'exception':
+        case 'const':
+        case 'typedef':
+        case 'stringifier':
+        case 'serializer':
+        case 'iterator':
+        case 'maplike':
+        case 'setlike':
+        case 'extended-attribute':
+        case 'event':
+        case 'idl': return (text) => `{{${text}}}`;
+
+        case 'element-state':
+        case 'element-attr':
+        case 'attr-value':
+        case 'element': return (element) => `<{${element}}>`;
+
+        case 'grammar': return (text) => `${text} (within a <pre class=prod>)`;
+
+        case 'type': return (text)=> `<<${text}>>`;
+
+        case 'descriptor':
+        case 'property': return (text) => `'${text}'`;
+
+        default: return;
+    };
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!needsFor(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!refusesFor(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
 }
 </script>
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
-                mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
+let refsData = {
+"#containment": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-contain","spec":"css-contain-1","status":"local","text":"containment","type":"dfn","url":"#containment"},
+"#laying-out-in-place": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-contain","spec":"css-contain-1","status":"local","text":"laying out in-place","type":"dfn","url":"#laying-out-in-place"},
+"#layout-containment": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-contain","spec":"css-contain-1","status":"local","text":"layout containment","type":"dfn","url":"#layout-containment"},
+"#layout-containment-box": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-contain","spec":"css-contain-1","status":"local","text":"layout containment box","type":"dfn","url":"#layout-containment-box"},
+"#paint-containment": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-contain","spec":"css-contain-1","status":"local","text":"paint containment","type":"dfn","url":"#paint-containment"},
+"#paint-containment-box": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-contain","spec":"css-contain-1","status":"local","text":"paint containment box","type":"dfn","url":"#paint-containment-box"},
+"#propdef-contain": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-contain","spec":"css-contain-1","status":"local","text":"contain","type":"property","url":"#propdef-contain"},
+"#size-containment": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-contain","spec":"css-contain-1","status":"local","text":"size containment","type":"dfn","url":"#size-containment"},
+"#size-containment-box": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-contain","spec":"css-contain-1","status":"local","text":"size containment box","type":"dfn","url":"#size-containment-box"},
+"#sizing-as-if-empty": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-contain","spec":"css-contain-1","status":"local","text":"sizing as if empty","type":"dfn","url":"#sizing-as-if-empty"},
+"#valdef-contain-content": {"export":true,"for_":["contain"],"level":"1","normative":true,"shortname":"css-contain","spec":"css-contain-1","status":"local","text":"content","type":"value","url":"#valdef-contain-content"},
+"#valdef-contain-layout": {"export":true,"for_":["contain"],"level":"1","normative":true,"shortname":"css-contain","spec":"css-contain-1","status":"local","text":"layout","type":"value","url":"#valdef-contain-layout"},
+"#valdef-contain-none": {"export":true,"for_":["contain"],"level":"1","normative":true,"shortname":"css-contain","spec":"css-contain-1","status":"local","text":"none","type":"value","url":"#valdef-contain-none"},
+"#valdef-contain-paint": {"export":true,"for_":["contain"],"level":"1","normative":true,"shortname":"css-contain","spec":"css-contain-1","status":"local","text":"paint","type":"value","url":"#valdef-contain-paint"},
+"#valdef-contain-size": {"export":true,"for_":["contain"],"level":"1","normative":true,"shortname":"css-contain","spec":"css-contain-1","status":"local","text":"size","type":"value","url":"#valdef-contain-size"},
+"#valdef-contain-strict": {"export":true,"for_":["contain"],"level":"1","normative":true,"shortname":"css-contain","spec":"css-contain-1","status":"local","text":"strict","type":"value","url":"#valdef-contain-strict"},
+"https://drafts.csswg.org/css-backgrounds-3/#corner-clipping": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"anchor-block","text":"corner clipping","type":"dfn","url":"https://drafts.csswg.org/css-backgrounds-3/#corner-clipping"},
+"https://drafts.csswg.org/css-break-3/#forced-break": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-break","spec":"css-break-3","status":"current","text":"forced break","type":"dfn","url":"https://drafts.csswg.org/css-break-3/#forced-break"},
+"https://drafts.csswg.org/css-break-3/#fragmentation": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-break","spec":"css-break-3","status":"current","text":"fragmentation","type":"dfn","url":"https://drafts.csswg.org/css-break-3/#fragmentation"},
+"https://drafts.csswg.org/css-break-3/#fragmentation-container": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-break","spec":"css-break-3","status":"current","text":"fragmentation container","type":"dfn","url":"https://drafts.csswg.org/css-break-3/#fragmentation-container"},
+"https://drafts.csswg.org/css-break-3/#fragmentation-context": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-break","spec":"css-break-3","status":"current","text":"fragmentation context","type":"dfn","url":"https://drafts.csswg.org/css-break-3/#fragmentation-context"},
+"https://drafts.csswg.org/css-break-3/#fragmented-flow": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-break","spec":"css-break-3","status":"current","text":"fragmented flow","type":"dfn","url":"https://drafts.csswg.org/css-break-3/#fragmented-flow"},
+"https://drafts.csswg.org/css-break-3/#monolithic": {"export":false,"for_":[],"level":"3","normative":true,"shortname":"css-break","spec":"css-break-3","status":"current","text":"monolithic","type":"dfn","url":"https://drafts.csswg.org/css-break-3/#monolithic"},
+"https://drafts.csswg.org/css-cascade-5/#used-value": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-cascade","spec":"css-cascade-5","status":"current","text":"used value","type":"dfn","url":"https://drafts.csswg.org/css-cascade-5/#used-value"},
+"https://drafts.csswg.org/css-contain-2/#style-containment": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-contain","spec":"css-contain-2","status":"current","text":"style containment","type":"dfn","url":"https://drafts.csswg.org/css-contain-2/#style-containment"},
+"https://drafts.csswg.org/css-display-3/#atomic-inline": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-display","spec":"css-display-3","status":"current","text":"atomic inline","type":"dfn","url":"https://drafts.csswg.org/css-display-3/#atomic-inline"},
+"https://drafts.csswg.org/css-display-3/#inline-level": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-display","spec":"css-display-3","status":"current","text":"inline-level","type":"dfn","url":"https://drafts.csswg.org/css-display-3/#inline-level"},
+"https://drafts.csswg.org/css-display-3/#internal-ruby-box": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-display","spec":"css-display-3","status":"current","text":"internal ruby box","type":"dfn","url":"https://drafts.csswg.org/css-display-3/#internal-ruby-box"},
+"https://drafts.csswg.org/css-display-3/#internal-table-box": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-display","spec":"css-display-3","status":"current","text":"internal table box","type":"dfn","url":"https://drafts.csswg.org/css-display-3/#internal-table-box"},
+"https://drafts.csswg.org/css-display-3/#propdef-display": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-display","spec":"css-display-3","status":"current","text":"display","type":"property","url":"https://drafts.csswg.org/css-display-3/#propdef-display"},
+"https://drafts.csswg.org/css-display-4/#establish-an-independent-formatting-context": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"establishes an independent formatting context","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#establish-an-independent-formatting-context"},
+"https://drafts.csswg.org/css-display-4/#inner-display-type": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"inner display type","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#inner-display-type"},
+"https://drafts.csswg.org/css-display-4/#principal-box": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"principal box","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#principal-box"},
+"https://drafts.csswg.org/css-display-4/#replaced-element": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"replaced element","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#replaced-element"},
+"https://drafts.csswg.org/css-display-4/#valdef-display-contents": {"export":true,"for_":["display","<display-box>"],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"contents","type":"value","url":"https://drafts.csswg.org/css-display-4/#valdef-display-contents"},
+"https://drafts.csswg.org/css-display-4/#valdef-display-none": {"export":true,"for_":["display","<display-box>"],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"none","type":"value","url":"https://drafts.csswg.org/css-display-4/#valdef-display-none"},
+"https://drafts.csswg.org/css-display-4/#valdef-display-table": {"export":true,"for_":["display","<display-inside>"],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"table","type":"value","url":"https://drafts.csswg.org/css-display-4/#valdef-display-table"},
+"https://drafts.csswg.org/css-display-4/#valdef-display-table-cell": {"export":true,"for_":["display","<display-internal>"],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"table-cell","type":"value","url":"https://drafts.csswg.org/css-display-4/#valdef-display-table-cell"},
+"https://drafts.csswg.org/css-grid-2/#grid-track": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-grid","spec":"css-grid-2","status":"current","text":"grid track","type":"dfn","url":"https://drafts.csswg.org/css-grid-2/#grid-track"},
+"https://drafts.csswg.org/css-images-3/#natural-aspect-ratio": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-images","spec":"css-images-3","status":"current","text":"natural aspect ratio","type":"dfn","url":"https://drafts.csswg.org/css-images-3/#natural-aspect-ratio"},
+"https://drafts.csswg.org/css-images-3/#natural-dimensions": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-images","spec":"css-images-3","status":"current","text":"natural dimension","type":"dfn","url":"https://drafts.csswg.org/css-images-3/#natural-dimensions"},
+"https://drafts.csswg.org/css-images-3/#natural-height": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-images","spec":"css-images-3","status":"current","text":"natural height","type":"dfn","url":"https://drafts.csswg.org/css-images-3/#natural-height"},
+"https://drafts.csswg.org/css-overflow-3/#ink-overflow": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-overflow","spec":"css-overflow-3","status":"current","text":"ink overflow","type":"dfn","url":"https://drafts.csswg.org/css-overflow-3/#ink-overflow"},
+"https://drafts.csswg.org/css-overflow-3/#propdef-overflow": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-overflow","spec":"css-overflow-3","status":"current","text":"overflow","type":"property","url":"https://drafts.csswg.org/css-overflow-3/#propdef-overflow"},
+"https://drafts.csswg.org/css-overflow-3/#propdef-overflow-x": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-overflow","spec":"css-overflow-3","status":"current","text":"overflow-x","type":"property","url":"https://drafts.csswg.org/css-overflow-3/#propdef-overflow-x"},
+"https://drafts.csswg.org/css-overflow-3/#propdef-overflow-y": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-overflow","spec":"css-overflow-3","status":"current","text":"overflow-y","type":"property","url":"https://drafts.csswg.org/css-overflow-3/#propdef-overflow-y"},
+"https://drafts.csswg.org/css-overflow-3/#scrollable-overflow": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-overflow","spec":"css-overflow-3","status":"current","text":"scrollable overflow","type":"dfn","url":"https://drafts.csswg.org/css-overflow-3/#scrollable-overflow"},
+"https://drafts.csswg.org/css-overflow-3/#valdef-overflow-clip": {"export":true,"for_":["overflow","overflow-x","overflow-y"],"level":"3","normative":true,"shortname":"css-overflow","spec":"css-overflow-3","status":"current","text":"clip","type":"value","url":"https://drafts.csswg.org/css-overflow-3/#valdef-overflow-clip"},
+"https://drafts.csswg.org/css-overflow-3/#valdef-overflow-visible": {"export":true,"for_":["overflow","overflow-x","overflow-y"],"level":"3","normative":true,"shortname":"css-overflow","spec":"css-overflow-3","status":"current","text":"visible","type":"value","url":"https://drafts.csswg.org/css-overflow-3/#valdef-overflow-visible"},
+"https://drafts.csswg.org/css-overflow-4/#overflow-clip-edge": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-overflow","spec":"css-overflow-4","status":"current","text":"overflow clip edge","type":"dfn","url":"https://drafts.csswg.org/css-overflow-4/#overflow-clip-edge"},
+"https://drafts.csswg.org/css-overflow-4/#propdef-overflow-clip-margin": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-overflow","spec":"css-overflow-4","status":"current","text":"overflow-clip-margin","type":"property","url":"https://drafts.csswg.org/css-overflow-4/#propdef-overflow-clip-margin"},
+"https://drafts.csswg.org/css-overflow-4/#selectordef-nth-fragment": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-overflow","spec":"css-overflow-4","status":"current","text":"::nth-fragment()","type":"selector","url":"https://drafts.csswg.org/css-overflow-4/#selectordef-nth-fragment"},
+"https://drafts.csswg.org/css-position-3/#absolute-positioning-containing-block": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-position","spec":"css-position-3","status":"current","text":"absolute positioning containing block","type":"dfn","url":"https://drafts.csswg.org/css-position-3/#absolute-positioning-containing-block"},
+"https://drafts.csswg.org/css-position-3/#fixed-positioning-containing-block": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-position","spec":"css-position-3","status":"current","text":"fixed positioning containing block","type":"dfn","url":"https://drafts.csswg.org/css-position-3/#fixed-positioning-containing-block"},
+"https://drafts.csswg.org/css-pseudo-4/#selectordef-after": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-pseudo","spec":"css-pseudo-4","status":"current","text":"::after","type":"selector","url":"https://drafts.csswg.org/css-pseudo-4/#selectordef-after"},
+"https://drafts.csswg.org/css-pseudo-4/#selectordef-before": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-pseudo","spec":"css-pseudo-4","status":"current","text":"::before","type":"selector","url":"https://drafts.csswg.org/css-pseudo-4/#selectordef-before"},
+"https://drafts.csswg.org/css-pseudo-4/#selectordef-marker": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-pseudo","spec":"css-pseudo-4","status":"current","text":"::marker","type":"selector","url":"https://drafts.csswg.org/css-pseudo-4/#selectordef-marker"},
+"https://drafts.csswg.org/css-sizing-3/#fit-content-size": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-sizing","spec":"css-sizing-3","status":"current","text":"fit-content size","type":"dfn","url":"https://drafts.csswg.org/css-sizing-3/#fit-content-size"},
+"https://drafts.csswg.org/css-sizing-3/#intrinsic-size": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-sizing","spec":"css-sizing-3","status":"current","text":"intrinsic size","type":"dfn","url":"https://drafts.csswg.org/css-sizing-3/#intrinsic-size"},
+"https://drafts.csswg.org/css-sizing-3/#propdef-height": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-sizing","spec":"css-sizing-3","status":"current","text":"height","type":"property","url":"https://drafts.csswg.org/css-sizing-3/#propdef-height"},
+"https://drafts.csswg.org/css-sizing-3/#propdef-width": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-sizing","spec":"css-sizing-3","status":"current","text":"width","type":"property","url":"https://drafts.csswg.org/css-sizing-3/#propdef-width"},
+"https://drafts.csswg.org/css-sizing-3/#sizing-property": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-sizing","spec":"css-sizing-3","status":"current","text":"sizing property","type":"dfn","url":"https://drafts.csswg.org/css-sizing-3/#sizing-property"},
+"https://drafts.csswg.org/css-sizing-3/#valdef-width-max-content": {"export":true,"for_":["width","min-width","max-width","height","min-height","max-height"],"level":"3","normative":true,"shortname":"css-sizing","spec":"css-sizing-3","status":"current","text":"max-content","type":"value","url":"https://drafts.csswg.org/css-sizing-3/#valdef-width-max-content"},
+"https://drafts.csswg.org/css-sizing-3/#valdef-width-min-content": {"export":true,"for_":["width","min-width","max-width","height","min-height","max-height"],"level":"3","normative":true,"shortname":"css-sizing","spec":"css-sizing-3","status":"current","text":"min-content","type":"value","url":"https://drafts.csswg.org/css-sizing-3/#valdef-width-min-content"},
+"https://drafts.csswg.org/css-sizing-4/#preferred-aspect-ratio": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-sizing","spec":"css-sizing-4","status":"current","text":"preferred aspect ratio","type":"dfn","url":"https://drafts.csswg.org/css-sizing-4/#preferred-aspect-ratio"},
+"https://drafts.csswg.org/css-sizing-4/#propdef-aspect-ratio": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-sizing","spec":"css-sizing-4","status":"current","text":"aspect-ratio","type":"property","url":"https://drafts.csswg.org/css-sizing-4/#propdef-aspect-ratio"},
+"https://drafts.csswg.org/css-ui-3/#propdef-text-overflow": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-ui","spec":"css-ui-3","status":"current","text":"text-overflow","type":"property","url":"https://drafts.csswg.org/css-ui-3/#propdef-text-overflow"},
+"https://drafts.csswg.org/css-ui-4/#propdef-resize": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-ui","spec":"css-ui-4","status":"current","text":"resize","type":"property","url":"https://drafts.csswg.org/css-ui-4/#propdef-resize"},
+"https://drafts.csswg.org/css-values-4/#comb-any": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"||","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-any"},
+"https://drafts.csswg.org/css-values-4/#comb-one": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"|","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"https://drafts.csswg.org/css-values-4/#css-wide-keywords": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"css-wide keywords","type":"dfn","url":"https://drafts.csswg.org/css-values-4/#css-wide-keywords"},
+"https://svgwg.org/svg2-draft/struct.html#elementdef-svg": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"svg","spec":"svg2","status":"current","text":"svg","type":"element","url":"https://svgwg.org/svg2-draft/struct.html#elementdef-svg"},
+"https://www.w3.org/TR/CSS2/box.html#padding-edge": {"export":true,"for_":[],"level":"","normative":true,"shortname":"css2","spec":"css2","status":"anchor-block","text":"padding edge","type":"dfn","url":"https://www.w3.org/TR/CSS2/box.html#padding-edge"},
+"https://www.w3.org/TR/CSS2/visudet.html#propdef-vertical-align": {"export":true,"for_":[],"level":"","normative":true,"shortname":"css2","spec":"css2","status":"anchor-block","text":"vertical-align","type":"property","url":"https://www.w3.org/TR/CSS2/visudet.html#propdef-vertical-align"},
+};
+
+function mkRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "Term: "),
+                mk.span({}, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    let forListElements;
+    if(forList.length == 0) {
+        forListElements = [];
+    } else if(forList.length == 1) {
+        forListElements = mk.li({},
+            mk.b({}, "For: "),
+            mk.span({}, forList[0]),
+        );
+    } else {
+        forListElements = mk.li({},
             mk.b({}, "For: "),
             mk.ul({},
                 ...forList.map(forItem =>
                     mk.li({},
-                        mk.span({}, `${forItem}`)
+                        mk.span({}, forItem)
                     ),
                 ),
             ),
         );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+    }
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    setupRefHintEventListeners(link, hintPanel);
+    return hintPanel;
+}
+
+function hideAllRefHints() {
+    queryAll(".ref-hint").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    if(refHint.teardownEventListeners) {
+        refHint.teardownEventListeners();
     }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+    refHint.remove();
+}
+
+function showRefHint(link) {
+    if(link.classList.contains("dfn-link")) return;
+    const url = link.getAttribute("href");
+    const ref = refsData[url];
+    if(!ref) return;
+
+    hideAllRefHints(); // Only display one at this time.
+
+    const refHint = mkRefHint(link, ref);
+    append(document.body, refHint);
+    link.setAttribute("aria-expanded", "true");
+    positionRefHint(refHint);
+}
+
+function setupRefHintEventListeners(link, refHint) {
+    if (refHint.teardownEventListeners) return;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
+
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
-
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
-    }
-
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
-        }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
-
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
-    }
-
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+document.addEventListener("DOMContentLoaded", () => {
+    document.body.addEventListener("mouseover", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
+    });
+    document.body.addEventListener("focus", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
     });
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
 </script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['#propdef-contain'] = {"text": "contain", "type": "property", "spec": "css-contain-1", "shortname": "css-contain", "level": "1", "status": "local", "url": "#propdef-contain", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#css-wide-keywords'] = {"text": "css-wide keywords", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-contain-strict'] = {"text": "strict", "type": "value", "spec": "css-contain-1", "shortname": "css-contain", "level": "1", "status": "local", "url": "#valdef-contain-strict", "export": true, "normative": true, "for_": ["contain"]};
-window.refsData['#valdef-contain-content'] = {"text": "content", "type": "value", "spec": "css-contain-1", "shortname": "css-contain", "level": "1", "status": "local", "url": "#valdef-contain-content", "export": true, "normative": true, "for_": ["contain"]};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-any'] = {"text": "||", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-any", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-contain-none'] = {"text": "none", "type": "value", "spec": "css-contain-1", "shortname": "css-contain", "level": "1", "status": "local", "url": "#valdef-contain-none", "export": true, "normative": true, "for_": ["contain"]};
-window.refsData['#valdef-contain-size'] = {"text": "size", "type": "value", "spec": "css-contain-1", "shortname": "css-contain", "level": "1", "status": "local", "url": "#valdef-contain-size", "export": true, "normative": true, "for_": ["contain"]};
-window.refsData['#valdef-contain-layout'] = {"text": "layout", "type": "value", "spec": "css-contain-1", "shortname": "css-contain", "level": "1", "status": "local", "url": "#valdef-contain-layout", "export": true, "normative": true, "for_": ["contain"]};
-window.refsData['#valdef-contain-paint'] = {"text": "paint", "type": "value", "spec": "css-contain-1", "shortname": "css-contain", "level": "1", "status": "local", "url": "#valdef-contain-paint", "export": true, "normative": true, "for_": ["contain"]};
-window.refsData['#containment'] = {"text": "containment", "type": "dfn", "spec": "css-contain-1", "shortname": "css-contain", "level": "1", "status": "local", "url": "#containment", "export": true, "normative": true, "for_": []};
-window.refsData['#size-containment'] = {"text": "size containment", "type": "dfn", "spec": "css-contain-1", "shortname": "css-contain", "level": "1", "status": "local", "url": "#size-containment", "export": true, "normative": true, "for_": []};
-window.refsData['#size-containment-box'] = {"text": "size containment box", "type": "dfn", "spec": "css-contain-1", "shortname": "css-contain", "level": "1", "status": "local", "url": "#size-containment-box", "export": true, "normative": true, "for_": []};
-window.refsData['#layout-containment'] = {"text": "layout containment", "type": "dfn", "spec": "css-contain-1", "shortname": "css-contain", "level": "1", "status": "local", "url": "#layout-containment", "export": true, "normative": true, "for_": []};
-window.refsData['#layout-containment-box'] = {"text": "layout containment box", "type": "dfn", "spec": "css-contain-1", "shortname": "css-contain", "level": "1", "status": "local", "url": "#layout-containment-box", "export": true, "normative": true, "for_": []};
-window.refsData['#paint-containment'] = {"text": "paint containment", "type": "dfn", "spec": "css-contain-1", "shortname": "css-contain", "level": "1", "status": "local", "url": "#paint-containment", "export": true, "normative": true, "for_": []};
-window.refsData['#paint-containment-box'] = {"text": "paint containment box", "type": "dfn", "spec": "css-contain-1", "shortname": "css-contain", "level": "1", "status": "local", "url": "#paint-containment-box", "export": true, "normative": true, "for_": []};
-window.refsData['https://svgwg.org/svg2-draft/struct.html#elementdef-svg'] = {"text": "svg", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-svg", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#principal-box'] = {"text": "principal box", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#principal-box", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-3/#propdef-display'] = {"text": "display", "type": "property", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-display-3/#propdef-display", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#inner-display-type'] = {"text": "inner display type", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#inner-display-type", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#valdef-display-table'] = {"text": "table", "type": "value", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#valdef-display-table", "export": true, "normative": true, "for_": ["display", "<display-inside>"]};
-window.refsData['https://drafts.csswg.org/css-display-3/#internal-table-box'] = {"text": "internal table box", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-display-3/#internal-table-box", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-3/#internal-ruby-box'] = {"text": "internal ruby box", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-display-3/#internal-ruby-box", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-3/#atomic-inline'] = {"text": "atomic inline", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-display-3/#atomic-inline", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-3/#inline-level'] = {"text": "inline-level", "type": "dfn", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-display-3/#inline-level", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-sizing-3/#propdef-width'] = {"text": "width", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-width", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-sizing-3/#propdef-height'] = {"text": "height", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-height", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-sizing-3/#sizing-property'] = {"text": "sizing property", "type": "dfn", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#sizing-property", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-sizing-3/#intrinsic-size'] = {"text": "intrinsic size", "type": "dfn", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#intrinsic-size", "export": true, "normative": true, "for_": []};
-window.refsData['#sizing-as-if-empty'] = {"text": "sizing as if empty", "type": "dfn", "spec": "css-contain-1", "shortname": "css-contain", "level": "1", "status": "local", "url": "#sizing-as-if-empty", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-sizing-3/#valdef-width-min-content'] = {"text": "min-content", "type": "value", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#valdef-width-min-content", "export": true, "normative": true, "for_": ["width", "min-width", "max-width", "height", "min-height", "max-height"]};
-window.refsData['https://drafts.csswg.org/css-sizing-3/#valdef-width-max-content'] = {"text": "max-content", "type": "value", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#valdef-width-max-content", "export": true, "normative": true, "for_": ["width", "min-width", "max-width", "height", "min-height", "max-height"]};
-window.refsData['https://drafts.csswg.org/css-grid-2/#grid-track'] = {"text": "grid track", "type": "dfn", "spec": "css-grid-2", "shortname": "css-grid", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-grid-2/#grid-track", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-sizing-3/#fit-content-size'] = {"text": "fit-content size", "type": "dfn", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#fit-content-size", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-cascade-5/#used-value'] = {"text": "used value", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#used-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-before'] = {"text": "::before", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-before", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-after'] = {"text": "::after", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-after", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-marker'] = {"text": "::marker", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-marker", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#replaced-element'] = {"text": "replaced element", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#replaced-element", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-images-3/#natural-dimensions'] = {"text": "natural dimension", "type": "dfn", "spec": "css-images-3", "shortname": "css-images", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-images-3/#natural-dimensions", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-images-3/#natural-aspect-ratio'] = {"text": "natural aspect ratio", "type": "dfn", "spec": "css-images-3", "shortname": "css-images", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-images-3/#natural-aspect-ratio", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-sizing-4/#propdef-aspect-ratio'] = {"text": "aspect-ratio", "type": "property", "spec": "css-sizing-4", "shortname": "css-sizing", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-sizing-4/#propdef-aspect-ratio", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-sizing-4/#preferred-aspect-ratio'] = {"text": "preferred aspect ratio", "type": "dfn", "spec": "css-sizing-4", "shortname": "css-sizing", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-sizing-4/#preferred-aspect-ratio", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-break-3/#monolithic'] = {"text": "monolithic", "type": "dfn", "spec": "css-break-3", "shortname": "css-break", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-break-3/#monolithic", "export": false, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-images-3/#natural-height'] = {"text": "natural height", "type": "dfn", "spec": "css-images-3", "shortname": "css-images", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-images-3/#natural-height", "export": true, "normative": true, "for_": []};
-window.refsData['#laying-out-in-place'] = {"text": "laying out in-place", "type": "dfn", "spec": "css-contain-1", "shortname": "css-contain", "level": "1", "status": "local", "url": "#laying-out-in-place", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#valdef-display-contents'] = {"text": "contents", "type": "value", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#valdef-display-contents", "export": true, "normative": true, "for_": ["display", "<display-box>"]};
-window.refsData['https://drafts.csswg.org/css-display-4/#valdef-display-none'] = {"text": "none", "type": "value", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#valdef-display-none", "export": true, "normative": true, "for_": ["display", "<display-box>"]};
-window.refsData['https://drafts.csswg.org/css-display-4/#valdef-display-table-cell'] = {"text": "table-cell", "type": "value", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#valdef-display-table-cell", "export": true, "normative": true, "for_": ["display", "<display-internal>"]};
-window.refsData['https://drafts.csswg.org/css-display-4/#establish-an-independent-formatting-context'] = {"text": "establishes an independent formatting context", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#establish-an-independent-formatting-context", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-break-3/#fragmentation-container'] = {"text": "fragmentation container", "type": "dfn", "spec": "css-break-3", "shortname": "css-break", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-break-3/#fragmentation-container", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-break-3/#fragmentation-context'] = {"text": "fragmentation context", "type": "dfn", "spec": "css-break-3", "shortname": "css-break", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-break-3/#fragmentation-context", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-break-3/#fragmented-flow'] = {"text": "fragmented flow", "type": "dfn", "spec": "css-break-3", "shortname": "css-break", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-break-3/#fragmented-flow", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-break-3/#fragmentation'] = {"text": "fragmentation", "type": "dfn", "spec": "css-break-3", "shortname": "css-break", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-break-3/#fragmentation", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-overflow-4/#selectordef-nth-fragment'] = {"text": "::nth-fragment()", "type": "selector", "spec": "css-overflow-4", "shortname": "css-overflow", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-overflow-4/#selectordef-nth-fragment", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-overflow-3/#propdef-overflow'] = {"text": "overflow", "type": "property", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#propdef-overflow", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-overflow-3/#valdef-overflow-visible'] = {"text": "visible", "type": "value", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#valdef-overflow-visible", "export": true, "normative": true, "for_": ["overflow", "overflow-x", "overflow-y"]};
-window.refsData['https://drafts.csswg.org/css-overflow-3/#valdef-overflow-clip'] = {"text": "clip", "type": "value", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#valdef-overflow-clip", "export": true, "normative": true, "for_": ["overflow", "overflow-x", "overflow-y"]};
-window.refsData['https://drafts.csswg.org/css-overflow-3/#ink-overflow'] = {"text": "ink overflow", "type": "dfn", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#ink-overflow", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-position-3/#absolute-positioning-containing-block'] = {"text": "absolute positioning containing block", "type": "dfn", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#absolute-positioning-containing-block", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-position-3/#fixed-positioning-containing-block'] = {"text": "fixed positioning containing block", "type": "dfn", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#fixed-positioning-containing-block", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-break-3/#forced-break'] = {"text": "forced break", "type": "dfn", "spec": "css-break-3", "shortname": "css-break", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-break-3/#forced-break", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/CSS2/visudet.html#propdef-vertical-align'] = {"text": "vertical-align", "type": "property", "spec": "css2", "shortname": "css2", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/CSS2/visudet.html#propdef-vertical-align", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-overflow-3/#scrollable-overflow'] = {"text": "scrollable overflow", "type": "dfn", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#scrollable-overflow", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/CSS2/box.html#padding-edge'] = {"text": "padding edge", "type": "dfn", "spec": "css2", "shortname": "css2", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/CSS2/box.html#padding-edge", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#corner-clipping'] = {"text": "corner clipping", "type": "dfn", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "anchor-block", "url": "https://drafts.csswg.org/css-backgrounds-3/#corner-clipping", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-ui-4/#propdef-resize'] = {"text": "resize", "type": "property", "spec": "css-ui-4", "shortname": "css-ui", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-ui-4/#propdef-resize", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-ui-3/#propdef-text-overflow'] = {"text": "text-overflow", "type": "property", "spec": "css-ui-3", "shortname": "css-ui", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-ui-3/#propdef-text-overflow", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-overflow-4/#overflow-clip-edge'] = {"text": "overflow clip edge", "type": "dfn", "spec": "css-overflow-4", "shortname": "css-overflow", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-overflow-4/#overflow-clip-edge", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-overflow-4/#propdef-overflow-clip-margin'] = {"text": "overflow-clip-margin", "type": "property", "spec": "css-overflow-4", "shortname": "css-overflow", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-overflow-4/#propdef-overflow-clip-margin", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-overflow-3/#propdef-overflow-x'] = {"text": "overflow-x", "type": "property", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#propdef-overflow-x", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-overflow-3/#propdef-overflow-y'] = {"text": "overflow-y", "type": "property", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#propdef-overflow-y", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-contain-2/#style-containment'] = {"text": "style containment", "type": "dfn", "spec": "css-contain-2", "shortname": "css-contain", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-contain-2/#style-containment", "export": true, "normative": true, "for_": []};window.refsData['#propdef-contain'] = {"text": "contain", "type": "property", "spec": "css-contain-1", "shortname": "css-contain", "level": "1", "status": "local", "url": "#propdef-contain", "export": true, "normative": true, "for_": []};
-</script>
 <script>/* Boilerplate: script-wpt */
-let wptPath = "/css/css-contain/";
 "use strict";
+{
+let wptData = {
+"path": "/css/css-contain/",
+};
 
 document.addEventListener("DOMContentLoaded", async ()=>{
-    if(wptPath == "/") return;
+    if(wptData.path == "/") return;
 
     const runsUrl = "https://wpt.fyi/api/runs?label=master&label=stable&max-count=1&product=chrome&product=firefox&product=safari&product=edge";
     const runs = await (await fetch(runsUrl)).json();
@@ -3498,7 +3494,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         },
         body: JSON.stringify({
             "run_ids": runs.map(x=>x.id),
-            "query": {"path": wptPath},
+            "query": {"path": wptData.path},
         })
     })).json();
 
@@ -3518,11 +3514,11 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         const numTests = passData[0][1];
         if(numTests > 1) {
             nameEl.insertAdjacentElement("beforeend",
-                el("small", {}, ` (${numTests} tests)`));
+                mk.small({}, ` (${numTests} tests)`));
         }
         if(passData == undefined) return;
-        const resultsEl = el("span",{"class":"wpt-results"},
-            ...passData.map((p,i) => el("span",
+        const resultsEl = mk.span({"class":"wpt-results"},
+            ...passData.map((p,i) => mk.span(
             {
                 "title": `${browsers[i].name} ${p[0]}/${p[1]}`,
                 "class": "wpt-result",
@@ -3544,8 +3540,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     });
     const overview = document.querySelector(".wpt-overview");
     if(overview) {
-        overview.appendChild(el('ul',{}, ...browsers.map(formatWptResult)));
-        document.head.appendChild(el('style', {},
+        overview.appendChild(mk.ul({}, ...browsers.map(formatWptResult)));
+        document.head.appendChild(mk.style({},
             `.wpt-overview ul { display: flex; flex-flow: row wrap; gap: .2em; justify-content: start; list-style: none; padding: 0; margin: 0;}
              .wpt-overview li { padding: .25em 1em; color: black; text-align: center; }
              .wpt-overview img { height: 1.5em; height: max(1.5em, 32px); background: transparent; }
@@ -3559,19 +3555,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
              .wpt-overview .passes-all { background: #81c784; }`));
     }
 });
-function el(name, attrs, ...content) {
-    const x = document.createElement(name);
-    for(const [k,v] of Object.entries(attrs)) {
-        x.setAttribute(k, v);
-    }
-    for(let child of content) {
-        if(typeof child == "string") child = document.createTextNode(child);
-        try {
-        x.appendChild(child);
-        } catch(e) { console.log({x, child}); }
-    }
-    return x;
-}
+
 function formatWptResult({name, version, passes, total}) {
     const passRate = passes/total;
     let passClass = "";
@@ -3587,15 +3571,16 @@ function formatWptResult({name, version, passes, total}) {
     const shortVersion = /^\d+/.exec(version);
     const icon = []
 
-    if(name == "Chrome") icon.push(el('img', {alt:"", src:"https://wpt.fyi/static/chrome_64x64.png"}));
-    if(name == "Edge") icon.push(el('img', {alt:"", src:"https://wpt.fyi/static/edge_64x64.png"}));
-    if(name == "Safari") icon.push(el('img', {alt:"", src:"https://wpt.fyi/static/safari_64x64.png"}));
-    if(name == "Firefox") icon.push(el('img', {alt:"", src:"https://wpt.fyi/static/firefox_64x64.png"}));
+    if(name == "Chrome") icon.push(mk.img({alt:"", src:"https://wpt.fyi/static/chrome_64x64.png"}));
+    if(name == "Edge") icon.push(mk.img({alt:"", src:"https://wpt.fyi/static/edge_64x64.png"}));
+    if(name == "Safari") icon.push(mk.img({alt:"", src:"https://wpt.fyi/static/safari_64x64.png"}));
+    if(name == "Firefox") icon.push(mk.img({alt:"", src:"https://wpt.fyi/static/firefox_64x64.png"}));
 
-    return el('li', {"class":passClass},
-        el('nobr', {'class':'browser'}, ...icon, ` ${name} ${shortVersion}`),
-        el('br', {}),
-        el('nobr', {'class':'pass-rate'}, `${passes}/${total}`)
+    return mk.li({"class":passClass},
+        mk.nobr({'class':'browser'}, ...icon, ` ${name} ${shortVersion}`),
+        mk.br(),
+        mk.nobr({'class':'pass-rate'}, `${passes}/${total}`)
     );
+}
 }
 </script>

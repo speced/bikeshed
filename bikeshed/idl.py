@@ -359,7 +359,6 @@ class IDLMarker(widlparser.protocols.Marker):
 
 
 def markupIDL(doc: t.SpecT) -> None:
-    highlightingOccurred = False
     idlEls = h.findAll("pre.idl:not([data-no-idl]), xmp.idl:not([data-no-idl])", doc)
     for el in h.findAll("script[type=idl]", doc):
         # To help with syntax-highlighting, <script type=idl> is also allowed here.
@@ -385,7 +384,7 @@ def markupIDL(doc: t.SpecT) -> None:
             # Parse a second time with the global one, which collects all data in the doc.
             doc.widl.parse(text)
         h.addClass(doc, el, "highlight")
-        highlightingOccurred = True
+        doc.extraJC.addIDLHighlighting()
     if doc.md.slimBuildArtifact:
         # Remove the highlight-only spans
         for el in idlEls:
@@ -393,15 +392,6 @@ def markupIDL(doc: t.SpecT) -> None:
                 contents = h.childNodes(span, clear=True)
                 h.replaceNode(span, *contents)
         return
-    if highlightingOccurred:
-        doc.extraStyles.set(
-            "syntax-highlighting",
-            """
-            pre.idl.highlight {
-                background: var(--borderedblock-bg, var(--def-bg));
-            }
-            """,
-        )
 
 
 def markupIDLBlock(pre: t.ElementT, doc: t.SpecT) -> set[t.ElementT]:

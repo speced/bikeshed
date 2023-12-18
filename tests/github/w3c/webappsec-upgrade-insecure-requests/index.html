@@ -78,7 +78,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -704,7 +703,7 @@ a[href].issue-return {
 }
 
 .ref-hint {
-    display: none;
+    display: inline-block;
     position: absolute;
     z-index: 35;
     width: 20em;
@@ -720,16 +719,11 @@ a[href].issue-return {
     white-space: normal; /* in case it's moved into a pre */
 }
 
-.ref-hint.on {
-    display: inline-block;
-}
-
 .ref-hint * { margin: 0; padding: 0; text-indent: 0; }
 
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -1717,471 +1711,8 @@ Location: https://example.com/
     </div>
    </div>
   </details>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['bed34579'] = {"dfnID": "bed34579", "url": "https://tools.ietf.org/html/rfc5234#appendix-B.1", "dfnText": "wsp", "refSections": [{"refs": [{"id": "ref-for-appendix-B.1"}, {"id": "ref-for-appendix-B.1\u2460"}], "title": "3.2.1. \n    The Upgrade-Insecure-Requests HTTP Request Header Field\n  "}], "external": true};
-window.dfnpanelData['6fe4936a'] = {"dfnID": "6fe4936a", "url": "https://www.w3.org/TR/CSP/#content-security-policy", "dfnText": "content-security-policy", "refSections": [{"refs": [{"id": "ref-for-content-security-policy"}], "title": "1.2.1. Non-navigational Upgrades"}, {"refs": [{"id": "ref-for-content-security-policy\u2460"}], "title": "1.2.2. Navigational Upgrades"}, {"refs": [{"id": "ref-for-content-security-policy\u2461"}, {"id": "ref-for-content-security-policy\u2462"}], "title": "1.3. Recommendations"}, {"refs": [{"id": "ref-for-content-security-policy\u2463"}], "title": "3.1. \n    The upgrade-insecure-requests Content Security Policy directive\n  "}, {"refs": [{"id": "ref-for-content-security-policy\u2464"}], "title": "3.4. Reporting Upgrades"}], "external": true};
-window.dfnpanelData['0f172001'] = {"dfnID": "0f172001", "url": "https://www.w3.org/TR/CSP/#content-security-policy-report-only", "dfnText": "content-security-policy-report-only", "refSections": [{"refs": [{"id": "ref-for-content-security-policy-report-only"}, {"id": "ref-for-content-security-policy-report-only\u2460"}, {"id": "ref-for-content-security-policy-report-only\u2461"}], "title": "3.1. \n    The upgrade-insecure-requests Content Security Policy directive\n  "}, {"refs": [{"id": "ref-for-content-security-policy-report-only\u2462"}], "title": "3.4. Reporting Upgrades"}], "external": true};
-window.dfnpanelData['6e70fa2b'] = {"dfnID": "6e70fa2b", "url": "https://www.w3.org/TR/CSP/#default-src", "dfnText": "default-src", "refSections": [{"refs": [{"id": "ref-for-default-src"}, {"id": "ref-for-default-src\u2460"}], "title": "3.4. Reporting Upgrades"}], "external": true};
-window.dfnpanelData['c1a3355a'] = {"dfnID": "c1a3355a", "url": "https://www.w3.org/TR/CSP/#enforce", "dfnText": "enforce", "refSections": [{"refs": [{"id": "ref-for-enforce"}], "title": "3.1. \n    The upgrade-insecure-requests Content Security Policy directive\n  "}, {"refs": [{"id": "ref-for-enforce\u2460"}, {"id": "ref-for-enforce\u2461"}], "title": "3.4. Reporting Upgrades"}], "external": true};
-window.dfnpanelData['acdef210'] = {"dfnID": "acdef210", "url": "https://www.w3.org/TR/CSP/#enforce", "dfnText": "enforced", "refSections": [{"refs": [{"id": "ref-for-enforce"}], "title": "3.1. \n    The upgrade-insecure-requests Content Security Policy directive\n  "}, {"refs": [{"id": "ref-for-enforce\u2460"}, {"id": "ref-for-enforce\u2461"}], "title": "3.4. Reporting Upgrades"}], "external": true};
-window.dfnpanelData['ae771aec'] = {"dfnID": "ae771aec", "url": "https://www.w3.org/TR/CSP/#monitor", "dfnText": "monitor", "refSections": [{"refs": [{"id": "ref-for-monitor"}], "title": "3.1. \n    The upgrade-insecure-requests Content Security Policy directive\n  "}, {"refs": [{"id": "ref-for-monitor\u2460"}, {"id": "ref-for-monitor\u2461"}], "title": "3.4. Reporting Upgrades"}], "external": true};
-window.dfnpanelData['5f7823d5'] = {"dfnID": "5f7823d5", "url": "https://www.w3.org/TR/CSP/#monitor", "dfnText": "monitored", "refSections": [{"refs": [{"id": "ref-for-monitor"}], "title": "3.1. \n    The upgrade-insecure-requests Content Security Policy directive\n  "}, {"refs": [{"id": "ref-for-monitor\u2460"}, {"id": "ref-for-monitor\u2461"}], "title": "3.4. Reporting Upgrades"}], "external": true};
-window.dfnpanelData['20a14959'] = {"dfnID": "20a14959", "url": "https://www.w3.org/TR/CSP/#protected-resource", "dfnText": "protected resource", "refSections": [{"refs": [{"id": "ref-for-protected-resource"}, {"id": "ref-for-protected-resource\u2460"}, {"id": "ref-for-protected-resource\u2461"}], "title": "3.1. \n    The upgrade-insecure-requests Content Security Policy directive\n  "}, {"refs": [{"id": "ref-for-protected-resource\u2462"}], "title": "3.4. Reporting Upgrades"}, {"refs": [{"id": "ref-for-protected-resource\u2463"}], "title": "4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}, {"refs": [{"id": "ref-for-protected-resource\u2464"}], "title": "7.2. Relation to HSTS"}], "external": true};
-window.dfnpanelData['8d5dcd58'] = {"dfnID": "8d5dcd58", "url": "https://www.w3.org/TR/CSP/#report-uri", "dfnText": "report-uri", "refSections": [{"refs": [{"id": "ref-for-report-uri"}], "title": "3.4. Reporting Upgrades"}], "external": true};
-window.dfnpanelData['0c4f954f'] = {"dfnID": "0c4f954f", "url": "https://www.w3.org/TR/CSP/#send-violation-reports", "dfnText": "send violation reports", "refSections": [{"refs": [{"id": "ref-for-send-violation-reports"}], "title": "7.1. Legacy Clients"}], "external": true};
-window.dfnpanelData['760871ee'] = {"dfnID": "760871ee", "url": "https://www.w3.org/TR/CSP/#example-violation-report", "dfnText": "violation report", "refSections": [{"refs": [{"id": "ref-for-example-violation-report"}], "title": "3.4. Reporting Upgrades"}], "external": true};
-window.dfnpanelData['298863fc'] = {"dfnID": "298863fc", "url": "http://www.w3.org/TR/dom/#interface-document", "dfnText": "Document", "refSections": [{"refs": [{"id": "ref-for-interface-document"}], "title": "3.3. Policy Inheritance"}, {"refs": [{"id": "ref-for-interface-document\u2460"}], "title": "4.2. \n    Should insecure requests be upgraded for client?\n  "}, {"refs": [{"id": "ref-for-interface-document\u2461"}, {"id": "ref-for-interface-document\u2462"}, {"id": "ref-for-interface-document\u2463"}], "title": "5.2. CSP Violation Reports"}], "external": true};
-window.dfnpanelData['a6a8ec88'] = {"dfnID": "a6a8ec88", "url": "https://fetch.spec.whatwg.org/#concept-header-list-append", "dfnText": "append", "refSections": [{"refs": [{"id": "ref-for-concept-header-list-append"}], "title": "4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}], "external": true};
-window.dfnpanelData['857d5516'] = {"dfnID": "857d5516", "url": "https://fetch.spec.whatwg.org/#concept-request-client", "dfnText": "client", "refSections": [{"refs": [{"id": "ref-for-concept-request-client"}, {"id": "ref-for-concept-request-client\u2460"}, {"id": "ref-for-concept-request-client\u2461"}, {"id": "ref-for-concept-request-client\u2462"}], "title": "4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}, {"refs": [{"id": "ref-for-concept-request-client\u2463"}, {"id": "ref-for-concept-request-client\u2464"}], "title": "4.2. \n    Should insecure requests be upgraded for client?\n  "}], "external": true};
-window.dfnpanelData['a33db89a'] = {"dfnID": "a33db89a", "url": "https://fetch.spec.whatwg.org/#concept-fetch", "dfnText": "fetch", "refSections": [{"refs": [{"id": "ref-for-concept-fetch"}], "title": "3. Upgrading Insecure Resource Requests"}, {"refs": [{"id": "ref-for-concept-fetch\u2460"}], "title": "3.1.1. Relation to \"Mixed Content\""}], "external": true};
-window.dfnpanelData['6ee0eab1'] = {"dfnID": "6ee0eab1", "url": "https://fetch.spec.whatwg.org/#concept-request-header-list", "dfnText": "header list", "refSections": [{"refs": [{"id": "ref-for-concept-request-header-list"}], "title": "2. Key Concepts and Terminology"}, {"refs": [{"id": "ref-for-concept-request-header-list\u2460"}], "title": "4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}], "external": true};
-window.dfnpanelData['821e824a'] = {"dfnID": "821e824a", "url": "https://fetch.spec.whatwg.org/#main-fetch", "dfnText": "main fetch", "refSections": [{"refs": [{"id": "ref-for-main-fetch"}], "title": "4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}], "external": true};
-window.dfnpanelData['2889d1ec'] = {"dfnID": "2889d1ec", "url": "https://fetch.spec.whatwg.org/#navigation-request", "dfnText": "navigation request", "refSections": [{"refs": [{"id": "ref-for-navigation-request"}], "title": "3. Upgrading Insecure Resource Requests"}, {"refs": [{"id": "ref-for-navigation-request\u2460"}], "title": "3.2. Feature Detecting Clients Capable of Upgrading"}, {"refs": [{"id": "ref-for-navigation-request\u2461"}, {"id": "ref-for-navigation-request\u2462"}, {"id": "ref-for-navigation-request\u2463"}, {"id": "ref-for-navigation-request\u2464"}, {"id": "ref-for-navigation-request\u2465"}], "title": "4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}, {"refs": [{"id": "ref-for-navigation-request\u2466"}], "title": "6. Performance Considerations"}], "external": true};
-window.dfnpanelData['55213b5b'] = {"dfnID": "55213b5b", "url": "https://fetch.spec.whatwg.org/#concept-request", "dfnText": "request", "refSections": [{"refs": [{"id": "ref-for-concept-request"}, {"id": "ref-for-concept-request\u2460"}, {"id": "ref-for-concept-request\u2461"}], "title": "2. Key Concepts and Terminology"}, {"refs": [{"id": "ref-for-concept-request\u2462"}], "title": "3.2. Feature Detecting Clients Capable of Upgrading"}, {"refs": [{"id": "ref-for-concept-request\u2463"}, {"id": "ref-for-concept-request\u2464"}, {"id": "ref-for-concept-request\u2465"}], "title": "3.2.1. \n    The Upgrade-Insecure-Requests HTTP Request Header Field\n  "}, {"refs": [{"id": "ref-for-concept-request\u2466"}], "title": "3.4. Reporting Upgrades"}, {"refs": [{"id": "ref-for-concept-request\u2467"}], "title": "4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}, {"refs": [{"id": "ref-for-concept-request\u2468"}, {"id": "ref-for-concept-request\u2460\u24ea"}], "title": "4.2. \n    Should insecure requests be upgraded for client?\n  "}], "external": true};
-window.dfnpanelData['dc1cd39b'] = {"dfnID": "dc1cd39b", "url": "https://fetch.spec.whatwg.org/#concept-request-url", "dfnText": "url", "refSections": [{"refs": [{"id": "ref-for-concept-request-url"}, {"id": "ref-for-concept-request-url\u2460"}], "title": "3.2.1. \n    The Upgrade-Insecure-Requests HTTP Request Header Field\n  "}, {"refs": [{"id": "ref-for-concept-request-url\u2461"}, {"id": "ref-for-concept-request-url\u2462"}, {"id": "ref-for-concept-request-url\u2463"}, {"id": "ref-for-concept-request-url\u2464"}, {"id": "ref-for-concept-request-url\u2465"}, {"id": "ref-for-concept-request-url\u2466"}], "title": "4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}], "external": true};
-window.dfnpanelData['faf954d6'] = {"dfnID": "faf954d6", "url": "https://html.spec.whatwg.org/multipage/browsers.html#browsing-context", "dfnText": "browsing context", "refSections": [{"refs": [{"id": "ref-for-browsing-context"}, {"id": "ref-for-browsing-context\u2460"}], "title": "3. Upgrading Insecure Resource Requests"}, {"refs": [{"id": "ref-for-browsing-context\u2461"}], "title": "3.3. Policy Inheritance"}, {"refs": [{"id": "ref-for-browsing-context\u2462"}], "title": "4.2. \n    Should insecure requests be upgraded for client?\n  "}], "external": true};
-window.dfnpanelData['ebfdb814'] = {"dfnID": "ebfdb814", "url": "https://html.spec.whatwg.org/multipage/browsers.html#create-a-document-object", "dfnText": "creating a new document object", "refSections": [{"refs": [{"id": "ref-for-create-a-document-object"}], "title": "3.3. Policy Inheritance"}], "external": true};
-window.dfnpanelData['9756ebfd'] = {"dfnID": "9756ebfd", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#settings-object", "dfnText": "environment settings object", "refSections": [{"refs": [{"id": "ref-for-settings-object"}, {"id": "ref-for-settings-object\u2460"}], "title": "3. Upgrading Insecure Resource Requests"}, {"refs": [{"id": "ref-for-settings-object\u2461"}], "title": "4.2. \n    Should insecure requests be upgraded for client?\n  "}], "external": true};
-window.dfnpanelData['87fcd40c'] = {"dfnID": "87fcd40c", "url": "https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element", "dfnText": "iframe", "refSections": [{"refs": [{"id": "ref-for-the-iframe-element"}], "title": "4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}], "external": true};
-window.dfnpanelData['d7af7adc'] = {"dfnID": "d7af7adc", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#incumbent-settings-object", "dfnText": "incumbent settings object", "refSections": [{"refs": [{"id": "ref-for-incumbent-settings-object"}], "title": "3.1. \n    The upgrade-insecure-requests Content Security Policy directive\n  "}, {"refs": [{"id": "ref-for-incumbent-settings-object\u2460"}, {"id": "ref-for-incumbent-settings-object\u2461"}], "title": "3.3. Policy Inheritance"}], "external": true};
-window.dfnpanelData['25d33108'] = {"dfnID": "25d33108", "url": "https://html.spec.whatwg.org/multipage/browsers.html#nested-browsing-context", "dfnText": "nested browsing context", "refSections": [{"refs": [{"id": "ref-for-nested-browsing-context"}, {"id": "ref-for-nested-browsing-context\u2460"}], "title": "3.3. Policy Inheritance"}, {"refs": [{"id": "ref-for-nested-browsing-context\u2461"}], "title": "4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}], "external": true};
-window.dfnpanelData['82fe9f95'] = {"dfnID": "82fe9f95", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#responsible-browsing-context", "dfnText": "responsible browsing context", "refSections": [{"refs": [{"id": "ref-for-responsible-browsing-context"}], "title": "4.2. \n    Should insecure requests be upgraded for client?\n  "}], "external": true};
-window.dfnpanelData['03365d4d'] = {"dfnID": "03365d4d", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#responsible-document", "dfnText": "responsible document", "refSections": [{"refs": [{"id": "ref-for-responsible-document"}], "title": "4.2. \n    Should insecure requests be upgraded for client?\n  "}], "external": true};
-window.dfnpanelData['085ddd0a'] = {"dfnID": "085ddd0a", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-environment-target-browsing-context", "dfnText": "target browsing context", "refSections": [{"refs": [{"id": "ref-for-concept-environment-target-browsing-context"}], "title": "4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}], "external": true};
-window.dfnpanelData['73174c9a'] = {"dfnID": "73174c9a", "url": "https://w3c.github.io/webappsec/specs/mixedcontent/#block-all-mixed-content", "dfnText": "block-all-mixed-content", "refSections": [{"refs": [{"id": "ref-for-block-all-mixed-content"}], "title": "1.3. Recommendations"}, {"refs": [{"id": "ref-for-block-all-mixed-content\u2460"}], "title": "3.1.1. Relation to \"Mixed Content\""}], "external": true};
-window.dfnpanelData['e33c6970'] = {"dfnID": "e33c6970", "url": "https://w3c.github.io/webappsec-mixed-content/#embedding-document", "dfnText": "embedding document", "refSections": [{"refs": [{"id": "ref-for-embedding-document"}, {"id": "ref-for-embedding-document\u2460"}], "title": "3.3. Policy Inheritance"}, {"refs": [{"id": "ref-for-embedding-document\u2461"}], "title": "4.2. \n    Should insecure requests be upgraded for client?\n  "}], "external": true};
-window.dfnpanelData['479dd2eb'] = {"dfnID": "479dd2eb", "url": "https://w3c.github.io/webappsec/specs/mixedcontent/#strict-mode", "dfnText": "strict mode", "refSections": [{"refs": [{"id": "ref-for-strict-mode"}], "title": "1.1. Goals"}, {"refs": [{"id": "ref-for-strict-mode\u2460"}], "title": "1.3. Recommendations"}], "external": true};
-window.dfnpanelData['c99fa6fa'] = {"dfnID": "c99fa6fa", "url": "https://tools.ietf.org/html/rfc6454#section-3.2", "dfnText": "origin", "refSections": [{"refs": [{"id": "ref-for-section-3.2"}, {"id": "ref-for-section-3.2\u2460"}], "title": "2. Key Concepts and Terminology"}], "external": true};
-window.dfnpanelData['7e8959b8'] = {"dfnID": "7e8959b8", "url": "https://tools.ietf.org/html/rfc6797#section-8.2", "dfnText": "congruent match", "refSections": [{"refs": [{"id": "ref-for-section-8.2"}, {"id": "ref-for-section-8.2\u2460"}, {"id": "ref-for-section-8.2\u2461"}], "title": "2. Key Concepts and Terminology"}], "external": true};
-window.dfnpanelData['5a13df4f'] = {"dfnID": "5a13df4f", "url": "https://tools.ietf.org/html/rfc6797#section-6.1.2", "dfnText": "includesubdomains", "refSections": [{"refs": [{"id": "ref-for-section-6.1.2"}], "title": "2. Key Concepts and Terminology"}], "external": true};
-window.dfnpanelData['7c90adb1'] = {"dfnID": "7c90adb1", "url": "https://tools.ietf.org/html/rfc6797#section-8.1.1", "dfnText": "known hsts host", "refSections": [{"refs": [{"id": "ref-for-section-8.1.1"}, {"id": "ref-for-section-8.1.1\u2460"}], "title": "2. Key Concepts and Terminology"}], "external": true};
-window.dfnpanelData['f5742a08'] = {"dfnID": "f5742a08", "url": "https://tools.ietf.org/html/rfc6797#section-8.2", "dfnText": "known hsts host domain name matching", "refSections": [{"refs": [{"id": "ref-for-section-8.2"}, {"id": "ref-for-section-8.2\u2460"}, {"id": "ref-for-section-8.2\u2461"}], "title": "2. Key Concepts and Terminology"}], "external": true};
-window.dfnpanelData['ff01c853'] = {"dfnID": "ff01c853", "url": "https://tools.ietf.org/html/rfc6797#section-6.1", "dfnText": "strict-transport-security", "refSections": [{"refs": [{"id": "ref-for-section-6.1"}, {"id": "ref-for-section-6.1\u2460"}, {"id": "ref-for-section-6.1\u2461"}], "title": "1.3. Recommendations"}, {"refs": [{"id": "ref-for-section-6.1\u2462"}, {"id": "ref-for-section-6.1\u2463"}, {"id": "ref-for-section-6.1\u2464"}], "title": "2. Key Concepts and Terminology"}, {"refs": [{"id": "ref-for-section-6.1\u2465"}], "title": "3.2. Feature Detecting Clients Capable of Upgrading"}, {"refs": [{"id": "ref-for-section-6.1\u2466"}], "title": "3.2.1. \n    The Upgrade-Insecure-Requests HTTP Request Header Field\n  "}, {"refs": [{"id": "ref-for-section-6.1\u2467"}], "title": "5.1. Interaction with HSTS"}], "external": true};
-window.dfnpanelData['87ed2210'] = {"dfnID": "87ed2210", "url": "https://tools.ietf.org/html/rfc6797#section-8.2", "dfnText": "superdomain match", "refSections": [{"refs": [{"id": "ref-for-section-8.2"}, {"id": "ref-for-section-8.2\u2460"}, {"id": "ref-for-section-8.2\u2461"}], "title": "2. Key Concepts and Terminology"}], "external": true};
-window.dfnpanelData['35c08a82'] = {"dfnID": "35c08a82", "url": "https://tools.ietf.org/html/rfc7231#section-3", "dfnText": "resource representation", "refSections": [{"refs": [{"id": "ref-for-section-3"}, {"id": "ref-for-section-3\u2460"}, {"id": "ref-for-section-3\u2461"}, {"id": "ref-for-section-3\u2462"}, {"id": "ref-for-section-3\u2463"}], "title": "2. Key Concepts and Terminology"}], "external": true};
-window.dfnpanelData['9de4af9f'] = {"dfnID": "9de4af9f", "url": "https://tools.ietf.org/html/rfc7231#section-7.1.4", "dfnText": "vary", "refSections": [{"refs": [{"id": "ref-for-section-7.1.4"}, {"id": "ref-for-section-7.1.4\u2460"}], "title": "3.2.1. \n    The Upgrade-Insecure-Requests HTTP Request Header Field\n  "}], "external": true};
-window.dfnpanelData['b3a57b71'] = {"dfnID": "b3a57b71", "url": "https://tools.ietf.org/html/rfc7234#section-5.2", "dfnText": "cache-control", "refSections": [{"refs": [{"id": "ref-for-section-5.2"}, {"id": "ref-for-section-5.2\u2460"}], "title": "3.2.1. \n    The Upgrade-Insecure-Requests HTTP Request Header Field\n  "}], "external": true};
-window.dfnpanelData['82d4dbc2'] = {"dfnID": "82d4dbc2", "url": "https://tools.ietf.org/html/rfc7234#section-5.2.2.3", "dfnText": "no-store", "refSections": [{"refs": [{"id": "ref-for-section-5.2.2.3"}], "title": "3.2.1. \n    The Upgrade-Insecure-Requests HTTP Request Header Field\n  "}], "external": true};
-window.dfnpanelData['077c1da9'] = {"dfnID": "077c1da9", "url": "https://tools.ietf.org/html/rfc7240#section-2", "dfnText": "prefer", "refSections": [{"refs": [{"id": "ref-for-section-2"}], "title": "3.2.1. \n    The Upgrade-Insecure-Requests HTTP Request Header Field\n  "}], "external": true};
-window.dfnpanelData['9c5d9c4d'] = {"dfnID": "9c5d9c4d", "url": "https://w3c.github.io/webappsec-secure-contexts/#potentially-trustworthy-url", "dfnText": "potentially trustworthy url", "refSections": [{"refs": [{"id": "ref-for-potentially-trustworthy-url"}], "title": "1.3. Recommendations"}, {"refs": [{"id": "ref-for-potentially-trustworthy-url\u2460"}], "title": "3. Upgrading Insecure Resource Requests"}, {"refs": [{"id": "ref-for-potentially-trustworthy-url\u2461"}, {"id": "ref-for-potentially-trustworthy-url\u2462"}, {"id": "ref-for-potentially-trustworthy-url\u2463"}], "title": "3.2.1. \n    The Upgrade-Insecure-Requests HTTP Request Header Field\n  "}, {"refs": [{"id": "ref-for-potentially-trustworthy-url\u2464"}, {"id": "ref-for-potentially-trustworthy-url\u2465"}], "title": "4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}], "external": true};
-window.dfnpanelData['b85ee3be'] = {"dfnID": "b85ee3be", "url": "https://url.spec.whatwg.org/#concept-url-host", "dfnText": "host", "refSections": [{"refs": [{"id": "ref-for-concept-url-host"}], "title": "1.1. Goals"}, {"refs": [{"id": "ref-for-concept-url-host\u2460"}], "title": "2. Key Concepts and Terminology"}, {"refs": [{"id": "ref-for-concept-url-host\u2461"}], "title": "3. Upgrading Insecure Resource Requests"}, {"refs": [{"id": "ref-for-concept-url-host\u2462"}], "title": "3.1. \n    The upgrade-insecure-requests Content Security Policy directive\n  "}, {"refs": [{"id": "ref-for-concept-url-host\u2463"}, {"id": "ref-for-concept-url-host\u2464"}, {"id": "ref-for-concept-url-host\u2465"}], "title": "3.2.1. \n    The Upgrade-Insecure-Requests HTTP Request Header Field\n  "}, {"refs": [{"id": "ref-for-concept-url-host\u2466"}, {"id": "ref-for-concept-url-host\u2467"}], "title": "4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}], "external": true};
-window.dfnpanelData['c0868016'] = {"dfnID": "c0868016", "url": "https://url.spec.whatwg.org/#concept-url-path", "dfnText": "path", "refSections": [{"refs": [{"id": "ref-for-concept-url-path"}], "title": "1.1. Goals"}], "external": true};
-window.dfnpanelData['852ada56'] = {"dfnID": "852ada56", "url": "https://url.spec.whatwg.org/#concept-url-port", "dfnText": "port", "refSections": [{"refs": [{"id": "ref-for-concept-url-port"}], "title": "3. Upgrading Insecure Resource Requests"}, {"refs": [{"id": "ref-for-concept-url-port\u2460"}], "title": "3.1. \n    The upgrade-insecure-requests Content Security Policy directive\n  "}, {"refs": [{"id": "ref-for-concept-url-port\u2461"}], "title": "4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}], "external": true};
-window.dfnpanelData['3a711be7'] = {"dfnID": "3a711be7", "url": "https://url.spec.whatwg.org/#concept-url-scheme", "dfnText": "scheme", "refSections": [{"refs": [{"id": "ref-for-concept-url-scheme"}], "title": "1.1. Goals"}, {"refs": [{"id": "ref-for-concept-url-scheme\u2460"}], "title": "2. Key Concepts and Terminology"}, {"refs": [{"id": "ref-for-concept-url-scheme\u2461"}, {"id": "ref-for-concept-url-scheme\u2462"}], "title": "4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}], "external": true};
-window.dfnpanelData['dcffbccd'] = {"dfnID": "dcffbccd", "url": "https://url.spec.whatwg.org/#concept-url", "dfnText": "url", "refSections": [{"refs": [{"id": "ref-for-concept-url"}], "title": "3.1. \n    The upgrade-insecure-requests Content Security Policy directive\n  "}], "external": true};
-window.dfnpanelData['6a277af6'] = {"dfnID": "6a277af6", "url": "http://www.w3.org/TR/workers/#worker", "dfnText": "Worker", "refSections": [{"refs": [{"id": "ref-for-worker"}], "title": "4.2. \n    Should insecure requests be upgraded for client?\n  "}, {"refs": [{"id": "ref-for-worker\u2460"}, {"id": "ref-for-worker\u2461"}], "title": "5.2. CSP Violation Reports"}], "external": true};
-window.dfnpanelData['3fc4555e'] = {"dfnID": "3fc4555e", "url": "http://www.w3.org/TR/workers/#script-settings-for-workers", "dfnText": "set up a worker environment settings object", "refSections": [{"refs": [{"id": "ref-for-script-settings-for-workers"}], "title": "3.3. Policy Inheritance"}], "external": true};
-window.dfnpanelData['safely-upgradable-requests'] = {"dfnID": "safely-upgradable-requests", "url": "#safely-upgradable-requests", "dfnText": "safely upgradable requests", "refSections": [{"refs": [{"id": "ref-for-safely-upgradable-requests"}, {"id": "ref-for-safely-upgradable-requests\u2460"}, {"id": "ref-for-safely-upgradable-requests\u2461"}], "title": "1.3. Recommendations"}], "external": false};
-window.dfnpanelData['hsts-safe-origin'] = {"dfnID": "hsts-safe-origin", "url": "#hsts-safe-origin", "dfnText": "HSTS-safe origin", "refSections": [{"refs": [{"id": "ref-for-hsts-safe-origin"}], "title": "1.3. Recommendations"}, {"refs": [{"id": "ref-for-hsts-safe-origin\u2460"}], "title": "2. Key Concepts and Terminology"}, {"refs": [{"id": "ref-for-hsts-safe-origin\u2461"}, {"id": "ref-for-hsts-safe-origin\u2462"}], "title": "3.2.1. \n    The Upgrade-Insecure-Requests HTTP Request Header Field\n  "}], "external": false};
-window.dfnpanelData['conditionally-hsts-safe-origin'] = {"dfnID": "conditionally-hsts-safe-origin", "url": "#conditionally-hsts-safe-origin", "dfnText": "conditionally HSTS-safe origin", "refSections": [{"refs": [{"id": "ref-for-conditionally-hsts-safe-origin"}], "title": "1.3. Recommendations"}, {"refs": [{"id": "ref-for-conditionally-hsts-safe-origin\u2460"}], "title": "2. Key Concepts and Terminology"}, {"refs": [{"id": "ref-for-conditionally-hsts-safe-origin\u2461"}], "title": "3.2. Feature Detecting Clients Capable of Upgrading"}, {"refs": [{"id": "ref-for-conditionally-hsts-safe-origin\u2462"}], "title": "3.2.1. \n    The Upgrade-Insecure-Requests HTTP Request Header Field\n  "}], "external": false};
-window.dfnpanelData['preloadable-hsts-host'] = {"dfnID": "preloadable-hsts-host", "url": "#preloadable-hsts-host", "dfnText": "preloadable HSTS host", "refSections": [{"refs": [{"id": "ref-for-preloadable-hsts-host"}, {"id": "ref-for-preloadable-hsts-host\u2460"}, {"id": "ref-for-preloadable-hsts-host\u2461"}], "title": "3.2.1. \n    The Upgrade-Insecure-Requests HTTP Request Header Field\n  "}, {"refs": [{"id": "ref-for-preloadable-hsts-host\u2462"}], "title": "4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}, {"refs": [{"id": "ref-for-preloadable-hsts-host\u2463"}, {"id": "ref-for-preloadable-hsts-host\u2464"}], "title": "6. Performance Considerations"}], "external": false};
-window.dfnpanelData['insecure-requests-policy'] = {"dfnID": "insecure-requests-policy", "url": "#insecure-requests-policy", "dfnText": "insecure requests policy", "refSections": [{"refs": [{"id": "ref-for-insecure-requests-policy"}], "title": "3.1. \n    The upgrade-insecure-requests Content Security Policy directive\n  "}, {"refs": [{"id": "ref-for-insecure-requests-policy\u2460"}, {"id": "ref-for-insecure-requests-policy\u2461"}, {"id": "ref-for-insecure-requests-policy\u2462"}, {"id": "ref-for-insecure-requests-policy\u2463"}, {"id": "ref-for-insecure-requests-policy\u2464"}, {"id": "ref-for-insecure-requests-policy\u2465"}, {"id": "ref-for-insecure-requests-policy\u2466"}], "title": "3.3. Policy Inheritance"}, {"refs": [{"id": "ref-for-insecure-requests-policy\u2467"}, {"id": "ref-for-insecure-requests-policy\u2468"}, {"id": "ref-for-insecure-requests-policy\u2460\u24ea"}], "title": "4.2. \n    Should insecure requests be upgraded for client?\n  "}], "external": false};
-window.dfnpanelData['valdef-insecure-requests-policy-do-not-upgrade'] = {"dfnID": "valdef-insecure-requests-policy-do-not-upgrade", "url": "#valdef-insecure-requests-policy-do-not-upgrade", "dfnText": "Do Not\n      Upgrade", "refSections": [{"refs": [{"id": "ref-for-valdef-insecure-requests-policy-do-not-upgrade"}], "title": "3. Upgrading Insecure Resource Requests"}, {"refs": [{"id": "ref-for-valdef-insecure-requests-policy-do-not-upgrade\u2460"}], "title": "4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}, {"refs": [{"id": "ref-for-valdef-insecure-requests-policy-do-not-upgrade\u2461"}, {"id": "ref-for-valdef-insecure-requests-policy-do-not-upgrade\u2462"}], "title": "4.2. \n    Should insecure requests be upgraded for client?\n  "}], "external": false};
-window.dfnpanelData['valdef-insecure-requests-policy-upgrade'] = {"dfnID": "valdef-insecure-requests-policy-upgrade", "url": "#valdef-insecure-requests-policy-upgrade", "dfnText": "Upgrade", "refSections": [{"refs": [{"id": "ref-for-valdef-insecure-requests-policy-upgrade"}], "title": "3.1. \n    The upgrade-insecure-requests Content Security Policy directive\n  "}, {"refs": [{"id": "ref-for-valdef-insecure-requests-policy-upgrade\u2460"}, {"id": "ref-for-valdef-insecure-requests-policy-upgrade\u2461"}, {"id": "ref-for-valdef-insecure-requests-policy-upgrade\u2462"}, {"id": "ref-for-valdef-insecure-requests-policy-upgrade\u2463"}, {"id": "ref-for-valdef-insecure-requests-policy-upgrade\u2464"}, {"id": "ref-for-valdef-insecure-requests-policy-upgrade\u2465"}, {"id": "ref-for-valdef-insecure-requests-policy-upgrade\u2466"}], "title": "3.3. Policy Inheritance"}], "external": false};
-window.dfnpanelData['upgrade-insecure-navigations-set'] = {"dfnID": "upgrade-insecure-navigations-set", "url": "#upgrade-insecure-navigations-set", "dfnText": "upgrade insecure navigations set", "refSections": [{"refs": [{"id": "ref-for-upgrade-insecure-navigations-set"}], "title": "3.1. \n    The upgrade-insecure-requests Content Security Policy directive\n  "}, {"refs": [{"id": "ref-for-upgrade-insecure-navigations-set\u2460"}, {"id": "ref-for-upgrade-insecure-navigations-set\u2461"}, {"id": "ref-for-upgrade-insecure-navigations-set\u2462"}, {"id": "ref-for-upgrade-insecure-navigations-set\u2463"}, {"id": "ref-for-upgrade-insecure-navigations-set\u2464"}, {"id": "ref-for-upgrade-insecure-navigations-set\u2465"}], "title": "3.3. Policy Inheritance"}, {"refs": [{"id": "ref-for-upgrade-insecure-navigations-set\u2466"}], "title": "4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}], "external": false};
-window.dfnpanelData['upgrade-insecure-requests'] = {"dfnID": "upgrade-insecure-requests", "url": "#upgrade-insecure-requests", "dfnText": "upgrade-insecure-requests", "refSections": [{"refs": [{"id": "ref-for-upgrade-insecure-requests"}], "title": "1. Introduction"}, {"refs": [{"id": "ref-for-upgrade-insecure-requests\u2460"}], "title": "1.2.1. Non-navigational Upgrades"}, {"refs": [{"id": "ref-for-upgrade-insecure-requests\u2461"}, {"id": "ref-for-upgrade-insecure-requests\u2462"}], "title": "1.2.2. Navigational Upgrades"}, {"refs": [{"id": "ref-for-upgrade-insecure-requests\u2463"}], "title": "1.2.3. Failed Upgrade"}, {"refs": [{"id": "ref-for-upgrade-insecure-requests\u2464"}, {"id": "ref-for-upgrade-insecure-requests\u2465"}, {"id": "ref-for-upgrade-insecure-requests\u2466"}], "title": "1.3. Recommendations"}, {"refs": [{"id": "ref-for-upgrade-insecure-requests\u2467"}, {"id": "ref-for-upgrade-insecure-requests\u2468"}, {"id": "ref-for-upgrade-insecure-requests\u2460\u24ea"}, {"id": "ref-for-upgrade-insecure-requests\u2460\u2460"}, {"id": "ref-for-upgrade-insecure-requests\u2460\u2461"}], "title": "2. Key Concepts and Terminology"}, {"refs": [{"id": "ref-for-upgrade-insecure-requests\u2460\u2462"}, {"id": "ref-for-upgrade-insecure-requests\u2460\u2463"}], "title": "3.1.1. Relation to \"Mixed Content\""}, {"refs": [{"id": "ref-for-upgrade-insecure-requests\u2460\u2464"}, {"id": "ref-for-upgrade-insecure-requests\u2460\u2465"}, {"id": "ref-for-upgrade-insecure-requests\u2460\u2466"}], "title": "3.2.1. \n    The Upgrade-Insecure-Requests HTTP Request Header Field\n  "}, {"refs": [{"id": "ref-for-upgrade-insecure-requests\u2460\u2467"}], "title": "3.4. Reporting Upgrades"}, {"refs": [{"id": "ref-for-upgrade-insecure-requests\u2460\u2468"}], "title": "4.2. \n    Should insecure requests be upgraded for client?\n  "}, {"refs": [{"id": "ref-for-upgrade-insecure-requests\u2461\u24ea"}], "title": "5.1. Interaction with HSTS"}, {"refs": [{"id": "ref-for-upgrade-insecure-requests\u2461\u2460"}], "title": "5.2. CSP Violation Reports"}, {"refs": [{"id": "ref-for-upgrade-insecure-requests\u2461\u2461"}], "title": "7.1. Legacy Clients"}, {"refs": [{"id": "ref-for-upgrade-insecure-requests\u2461\u2462"}, {"id": "ref-for-upgrade-insecure-requests\u2461\u2463"}], "title": "7.2. Relation to HSTS"}], "external": false};
-window.dfnpanelData['upgrade-insecure-requests-http-request-header-field'] = {"dfnID": "upgrade-insecure-requests-http-request-header-field", "url": "#upgrade-insecure-requests-http-request-header-field", "dfnText": "\n  Upgrade-Insecure-Requests HTTP request header\n  field", "refSections": [{"refs": [{"id": "ref-for-upgrade-insecure-requests-http-request-header-field"}], "title": "2. Key Concepts and Terminology"}, {"refs": [{"id": "ref-for-upgrade-insecure-requests-http-request-header-field\u2460"}], "title": "3.2. Feature Detecting Clients Capable of Upgrading"}, {"refs": [{"id": "ref-for-upgrade-insecure-requests-http-request-header-field\u2461"}, {"id": "ref-for-upgrade-insecure-requests-http-request-header-field\u2462"}, {"id": "ref-for-upgrade-insecure-requests-http-request-header-field\u2463"}, {"id": "ref-for-upgrade-insecure-requests-http-request-header-field\u2464"}, {"id": "ref-for-upgrade-insecure-requests-http-request-header-field\u2465"}, {"id": "ref-for-upgrade-insecure-requests-http-request-header-field\u2466"}, {"id": "ref-for-upgrade-insecure-requests-http-request-header-field\u2467"}, {"id": "ref-for-upgrade-insecure-requests-http-request-header-field\u2468"}], "title": "3.2.1. \n    The Upgrade-Insecure-Requests HTTP Request Header Field\n  "}, {"refs": [{"id": "ref-for-upgrade-insecure-requests-http-request-header-field\u2460\u24ea"}, {"id": "ref-for-upgrade-insecure-requests-http-request-header-field\u2460\u2460"}], "title": "4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}], "external": false};
-window.dfnpanelData['upgrade-request'] = {"dfnID": "upgrade-request", "url": "#upgrade-request", "dfnText": "4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  ", "refSections": [{"refs": [{"id": "ref-for-upgrade-request"}, {"id": "ref-for-upgrade-request"}], "title": "3. Upgrading Insecure Resource Requests"}, {"refs": [{"id": "ref-for-upgrade-request"}], "title": "3.1.1. Relation to \"Mixed Content\""}, {"refs": [{"id": "ref-for-upgrade-request"}], "title": "3.2.1. \n    The Upgrade-Insecure-Requests HTTP Request Header Field\n  "}, {"refs": [{"id": "ref-for-upgrade-request"}], "title": "4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -2375,34 +1906,489 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"03365d4d": {"dfnID":"03365d4d","dfnText":"responsible document","external":true,"refSections":[{"refs":[{"id":"ref-for-responsible-document"}],"title":"4.2. \n    Should insecure requests be upgraded for client?\n  "}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#responsible-document"},
+"077c1da9": {"dfnID":"077c1da9","dfnText":"prefer","external":true,"refSections":[{"refs":[{"id":"ref-for-section-2"}],"title":"3.2.1. \n    The Upgrade-Insecure-Requests HTTP Request Header Field\n  "}],"url":"https://tools.ietf.org/html/rfc7240#section-2"},
+"085ddd0a": {"dfnID":"085ddd0a","dfnText":"target browsing context","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-environment-target-browsing-context"}],"title":"4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#concept-environment-target-browsing-context"},
+"0c4f954f": {"dfnID":"0c4f954f","dfnText":"send violation reports","external":true,"refSections":[{"refs":[{"id":"ref-for-send-violation-reports"}],"title":"7.1. Legacy Clients"}],"url":"https://www.w3.org/TR/CSP/#send-violation-reports"},
+"0f172001": {"dfnID":"0f172001","dfnText":"content-security-policy-report-only","external":true,"refSections":[{"refs":[{"id":"ref-for-content-security-policy-report-only"},{"id":"ref-for-content-security-policy-report-only\u2460"},{"id":"ref-for-content-security-policy-report-only\u2461"}],"title":"3.1. \n    The upgrade-insecure-requests Content Security Policy directive\n  "},{"refs":[{"id":"ref-for-content-security-policy-report-only\u2462"}],"title":"3.4. Reporting Upgrades"}],"url":"https://www.w3.org/TR/CSP/#content-security-policy-report-only"},
+"20a14959": {"dfnID":"20a14959","dfnText":"protected resource","external":true,"refSections":[{"refs":[{"id":"ref-for-protected-resource"},{"id":"ref-for-protected-resource\u2460"},{"id":"ref-for-protected-resource\u2461"}],"title":"3.1. \n    The upgrade-insecure-requests Content Security Policy directive\n  "},{"refs":[{"id":"ref-for-protected-resource\u2462"}],"title":"3.4. Reporting Upgrades"},{"refs":[{"id":"ref-for-protected-resource\u2463"}],"title":"4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "},{"refs":[{"id":"ref-for-protected-resource\u2464"}],"title":"7.2. Relation to HSTS"}],"url":"https://www.w3.org/TR/CSP/#protected-resource"},
+"25d33108": {"dfnID":"25d33108","dfnText":"nested browsing context","external":true,"refSections":[{"refs":[{"id":"ref-for-nested-browsing-context"},{"id":"ref-for-nested-browsing-context\u2460"}],"title":"3.3. Policy Inheritance"},{"refs":[{"id":"ref-for-nested-browsing-context\u2461"}],"title":"4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}],"url":"https://html.spec.whatwg.org/multipage/browsers.html#nested-browsing-context"},
+"2889d1ec": {"dfnID":"2889d1ec","dfnText":"navigation request","external":true,"refSections":[{"refs":[{"id":"ref-for-navigation-request"}],"title":"3. Upgrading Insecure Resource Requests"},{"refs":[{"id":"ref-for-navigation-request\u2460"}],"title":"3.2. Feature Detecting Clients Capable of Upgrading"},{"refs":[{"id":"ref-for-navigation-request\u2461"},{"id":"ref-for-navigation-request\u2462"},{"id":"ref-for-navigation-request\u2463"},{"id":"ref-for-navigation-request\u2464"},{"id":"ref-for-navigation-request\u2465"}],"title":"4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "},{"refs":[{"id":"ref-for-navigation-request\u2466"}],"title":"6. Performance Considerations"}],"url":"https://fetch.spec.whatwg.org/#navigation-request"},
+"298863fc": {"dfnID":"298863fc","dfnText":"Document","external":true,"refSections":[{"refs":[{"id":"ref-for-interface-document"}],"title":"3.3. Policy Inheritance"},{"refs":[{"id":"ref-for-interface-document\u2460"}],"title":"4.2. \n    Should insecure requests be upgraded for client?\n  "},{"refs":[{"id":"ref-for-interface-document\u2461"},{"id":"ref-for-interface-document\u2462"},{"id":"ref-for-interface-document\u2463"}],"title":"5.2. CSP Violation Reports"}],"url":"http://www.w3.org/TR/dom/#interface-document"},
+"35c08a82": {"dfnID":"35c08a82","dfnText":"resource representation","external":true,"refSections":[{"refs":[{"id":"ref-for-section-3"},{"id":"ref-for-section-3\u2460"},{"id":"ref-for-section-3\u2461"},{"id":"ref-for-section-3\u2462"},{"id":"ref-for-section-3\u2463"}],"title":"2. Key Concepts and Terminology"}],"url":"https://tools.ietf.org/html/rfc7231#section-3"},
+"3a711be7": {"dfnID":"3a711be7","dfnText":"scheme","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-url-scheme"}],"title":"1.1. Goals"},{"refs":[{"id":"ref-for-concept-url-scheme\u2460"}],"title":"2. Key Concepts and Terminology"},{"refs":[{"id":"ref-for-concept-url-scheme\u2461"},{"id":"ref-for-concept-url-scheme\u2462"}],"title":"4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}],"url":"https://url.spec.whatwg.org/#concept-url-scheme"},
+"3fc4555e": {"dfnID":"3fc4555e","dfnText":"set up a worker environment settings object","external":true,"refSections":[{"refs":[{"id":"ref-for-script-settings-for-workers"}],"title":"3.3. Policy Inheritance"}],"url":"http://www.w3.org/TR/workers/#script-settings-for-workers"},
+"479dd2eb": {"dfnID":"479dd2eb","dfnText":"strict mode","external":true,"refSections":[{"refs":[{"id":"ref-for-strict-mode"}],"title":"1.1. Goals"},{"refs":[{"id":"ref-for-strict-mode\u2460"}],"title":"1.3. Recommendations"}],"url":"https://w3c.github.io/webappsec/specs/mixedcontent/#strict-mode"},
+"55213b5b": {"dfnID":"55213b5b","dfnText":"request","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-request"},{"id":"ref-for-concept-request\u2460"},{"id":"ref-for-concept-request\u2461"}],"title":"2. Key Concepts and Terminology"},{"refs":[{"id":"ref-for-concept-request\u2462"}],"title":"3.2. Feature Detecting Clients Capable of Upgrading"},{"refs":[{"id":"ref-for-concept-request\u2463"},{"id":"ref-for-concept-request\u2464"},{"id":"ref-for-concept-request\u2465"}],"title":"3.2.1. \n    The Upgrade-Insecure-Requests HTTP Request Header Field\n  "},{"refs":[{"id":"ref-for-concept-request\u2466"}],"title":"3.4. Reporting Upgrades"},{"refs":[{"id":"ref-for-concept-request\u2467"}],"title":"4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "},{"refs":[{"id":"ref-for-concept-request\u2468"},{"id":"ref-for-concept-request\u2460\u24ea"}],"title":"4.2. \n    Should insecure requests be upgraded for client?\n  "}],"url":"https://fetch.spec.whatwg.org/#concept-request"},
+"5a13df4f": {"dfnID":"5a13df4f","dfnText":"includesubdomains","external":true,"refSections":[{"refs":[{"id":"ref-for-section-6.1.2"}],"title":"2. Key Concepts and Terminology"}],"url":"https://tools.ietf.org/html/rfc6797#section-6.1.2"},
+"5f7823d5": {"dfnID":"5f7823d5","dfnText":"monitored","external":true,"refSections":[{"refs":[{"id":"ref-for-monitor"}],"title":"3.1. \n    The upgrade-insecure-requests Content Security Policy directive\n  "},{"refs":[{"id":"ref-for-monitor\u2460"},{"id":"ref-for-monitor\u2461"}],"title":"3.4. Reporting Upgrades"}],"url":"https://www.w3.org/TR/CSP/#monitor"},
+"6a277af6": {"dfnID":"6a277af6","dfnText":"Worker","external":true,"refSections":[{"refs":[{"id":"ref-for-worker"}],"title":"4.2. \n    Should insecure requests be upgraded for client?\n  "},{"refs":[{"id":"ref-for-worker\u2460"},{"id":"ref-for-worker\u2461"}],"title":"5.2. CSP Violation Reports"}],"url":"http://www.w3.org/TR/workers/#worker"},
+"6e70fa2b": {"dfnID":"6e70fa2b","dfnText":"default-src","external":true,"refSections":[{"refs":[{"id":"ref-for-default-src"},{"id":"ref-for-default-src\u2460"}],"title":"3.4. Reporting Upgrades"}],"url":"https://www.w3.org/TR/CSP/#default-src"},
+"6ee0eab1": {"dfnID":"6ee0eab1","dfnText":"header list","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-request-header-list"}],"title":"2. Key Concepts and Terminology"},{"refs":[{"id":"ref-for-concept-request-header-list\u2460"}],"title":"4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}],"url":"https://fetch.spec.whatwg.org/#concept-request-header-list"},
+"6fe4936a": {"dfnID":"6fe4936a","dfnText":"content-security-policy","external":true,"refSections":[{"refs":[{"id":"ref-for-content-security-policy"}],"title":"1.2.1. Non-navigational Upgrades"},{"refs":[{"id":"ref-for-content-security-policy\u2460"}],"title":"1.2.2. Navigational Upgrades"},{"refs":[{"id":"ref-for-content-security-policy\u2461"},{"id":"ref-for-content-security-policy\u2462"}],"title":"1.3. Recommendations"},{"refs":[{"id":"ref-for-content-security-policy\u2463"}],"title":"3.1. \n    The upgrade-insecure-requests Content Security Policy directive\n  "},{"refs":[{"id":"ref-for-content-security-policy\u2464"}],"title":"3.4. Reporting Upgrades"}],"url":"https://www.w3.org/TR/CSP/#content-security-policy"},
+"73174c9a": {"dfnID":"73174c9a","dfnText":"block-all-mixed-content","external":true,"refSections":[{"refs":[{"id":"ref-for-block-all-mixed-content"}],"title":"1.3. Recommendations"},{"refs":[{"id":"ref-for-block-all-mixed-content\u2460"}],"title":"3.1.1. Relation to \"Mixed Content\""}],"url":"https://w3c.github.io/webappsec/specs/mixedcontent/#block-all-mixed-content"},
+"760871ee": {"dfnID":"760871ee","dfnText":"violation report","external":true,"refSections":[{"refs":[{"id":"ref-for-example-violation-report"}],"title":"3.4. Reporting Upgrades"}],"url":"https://www.w3.org/TR/CSP/#example-violation-report"},
+"7c90adb1": {"dfnID":"7c90adb1","dfnText":"known hsts host","external":true,"refSections":[{"refs":[{"id":"ref-for-section-8.1.1"},{"id":"ref-for-section-8.1.1\u2460"}],"title":"2. Key Concepts and Terminology"}],"url":"https://tools.ietf.org/html/rfc6797#section-8.1.1"},
+"7e8959b8": {"dfnID":"7e8959b8","dfnText":"congruent match","external":true,"refSections":[{"refs":[{"id":"ref-for-section-8.2"},{"id":"ref-for-section-8.2\u2460"},{"id":"ref-for-section-8.2\u2461"}],"title":"2. Key Concepts and Terminology"}],"url":"https://tools.ietf.org/html/rfc6797#section-8.2"},
+"821e824a": {"dfnID":"821e824a","dfnText":"main fetch","external":true,"refSections":[{"refs":[{"id":"ref-for-main-fetch"}],"title":"4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}],"url":"https://fetch.spec.whatwg.org/#main-fetch"},
+"82d4dbc2": {"dfnID":"82d4dbc2","dfnText":"no-store","external":true,"refSections":[{"refs":[{"id":"ref-for-section-5.2.2.3"}],"title":"3.2.1. \n    The Upgrade-Insecure-Requests HTTP Request Header Field\n  "}],"url":"https://tools.ietf.org/html/rfc7234#section-5.2.2.3"},
+"82fe9f95": {"dfnID":"82fe9f95","dfnText":"responsible browsing context","external":true,"refSections":[{"refs":[{"id":"ref-for-responsible-browsing-context"}],"title":"4.2. \n    Should insecure requests be upgraded for client?\n  "}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#responsible-browsing-context"},
+"852ada56": {"dfnID":"852ada56","dfnText":"port","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-url-port"}],"title":"3. Upgrading Insecure Resource Requests"},{"refs":[{"id":"ref-for-concept-url-port\u2460"}],"title":"3.1. \n    The upgrade-insecure-requests Content Security Policy directive\n  "},{"refs":[{"id":"ref-for-concept-url-port\u2461"}],"title":"4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}],"url":"https://url.spec.whatwg.org/#concept-url-port"},
+"857d5516": {"dfnID":"857d5516","dfnText":"client","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-request-client"},{"id":"ref-for-concept-request-client\u2460"},{"id":"ref-for-concept-request-client\u2461"},{"id":"ref-for-concept-request-client\u2462"}],"title":"4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "},{"refs":[{"id":"ref-for-concept-request-client\u2463"},{"id":"ref-for-concept-request-client\u2464"}],"title":"4.2. \n    Should insecure requests be upgraded for client?\n  "}],"url":"https://fetch.spec.whatwg.org/#concept-request-client"},
+"87ed2210": {"dfnID":"87ed2210","dfnText":"superdomain match","external":true,"refSections":[{"refs":[{"id":"ref-for-section-8.2"},{"id":"ref-for-section-8.2\u2460"},{"id":"ref-for-section-8.2\u2461"}],"title":"2. Key Concepts and Terminology"}],"url":"https://tools.ietf.org/html/rfc6797#section-8.2"},
+"87fcd40c": {"dfnID":"87fcd40c","dfnText":"iframe","external":true,"refSections":[{"refs":[{"id":"ref-for-the-iframe-element"}],"title":"4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}],"url":"https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element"},
+"8d5dcd58": {"dfnID":"8d5dcd58","dfnText":"report-uri","external":true,"refSections":[{"refs":[{"id":"ref-for-report-uri"}],"title":"3.4. Reporting Upgrades"}],"url":"https://www.w3.org/TR/CSP/#report-uri"},
+"9756ebfd": {"dfnID":"9756ebfd","dfnText":"environment settings object","external":true,"refSections":[{"refs":[{"id":"ref-for-settings-object"},{"id":"ref-for-settings-object\u2460"}],"title":"3. Upgrading Insecure Resource Requests"},{"refs":[{"id":"ref-for-settings-object\u2461"}],"title":"4.2. \n    Should insecure requests be upgraded for client?\n  "}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#settings-object"},
+"9c5d9c4d": {"dfnID":"9c5d9c4d","dfnText":"potentially trustworthy url","external":true,"refSections":[{"refs":[{"id":"ref-for-potentially-trustworthy-url"}],"title":"1.3. Recommendations"},{"refs":[{"id":"ref-for-potentially-trustworthy-url\u2460"}],"title":"3. Upgrading Insecure Resource Requests"},{"refs":[{"id":"ref-for-potentially-trustworthy-url\u2461"},{"id":"ref-for-potentially-trustworthy-url\u2462"},{"id":"ref-for-potentially-trustworthy-url\u2463"}],"title":"3.2.1. \n    The Upgrade-Insecure-Requests HTTP Request Header Field\n  "},{"refs":[{"id":"ref-for-potentially-trustworthy-url\u2464"},{"id":"ref-for-potentially-trustworthy-url\u2465"}],"title":"4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}],"url":"https://w3c.github.io/webappsec-secure-contexts/#potentially-trustworthy-url"},
+"9de4af9f": {"dfnID":"9de4af9f","dfnText":"vary","external":true,"refSections":[{"refs":[{"id":"ref-for-section-7.1.4"},{"id":"ref-for-section-7.1.4\u2460"}],"title":"3.2.1. \n    The Upgrade-Insecure-Requests HTTP Request Header Field\n  "}],"url":"https://tools.ietf.org/html/rfc7231#section-7.1.4"},
+"a33db89a": {"dfnID":"a33db89a","dfnText":"fetch","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-fetch"}],"title":"3. Upgrading Insecure Resource Requests"},{"refs":[{"id":"ref-for-concept-fetch\u2460"}],"title":"3.1.1. Relation to \"Mixed Content\""}],"url":"https://fetch.spec.whatwg.org/#concept-fetch"},
+"a6a8ec88": {"dfnID":"a6a8ec88","dfnText":"append","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-header-list-append"}],"title":"4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}],"url":"https://fetch.spec.whatwg.org/#concept-header-list-append"},
+"acdef210": {"dfnID":"acdef210","dfnText":"enforced","external":true,"refSections":[{"refs":[{"id":"ref-for-enforce"}],"title":"3.1. \n    The upgrade-insecure-requests Content Security Policy directive\n  "},{"refs":[{"id":"ref-for-enforce\u2460"},{"id":"ref-for-enforce\u2461"}],"title":"3.4. Reporting Upgrades"}],"url":"https://www.w3.org/TR/CSP/#enforce"},
+"ae771aec": {"dfnID":"ae771aec","dfnText":"monitor","external":true,"refSections":[{"refs":[{"id":"ref-for-monitor"}],"title":"3.1. \n    The upgrade-insecure-requests Content Security Policy directive\n  "},{"refs":[{"id":"ref-for-monitor\u2460"},{"id":"ref-for-monitor\u2461"}],"title":"3.4. Reporting Upgrades"}],"url":"https://www.w3.org/TR/CSP/#monitor"},
+"b3a57b71": {"dfnID":"b3a57b71","dfnText":"cache-control","external":true,"refSections":[{"refs":[{"id":"ref-for-section-5.2"},{"id":"ref-for-section-5.2\u2460"}],"title":"3.2.1. \n    The Upgrade-Insecure-Requests HTTP Request Header Field\n  "}],"url":"https://tools.ietf.org/html/rfc7234#section-5.2"},
+"b85ee3be": {"dfnID":"b85ee3be","dfnText":"host","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-url-host"}],"title":"1.1. Goals"},{"refs":[{"id":"ref-for-concept-url-host\u2460"}],"title":"2. Key Concepts and Terminology"},{"refs":[{"id":"ref-for-concept-url-host\u2461"}],"title":"3. Upgrading Insecure Resource Requests"},{"refs":[{"id":"ref-for-concept-url-host\u2462"}],"title":"3.1. \n    The upgrade-insecure-requests Content Security Policy directive\n  "},{"refs":[{"id":"ref-for-concept-url-host\u2463"},{"id":"ref-for-concept-url-host\u2464"},{"id":"ref-for-concept-url-host\u2465"}],"title":"3.2.1. \n    The Upgrade-Insecure-Requests HTTP Request Header Field\n  "},{"refs":[{"id":"ref-for-concept-url-host\u2466"},{"id":"ref-for-concept-url-host\u2467"}],"title":"4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}],"url":"https://url.spec.whatwg.org/#concept-url-host"},
+"bed34579": {"dfnID":"bed34579","dfnText":"wsp","external":true,"refSections":[{"refs":[{"id":"ref-for-appendix-B.1"},{"id":"ref-for-appendix-B.1\u2460"}],"title":"3.2.1. \n    The Upgrade-Insecure-Requests HTTP Request Header Field\n  "}],"url":"https://tools.ietf.org/html/rfc5234#appendix-B.1"},
+"c0868016": {"dfnID":"c0868016","dfnText":"path","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-url-path"}],"title":"1.1. Goals"}],"url":"https://url.spec.whatwg.org/#concept-url-path"},
+"c1a3355a": {"dfnID":"c1a3355a","dfnText":"enforce","external":true,"refSections":[{"refs":[{"id":"ref-for-enforce"}],"title":"3.1. \n    The upgrade-insecure-requests Content Security Policy directive\n  "},{"refs":[{"id":"ref-for-enforce\u2460"},{"id":"ref-for-enforce\u2461"}],"title":"3.4. Reporting Upgrades"}],"url":"https://www.w3.org/TR/CSP/#enforce"},
+"c99fa6fa": {"dfnID":"c99fa6fa","dfnText":"origin","external":true,"refSections":[{"refs":[{"id":"ref-for-section-3.2"},{"id":"ref-for-section-3.2\u2460"}],"title":"2. Key Concepts and Terminology"}],"url":"https://tools.ietf.org/html/rfc6454#section-3.2"},
+"conditionally-hsts-safe-origin": {"dfnID":"conditionally-hsts-safe-origin","dfnText":"conditionally HSTS-safe origin","external":false,"refSections":[{"refs":[{"id":"ref-for-conditionally-hsts-safe-origin"}],"title":"1.3. Recommendations"},{"refs":[{"id":"ref-for-conditionally-hsts-safe-origin\u2460"}],"title":"2. Key Concepts and Terminology"},{"refs":[{"id":"ref-for-conditionally-hsts-safe-origin\u2461"}],"title":"3.2. Feature Detecting Clients Capable of Upgrading"},{"refs":[{"id":"ref-for-conditionally-hsts-safe-origin\u2462"}],"title":"3.2.1. \n    The Upgrade-Insecure-Requests HTTP Request Header Field\n  "}],"url":"#conditionally-hsts-safe-origin"},
+"d7af7adc": {"dfnID":"d7af7adc","dfnText":"incumbent settings object","external":true,"refSections":[{"refs":[{"id":"ref-for-incumbent-settings-object"}],"title":"3.1. \n    The upgrade-insecure-requests Content Security Policy directive\n  "},{"refs":[{"id":"ref-for-incumbent-settings-object\u2460"},{"id":"ref-for-incumbent-settings-object\u2461"}],"title":"3.3. Policy Inheritance"}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#incumbent-settings-object"},
+"dc1cd39b": {"dfnID":"dc1cd39b","dfnText":"url","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-request-url"},{"id":"ref-for-concept-request-url\u2460"}],"title":"3.2.1. \n    The Upgrade-Insecure-Requests HTTP Request Header Field\n  "},{"refs":[{"id":"ref-for-concept-request-url\u2461"},{"id":"ref-for-concept-request-url\u2462"},{"id":"ref-for-concept-request-url\u2463"},{"id":"ref-for-concept-request-url\u2464"},{"id":"ref-for-concept-request-url\u2465"},{"id":"ref-for-concept-request-url\u2466"}],"title":"4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}],"url":"https://fetch.spec.whatwg.org/#concept-request-url"},
+"dcffbccd": {"dfnID":"dcffbccd","dfnText":"url","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-url"}],"title":"3.1. \n    The upgrade-insecure-requests Content Security Policy directive\n  "}],"url":"https://url.spec.whatwg.org/#concept-url"},
+"e33c6970": {"dfnID":"e33c6970","dfnText":"embedding document","external":true,"refSections":[{"refs":[{"id":"ref-for-embedding-document"},{"id":"ref-for-embedding-document\u2460"}],"title":"3.3. Policy Inheritance"},{"refs":[{"id":"ref-for-embedding-document\u2461"}],"title":"4.2. \n    Should insecure requests be upgraded for client?\n  "}],"url":"https://w3c.github.io/webappsec-mixed-content/#embedding-document"},
+"ebfdb814": {"dfnID":"ebfdb814","dfnText":"creating a new document object","external":true,"refSections":[{"refs":[{"id":"ref-for-create-a-document-object"}],"title":"3.3. Policy Inheritance"}],"url":"https://html.spec.whatwg.org/multipage/browsers.html#create-a-document-object"},
+"f5742a08": {"dfnID":"f5742a08","dfnText":"known hsts host domain name matching","external":true,"refSections":[{"refs":[{"id":"ref-for-section-8.2"},{"id":"ref-for-section-8.2\u2460"},{"id":"ref-for-section-8.2\u2461"}],"title":"2. Key Concepts and Terminology"}],"url":"https://tools.ietf.org/html/rfc6797#section-8.2"},
+"faf954d6": {"dfnID":"faf954d6","dfnText":"browsing context","external":true,"refSections":[{"refs":[{"id":"ref-for-browsing-context"},{"id":"ref-for-browsing-context\u2460"}],"title":"3. Upgrading Insecure Resource Requests"},{"refs":[{"id":"ref-for-browsing-context\u2461"}],"title":"3.3. Policy Inheritance"},{"refs":[{"id":"ref-for-browsing-context\u2462"}],"title":"4.2. \n    Should insecure requests be upgraded for client?\n  "}],"url":"https://html.spec.whatwg.org/multipage/browsers.html#browsing-context"},
+"ff01c853": {"dfnID":"ff01c853","dfnText":"strict-transport-security","external":true,"refSections":[{"refs":[{"id":"ref-for-section-6.1"},{"id":"ref-for-section-6.1\u2460"},{"id":"ref-for-section-6.1\u2461"}],"title":"1.3. Recommendations"},{"refs":[{"id":"ref-for-section-6.1\u2462"},{"id":"ref-for-section-6.1\u2463"},{"id":"ref-for-section-6.1\u2464"}],"title":"2. Key Concepts and Terminology"},{"refs":[{"id":"ref-for-section-6.1\u2465"}],"title":"3.2. Feature Detecting Clients Capable of Upgrading"},{"refs":[{"id":"ref-for-section-6.1\u2466"}],"title":"3.2.1. \n    The Upgrade-Insecure-Requests HTTP Request Header Field\n  "},{"refs":[{"id":"ref-for-section-6.1\u2467"}],"title":"5.1. Interaction with HSTS"}],"url":"https://tools.ietf.org/html/rfc6797#section-6.1"},
+"hsts-safe-origin": {"dfnID":"hsts-safe-origin","dfnText":"HSTS-safe origin","external":false,"refSections":[{"refs":[{"id":"ref-for-hsts-safe-origin"}],"title":"1.3. Recommendations"},{"refs":[{"id":"ref-for-hsts-safe-origin\u2460"}],"title":"2. Key Concepts and Terminology"},{"refs":[{"id":"ref-for-hsts-safe-origin\u2461"},{"id":"ref-for-hsts-safe-origin\u2462"}],"title":"3.2.1. \n    The Upgrade-Insecure-Requests HTTP Request Header Field\n  "}],"url":"#hsts-safe-origin"},
+"insecure-requests-policy": {"dfnID":"insecure-requests-policy","dfnText":"insecure requests policy","external":false,"refSections":[{"refs":[{"id":"ref-for-insecure-requests-policy"}],"title":"3.1. \n    The upgrade-insecure-requests Content Security Policy directive\n  "},{"refs":[{"id":"ref-for-insecure-requests-policy\u2460"},{"id":"ref-for-insecure-requests-policy\u2461"},{"id":"ref-for-insecure-requests-policy\u2462"},{"id":"ref-for-insecure-requests-policy\u2463"},{"id":"ref-for-insecure-requests-policy\u2464"},{"id":"ref-for-insecure-requests-policy\u2465"},{"id":"ref-for-insecure-requests-policy\u2466"}],"title":"3.3. Policy Inheritance"},{"refs":[{"id":"ref-for-insecure-requests-policy\u2467"},{"id":"ref-for-insecure-requests-policy\u2468"},{"id":"ref-for-insecure-requests-policy\u2460\u24ea"}],"title":"4.2. \n    Should insecure requests be upgraded for client?\n  "}],"url":"#insecure-requests-policy"},
+"preloadable-hsts-host": {"dfnID":"preloadable-hsts-host","dfnText":"preloadable HSTS host","external":false,"refSections":[{"refs":[{"id":"ref-for-preloadable-hsts-host"},{"id":"ref-for-preloadable-hsts-host\u2460"},{"id":"ref-for-preloadable-hsts-host\u2461"}],"title":"3.2.1. \n    The Upgrade-Insecure-Requests HTTP Request Header Field\n  "},{"refs":[{"id":"ref-for-preloadable-hsts-host\u2462"}],"title":"4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "},{"refs":[{"id":"ref-for-preloadable-hsts-host\u2463"},{"id":"ref-for-preloadable-hsts-host\u2464"}],"title":"6. Performance Considerations"}],"url":"#preloadable-hsts-host"},
+"safely-upgradable-requests": {"dfnID":"safely-upgradable-requests","dfnText":"safely upgradable requests","external":false,"refSections":[{"refs":[{"id":"ref-for-safely-upgradable-requests"},{"id":"ref-for-safely-upgradable-requests\u2460"},{"id":"ref-for-safely-upgradable-requests\u2461"}],"title":"1.3. Recommendations"}],"url":"#safely-upgradable-requests"},
+"upgrade-insecure-navigations-set": {"dfnID":"upgrade-insecure-navigations-set","dfnText":"upgrade insecure navigations set","external":false,"refSections":[{"refs":[{"id":"ref-for-upgrade-insecure-navigations-set"}],"title":"3.1. \n    The upgrade-insecure-requests Content Security Policy directive\n  "},{"refs":[{"id":"ref-for-upgrade-insecure-navigations-set\u2460"},{"id":"ref-for-upgrade-insecure-navigations-set\u2461"},{"id":"ref-for-upgrade-insecure-navigations-set\u2462"},{"id":"ref-for-upgrade-insecure-navigations-set\u2463"},{"id":"ref-for-upgrade-insecure-navigations-set\u2464"},{"id":"ref-for-upgrade-insecure-navigations-set\u2465"}],"title":"3.3. Policy Inheritance"},{"refs":[{"id":"ref-for-upgrade-insecure-navigations-set\u2466"}],"title":"4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}],"url":"#upgrade-insecure-navigations-set"},
+"upgrade-insecure-requests": {"dfnID":"upgrade-insecure-requests","dfnText":"upgrade-insecure-requests","external":false,"refSections":[{"refs":[{"id":"ref-for-upgrade-insecure-requests"}],"title":"1. Introduction"},{"refs":[{"id":"ref-for-upgrade-insecure-requests\u2460"}],"title":"1.2.1. Non-navigational Upgrades"},{"refs":[{"id":"ref-for-upgrade-insecure-requests\u2461"},{"id":"ref-for-upgrade-insecure-requests\u2462"}],"title":"1.2.2. Navigational Upgrades"},{"refs":[{"id":"ref-for-upgrade-insecure-requests\u2463"}],"title":"1.2.3. Failed Upgrade"},{"refs":[{"id":"ref-for-upgrade-insecure-requests\u2464"},{"id":"ref-for-upgrade-insecure-requests\u2465"},{"id":"ref-for-upgrade-insecure-requests\u2466"}],"title":"1.3. Recommendations"},{"refs":[{"id":"ref-for-upgrade-insecure-requests\u2467"},{"id":"ref-for-upgrade-insecure-requests\u2468"},{"id":"ref-for-upgrade-insecure-requests\u2460\u24ea"},{"id":"ref-for-upgrade-insecure-requests\u2460\u2460"},{"id":"ref-for-upgrade-insecure-requests\u2460\u2461"}],"title":"2. Key Concepts and Terminology"},{"refs":[{"id":"ref-for-upgrade-insecure-requests\u2460\u2462"},{"id":"ref-for-upgrade-insecure-requests\u2460\u2463"}],"title":"3.1.1. Relation to \"Mixed Content\""},{"refs":[{"id":"ref-for-upgrade-insecure-requests\u2460\u2464"},{"id":"ref-for-upgrade-insecure-requests\u2460\u2465"},{"id":"ref-for-upgrade-insecure-requests\u2460\u2466"}],"title":"3.2.1. \n    The Upgrade-Insecure-Requests HTTP Request Header Field\n  "},{"refs":[{"id":"ref-for-upgrade-insecure-requests\u2460\u2467"}],"title":"3.4. Reporting Upgrades"},{"refs":[{"id":"ref-for-upgrade-insecure-requests\u2460\u2468"}],"title":"4.2. \n    Should insecure requests be upgraded for client?\n  "},{"refs":[{"id":"ref-for-upgrade-insecure-requests\u2461\u24ea"}],"title":"5.1. Interaction with HSTS"},{"refs":[{"id":"ref-for-upgrade-insecure-requests\u2461\u2460"}],"title":"5.2. CSP Violation Reports"},{"refs":[{"id":"ref-for-upgrade-insecure-requests\u2461\u2461"}],"title":"7.1. Legacy Clients"},{"refs":[{"id":"ref-for-upgrade-insecure-requests\u2461\u2462"},{"id":"ref-for-upgrade-insecure-requests\u2461\u2463"}],"title":"7.2. Relation to HSTS"}],"url":"#upgrade-insecure-requests"},
+"upgrade-insecure-requests-http-request-header-field": {"dfnID":"upgrade-insecure-requests-http-request-header-field","dfnText":"\n  Upgrade-Insecure-Requests HTTP request header\n  field","external":false,"refSections":[{"refs":[{"id":"ref-for-upgrade-insecure-requests-http-request-header-field"}],"title":"2. Key Concepts and Terminology"},{"refs":[{"id":"ref-for-upgrade-insecure-requests-http-request-header-field\u2460"}],"title":"3.2. Feature Detecting Clients Capable of Upgrading"},{"refs":[{"id":"ref-for-upgrade-insecure-requests-http-request-header-field\u2461"},{"id":"ref-for-upgrade-insecure-requests-http-request-header-field\u2462"},{"id":"ref-for-upgrade-insecure-requests-http-request-header-field\u2463"},{"id":"ref-for-upgrade-insecure-requests-http-request-header-field\u2464"},{"id":"ref-for-upgrade-insecure-requests-http-request-header-field\u2465"},{"id":"ref-for-upgrade-insecure-requests-http-request-header-field\u2466"},{"id":"ref-for-upgrade-insecure-requests-http-request-header-field\u2467"},{"id":"ref-for-upgrade-insecure-requests-http-request-header-field\u2468"}],"title":"3.2.1. \n    The Upgrade-Insecure-Requests HTTP Request Header Field\n  "},{"refs":[{"id":"ref-for-upgrade-insecure-requests-http-request-header-field\u2460\u24ea"},{"id":"ref-for-upgrade-insecure-requests-http-request-header-field\u2460\u2460"}],"title":"4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}],"url":"#upgrade-insecure-requests-http-request-header-field"},
+"upgrade-request": {"dfnID":"upgrade-request","dfnText":"4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  ","external":false,"refSections":[{"refs":[{"id":"ref-for-upgrade-request"},{"id":"ref-for-upgrade-request"}],"title":"3. Upgrading Insecure Resource Requests"},{"refs":[{"id":"ref-for-upgrade-request"}],"title":"3.1.1. Relation to \"Mixed Content\""},{"refs":[{"id":"ref-for-upgrade-request"}],"title":"3.2.1. \n    The Upgrade-Insecure-Requests HTTP Request Header Field\n  "},{"refs":[{"id":"ref-for-upgrade-request"}],"title":"4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "}],"url":"#upgrade-request"},
+"valdef-insecure-requests-policy-do-not-upgrade": {"dfnID":"valdef-insecure-requests-policy-do-not-upgrade","dfnText":"Do Not\n      Upgrade","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-insecure-requests-policy-do-not-upgrade"}],"title":"3. Upgrading Insecure Resource Requests"},{"refs":[{"id":"ref-for-valdef-insecure-requests-policy-do-not-upgrade\u2460"}],"title":"4.1. \n    Upgrade request to a potentially trustworthy URL, if appropriate\n  "},{"refs":[{"id":"ref-for-valdef-insecure-requests-policy-do-not-upgrade\u2461"},{"id":"ref-for-valdef-insecure-requests-policy-do-not-upgrade\u2462"}],"title":"4.2. \n    Should insecure requests be upgraded for client?\n  "}],"url":"#valdef-insecure-requests-policy-do-not-upgrade"},
+"valdef-insecure-requests-policy-upgrade": {"dfnID":"valdef-insecure-requests-policy-upgrade","dfnText":"Upgrade","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-insecure-requests-policy-upgrade"}],"title":"3.1. \n    The upgrade-insecure-requests Content Security Policy directive\n  "},{"refs":[{"id":"ref-for-valdef-insecure-requests-policy-upgrade\u2460"},{"id":"ref-for-valdef-insecure-requests-policy-upgrade\u2461"},{"id":"ref-for-valdef-insecure-requests-policy-upgrade\u2462"},{"id":"ref-for-valdef-insecure-requests-policy-upgrade\u2463"},{"id":"ref-for-valdef-insecure-requests-policy-upgrade\u2464"},{"id":"ref-for-valdef-insecure-requests-policy-upgrade\u2465"},{"id":"ref-for-valdef-insecure-requests-policy-upgrade\u2466"}],"title":"3.3. Policy Inheritance"}],"url":"#valdef-insecure-requests-policy-upgrade"},
+};
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+});
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        dfn.panelData = panelData;
+        insertDfnPopupAction(dfn);
+    }
+}
+
+function genDfnPanel(dfn, { dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel on",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel({dfnPanel});
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.dfn = dfn;
+    dfn.dfnPanel = dfnPanel;
+    return dfnPanel;
+}
+
+
+
+function hideAllDfnPanels() {
+    // Delete the currently-active dfn panel.
+    queryAll(".dfn-panel").forEach(dfnPanel=>hideDfnPanel({dfnPanel}));
+}
+
+function showDfnPanel(dfn) {
+    hideAllDfnPanels(); // Only display one at a time.
+
+    dfn.setAttribute("aria-expanded", "true");
+
+    const dfnPanel = genDfnPanel(dfn, dfn.panelData);
+
+    // Give the dfn a unique tabindex, and then
+    // give all the tabbable panel bits successive indexes.
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+
+    append(document.body, dfnPanel);
+    positionDfnPanel(dfnPanel);
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.dfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }
+}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel({dfn, dfnPanel}) {
+    if(!dfnPanel) dfnPanel = dfn.dfnPanel;
+    if(!dfn) dfn = dfnPanel.dfn;
+    dfn.dfnPanel = undefined;
+    dfnPanel.dfn = undefined;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.remove()
+}
+
+function toggleDfnPanel(dfn) {
+    if(dfn.dfnPanel) {
+        hideDfnPanel(dfn);
+    } else {
+        showDfnPanel(dfn);
+    }
+}
+
+function insertDfnPopupAction(dfn) {
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        toggleDfnPanel(dfn);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+function needsFor(type) {
+    switch(type) {
+        case "descriptor":
+        case "value":
+        case "element-attr":
+        case "attr-value":
+        case "element-state":
+        case "method":
+        case "constructor":
+        case "argument":
+        case "attribute":
+        case "const":
+        case "dict-member":
+        case "event":
+        case "enum-value":
+        case "stringifier":
+        case "serializer":
+        case "iterator":
+        case "maplike":
+        case "setlike":
+        case "state":
+        case "mode":
+        case "context":
+        case "facet": return true;
+
+        default: return false;
+    }
+}
+function refusesFor(type) {
+    switch(type) {
+        case "property":
+        case "element":
+        case "interface":
+        case "namespace":
+        case "callback":
+        case "dictionary":
+        case "enum":
+        case "exception":
+        case "typedef":
+        case "http-header":
+        case "permission": return true;
+
+        default: return false;
+    }
+}
+function linkFormatterFromType(type) {
+    switch(type) {
+        case 'scheme':
+        case 'permission':
+        case 'dfn': return (text) => `[=${text}=]`;
+
+        case 'abstract-op': return (text) => `[\$${text}\$]`;
+
+        case 'function':
+        case 'at-rule':
+        case 'selector':
+        case 'value': return (text) => `''${text}''`;
+
+        case 'http-header': return (text) => `[:${text}:]`;
+
+        case 'interface':
+        case 'constructor':
+        case 'method':
+        case 'argument':
+        case 'attribute':
+        case 'callback':
+        case 'dictionary':
+        case 'dict-member':
+        case 'enum':
+        case 'enum-value':
+        case 'exception':
+        case 'const':
+        case 'typedef':
+        case 'stringifier':
+        case 'serializer':
+        case 'iterator':
+        case 'maplike':
+        case 'setlike':
+        case 'extended-attribute':
+        case 'event':
+        case 'idl': return (text) => `{{${text}}}`;
+
+        case 'element-state':
+        case 'element-attr':
+        case 'attr-value':
+        case 'element': return (element) => `<{${element}}>`;
+
+        case 'grammar': return (text) => `${text} (within a <pre class=prod>)`;
+
+        case 'type': return (text)=> `<<${text}>>`;
+
+        case 'descriptor':
+        case 'property': return (text) => `'${text}'`;
+
+        default: return;
+    };
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!needsFor(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!refusesFor(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
 }
 </script>
 <script>/* Boilerplate: script-position-annos */
 "use strict";
 {
-
 function repositionAnnoPanels(){
     const panels = [...document.querySelectorAll("[data-anno-for]")];
-    const main = document.querySelector("main");
-    let mainRect;
-    if(main) mainRect = main.getBoundingClientRect();
-    for(const panel of panels) {
-        const dfn = document.getElementById(panel.getAttribute("data-anno-for"));
-        if(!dfn) {
-            console.log("Can't find the annotation panel target:", panel);
-            continue;
-        }
-        const rect = dfn.getBoundingClientRect();
-        const top = window.scrollY + rect.top
-        panel.style.top = top + "px";
-        panel.top = top;
-        panel.height = rect.height;
-        panel.classList.remove("unpositioned");
-        const panelRect = panel.getBoundingClientRect()
-        if(main) {
-            panel.classList.toggle("overlapping-main", panelRect.left < mainRect.right)
-        }
-    }
+    hydratePanels(panels);
     let vSoFar = 0;
     for(const panel of panels.sort(cmpTops)) {
         if(panel.top < vSoFar) {
@@ -2410,6 +2396,39 @@ function repositionAnnoPanels(){
             panel.style.top = vSoFar + "px";
         }
         vSoFar = panel.top + panel.height + 15;
+    }
+}
+function hydratePanels(panels) {
+    const main = document.querySelector("main");
+    let mainRect;
+    if(main) mainRect = main.getBoundingClientRect();
+    // First display them all, if they're not already visible.
+    for(const panel of panels) {
+        panel.classList.remove("unpositioned");
+    }
+    // Measure them all
+    for(const panel of panels) {
+        const dfn = document.getElementById(panel.getAttribute("data-anno-for"));
+        if(!dfn) {
+            console.log("Can't find the annotation panel target:", panel);
+            continue;
+        }
+        panel.dfn = dfn;
+        panel.top = window.scrollY + dfn.getBoundingClientRect().top;
+        let panelRect = panel.getBoundingClientRect();
+        panel.height = panelRect.height;
+        if(main) {
+            panel.overlappingMain = panelRect.left < mainRect.right;
+        } else {
+            panel.overlappingMain = false;
+        }
+    }
+    // And finally position them
+    for(const panel of panels) {
+        const dfn = panel.dfn;
+        if(!dfn) continue;
+        panel.style.top = panel.top + "px";
+        panel.classList.toggle("overlapping-main", panel.overlappingMain);
     }
 }
 
@@ -2424,271 +2443,260 @@ window.addEventListener("resize", repositionAnnoPanels);
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
-                mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
+let refsData = {
+"#conditionally-hsts-safe-origin": {"export":true,"for_":[],"level":"","normative":true,"shortname":"upgrade-insecure-requests","spec":"upgrade-insecure-requests","status":"local","text":"conditionally hsts-safe","type":"dfn","url":"#conditionally-hsts-safe-origin"},
+"#hsts-safe-origin": {"export":true,"for_":[],"level":"","normative":true,"shortname":"upgrade-insecure-requests","spec":"upgrade-insecure-requests","status":"local","text":"hsts-safe","type":"dfn","url":"#hsts-safe-origin"},
+"#insecure-requests-policy": {"export":true,"for_":[],"level":"","normative":true,"shortname":"upgrade-insecure-requests","spec":"upgrade-insecure-requests","status":"local","text":"insecure requests policy","type":"dfn","url":"#insecure-requests-policy"},
+"#preloadable-hsts-host": {"export":true,"for_":[],"level":"","normative":true,"shortname":"upgrade-insecure-requests","spec":"upgrade-insecure-requests","status":"local","text":"preloadable hsts host","type":"dfn","url":"#preloadable-hsts-host"},
+"#safely-upgradable-requests": {"export":true,"for_":[],"level":"","normative":true,"shortname":"upgrade-insecure-requests","spec":"upgrade-insecure-requests","status":"local","text":"safely upgradable requests","type":"dfn","url":"#safely-upgradable-requests"},
+"#upgrade-insecure-navigations-set": {"export":true,"for_":[],"level":"","normative":true,"shortname":"upgrade-insecure-requests","spec":"upgrade-insecure-requests","status":"local","text":"upgrade insecure navigations set","type":"dfn","url":"#upgrade-insecure-navigations-set"},
+"#upgrade-insecure-requests": {"export":true,"for_":[],"level":"","normative":true,"shortname":"upgrade-insecure-requests","spec":"upgrade-insecure-requests","status":"local","text":"upgrade-insecure-requests","type":"dfn","url":"#upgrade-insecure-requests"},
+"#upgrade-insecure-requests-http-request-header-field": {"export":true,"for_":[],"level":"","normative":true,"shortname":"upgrade-insecure-requests","spec":"upgrade-insecure-requests","status":"local","text":"upgrade-insecure-requests header field","type":"dfn","url":"#upgrade-insecure-requests-http-request-header-field"},
+"#valdef-insecure-requests-policy-do-not-upgrade": {"export":true,"for_":["insecure requests policy"],"level":"","normative":true,"shortname":"upgrade-insecure-requests","spec":"upgrade-insecure-requests","status":"local","text":"do not upgrade","type":"value","url":"#valdef-insecure-requests-policy-do-not-upgrade"},
+"#valdef-insecure-requests-policy-upgrade": {"export":true,"for_":["insecure requests policy"],"level":"","normative":true,"shortname":"upgrade-insecure-requests","spec":"upgrade-insecure-requests","status":"local","text":"upgrade","type":"value","url":"#valdef-insecure-requests-policy-upgrade"},
+"http://www.w3.org/TR/dom/#interface-document": {"export":true,"for_":[],"level":"","normative":true,"shortname":"dom","spec":"dom","status":"anchor-block","text":"Document","type":"interface","url":"http://www.w3.org/TR/dom/#interface-document"},
+"http://www.w3.org/TR/workers/#script-settings-for-workers": {"export":true,"for_":[],"level":"","normative":true,"shortname":"workers","spec":"workers","status":"anchor-block","text":"set up a worker environment settings object","type":"dfn","url":"http://www.w3.org/TR/workers/#script-settings-for-workers"},
+"http://www.w3.org/TR/workers/#worker": {"export":true,"for_":[],"level":"","normative":true,"shortname":"workers","spec":"workers","status":"anchor-block","text":"Worker","type":"interface","url":"http://www.w3.org/TR/workers/#worker"},
+"https://fetch.spec.whatwg.org/#concept-fetch": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"fetch","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-fetch"},
+"https://fetch.spec.whatwg.org/#concept-header-list-append": {"export":true,"for_":["header list"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"append","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-header-list-append"},
+"https://fetch.spec.whatwg.org/#concept-request": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"request","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-request"},
+"https://fetch.spec.whatwg.org/#concept-request-client": {"export":true,"for_":["request"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"client","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-request-client"},
+"https://fetch.spec.whatwg.org/#concept-request-header-list": {"export":true,"for_":["request"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"header list","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-request-header-list"},
+"https://fetch.spec.whatwg.org/#concept-request-url": {"export":true,"for_":["request"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"url","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-request-url"},
+"https://fetch.spec.whatwg.org/#main-fetch": {"export":true,"for_":[],"level":"","normative":true,"shortname":"fetch","spec":"fetch","status":"anchor-block","text":"main fetch","type":"dfn","url":"https://fetch.spec.whatwg.org/#main-fetch"},
+"https://fetch.spec.whatwg.org/#navigation-request": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"navigation request","type":"dfn","url":"https://fetch.spec.whatwg.org/#navigation-request"},
+"https://html.spec.whatwg.org/multipage/browsers.html#browsing-context": {"export":true,"for_":[],"level":"","normative":true,"shortname":"html","spec":"html","status":"anchor-block","text":"browsing context","type":"dfn","url":"https://html.spec.whatwg.org/multipage/browsers.html#browsing-context"},
+"https://html.spec.whatwg.org/multipage/browsers.html#create-a-document-object": {"export":true,"for_":[],"level":"","normative":true,"shortname":"html","spec":"html","status":"anchor-block","text":"creating a new document object","type":"dfn","url":"https://html.spec.whatwg.org/multipage/browsers.html#create-a-document-object"},
+"https://html.spec.whatwg.org/multipage/browsers.html#nested-browsing-context": {"export":true,"for_":[],"level":"","normative":true,"shortname":"html","spec":"html","status":"anchor-block","text":"nested browsing context","type":"dfn","url":"https://html.spec.whatwg.org/multipage/browsers.html#nested-browsing-context"},
+"https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"iframe","type":"element","url":"https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#concept-environment-target-browsing-context": {"export":true,"for_":["environment"],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"target browsing context","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#concept-environment-target-browsing-context"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#incumbent-settings-object": {"export":true,"for_":[],"level":"","normative":true,"shortname":"html","spec":"html","status":"anchor-block","text":"incumbent settings object","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#incumbent-settings-object"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#responsible-browsing-context": {"export":true,"for_":[],"level":"","normative":true,"shortname":"html","spec":"html","status":"anchor-block","text":"responsible browsing context","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#responsible-browsing-context"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#responsible-document": {"export":true,"for_":[],"level":"","normative":true,"shortname":"html","spec":"html","status":"anchor-block","text":"responsible document","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#responsible-document"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#settings-object": {"export":true,"for_":[],"level":"","normative":true,"shortname":"html","spec":"html","status":"anchor-block","text":"environment settings object","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#settings-object"},
+"https://tools.ietf.org/html/rfc5234#appendix-B.1": {"export":true,"for_":[],"level":"","normative":true,"shortname":"rfc5234","spec":"rfc5234","status":"anchor-block","text":"wsp","type":"dfn","url":"https://tools.ietf.org/html/rfc5234#appendix-B.1"},
+"https://tools.ietf.org/html/rfc6454#section-3.2": {"export":true,"for_":[],"level":"","normative":true,"shortname":"rfc6454","spec":"rfc6454","status":"anchor-block","text":"origin","type":"dfn","url":"https://tools.ietf.org/html/rfc6454#section-3.2"},
+"https://tools.ietf.org/html/rfc6797#section-6.1": {"export":true,"for_":[],"level":"","normative":true,"shortname":"rfc6797","spec":"rfc6797","status":"anchor-block","text":"strict-transport-security","type":"dfn","url":"https://tools.ietf.org/html/rfc6797#section-6.1"},
+"https://tools.ietf.org/html/rfc6797#section-6.1.2": {"export":true,"for_":[],"level":"","normative":true,"shortname":"rfc6797","spec":"rfc6797","status":"anchor-block","text":"includesubdomains","type":"dfn","url":"https://tools.ietf.org/html/rfc6797#section-6.1.2"},
+"https://tools.ietf.org/html/rfc6797#section-8.1.1": {"export":true,"for_":[],"level":"","normative":true,"shortname":"rfc6797","spec":"rfc6797","status":"anchor-block","text":"known hsts host","type":"dfn","url":"https://tools.ietf.org/html/rfc6797#section-8.1.1"},
+"https://tools.ietf.org/html/rfc6797#section-8.2": {"export":true,"for_":[],"level":"","normative":true,"shortname":"rfc6797","spec":"rfc6797","status":"anchor-block","text":"known hsts host domain name matching","type":"dfn","url":"https://tools.ietf.org/html/rfc6797#section-8.2"},
+"https://tools.ietf.org/html/rfc7231#section-3": {"export":true,"for_":[],"level":"","normative":true,"shortname":"rfc7231","spec":"rfc7231","status":"anchor-block","text":"resource representation","type":"dfn","url":"https://tools.ietf.org/html/rfc7231#section-3"},
+"https://tools.ietf.org/html/rfc7231#section-7.1.4": {"export":true,"for_":[],"level":"","normative":true,"shortname":"rfc7231","spec":"rfc7231","status":"anchor-block","text":"vary","type":"dfn","url":"https://tools.ietf.org/html/rfc7231#section-7.1.4"},
+"https://tools.ietf.org/html/rfc7234#section-5.2": {"export":true,"for_":[],"level":"","normative":true,"shortname":"rfc7234","spec":"rfc7234","status":"anchor-block","text":"cache-control","type":"dfn","url":"https://tools.ietf.org/html/rfc7234#section-5.2"},
+"https://tools.ietf.org/html/rfc7234#section-5.2.2.3": {"export":true,"for_":[],"level":"","normative":true,"shortname":"rfc7234","spec":"rfc7234","status":"anchor-block","text":"no-store","type":"dfn","url":"https://tools.ietf.org/html/rfc7234#section-5.2.2.3"},
+"https://tools.ietf.org/html/rfc7240#section-2": {"export":true,"for_":[],"level":"","normative":true,"shortname":"rfc7240","spec":"rfc7240","status":"anchor-block","text":"prefer","type":"dfn","url":"https://tools.ietf.org/html/rfc7240#section-2"},
+"https://url.spec.whatwg.org/#concept-url": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"url","spec":"url","status":"current","text":"url","type":"dfn","url":"https://url.spec.whatwg.org/#concept-url"},
+"https://url.spec.whatwg.org/#concept-url-host": {"export":true,"for_":["url"],"level":"1","normative":true,"shortname":"url","spec":"url","status":"current","text":"host","type":"dfn","url":"https://url.spec.whatwg.org/#concept-url-host"},
+"https://url.spec.whatwg.org/#concept-url-path": {"export":true,"for_":["url"],"level":"1","normative":true,"shortname":"url","spec":"url","status":"current","text":"path","type":"dfn","url":"https://url.spec.whatwg.org/#concept-url-path"},
+"https://url.spec.whatwg.org/#concept-url-port": {"export":true,"for_":["url"],"level":"1","normative":true,"shortname":"url","spec":"url","status":"current","text":"port","type":"dfn","url":"https://url.spec.whatwg.org/#concept-url-port"},
+"https://url.spec.whatwg.org/#concept-url-scheme": {"export":true,"for_":["url"],"level":"1","normative":true,"shortname":"url","spec":"url","status":"current","text":"scheme","type":"dfn","url":"https://url.spec.whatwg.org/#concept-url-scheme"},
+"https://w3c.github.io/webappsec-mixed-content/#embedding-document": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"mixed-content","spec":"mixed-content","status":"current","text":"embedding document","type":"dfn","url":"https://w3c.github.io/webappsec-mixed-content/#embedding-document"},
+"https://w3c.github.io/webappsec-secure-contexts/#potentially-trustworthy-url": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"secure-contexts","spec":"secure-contexts","status":"current","text":"potentially trustworthy url","type":"dfn","url":"https://w3c.github.io/webappsec-secure-contexts/#potentially-trustworthy-url"},
+"https://w3c.github.io/webappsec/specs/mixedcontent/#block-all-mixed-content": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mix","spec":"mix","status":"anchor-block","text":"block-all-mixed-content","type":"dfn","url":"https://w3c.github.io/webappsec/specs/mixedcontent/#block-all-mixed-content"},
+"https://w3c.github.io/webappsec/specs/mixedcontent/#strict-mode": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mix","spec":"mix","status":"anchor-block","text":"strict mode","type":"dfn","url":"https://w3c.github.io/webappsec/specs/mixedcontent/#strict-mode"},
+"https://www.w3.org/TR/CSP/#content-security-policy": {"export":true,"for_":[],"level":"","normative":true,"shortname":"csp","spec":"csp","status":"anchor-block","text":"content-security-policy","type":"dfn","url":"https://www.w3.org/TR/CSP/#content-security-policy"},
+"https://www.w3.org/TR/CSP/#content-security-policy-report-only": {"export":true,"for_":[],"level":"","normative":true,"shortname":"csp","spec":"csp","status":"anchor-block","text":"content-security-policy-report-only","type":"dfn","url":"https://www.w3.org/TR/CSP/#content-security-policy-report-only"},
+"https://www.w3.org/TR/CSP/#default-src": {"export":true,"for_":[],"level":"","normative":true,"shortname":"csp","spec":"csp","status":"anchor-block","text":"default-src","type":"dfn","url":"https://www.w3.org/TR/CSP/#default-src"},
+"https://www.w3.org/TR/CSP/#enforce": {"export":true,"for_":[],"level":"","normative":true,"shortname":"csp","spec":"csp","status":"anchor-block","text":"enforce","type":"dfn","url":"https://www.w3.org/TR/CSP/#enforce"},
+"https://www.w3.org/TR/CSP/#example-violation-report": {"export":true,"for_":[],"level":"","normative":true,"shortname":"csp","spec":"csp","status":"anchor-block","text":"violation report","type":"dfn","url":"https://www.w3.org/TR/CSP/#example-violation-report"},
+"https://www.w3.org/TR/CSP/#monitor": {"export":true,"for_":[],"level":"","normative":true,"shortname":"csp","spec":"csp","status":"anchor-block","text":"monitor","type":"dfn","url":"https://www.w3.org/TR/CSP/#monitor"},
+"https://www.w3.org/TR/CSP/#protected-resource": {"export":true,"for_":[],"level":"","normative":true,"shortname":"csp","spec":"csp","status":"anchor-block","text":"protected resource","type":"dfn","url":"https://www.w3.org/TR/CSP/#protected-resource"},
+"https://www.w3.org/TR/CSP/#report-uri": {"export":true,"for_":[],"level":"","normative":true,"shortname":"csp","spec":"csp","status":"anchor-block","text":"report-uri","type":"dfn","url":"https://www.w3.org/TR/CSP/#report-uri"},
+"https://www.w3.org/TR/CSP/#send-violation-reports": {"export":true,"for_":[],"level":"","normative":true,"shortname":"csp","spec":"csp","status":"anchor-block","text":"send violation reports","type":"dfn","url":"https://www.w3.org/TR/CSP/#send-violation-reports"},
+};
+
+function mkRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "Term: "),
+                mk.span({}, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    let forListElements;
+    if(forList.length == 0) {
+        forListElements = [];
+    } else if(forList.length == 1) {
+        forListElements = mk.li({},
+            mk.b({}, "For: "),
+            mk.span({}, forList[0]),
+        );
+    } else {
+        forListElements = mk.li({},
             mk.b({}, "For: "),
             mk.ul({},
                 ...forList.map(forItem =>
                     mk.li({},
-                        mk.span({}, `${forItem}`)
+                        mk.span({}, forItem)
                     ),
                 ),
             ),
         );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+    }
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    setupRefHintEventListeners(link, hintPanel);
+    return hintPanel;
+}
+
+function hideAllRefHints() {
+    queryAll(".ref-hint").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    if(refHint.teardownEventListeners) {
+        refHint.teardownEventListeners();
     }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+    refHint.remove();
+}
+
+function showRefHint(link) {
+    if(link.classList.contains("dfn-link")) return;
+    const url = link.getAttribute("href");
+    const ref = refsData[url];
+    if(!ref) return;
+
+    hideAllRefHints(); // Only display one at this time.
+
+    const refHint = mkRefHint(link, ref);
+    append(document.body, refHint);
+    link.setAttribute("aria-expanded", "true");
+    positionRefHint(refHint);
+}
+
+function setupRefHintEventListeners(link, refHint) {
+    if (refHint.teardownEventListeners) return;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
+
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
-
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
-    }
-
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
-        }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
-
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
-    }
-
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+document.addEventListener("DOMContentLoaded", () => {
+    document.body.addEventListener("mouseover", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
+    });
+    document.body.addEventListener("focus", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
     });
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['#upgrade-insecure-requests'] = {"text": "upgrade-insecure-requests", "type": "dfn", "spec": "upgrade-insecure-requests", "shortname": "upgrade-insecure-requests", "level": "", "status": "local", "url": "#upgrade-insecure-requests", "export": true, "normative": true, "for_": []};
-window.refsData['https://url.spec.whatwg.org/#concept-url-host'] = {"text": "host", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-host", "export": true, "normative": true, "for_": ["url"]};
-window.refsData['https://url.spec.whatwg.org/#concept-url-path'] = {"text": "path", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-path", "export": true, "normative": true, "for_": ["url"]};
-window.refsData['https://url.spec.whatwg.org/#concept-url-scheme'] = {"text": "scheme", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-scheme", "export": true, "normative": true, "for_": ["url"]};
-window.refsData['https://w3c.github.io/webappsec/specs/mixedcontent/#strict-mode'] = {"text": "strict mode", "type": "dfn", "spec": "mix", "shortname": "mix", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webappsec/specs/mixedcontent/#strict-mode", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/CSP/#content-security-policy'] = {"text": "content-security-policy", "type": "dfn", "spec": "csp", "shortname": "csp", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/CSP/#content-security-policy", "export": true, "normative": true, "for_": []};
-window.refsData['#safely-upgradable-requests'] = {"text": "safely upgradable requests", "type": "dfn", "spec": "upgrade-insecure-requests", "shortname": "upgrade-insecure-requests", "level": "", "status": "local", "url": "#safely-upgradable-requests", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/webappsec-secure-contexts/#potentially-trustworthy-url'] = {"text": "potentially trustworthy url", "type": "dfn", "spec": "secure-contexts", "shortname": "secure-contexts", "level": "1", "status": "current", "url": "https://w3c.github.io/webappsec-secure-contexts/#potentially-trustworthy-url", "export": true, "normative": true, "for_": []};
-window.refsData['#hsts-safe-origin'] = {"text": "hsts-safe", "type": "dfn", "spec": "upgrade-insecure-requests", "shortname": "upgrade-insecure-requests", "level": "", "status": "local", "url": "#hsts-safe-origin", "export": true, "normative": true, "for_": []};
-window.refsData['https://tools.ietf.org/html/rfc6797#section-6.1'] = {"text": "strict-transport-security", "type": "dfn", "spec": "rfc6797", "shortname": "rfc6797", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc6797#section-6.1", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/webappsec/specs/mixedcontent/#block-all-mixed-content'] = {"text": "block-all-mixed-content", "type": "dfn", "spec": "mix", "shortname": "mix", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webappsec/specs/mixedcontent/#block-all-mixed-content", "export": true, "normative": true, "for_": []};
-window.refsData['#conditionally-hsts-safe-origin'] = {"text": "conditionally hsts-safe", "type": "dfn", "spec": "upgrade-insecure-requests", "shortname": "upgrade-insecure-requests", "level": "", "status": "local", "url": "#conditionally-hsts-safe-origin", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#concept-request'] = {"text": "request", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request", "export": true, "normative": true, "for_": []};
-window.refsData['https://tools.ietf.org/html/rfc7231#section-3'] = {"text": "resource representation", "type": "dfn", "spec": "rfc7231", "shortname": "rfc7231", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc7231#section-3", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#concept-request-header-list'] = {"text": "header list", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-header-list", "export": true, "normative": true, "for_": ["request"]};
-window.refsData['#upgrade-insecure-requests-http-request-header-field'] = {"text": "upgrade-insecure-requests header field", "type": "dfn", "spec": "upgrade-insecure-requests", "shortname": "upgrade-insecure-requests", "level": "", "status": "local", "url": "#upgrade-insecure-requests-http-request-header-field", "export": true, "normative": true, "for_": []};
-window.refsData['https://tools.ietf.org/html/rfc6454#section-3.2'] = {"text": "origin", "type": "dfn", "spec": "rfc6454", "shortname": "rfc6454", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc6454#section-3.2", "export": true, "normative": true, "for_": []};
-window.refsData['https://tools.ietf.org/html/rfc6797#section-8.2'] = {"text": "known hsts host domain name matching", "type": "dfn", "spec": "rfc6797", "shortname": "rfc6797", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc6797#section-8.2", "export": true, "normative": true, "for_": []};
-window.refsData['https://tools.ietf.org/html/rfc6797#section-8.1.1'] = {"text": "known hsts host", "type": "dfn", "spec": "rfc6797", "shortname": "rfc6797", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc6797#section-8.1.1", "export": true, "normative": true, "for_": []};
-window.refsData['https://tools.ietf.org/html/rfc6797#section-6.1.2'] = {"text": "includesubdomains", "type": "dfn", "spec": "rfc6797", "shortname": "rfc6797", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc6797#section-6.1.2", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#settings-object'] = {"text": "environment settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#settings-object", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#browsing-context'] = {"text": "browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#browsing-context", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-insecure-requests-policy-do-not-upgrade'] = {"text": "do not upgrade", "type": "value", "spec": "upgrade-insecure-requests", "shortname": "upgrade-insecure-requests", "level": "", "status": "local", "url": "#valdef-insecure-requests-policy-do-not-upgrade", "export": true, "normative": true, "for_": ["insecure requests policy"]};
-window.refsData['https://fetch.spec.whatwg.org/#concept-fetch'] = {"text": "fetch", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-fetch", "export": true, "normative": true, "for_": []};
-window.refsData['https://url.spec.whatwg.org/#concept-url-port'] = {"text": "port", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-port", "export": true, "normative": true, "for_": ["url"]};
-window.refsData['https://fetch.spec.whatwg.org/#navigation-request'] = {"text": "navigation request", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#navigation-request", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/CSP/#protected-resource'] = {"text": "protected resource", "type": "dfn", "spec": "csp", "shortname": "csp", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/CSP/#protected-resource", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/CSP/#enforce'] = {"text": "enforce", "type": "dfn", "spec": "csp", "shortname": "csp", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/CSP/#enforce", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#incumbent-settings-object'] = {"text": "incumbent settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#incumbent-settings-object", "export": true, "normative": true, "for_": []};
-window.refsData['#insecure-requests-policy'] = {"text": "insecure requests policy", "type": "dfn", "spec": "upgrade-insecure-requests", "shortname": "upgrade-insecure-requests", "level": "", "status": "local", "url": "#insecure-requests-policy", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-insecure-requests-policy-upgrade'] = {"text": "upgrade", "type": "value", "spec": "upgrade-insecure-requests", "shortname": "upgrade-insecure-requests", "level": "", "status": "local", "url": "#valdef-insecure-requests-policy-upgrade", "export": true, "normative": true, "for_": ["insecure requests policy"]};
-window.refsData['https://url.spec.whatwg.org/#concept-url'] = {"text": "url", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url", "export": true, "normative": true, "for_": []};
-window.refsData['#upgrade-insecure-navigations-set'] = {"text": "upgrade insecure navigations set", "type": "dfn", "spec": "upgrade-insecure-requests", "shortname": "upgrade-insecure-requests", "level": "", "status": "local", "url": "#upgrade-insecure-navigations-set", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/CSP/#monitor'] = {"text": "monitor", "type": "dfn", "spec": "csp", "shortname": "csp", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/CSP/#monitor", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/CSP/#content-security-policy-report-only'] = {"text": "content-security-policy-report-only", "type": "dfn", "spec": "csp", "shortname": "csp", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/CSP/#content-security-policy-report-only", "export": true, "normative": true, "for_": []};
-window.refsData['https://tools.ietf.org/html/rfc5234#appendix-B.1'] = {"text": "wsp", "type": "dfn", "spec": "rfc5234", "shortname": "rfc5234", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc5234#appendix-B.1", "export": true, "normative": true, "for_": []};
-window.refsData['https://tools.ietf.org/html/rfc7240#section-2'] = {"text": "prefer", "type": "dfn", "spec": "rfc7240", "shortname": "rfc7240", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc7240#section-2", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#concept-request-url'] = {"text": "url", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-url", "export": true, "normative": true, "for_": ["request"]};
-window.refsData['#preloadable-hsts-host'] = {"text": "preloadable hsts host", "type": "dfn", "spec": "upgrade-insecure-requests", "shortname": "upgrade-insecure-requests", "level": "", "status": "local", "url": "#preloadable-hsts-host", "export": true, "normative": true, "for_": []};
-window.refsData['https://tools.ietf.org/html/rfc7231#section-7.1.4'] = {"text": "vary", "type": "dfn", "spec": "rfc7231", "shortname": "rfc7231", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc7231#section-7.1.4", "export": true, "normative": true, "for_": []};
-window.refsData['https://tools.ietf.org/html/rfc7234#section-5.2'] = {"text": "cache-control", "type": "dfn", "spec": "rfc7234", "shortname": "rfc7234", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc7234#section-5.2", "export": true, "normative": true, "for_": []};
-window.refsData['https://tools.ietf.org/html/rfc7234#section-5.2.2.3'] = {"text": "no-store", "type": "dfn", "spec": "rfc7234", "shortname": "rfc7234", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc7234#section-5.2.2.3", "export": true, "normative": true, "for_": []};
-window.refsData['http://www.w3.org/TR/dom/#interface-document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "", "status": "anchor-block", "url": "http://www.w3.org/TR/dom/#interface-document", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#nested-browsing-context'] = {"text": "nested browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#nested-browsing-context", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/webappsec-mixed-content/#embedding-document'] = {"text": "embedding document", "type": "dfn", "spec": "mixed-content", "shortname": "mixed-content", "level": "1", "status": "current", "url": "https://w3c.github.io/webappsec-mixed-content/#embedding-document", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#create-a-document-object'] = {"text": "creating a new document object", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#create-a-document-object", "export": true, "normative": true, "for_": []};
-window.refsData['http://www.w3.org/TR/workers/#script-settings-for-workers'] = {"text": "set up a worker environment settings object", "type": "dfn", "spec": "workers", "shortname": "workers", "level": "", "status": "anchor-block", "url": "http://www.w3.org/TR/workers/#script-settings-for-workers", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/CSP/#default-src'] = {"text": "default-src", "type": "dfn", "spec": "csp", "shortname": "csp", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/CSP/#default-src", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/CSP/#report-uri'] = {"text": "report-uri", "type": "dfn", "spec": "csp", "shortname": "csp", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/CSP/#report-uri", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/CSP/#example-violation-report'] = {"text": "violation report", "type": "dfn", "spec": "csp", "shortname": "csp", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/CSP/#example-violation-report", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#concept-request-client'] = {"text": "client", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-client", "export": true, "normative": true, "for_": ["request"]};
-window.refsData['https://fetch.spec.whatwg.org/#main-fetch'] = {"text": "main fetch", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#main-fetch", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#concept-header-list-append'] = {"text": "append", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-header-list-append", "export": true, "normative": true, "for_": ["header list"]};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-environment-target-browsing-context'] = {"text": "target browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-environment-target-browsing-context", "export": true, "normative": true, "for_": ["environment"]};
-window.refsData['https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element'] = {"text": "iframe", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#responsible-document'] = {"text": "responsible document", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#responsible-document", "export": true, "normative": true, "for_": []};
-window.refsData['http://www.w3.org/TR/workers/#worker'] = {"text": "Worker", "type": "interface", "spec": "workers", "shortname": "workers", "level": "", "status": "anchor-block", "url": "http://www.w3.org/TR/workers/#worker", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#responsible-browsing-context'] = {"text": "responsible browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#responsible-browsing-context", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/CSP/#send-violation-reports'] = {"text": "send violation reports", "type": "dfn", "spec": "csp", "shortname": "csp", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/CSP/#send-violation-reports", "export": true, "normative": true, "for_": []};
 </script>

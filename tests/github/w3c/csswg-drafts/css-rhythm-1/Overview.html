@@ -86,7 +86,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -712,7 +711,7 @@ a[href].issue-return {
 }
 
 .ref-hint {
-    display: none;
+    display: inline-block;
     position: absolute;
     z-index: 35;
     width: 20em;
@@ -728,16 +727,11 @@ a[href].issue-return {
     white-space: normal; /* in case it's moved into a pre */
 }
 
-.ref-hint.on {
-    display: inline-block;
-}
-
 .ref-hint * { margin: 0; padding: 0; text-indent: 0; }
 
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -797,7 +791,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -854,7 +847,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -1958,440 +1950,8 @@ h1 <c- p>{</c->
     </div>
    </div>
   </details>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['48350e83'] = {"dfnID": "48350e83", "url": "https://drafts.csswg.org/css-align-3/#propdef-align-self", "dfnText": "align-self", "refSections": [{"refs": [{"id": "ref-for-propdef-align-self"}], "title": "2.3. Specifying Alignment: the block-step-align property"}], "external": true};
-window.dfnpanelData['cecbe9cd'] = {"dfnID": "cecbe9cd", "url": "https://drafts.csswg.org/css-box-4/#propdef-margin", "dfnText": "margin", "refSections": [{"refs": [{"id": "ref-for-propdef-margin"}], "title": "2.2. Specifying the Spacing Type: the block-step-insert property"}], "external": true};
-window.dfnpanelData['b5418f3e'] = {"dfnID": "b5418f3e", "url": "https://drafts.csswg.org/css-box-4/#propdef-padding", "dfnText": "padding", "refSections": [{"refs": [{"id": "ref-for-propdef-padding"}], "title": "2.2. Specifying the Spacing Type: the block-step-insert property"}], "external": true};
-window.dfnpanelData['9729fd44'] = {"dfnID": "9729fd44", "url": "https://drafts.csswg.org/css-break-3/#fragment", "dfnText": "fragment", "refSections": [{"refs": [{"id": "ref-for-fragment"}], "title": "2.1. Specifying the Step Size: the block-step-size property"}], "external": true};
-window.dfnpanelData['8ca0c013'] = {"dfnID": "8ca0c013", "url": "https://drafts.csswg.org/css-cascade-5/#shorthand-property", "dfnText": "shorthand property", "refSections": [{"refs": [{"id": "ref-for-shorthand-property"}], "title": "2.5. Block Step Adjustment Shorthand: the block-step shorthand"}], "external": true};
-window.dfnpanelData['f41ab620'] = {"dfnID": "f41ab620", "url": "https://drafts.csswg.org/css-display-4/#establish-an-independent-formatting-context", "dfnText": "establish an independent formatting context", "refSections": [{"refs": [{"id": "ref-for-establish-an-independent-formatting-context"}], "title": "2.1. Specifying the Step Size: the block-step-size property"}], "external": true};
-window.dfnpanelData['e0b6ed58'] = {"dfnID": "e0b6ed58", "url": "https://drafts.csswg.org/css-inline-3/#propdef-vertical-align", "dfnText": "vertical-align", "refSections": [{"refs": [{"id": "ref-for-propdef-vertical-align"}, {"id": "ref-for-propdef-vertical-align\u2460"}], "title": "3. Adjusting Line Box Heights: the line-height-step property"}], "external": true};
-window.dfnpanelData['48dc3432'] = {"dfnID": "48dc3432", "url": "https://drafts.csswg.org/css-line-grid-1/#propdef-line-grid", "dfnText": "line-grid", "refSections": [{"refs": [{"id": "ref-for-propdef-line-grid"}, {"id": "ref-for-propdef-line-grid\u2460"}], "title": "1.1. East Asian Casual Vertical Rhythms"}], "external": true};
-window.dfnpanelData['fb030e6c'] = {"dfnID": "fb030e6c", "url": "https://drafts.csswg.org/css-values-4/#length-value", "dfnText": "<length>", "refSections": [{"refs": [{"id": "ref-for-length-value"}, {"id": "ref-for-length-value\u2460"}, {"id": "ref-for-length-value\u2461"}], "title": "2.1. Specifying the Step Size: the block-step-size property"}, {"refs": [{"id": "ref-for-length-value\u2462"}, {"id": "ref-for-length-value\u2463"}, {"id": "ref-for-length-value\u2464"}], "title": "3. Adjusting Line Box Heights: the line-height-step property"}], "external": true};
-window.dfnpanelData['584e9c31'] = {"dfnID": "584e9c31", "url": "https://drafts.csswg.org/css-values-4/#funcdef-calc", "dfnText": "calc()", "refSections": [{"refs": [{"id": "ref-for-funcdef-calc"}], "title": "3. Adjusting Line Box Heights: the line-height-step property"}], "external": true};
-window.dfnpanelData['358fd6ff'] = {"dfnID": "358fd6ff", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "dfnText": "css-wide keywords", "refSections": [{"refs": [{"id": "ref-for-css-wide-keywords"}], "title": "1.2. Value Definitions"}], "external": true};
-window.dfnpanelData['6ec67710'] = {"dfnID": "6ec67710", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "dfnText": "|", "refSections": [{"refs": [{"id": "ref-for-comb-one"}], "title": "2.1. Specifying the Step Size: the block-step-size property"}, {"refs": [{"id": "ref-for-comb-one\u2460"}], "title": "2.2. Specifying the Spacing Type: the block-step-insert property"}, {"refs": [{"id": "ref-for-comb-one\u2461"}, {"id": "ref-for-comb-one\u2462"}, {"id": "ref-for-comb-one\u2463"}], "title": "2.3. Specifying Alignment: the block-step-align property"}, {"refs": [{"id": "ref-for-comb-one\u2464"}, {"id": "ref-for-comb-one\u2465"}], "title": "2.4. Rounding Method: the block-step-round property"}], "external": true};
-window.dfnpanelData['8a82fda1'] = {"dfnID": "8a82fda1", "url": "https://drafts.csswg.org/css-values-4/#comb-any", "dfnText": "||", "refSections": [{"refs": [{"id": "ref-for-comb-any"}, {"id": "ref-for-comb-any\u2460"}, {"id": "ref-for-comb-any\u2461"}], "title": "2.5. Block Step Adjustment Shorthand: the block-step shorthand"}], "external": true};
-window.dfnpanelData['dbba942a'] = {"dfnID": "dbba942a", "url": "https://drafts.csswg.org/css-variables-2/#funcdef-var", "dfnText": "var()", "refSections": [{"refs": [{"id": "ref-for-funcdef-var"}], "title": "3. Adjusting Line Box Heights: the line-height-step property"}], "external": true};
-window.dfnpanelData['190183bb'] = {"dfnID": "190183bb", "url": "https://drafts.csswg.org/css-writing-modes-4/#block-size", "dfnText": "block size", "refSections": [{"refs": [{"id": "ref-for-block-size"}], "title": "2.1. Specifying the Step Size: the block-step-size property"}], "external": true};
-window.dfnpanelData['7bc19a34'] = {"dfnID": "7bc19a34", "url": "https://drafts.csswg.org/css-writing-modes-4/#css-end", "dfnText": "end", "refSections": [{"refs": [{"id": "ref-for-css-end"}], "title": "2.3. Specifying Alignment: the block-step-align property"}], "external": true};
-window.dfnpanelData['f3d0feab'] = {"dfnID": "f3d0feab", "url": "https://drafts.csswg.org/css-writing-modes-4/#over", "dfnText": "over", "refSections": [{"refs": [{"id": "ref-for-over"}], "title": "3. Adjusting Line Box Heights: the line-height-step property"}], "external": true};
-window.dfnpanelData['8067deca'] = {"dfnID": "8067deca", "url": "https://drafts.csswg.org/css-writing-modes-4/#css-start", "dfnText": "start", "refSections": [{"refs": [{"id": "ref-for-css-start"}], "title": "2.3. Specifying Alignment: the block-step-align property"}], "external": true};
-window.dfnpanelData['a24756d2'] = {"dfnID": "a24756d2", "url": "https://drafts.csswg.org/css-writing-modes-4/#under", "dfnText": "under", "refSections": [{"refs": [{"id": "ref-for-under"}], "title": "3. Adjusting Line Box Heights: the line-height-step property"}], "external": true};
-window.dfnpanelData['ac54fbff'] = {"dfnID": "ac54fbff", "url": "https://drafts.csswg.org/css2/#propdef-line-height", "dfnText": "line-height", "refSections": [{"refs": [{"id": "ref-for-propdef-line-height"}], "title": "3. Adjusting Line Box Heights: the line-height-step property"}], "external": true};
-window.dfnpanelData['propdef-block-step-size'] = {"dfnID": "propdef-block-step-size", "url": "#propdef-block-step-size", "dfnText": "block-step-size", "refSections": [{"refs": [{"id": "ref-for-propdef-block-step-size"}, {"id": "ref-for-propdef-block-step-size\u2460"}], "title": "2. Adjusting Block-level Box Heights"}, {"refs": [{"id": "ref-for-propdef-block-step-size\u2461"}], "title": "2.1. Specifying the Step Size: the block-step-size property"}, {"refs": [{"id": "ref-for-propdef-block-step-size\u2462"}, {"id": "ref-for-propdef-block-step-size\u2463"}, {"id": "ref-for-propdef-block-step-size\u2464"}], "title": "2.2. Specifying the Spacing Type: the block-step-insert property"}, {"refs": [{"id": "ref-for-propdef-block-step-size\u2465"}, {"id": "ref-for-propdef-block-step-size\u2466"}, {"id": "ref-for-propdef-block-step-size\u2467"}, {"id": "ref-for-propdef-block-step-size\u2468"}, {"id": "ref-for-propdef-block-step-size\u2460\u24ea"}], "title": "2.3. Specifying Alignment: the block-step-align property"}, {"refs": [{"id": "ref-for-propdef-block-step-size\u2460\u2460"}, {"id": "ref-for-propdef-block-step-size\u2460\u2461"}, {"id": "ref-for-propdef-block-step-size\u2460\u2462"}, {"id": "ref-for-propdef-block-step-size\u2460\u2463"}], "title": "2.4. Rounding Method: the block-step-round property"}, {"refs": [{"id": "ref-for-propdef-block-step-size\u2460\u2464"}, {"id": "ref-for-propdef-block-step-size\u2460\u2465"}], "title": "2.5. Block Step Adjustment Shorthand: the block-step shorthand"}], "external": false};
-window.dfnpanelData['propdef-block-step-insert'] = {"dfnID": "propdef-block-step-insert", "url": "#propdef-block-step-insert", "dfnText": "block-step-insert", "refSections": [{"refs": [{"id": "ref-for-propdef-block-step-insert"}], "title": "2. Adjusting Block-level Box Heights"}, {"refs": [{"id": "ref-for-propdef-block-step-insert\u2460"}], "title": "2.2. Specifying the Spacing Type: the block-step-insert property"}, {"refs": [{"id": "ref-for-propdef-block-step-insert\u2461"}, {"id": "ref-for-propdef-block-step-insert\u2462"}], "title": "2.3. Specifying Alignment: the block-step-align property"}, {"refs": [{"id": "ref-for-propdef-block-step-insert\u2463"}, {"id": "ref-for-propdef-block-step-insert\u2464"}], "title": "2.5. Block Step Adjustment Shorthand: the block-step shorthand"}], "external": false};
-window.dfnpanelData['valdef-block-step-insert-margin'] = {"dfnID": "valdef-block-step-insert-margin", "url": "#valdef-block-step-insert-margin", "dfnText": "margin", "refSections": [{"refs": [{"id": "ref-for-valdef-block-step-insert-margin"}, {"id": "ref-for-valdef-block-step-insert-margin\u2460"}], "title": "2.3. Specifying Alignment: the block-step-align property"}], "external": false};
-window.dfnpanelData['propdef-block-step-align'] = {"dfnID": "propdef-block-step-align", "url": "#propdef-block-step-align", "dfnText": "block-step-align", "refSections": [{"refs": [{"id": "ref-for-propdef-block-step-align"}], "title": "2. Adjusting Block-level Box Heights"}, {"refs": [{"id": "ref-for-propdef-block-step-align\u2460"}, {"id": "ref-for-propdef-block-step-align\u2461"}], "title": "2.3. Specifying Alignment: the block-step-align property"}, {"refs": [{"id": "ref-for-propdef-block-step-align\u2462"}, {"id": "ref-for-propdef-block-step-align\u2463"}], "title": "2.5. Block Step Adjustment Shorthand: the block-step shorthand"}], "external": false};
-window.dfnpanelData['valdef-block-step-align-center'] = {"dfnID": "valdef-block-step-align-center", "url": "#valdef-block-step-align-center", "dfnText": "center", "refSections": [{"refs": [{"id": "ref-for-valdef-block-step-align-center"}, {"id": "ref-for-valdef-block-step-align-center\u2460"}], "title": "2.3. Specifying Alignment: the block-step-align property"}], "external": false};
-window.dfnpanelData['valdef-block-step-align-start'] = {"dfnID": "valdef-block-step-align-start", "url": "#valdef-block-step-align-start", "dfnText": "start", "refSections": [{"refs": [{"id": "ref-for-valdef-block-step-align-start"}], "title": "2.3. Specifying Alignment: the block-step-align property"}], "external": false};
-window.dfnpanelData['valdef-block-step-align-end'] = {"dfnID": "valdef-block-step-align-end", "url": "#valdef-block-step-align-end", "dfnText": "end", "refSections": [{"refs": [{"id": "ref-for-valdef-block-step-align-end"}], "title": "2.3. Specifying Alignment: the block-step-align property"}], "external": false};
-window.dfnpanelData['propdef-block-step-round'] = {"dfnID": "propdef-block-step-round", "url": "#propdef-block-step-round", "dfnText": "block-step-round", "refSections": [{"refs": [{"id": "ref-for-propdef-block-step-round"}], "title": "2. Adjusting Block-level Box Heights"}, {"refs": [{"id": "ref-for-propdef-block-step-round\u2460"}], "title": "2.1. Specifying the Step Size: the block-step-size property"}, {"refs": [{"id": "ref-for-propdef-block-step-round\u2461"}], "title": "2.4. Rounding Method: the block-step-round property"}, {"refs": [{"id": "ref-for-propdef-block-step-round\u2462"}, {"id": "ref-for-propdef-block-step-round\u2463"}], "title": "2.5. Block Step Adjustment Shorthand: the block-step shorthand"}], "external": false};
-window.dfnpanelData['valdef-block-step-align-up'] = {"dfnID": "valdef-block-step-align-up", "url": "#valdef-block-step-align-up", "dfnText": "up", "refSections": [{"refs": [{"id": "ref-for-valdef-block-step-align-up"}], "title": "2.4. Rounding Method: the block-step-round property"}], "external": false};
-window.dfnpanelData['valdef-block-step-align-down'] = {"dfnID": "valdef-block-step-align-down", "url": "#valdef-block-step-align-down", "dfnText": "down", "refSections": [{"refs": [{"id": "ref-for-valdef-block-step-align-down"}], "title": "2.4. Rounding Method: the block-step-round property"}], "external": false};
-window.dfnpanelData['propdef-block-step'] = {"dfnID": "propdef-block-step", "url": "#propdef-block-step", "dfnText": "block-step", "refSections": [{"refs": [{"id": "ref-for-propdef-block-step"}, {"id": "ref-for-propdef-block-step\u2460"}], "title": "1.1. East Asian Casual Vertical Rhythms"}, {"refs": [{"id": "ref-for-propdef-block-step\u2461"}, {"id": "ref-for-propdef-block-step\u2462"}], "title": "2. Adjusting Block-level Box Heights"}, {"refs": [{"id": "ref-for-propdef-block-step\u2463"}], "title": "2.5. Block Step Adjustment Shorthand: the block-step shorthand"}], "external": false};
-window.dfnpanelData['propdef-line-height-step'] = {"dfnID": "propdef-line-height-step", "url": "#propdef-line-height-step", "dfnText": "line-height-step", "refSections": [{"refs": [{"id": "ref-for-propdef-line-height-step"}, {"id": "ref-for-propdef-line-height-step\u2460"}], "title": "1.1. East Asian Casual Vertical Rhythms"}, {"refs": [{"id": "ref-for-propdef-line-height-step\u2461"}], "title": "3. Adjusting Line Box Heights: the line-height-step property"}], "external": false};
-window.dfnpanelData['step-unit'] = {"dfnID": "step-unit", "url": "#step-unit", "dfnText": "step unit", "refSections": [{"refs": [{"id": "ref-for-step-unit"}, {"id": "ref-for-step-unit\u2460"}], "title": "2.1. Specifying the Step Size: the block-step-size property"}, {"refs": [{"id": "ref-for-step-unit\u2461"}, {"id": "ref-for-step-unit\u2462"}, {"id": "ref-for-step-unit\u2463"}, {"id": "ref-for-step-unit\u2464"}, {"id": "ref-for-step-unit\u2465"}, {"id": "ref-for-step-unit\u2466"}, {"id": "ref-for-step-unit\u2467"}, {"id": "ref-for-step-unit\u2468"}, {"id": "ref-for-step-unit\u2460\u24ea"}, {"id": "ref-for-step-unit\u2460\u2460"}, {"id": "ref-for-step-unit\u2460\u2461"}], "title": "3. Adjusting Line Box Heights: the line-height-step property"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -2585,11 +2145,457 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"190183bb": {"dfnID":"190183bb","dfnText":"block size","external":true,"refSections":[{"refs":[{"id":"ref-for-block-size"}],"title":"2.1. Specifying the Step Size: the block-step-size property"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#block-size"},
+"358fd6ff": {"dfnID":"358fd6ff","dfnText":"css-wide keywords","external":true,"refSections":[{"refs":[{"id":"ref-for-css-wide-keywords"}],"title":"1.2. Value Definitions"}],"url":"https://drafts.csswg.org/css-values-4/#css-wide-keywords"},
+"48350e83": {"dfnID":"48350e83","dfnText":"align-self","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-align-self"}],"title":"2.3. Specifying Alignment: the block-step-align property"}],"url":"https://drafts.csswg.org/css-align-3/#propdef-align-self"},
+"48dc3432": {"dfnID":"48dc3432","dfnText":"line-grid","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-line-grid"},{"id":"ref-for-propdef-line-grid\u2460"}],"title":"1.1. East Asian Casual Vertical Rhythms"}],"url":"https://drafts.csswg.org/css-line-grid-1/#propdef-line-grid"},
+"584e9c31": {"dfnID":"584e9c31","dfnText":"calc()","external":true,"refSections":[{"refs":[{"id":"ref-for-funcdef-calc"}],"title":"3. Adjusting Line Box Heights: the line-height-step property"}],"url":"https://drafts.csswg.org/css-values-4/#funcdef-calc"},
+"6ec67710": {"dfnID":"6ec67710","dfnText":"|","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-one"}],"title":"2.1. Specifying the Step Size: the block-step-size property"},{"refs":[{"id":"ref-for-comb-one\u2460"}],"title":"2.2. Specifying the Spacing Type: the block-step-insert property"},{"refs":[{"id":"ref-for-comb-one\u2461"},{"id":"ref-for-comb-one\u2462"},{"id":"ref-for-comb-one\u2463"}],"title":"2.3. Specifying Alignment: the block-step-align property"},{"refs":[{"id":"ref-for-comb-one\u2464"},{"id":"ref-for-comb-one\u2465"}],"title":"2.4. Rounding Method: the block-step-round property"}],"url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"7bc19a34": {"dfnID":"7bc19a34","dfnText":"end","external":true,"refSections":[{"refs":[{"id":"ref-for-css-end"}],"title":"2.3. Specifying Alignment: the block-step-align property"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#css-end"},
+"8067deca": {"dfnID":"8067deca","dfnText":"start","external":true,"refSections":[{"refs":[{"id":"ref-for-css-start"}],"title":"2.3. Specifying Alignment: the block-step-align property"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#css-start"},
+"8a82fda1": {"dfnID":"8a82fda1","dfnText":"||","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-any"},{"id":"ref-for-comb-any\u2460"},{"id":"ref-for-comb-any\u2461"}],"title":"2.5. Block Step Adjustment Shorthand: the block-step shorthand"}],"url":"https://drafts.csswg.org/css-values-4/#comb-any"},
+"8ca0c013": {"dfnID":"8ca0c013","dfnText":"shorthand property","external":true,"refSections":[{"refs":[{"id":"ref-for-shorthand-property"}],"title":"2.5. Block Step Adjustment Shorthand: the block-step shorthand"}],"url":"https://drafts.csswg.org/css-cascade-5/#shorthand-property"},
+"9729fd44": {"dfnID":"9729fd44","dfnText":"fragment","external":true,"refSections":[{"refs":[{"id":"ref-for-fragment"}],"title":"2.1. Specifying the Step Size: the block-step-size property"}],"url":"https://drafts.csswg.org/css-break-3/#fragment"},
+"a24756d2": {"dfnID":"a24756d2","dfnText":"under","external":true,"refSections":[{"refs":[{"id":"ref-for-under"}],"title":"3. Adjusting Line Box Heights: the line-height-step property"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#under"},
+"ac54fbff": {"dfnID":"ac54fbff","dfnText":"line-height","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-line-height"}],"title":"3. Adjusting Line Box Heights: the line-height-step property"}],"url":"https://drafts.csswg.org/css2/#propdef-line-height"},
+"b5418f3e": {"dfnID":"b5418f3e","dfnText":"padding","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-padding"}],"title":"2.2. Specifying the Spacing Type: the block-step-insert property"}],"url":"https://drafts.csswg.org/css-box-4/#propdef-padding"},
+"cecbe9cd": {"dfnID":"cecbe9cd","dfnText":"margin","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-margin"}],"title":"2.2. Specifying the Spacing Type: the block-step-insert property"}],"url":"https://drafts.csswg.org/css-box-4/#propdef-margin"},
+"dbba942a": {"dfnID":"dbba942a","dfnText":"var()","external":true,"refSections":[{"refs":[{"id":"ref-for-funcdef-var"}],"title":"3. Adjusting Line Box Heights: the line-height-step property"}],"url":"https://drafts.csswg.org/css-variables-2/#funcdef-var"},
+"e0b6ed58": {"dfnID":"e0b6ed58","dfnText":"vertical-align","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-vertical-align"},{"id":"ref-for-propdef-vertical-align\u2460"}],"title":"3. Adjusting Line Box Heights: the line-height-step property"}],"url":"https://drafts.csswg.org/css-inline-3/#propdef-vertical-align"},
+"f3d0feab": {"dfnID":"f3d0feab","dfnText":"over","external":true,"refSections":[{"refs":[{"id":"ref-for-over"}],"title":"3. Adjusting Line Box Heights: the line-height-step property"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#over"},
+"f41ab620": {"dfnID":"f41ab620","dfnText":"establish an independent formatting context","external":true,"refSections":[{"refs":[{"id":"ref-for-establish-an-independent-formatting-context"}],"title":"2.1. Specifying the Step Size: the block-step-size property"}],"url":"https://drafts.csswg.org/css-display-4/#establish-an-independent-formatting-context"},
+"fb030e6c": {"dfnID":"fb030e6c","dfnText":"<length>","external":true,"refSections":[{"refs":[{"id":"ref-for-length-value"},{"id":"ref-for-length-value\u2460"},{"id":"ref-for-length-value\u2461"}],"title":"2.1. Specifying the Step Size: the block-step-size property"},{"refs":[{"id":"ref-for-length-value\u2462"},{"id":"ref-for-length-value\u2463"},{"id":"ref-for-length-value\u2464"}],"title":"3. Adjusting Line Box Heights: the line-height-step property"}],"url":"https://drafts.csswg.org/css-values-4/#length-value"},
+"propdef-block-step": {"dfnID":"propdef-block-step","dfnText":"block-step","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-block-step"},{"id":"ref-for-propdef-block-step\u2460"}],"title":"1.1. East Asian Casual Vertical Rhythms"},{"refs":[{"id":"ref-for-propdef-block-step\u2461"},{"id":"ref-for-propdef-block-step\u2462"}],"title":"2. Adjusting Block-level Box Heights"},{"refs":[{"id":"ref-for-propdef-block-step\u2463"}],"title":"2.5. Block Step Adjustment Shorthand: the block-step shorthand"}],"url":"#propdef-block-step"},
+"propdef-block-step-align": {"dfnID":"propdef-block-step-align","dfnText":"block-step-align","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-block-step-align"}],"title":"2. Adjusting Block-level Box Heights"},{"refs":[{"id":"ref-for-propdef-block-step-align\u2460"},{"id":"ref-for-propdef-block-step-align\u2461"}],"title":"2.3. Specifying Alignment: the block-step-align property"},{"refs":[{"id":"ref-for-propdef-block-step-align\u2462"},{"id":"ref-for-propdef-block-step-align\u2463"}],"title":"2.5. Block Step Adjustment Shorthand: the block-step shorthand"}],"url":"#propdef-block-step-align"},
+"propdef-block-step-insert": {"dfnID":"propdef-block-step-insert","dfnText":"block-step-insert","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-block-step-insert"}],"title":"2. Adjusting Block-level Box Heights"},{"refs":[{"id":"ref-for-propdef-block-step-insert\u2460"}],"title":"2.2. Specifying the Spacing Type: the block-step-insert property"},{"refs":[{"id":"ref-for-propdef-block-step-insert\u2461"},{"id":"ref-for-propdef-block-step-insert\u2462"}],"title":"2.3. Specifying Alignment: the block-step-align property"},{"refs":[{"id":"ref-for-propdef-block-step-insert\u2463"},{"id":"ref-for-propdef-block-step-insert\u2464"}],"title":"2.5. Block Step Adjustment Shorthand: the block-step shorthand"}],"url":"#propdef-block-step-insert"},
+"propdef-block-step-round": {"dfnID":"propdef-block-step-round","dfnText":"block-step-round","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-block-step-round"}],"title":"2. Adjusting Block-level Box Heights"},{"refs":[{"id":"ref-for-propdef-block-step-round\u2460"}],"title":"2.1. Specifying the Step Size: the block-step-size property"},{"refs":[{"id":"ref-for-propdef-block-step-round\u2461"}],"title":"2.4. Rounding Method: the block-step-round property"},{"refs":[{"id":"ref-for-propdef-block-step-round\u2462"},{"id":"ref-for-propdef-block-step-round\u2463"}],"title":"2.5. Block Step Adjustment Shorthand: the block-step shorthand"}],"url":"#propdef-block-step-round"},
+"propdef-block-step-size": {"dfnID":"propdef-block-step-size","dfnText":"block-step-size","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-block-step-size"},{"id":"ref-for-propdef-block-step-size\u2460"}],"title":"2. Adjusting Block-level Box Heights"},{"refs":[{"id":"ref-for-propdef-block-step-size\u2461"}],"title":"2.1. Specifying the Step Size: the block-step-size property"},{"refs":[{"id":"ref-for-propdef-block-step-size\u2462"},{"id":"ref-for-propdef-block-step-size\u2463"},{"id":"ref-for-propdef-block-step-size\u2464"}],"title":"2.2. Specifying the Spacing Type: the block-step-insert property"},{"refs":[{"id":"ref-for-propdef-block-step-size\u2465"},{"id":"ref-for-propdef-block-step-size\u2466"},{"id":"ref-for-propdef-block-step-size\u2467"},{"id":"ref-for-propdef-block-step-size\u2468"},{"id":"ref-for-propdef-block-step-size\u2460\u24ea"}],"title":"2.3. Specifying Alignment: the block-step-align property"},{"refs":[{"id":"ref-for-propdef-block-step-size\u2460\u2460"},{"id":"ref-for-propdef-block-step-size\u2460\u2461"},{"id":"ref-for-propdef-block-step-size\u2460\u2462"},{"id":"ref-for-propdef-block-step-size\u2460\u2463"}],"title":"2.4. Rounding Method: the block-step-round property"},{"refs":[{"id":"ref-for-propdef-block-step-size\u2460\u2464"},{"id":"ref-for-propdef-block-step-size\u2460\u2465"}],"title":"2.5. Block Step Adjustment Shorthand: the block-step shorthand"}],"url":"#propdef-block-step-size"},
+"propdef-line-height-step": {"dfnID":"propdef-line-height-step","dfnText":"line-height-step","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-line-height-step"},{"id":"ref-for-propdef-line-height-step\u2460"}],"title":"1.1. East Asian Casual Vertical Rhythms"},{"refs":[{"id":"ref-for-propdef-line-height-step\u2461"}],"title":"3. Adjusting Line Box Heights: the line-height-step property"}],"url":"#propdef-line-height-step"},
+"step-unit": {"dfnID":"step-unit","dfnText":"step unit","external":false,"refSections":[{"refs":[{"id":"ref-for-step-unit"},{"id":"ref-for-step-unit\u2460"}],"title":"2.1. Specifying the Step Size: the block-step-size property"},{"refs":[{"id":"ref-for-step-unit\u2461"},{"id":"ref-for-step-unit\u2462"},{"id":"ref-for-step-unit\u2463"},{"id":"ref-for-step-unit\u2464"},{"id":"ref-for-step-unit\u2465"},{"id":"ref-for-step-unit\u2466"},{"id":"ref-for-step-unit\u2467"},{"id":"ref-for-step-unit\u2468"},{"id":"ref-for-step-unit\u2460\u24ea"},{"id":"ref-for-step-unit\u2460\u2460"},{"id":"ref-for-step-unit\u2460\u2461"}],"title":"3. Adjusting Line Box Heights: the line-height-step property"}],"url":"#step-unit"},
+"valdef-block-step-align-center": {"dfnID":"valdef-block-step-align-center","dfnText":"center","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-block-step-align-center"},{"id":"ref-for-valdef-block-step-align-center\u2460"}],"title":"2.3. Specifying Alignment: the block-step-align property"}],"url":"#valdef-block-step-align-center"},
+"valdef-block-step-align-down": {"dfnID":"valdef-block-step-align-down","dfnText":"down","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-block-step-align-down"}],"title":"2.4. Rounding Method: the block-step-round property"}],"url":"#valdef-block-step-align-down"},
+"valdef-block-step-align-end": {"dfnID":"valdef-block-step-align-end","dfnText":"end","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-block-step-align-end"}],"title":"2.3. Specifying Alignment: the block-step-align property"}],"url":"#valdef-block-step-align-end"},
+"valdef-block-step-align-start": {"dfnID":"valdef-block-step-align-start","dfnText":"start","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-block-step-align-start"}],"title":"2.3. Specifying Alignment: the block-step-align property"}],"url":"#valdef-block-step-align-start"},
+"valdef-block-step-align-up": {"dfnID":"valdef-block-step-align-up","dfnText":"up","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-block-step-align-up"}],"title":"2.4. Rounding Method: the block-step-round property"}],"url":"#valdef-block-step-align-up"},
+"valdef-block-step-insert-margin": {"dfnID":"valdef-block-step-insert-margin","dfnText":"margin","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-block-step-insert-margin"},{"id":"ref-for-valdef-block-step-insert-margin\u2460"}],"title":"2.3. Specifying Alignment: the block-step-align property"}],"url":"#valdef-block-step-insert-margin"},
+};
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+});
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        dfn.panelData = panelData;
+        insertDfnPopupAction(dfn);
+    }
+}
+
+function genDfnPanel(dfn, { dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel on",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel({dfnPanel});
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.dfn = dfn;
+    dfn.dfnPanel = dfnPanel;
+    return dfnPanel;
+}
+
+
+
+function hideAllDfnPanels() {
+    // Delete the currently-active dfn panel.
+    queryAll(".dfn-panel").forEach(dfnPanel=>hideDfnPanel({dfnPanel}));
+}
+
+function showDfnPanel(dfn) {
+    hideAllDfnPanels(); // Only display one at a time.
+
+    dfn.setAttribute("aria-expanded", "true");
+
+    const dfnPanel = genDfnPanel(dfn, dfn.panelData);
+
+    // Give the dfn a unique tabindex, and then
+    // give all the tabbable panel bits successive indexes.
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+
+    append(document.body, dfnPanel);
+    positionDfnPanel(dfnPanel);
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.dfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }
+}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel({dfn, dfnPanel}) {
+    if(!dfnPanel) dfnPanel = dfn.dfnPanel;
+    if(!dfn) dfn = dfnPanel.dfn;
+    dfn.dfnPanel = undefined;
+    dfnPanel.dfn = undefined;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.remove()
+}
+
+function toggleDfnPanel(dfn) {
+    if(dfn.dfnPanel) {
+        hideDfnPanel(dfn);
+    } else {
+        showDfnPanel(dfn);
+    }
+}
+
+function insertDfnPopupAction(dfn) {
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        toggleDfnPanel(dfn);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+function needsFor(type) {
+    switch(type) {
+        case "descriptor":
+        case "value":
+        case "element-attr":
+        case "attr-value":
+        case "element-state":
+        case "method":
+        case "constructor":
+        case "argument":
+        case "attribute":
+        case "const":
+        case "dict-member":
+        case "event":
+        case "enum-value":
+        case "stringifier":
+        case "serializer":
+        case "iterator":
+        case "maplike":
+        case "setlike":
+        case "state":
+        case "mode":
+        case "context":
+        case "facet": return true;
+
+        default: return false;
+    }
+}
+function refusesFor(type) {
+    switch(type) {
+        case "property":
+        case "element":
+        case "interface":
+        case "namespace":
+        case "callback":
+        case "dictionary":
+        case "enum":
+        case "exception":
+        case "typedef":
+        case "http-header":
+        case "permission": return true;
+
+        default: return false;
+    }
+}
+function linkFormatterFromType(type) {
+    switch(type) {
+        case 'scheme':
+        case 'permission':
+        case 'dfn': return (text) => `[=${text}=]`;
+
+        case 'abstract-op': return (text) => `[\$${text}\$]`;
+
+        case 'function':
+        case 'at-rule':
+        case 'selector':
+        case 'value': return (text) => `''${text}''`;
+
+        case 'http-header': return (text) => `[:${text}:]`;
+
+        case 'interface':
+        case 'constructor':
+        case 'method':
+        case 'argument':
+        case 'attribute':
+        case 'callback':
+        case 'dictionary':
+        case 'dict-member':
+        case 'enum':
+        case 'enum-value':
+        case 'exception':
+        case 'const':
+        case 'typedef':
+        case 'stringifier':
+        case 'serializer':
+        case 'iterator':
+        case 'maplike':
+        case 'setlike':
+        case 'extended-attribute':
+        case 'event':
+        case 'idl': return (text) => `{{${text}}}`;
+
+        case 'element-state':
+        case 'element-attr':
+        case 'attr-value':
+        case 'element': return (element) => `<{${element}}>`;
+
+        case 'grammar': return (text) => `${text} (within a <pre class=prod>)`;
+
+        case 'type': return (text)=> `<<${text}>>`;
+
+        case 'descriptor':
+        case 'property': return (text) => `'${text}'`;
+
+        default: return;
+    };
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!needsFor(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!refusesFor(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
 }
 </script>
 <script>/* Boilerplate: script-link-titles */
+"use strict";
+{
 let linkTitleData = {
- "https://drafts.csswg.org/css-values-4/#length-value": "Expands to: advance measure | cap | ch | cm | dvb | dvh | dvi | dvmax | dvmin | dvw | em | ex | ic | in | lh | lvb | lvh | lvi | lvmax | lvmin | lvw | mm | pc | pt | px | q | rcap | rch | rem | rex | ric | rlh | svb | svh | svi | svmax | svmin | svw | vb | vh | vi | vmax | vmin | vw"
+"https://drafts.csswg.org/css-values-4/#length-value": "Expands to: advance measure | cap | ch | cm | dvb | dvh | dvi | dvmax | dvmin | dvw | em | ex | ic | in | lh | lvb | lvh | lvi | lvmax | lvmin | lvw | mm | pc | pt | px | q | rcap | rch | rem | rex | ric | rlh | svb | svh | svi | svmax | svmin | svw | vb | vh | vi | vmax | vmin | vw",
 };
 
 function setTypeTitles() {
@@ -2601,33 +2607,14 @@ function setTypeTitles() {
 }
 
 document.addEventListener("DOMContentLoaded", setTypeTitles);
+}
 </script>
 <script>/* Boilerplate: script-position-annos */
 "use strict";
 {
-
 function repositionAnnoPanels(){
     const panels = [...document.querySelectorAll("[data-anno-for]")];
-    const main = document.querySelector("main");
-    let mainRect;
-    if(main) mainRect = main.getBoundingClientRect();
-    for(const panel of panels) {
-        const dfn = document.getElementById(panel.getAttribute("data-anno-for"));
-        if(!dfn) {
-            console.log("Can't find the annotation panel target:", panel);
-            continue;
-        }
-        const rect = dfn.getBoundingClientRect();
-        const top = window.scrollY + rect.top
-        panel.style.top = top + "px";
-        panel.top = top;
-        panel.height = rect.height;
-        panel.classList.remove("unpositioned");
-        const panelRect = panel.getBoundingClientRect()
-        if(main) {
-            panel.classList.toggle("overlapping-main", panelRect.left < mainRect.right)
-        }
-    }
+    hydratePanels(panels);
     let vSoFar = 0;
     for(const panel of panels.sort(cmpTops)) {
         if(panel.top < vSoFar) {
@@ -2635,6 +2622,39 @@ function repositionAnnoPanels(){
             panel.style.top = vSoFar + "px";
         }
         vSoFar = panel.top + panel.height + 15;
+    }
+}
+function hydratePanels(panels) {
+    const main = document.querySelector("main");
+    let mainRect;
+    if(main) mainRect = main.getBoundingClientRect();
+    // First display them all, if they're not already visible.
+    for(const panel of panels) {
+        panel.classList.remove("unpositioned");
+    }
+    // Measure them all
+    for(const panel of panels) {
+        const dfn = document.getElementById(panel.getAttribute("data-anno-for"));
+        if(!dfn) {
+            console.log("Can't find the annotation panel target:", panel);
+            continue;
+        }
+        panel.dfn = dfn;
+        panel.top = window.scrollY + dfn.getBoundingClientRect().top;
+        let panelRect = panel.getBoundingClientRect();
+        panel.height = panelRect.height;
+        if(main) {
+            panel.overlappingMain = panelRect.left < mainRect.right;
+        } else {
+            panel.overlappingMain = false;
+        }
+    }
+    // And finally position them
+    for(const panel of panels) {
+        const dfn = panel.dfn;
+        if(!dfn) continue;
+        panel.style.top = panel.top + "px";
+        panel.classList.toggle("overlapping-main", panel.overlappingMain);
     }
 }
 
@@ -2649,250 +2669,234 @@ window.addEventListener("resize", repositionAnnoPanels);
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
-                mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
+let refsData = {
+"#propdef-block-step": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-rhythm","spec":"css-rhythm-1","status":"local","text":"block-step","type":"property","url":"#propdef-block-step"},
+"#propdef-block-step-align": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-rhythm","spec":"css-rhythm-1","status":"local","text":"block-step-align","type":"property","url":"#propdef-block-step-align"},
+"#propdef-block-step-insert": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-rhythm","spec":"css-rhythm-1","status":"local","text":"block-step-insert","type":"property","url":"#propdef-block-step-insert"},
+"#propdef-block-step-round": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-rhythm","spec":"css-rhythm-1","status":"local","text":"block-step-round","type":"property","url":"#propdef-block-step-round"},
+"#propdef-block-step-size": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-rhythm","spec":"css-rhythm-1","status":"local","text":"block-step-size","type":"property","url":"#propdef-block-step-size"},
+"#propdef-line-height-step": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-rhythm","spec":"css-rhythm-1","status":"local","text":"line-height-step","type":"property","url":"#propdef-line-height-step"},
+"#step-unit": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-rhythm","spec":"css-rhythm-1","status":"local","text":"step unit","type":"dfn","url":"#step-unit"},
+"#valdef-block-step-align-center": {"export":true,"for_":["block-step-align"],"level":"1","normative":true,"shortname":"css-rhythm","spec":"css-rhythm-1","status":"local","text":"center","type":"value","url":"#valdef-block-step-align-center"},
+"#valdef-block-step-align-down": {"export":true,"for_":["block-step-align"],"level":"1","normative":true,"shortname":"css-rhythm","spec":"css-rhythm-1","status":"local","text":"down","type":"value","url":"#valdef-block-step-align-down"},
+"#valdef-block-step-align-end": {"export":true,"for_":["block-step-align"],"level":"1","normative":true,"shortname":"css-rhythm","spec":"css-rhythm-1","status":"local","text":"end","type":"value","url":"#valdef-block-step-align-end"},
+"#valdef-block-step-align-start": {"export":true,"for_":["block-step-align"],"level":"1","normative":true,"shortname":"css-rhythm","spec":"css-rhythm-1","status":"local","text":"start","type":"value","url":"#valdef-block-step-align-start"},
+"#valdef-block-step-align-up": {"export":true,"for_":["block-step-align"],"level":"1","normative":true,"shortname":"css-rhythm","spec":"css-rhythm-1","status":"local","text":"up","type":"value","url":"#valdef-block-step-align-up"},
+"#valdef-block-step-insert-margin": {"export":true,"for_":["block-step-insert"],"level":"1","normative":true,"shortname":"css-rhythm","spec":"css-rhythm-1","status":"local","text":"margin","type":"value","url":"#valdef-block-step-insert-margin"},
+"https://drafts.csswg.org/css-align-3/#propdef-align-self": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-align","spec":"css-align-3","status":"current","text":"align-self","type":"property","url":"https://drafts.csswg.org/css-align-3/#propdef-align-self"},
+"https://drafts.csswg.org/css-box-4/#propdef-margin": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"current","text":"margin","type":"property","url":"https://drafts.csswg.org/css-box-4/#propdef-margin"},
+"https://drafts.csswg.org/css-box-4/#propdef-padding": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-box","spec":"css-box-4","status":"current","text":"padding","type":"property","url":"https://drafts.csswg.org/css-box-4/#propdef-padding"},
+"https://drafts.csswg.org/css-break-3/#fragment": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-break","spec":"css-break-3","status":"current","text":"fragment","type":"dfn","url":"https://drafts.csswg.org/css-break-3/#fragment"},
+"https://drafts.csswg.org/css-cascade-5/#shorthand-property": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-cascade","spec":"css-cascade-5","status":"current","text":"shorthand property","type":"dfn","url":"https://drafts.csswg.org/css-cascade-5/#shorthand-property"},
+"https://drafts.csswg.org/css-display-4/#establish-an-independent-formatting-context": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-display","spec":"css-display-4","status":"current","text":"establish an independent formatting context","type":"dfn","url":"https://drafts.csswg.org/css-display-4/#establish-an-independent-formatting-context"},
+"https://drafts.csswg.org/css-inline-3/#propdef-vertical-align": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-inline","spec":"css-inline-3","status":"current","text":"vertical-align","type":"property","url":"https://drafts.csswg.org/css-inline-3/#propdef-vertical-align"},
+"https://drafts.csswg.org/css-line-grid-1/#propdef-line-grid": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-line-grid","spec":"css-line-grid-1","status":"current","text":"line-grid","type":"property","url":"https://drafts.csswg.org/css-line-grid-1/#propdef-line-grid"},
+"https://drafts.csswg.org/css-values-4/#comb-any": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"||","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-any"},
+"https://drafts.csswg.org/css-values-4/#comb-one": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"|","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"https://drafts.csswg.org/css-values-4/#css-wide-keywords": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"css-wide keywords","type":"dfn","url":"https://drafts.csswg.org/css-values-4/#css-wide-keywords"},
+"https://drafts.csswg.org/css-values-4/#funcdef-calc": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"calc()","type":"function","url":"https://drafts.csswg.org/css-values-4/#funcdef-calc"},
+"https://drafts.csswg.org/css-values-4/#length-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<length>","type":"type","url":"https://drafts.csswg.org/css-values-4/#length-value"},
+"https://drafts.csswg.org/css-variables-2/#funcdef-var": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-variables","spec":"css-variables-2","status":"current","text":"var()","type":"function","url":"https://drafts.csswg.org/css-variables-2/#funcdef-var"},
+"https://drafts.csswg.org/css-writing-modes-4/#block-size": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"block size","type":"dfn","url":"https://drafts.csswg.org/css-writing-modes-4/#block-size"},
+"https://drafts.csswg.org/css-writing-modes-4/#css-end": {"export":true,"for_":["CSS"],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"end","type":"dfn","url":"https://drafts.csswg.org/css-writing-modes-4/#css-end"},
+"https://drafts.csswg.org/css-writing-modes-4/#css-start": {"export":true,"for_":["CSS"],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"start","type":"dfn","url":"https://drafts.csswg.org/css-writing-modes-4/#css-start"},
+"https://drafts.csswg.org/css-writing-modes-4/#over": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"over","type":"dfn","url":"https://drafts.csswg.org/css-writing-modes-4/#over"},
+"https://drafts.csswg.org/css-writing-modes-4/#under": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"under","type":"dfn","url":"https://drafts.csswg.org/css-writing-modes-4/#under"},
+"https://drafts.csswg.org/css2/#propdef-line-height": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css","spec":"css22","status":"current","text":"line-height","type":"property","url":"https://drafts.csswg.org/css2/#propdef-line-height"},
+};
+
+function mkRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "Term: "),
+                mk.span({}, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    let forListElements;
+    if(forList.length == 0) {
+        forListElements = [];
+    } else if(forList.length == 1) {
+        forListElements = mk.li({},
+            mk.b({}, "For: "),
+            mk.span({}, forList[0]),
+        );
+    } else {
+        forListElements = mk.li({},
             mk.b({}, "For: "),
             mk.ul({},
                 ...forList.map(forItem =>
                     mk.li({},
-                        mk.span({}, `${forItem}`)
+                        mk.span({}, forItem)
                     ),
                 ),
             ),
         );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+    }
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    setupRefHintEventListeners(link, hintPanel);
+    return hintPanel;
+}
+
+function hideAllRefHints() {
+    queryAll(".ref-hint").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    if(refHint.teardownEventListeners) {
+        refHint.teardownEventListeners();
     }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+    refHint.remove();
+}
+
+function showRefHint(link) {
+    if(link.classList.contains("dfn-link")) return;
+    const url = link.getAttribute("href");
+    const ref = refsData[url];
+    if(!ref) return;
+
+    hideAllRefHints(); // Only display one at this time.
+
+    const refHint = mkRefHint(link, ref);
+    append(document.body, refHint);
+    link.setAttribute("aria-expanded", "true");
+    positionRefHint(refHint);
+}
+
+function setupRefHintEventListeners(link, refHint) {
+    if (refHint.teardownEventListeners) return;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
+
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
-
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
-    }
-
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
-        }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
-
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
-    }
-
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+document.addEventListener("DOMContentLoaded", () => {
+    document.body.addEventListener("mouseover", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
+    });
+    document.body.addEventListener("focus", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
     });
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['#propdef-line-height-step'] = {"text": "line-height-step", "type": "property", "spec": "css-rhythm-1", "shortname": "css-rhythm", "level": "1", "status": "local", "url": "#propdef-line-height-step", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-block-step'] = {"text": "block-step", "type": "property", "spec": "css-rhythm-1", "shortname": "css-rhythm", "level": "1", "status": "local", "url": "#propdef-block-step", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-line-grid-1/#propdef-line-grid'] = {"text": "line-grid", "type": "property", "spec": "css-line-grid-1", "shortname": "css-line-grid", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-line-grid-1/#propdef-line-grid", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#css-wide-keywords'] = {"text": "css-wide keywords", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-block-step-size'] = {"text": "block-step-size", "type": "property", "spec": "css-rhythm-1", "shortname": "css-rhythm", "level": "1", "status": "local", "url": "#propdef-block-step-size", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-block-step-insert'] = {"text": "block-step-insert", "type": "property", "spec": "css-rhythm-1", "shortname": "css-rhythm", "level": "1", "status": "local", "url": "#propdef-block-step-insert", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-block-step-align'] = {"text": "block-step-align", "type": "property", "spec": "css-rhythm-1", "shortname": "css-rhythm", "level": "1", "status": "local", "url": "#propdef-block-step-align", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-block-step-round'] = {"text": "block-step-round", "type": "property", "spec": "css-rhythm-1", "shortname": "css-rhythm", "level": "1", "status": "local", "url": "#propdef-block-step-round", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#length-value'] = {"text": "<length>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#length-value", "export": true, "normative": true, "for_": []};
-window.refsData['#step-unit'] = {"text": "step unit", "type": "dfn", "spec": "css-rhythm-1", "shortname": "css-rhythm", "level": "1", "status": "local", "url": "#step-unit", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#block-size'] = {"text": "block size", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#block-size", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-display-4/#establish-an-independent-formatting-context'] = {"text": "establish an independent formatting context", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#establish-an-independent-formatting-context", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-break-3/#fragment'] = {"text": "fragment", "type": "dfn", "spec": "css-break-3", "shortname": "css-break", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-break-3/#fragment", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-box-4/#propdef-padding'] = {"text": "padding", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#propdef-padding", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-box-4/#propdef-margin'] = {"text": "margin", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#propdef-margin", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-block-step-insert-margin'] = {"text": "margin", "type": "value", "spec": "css-rhythm-1", "shortname": "css-rhythm", "level": "1", "status": "local", "url": "#valdef-block-step-insert-margin", "export": true, "normative": true, "for_": ["block-step-insert"]};
-window.refsData['https://drafts.csswg.org/css-align-3/#propdef-align-self'] = {"text": "align-self", "type": "property", "spec": "css-align-3", "shortname": "css-align", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-align-3/#propdef-align-self", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-block-step-align-start'] = {"text": "start", "type": "value", "spec": "css-rhythm-1", "shortname": "css-rhythm", "level": "1", "status": "local", "url": "#valdef-block-step-align-start", "export": true, "normative": true, "for_": ["block-step-align"]};
-window.refsData['#valdef-block-step-align-end'] = {"text": "end", "type": "value", "spec": "css-rhythm-1", "shortname": "css-rhythm", "level": "1", "status": "local", "url": "#valdef-block-step-align-end", "export": true, "normative": true, "for_": ["block-step-align"]};
-window.refsData['#valdef-block-step-align-center'] = {"text": "center", "type": "value", "spec": "css-rhythm-1", "shortname": "css-rhythm", "level": "1", "status": "local", "url": "#valdef-block-step-align-center", "export": true, "normative": true, "for_": ["block-step-align"]};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#css-end'] = {"text": "end", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#css-end", "export": true, "normative": true, "for_": ["CSS"]};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#css-start'] = {"text": "start", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#css-start", "export": true, "normative": true, "for_": ["CSS"]};
-window.refsData['#valdef-block-step-align-up'] = {"text": "up", "type": "value", "spec": "css-rhythm-1", "shortname": "css-rhythm", "level": "1", "status": "local", "url": "#valdef-block-step-align-up", "export": true, "normative": true, "for_": ["block-step-align"]};
-window.refsData['#valdef-block-step-align-down'] = {"text": "down", "type": "value", "spec": "css-rhythm-1", "shortname": "css-rhythm", "level": "1", "status": "local", "url": "#valdef-block-step-align-down", "export": true, "normative": true, "for_": ["block-step-align"]};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-any'] = {"text": "||", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-any", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-cascade-5/#shorthand-property'] = {"text": "shorthand property", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#shorthand-property", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#over'] = {"text": "over", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#over", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#under'] = {"text": "under", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#under", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-inline-3/#propdef-vertical-align'] = {"text": "vertical-align", "type": "property", "spec": "css-inline-3", "shortname": "css-inline", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-inline-3/#propdef-vertical-align", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-variables-2/#funcdef-var'] = {"text": "var()", "type": "function", "spec": "css-variables-2", "shortname": "css-variables", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-variables-2/#funcdef-var", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#funcdef-calc'] = {"text": "calc()", "type": "function", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#funcdef-calc", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css2/#propdef-line-height'] = {"text": "line-height", "type": "property", "spec": "css22", "shortname": "css", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css2/#propdef-line-height", "export": true, "normative": true, "for_": []};window.refsData['#propdef-block-step'] = {"text": "block-step", "type": "property", "spec": "css-rhythm-1", "shortname": "css-rhythm", "level": "1", "status": "local", "url": "#propdef-block-step", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-block-step-align'] = {"text": "block-step-align", "type": "property", "spec": "css-rhythm-1", "shortname": "css-rhythm", "level": "1", "status": "local", "url": "#propdef-block-step-align", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-block-step-insert'] = {"text": "block-step-insert", "type": "property", "spec": "css-rhythm-1", "shortname": "css-rhythm", "level": "1", "status": "local", "url": "#propdef-block-step-insert", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-block-step-round'] = {"text": "block-step-round", "type": "property", "spec": "css-rhythm-1", "shortname": "css-rhythm", "level": "1", "status": "local", "url": "#propdef-block-step-round", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-block-step-size'] = {"text": "block-step-size", "type": "property", "spec": "css-rhythm-1", "shortname": "css-rhythm", "level": "1", "status": "local", "url": "#propdef-block-step-size", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-line-height-step'] = {"text": "line-height-step", "type": "property", "spec": "css-rhythm-1", "shortname": "css-rhythm", "level": "1", "status": "local", "url": "#propdef-line-height-step", "export": true, "normative": true, "for_": []};
 </script>

@@ -114,7 +114,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -488,6 +487,11 @@ figcaption:not(.no-marker)::before {
     }
 }
 </style>
+<style>/* Boilerplate: style-idl-highlighting */
+pre.idl.highlight {
+    background: var(--borderedblock-bg, var(--def-bg));
+}
+</style>
 <style>/* Boilerplate: style-issues */
 a[href].issue-return {
     float: right;
@@ -740,7 +744,7 @@ a[href].issue-return {
 }
 
 .ref-hint {
-    display: none;
+    display: inline-block;
     position: absolute;
     z-index: 35;
     width: 20em;
@@ -756,16 +760,11 @@ a[href].issue-return {
     white-space: normal; /* in case it's moved into a pre */
 }
 
-.ref-hint.on {
-    display: inline-block;
-}
-
 .ref-hint * { margin: 0; padding: 0; text-indent: 0; }
 
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -825,7 +824,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -882,7 +880,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -2672,444 +2669,8 @@ behavior per default (actual viewport is initial viewport). <a class="issue-retu
     </div>
    </div>
   </details>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['c388d253'] = {"dfnID": "c388d253", "url": "https://drafts.csswg.org/css-cascade-5/#valdef-all-inherit", "dfnText": "inherit", "refSections": [{"refs": [{"id": "ref-for-valdef-all-inherit"}], "title": "5. \nThe @viewport rule"}], "external": true};
-window.dfnpanelData['fdf6efd5'] = {"dfnID": "fdf6efd5", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-size", "dfnText": "font-size", "refSections": [{"refs": [{"id": "ref-for-propdef-font-size"}], "title": "6. \nViewport descriptors"}], "external": true};
-window.dfnpanelData['5ee7eb9e'] = {"dfnID": "5ee7eb9e", "url": "https://drafts.csswg.org/css-page-3/#at-ruledef-page", "dfnText": "@page", "refSections": [{"refs": [{"id": "ref-for-at-ruledef-page"}, {"id": "ref-for-at-ruledef-page\u2460"}], "title": "4. \nThe viewport"}, {"refs": [{"id": "ref-for-at-ruledef-page\u2461"}], "title": "5. \nThe @viewport rule"}], "external": true};
-window.dfnpanelData['68019d7a'] = {"dfnID": "68019d7a", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-height", "dfnText": "height", "refSections": [{"refs": [{"id": "ref-for-propdef-height"}], "title": "6.4. \nThe height shorthand descriptor"}, {"refs": [{"id": "ref-for-propdef-height\u2460"}], "title": "\nThe width\nand height\nproperties"}], "external": true};
-window.dfnpanelData['9e39189b'] = {"dfnID": "9e39189b", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-max-height", "dfnText": "max-height", "refSections": [{"refs": [{"id": "ref-for-propdef-max-height"}], "title": "6.3. \nThe min-height and max-height descriptors"}, {"refs": [{"id": "ref-for-propdef-max-height\u2460"}], "title": "\nResolve non-auto lengths to pixel lengths"}, {"refs": [{"id": "ref-for-propdef-max-height\u2461"}], "title": "\nThe width\nand height\nproperties"}], "external": true};
-window.dfnpanelData['f08b32ef'] = {"dfnID": "f08b32ef", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-max-width", "dfnText": "max-width", "refSections": [{"refs": [{"id": "ref-for-propdef-max-width"}, {"id": "ref-for-propdef-max-width\u2460"}], "title": "6.1. \nThe min-width and max-width descriptors"}, {"refs": [{"id": "ref-for-propdef-max-width\u2461"}, {"id": "ref-for-propdef-max-width\u2462"}, {"id": "ref-for-propdef-max-width\u2463"}], "title": "6.2. \nThe width shorthand descriptor"}, {"refs": [{"id": "ref-for-propdef-max-width\u2464"}], "title": "\nResolve non-auto lengths to pixel lengths"}, {"refs": [{"id": "ref-for-propdef-max-width\u2465"}], "title": "\nThe width\nand height\nproperties"}], "external": true};
-window.dfnpanelData['4c9599fa'] = {"dfnID": "4c9599fa", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-min-height", "dfnText": "min-height", "refSections": [{"refs": [{"id": "ref-for-propdef-min-height"}], "title": "6.3. \nThe min-height and max-height descriptors"}, {"refs": [{"id": "ref-for-propdef-min-height\u2460"}], "title": "\nResolve non-auto lengths to pixel lengths"}, {"refs": [{"id": "ref-for-propdef-min-height\u2461"}], "title": "\nThe width\nand height\nproperties"}], "external": true};
-window.dfnpanelData['88def535'] = {"dfnID": "88def535", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-min-width", "dfnText": "min-width", "refSections": [{"refs": [{"id": "ref-for-propdef-min-width"}, {"id": "ref-for-propdef-min-width\u2460"}], "title": "6.1. \nThe min-width and max-width descriptors"}, {"refs": [{"id": "ref-for-propdef-min-width\u2461"}, {"id": "ref-for-propdef-min-width\u2462"}, {"id": "ref-for-propdef-min-width\u2463"}], "title": "6.2. \nThe width shorthand descriptor"}, {"refs": [{"id": "ref-for-propdef-min-width\u2464"}], "title": "\nResolve non-auto lengths to pixel lengths"}, {"refs": [{"id": "ref-for-propdef-min-width\u2465"}], "title": "\nThe width\nand height\nproperties"}], "external": true};
-window.dfnpanelData['88643fe0'] = {"dfnID": "88643fe0", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-width", "dfnText": "width", "refSections": [{"refs": [{"id": "ref-for-propdef-width"}], "title": "6.2. \nThe width shorthand descriptor"}, {"refs": [{"id": "ref-for-propdef-width\u2460"}, {"id": "ref-for-propdef-width\u2461"}], "title": "\nThe width\nand height\nproperties"}], "external": true};
-window.dfnpanelData['fb030e6c'] = {"dfnID": "fb030e6c", "url": "https://drafts.csswg.org/css-values-4/#length-value", "dfnText": "<length>", "refSections": [{"refs": [{"id": "ref-for-length-value"}], "title": "6.1. \nThe min-width and max-width descriptors"}], "external": true};
-window.dfnpanelData['16310992'] = {"dfnID": "16310992", "url": "https://drafts.csswg.org/css-values-4/#number-value", "dfnText": "<number>", "refSections": [{"refs": [{"id": "ref-for-number-value"}, {"id": "ref-for-number-value\u2460"}], "title": "6.5. \nThe zoom descriptor"}, {"refs": [{"id": "ref-for-number-value\u2461"}, {"id": "ref-for-number-value\u2462"}], "title": "6.6. \nThe min-zoom descriptor"}, {"refs": [{"id": "ref-for-number-value\u2463"}, {"id": "ref-for-number-value\u2464"}], "title": "6.7. \nThe max-zoom descriptor"}], "external": true};
-window.dfnpanelData['15f5b381'] = {"dfnID": "15f5b381", "url": "https://drafts.csswg.org/css-values-4/#percentage-value", "dfnText": "<percentage>", "refSections": [{"refs": [{"id": "ref-for-percentage-value"}], "title": "6.1. \nThe min-width and max-width descriptors"}, {"refs": [{"id": "ref-for-percentage-value\u2460"}, {"id": "ref-for-percentage-value\u2461"}], "title": "6.5. \nThe zoom descriptor"}, {"refs": [{"id": "ref-for-percentage-value\u2462"}, {"id": "ref-for-percentage-value\u2463"}], "title": "6.6. \nThe min-zoom descriptor"}, {"refs": [{"id": "ref-for-percentage-value\u2464"}, {"id": "ref-for-percentage-value\u2465"}], "title": "6.7. \nThe max-zoom descriptor"}], "external": true};
-window.dfnpanelData['6cf6b879'] = {"dfnID": "6cf6b879", "url": "https://drafts.csswg.org/css-values-4/#valdef-length-vh", "dfnText": "vh", "refSections": [{"refs": [{"id": "ref-for-valdef-length-vh"}], "title": "6. \nViewport descriptors"}], "external": true};
-window.dfnpanelData['5fa4f559'] = {"dfnID": "5fa4f559", "url": "https://drafts.csswg.org/css-values-4/#valdef-length-vmax", "dfnText": "vmax", "refSections": [{"refs": [{"id": "ref-for-valdef-length-vmax"}], "title": "6. \nViewport descriptors"}], "external": true};
-window.dfnpanelData['75cfb42f'] = {"dfnID": "75cfb42f", "url": "https://drafts.csswg.org/css-values-4/#valdef-length-vmin", "dfnText": "vmin", "refSections": [{"refs": [{"id": "ref-for-valdef-length-vmin"}], "title": "6. \nViewport descriptors"}], "external": true};
-window.dfnpanelData['00d635ac'] = {"dfnID": "00d635ac", "url": "https://drafts.csswg.org/css-values-4/#valdef-length-vw", "dfnText": "vw", "refSections": [{"refs": [{"id": "ref-for-valdef-length-vw"}], "title": "6. \nViewport descriptors"}], "external": true};
-window.dfnpanelData['938ba280'] = {"dfnID": "938ba280", "url": "https://drafts.csswg.org/css-values-4/#mult-num-range", "dfnText": "{a,b}", "refSections": [{"refs": [{"id": "ref-for-mult-num-range"}], "title": "6.2. \nThe width shorthand descriptor"}, {"refs": [{"id": "ref-for-mult-num-range\u2460"}], "title": "6.4. \nThe height shorthand descriptor"}], "external": true};
-window.dfnpanelData['6ec67710'] = {"dfnID": "6ec67710", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "dfnText": "|", "refSections": [{"refs": [{"id": "ref-for-comb-one"}, {"id": "ref-for-comb-one\u2460"}], "title": "6.1. \nThe min-width and max-width descriptors"}, {"refs": [{"id": "ref-for-comb-one\u2461"}, {"id": "ref-for-comb-one\u2462"}], "title": "6.5. \nThe zoom descriptor"}, {"refs": [{"id": "ref-for-comb-one\u2463"}, {"id": "ref-for-comb-one\u2464"}], "title": "6.6. \nThe min-zoom descriptor"}, {"refs": [{"id": "ref-for-comb-one\u2465"}, {"id": "ref-for-comb-one\u2466"}], "title": "6.7. \nThe max-zoom descriptor"}, {"refs": [{"id": "ref-for-comb-one\u2467"}], "title": "6.8. \nThe user-zoom descriptor"}, {"refs": [{"id": "ref-for-comb-one\u2468"}, {"id": "ref-for-comb-one\u2460\u24ea"}], "title": "6.9. \nThe orientation descriptor"}], "external": true};
-window.dfnpanelData['5bc8bd12'] = {"dfnID": "5bc8bd12", "url": "https://drafts.csswg.org/css-writing-modes-3/#propdef-direction", "dfnText": "direction", "refSections": [{"refs": [{"id": "ref-for-propdef-direction"}, {"id": "ref-for-propdef-direction\u2460"}], "title": "4. \nThe viewport"}], "external": true};
-window.dfnpanelData['5f1b7f60'] = {"dfnID": "5f1b7f60", "url": "https://drafts.csswg.org/css-conditional-3/#at-ruledef-media", "dfnText": "@media", "refSections": [{"refs": [{"id": "ref-for-at-ruledef-media"}], "title": "5.1. \nSyntax"}], "external": true};
-window.dfnpanelData['c1ebc639'] = {"dfnID": "c1ebc639", "url": "https://drafts.csswg.org/css-conditional-3/#at-ruledef-supports", "dfnText": "@supports", "refSections": [{"refs": [{"id": "ref-for-at-ruledef-supports"}], "title": "5.1. \nSyntax"}], "external": true};
-window.dfnpanelData['bf3ca8a7'] = {"dfnID": "bf3ca8a7", "url": "https://drafts.csswg.org/css-conditional-3/#conditional-group-rule", "dfnText": "conditional group rule", "refSections": [{"refs": [{"id": "ref-for-conditional-group-rule"}], "title": "5.1. \nSyntax"}], "external": true};
-window.dfnpanelData['ebaeb088'] = {"dfnID": "ebaeb088", "url": "https://drafts.csswg.org/cssom-1/#cssrule", "dfnText": "CSSRule", "refSections": [{"refs": [{"id": "ref-for-cssrule"}], "title": "9.1. \nInterface CSSRule"}, {"refs": [{"id": "ref-for-cssrule\u2460"}], "title": "9.2. \nInterface CSSViewportRule"}], "external": true};
-window.dfnpanelData['a82a20ef'] = {"dfnID": "a82a20ef", "url": "https://drafts.csswg.org/cssom-1/#cssstyledeclaration", "dfnText": "CSSStyleDeclaration", "refSections": [{"refs": [{"id": "ref-for-cssstyledeclaration"}, {"id": "ref-for-cssstyledeclaration\u2460"}], "title": "9.2. \nInterface CSSViewportRule"}], "external": true};
-window.dfnpanelData['aba1ccaf'] = {"dfnID": "aba1ccaf", "url": "https://drafts.csswg.org/mediaqueries-5/#continuous-media", "dfnText": "continuous media", "refSections": [{"refs": [{"id": "ref-for-continuous-media"}], "title": "1. \nIntroduction"}, {"refs": [{"id": "ref-for-continuous-media\u2460"}, {"id": "ref-for-continuous-media\u2461"}, {"id": "ref-for-continuous-media\u2462"}], "title": "4. \nThe viewport"}], "external": true};
-window.dfnpanelData['758665a5'] = {"dfnID": "758665a5", "url": "https://drafts.csswg.org/mediaqueries-5/#paged-media", "dfnText": "paged media", "refSections": [{"refs": [{"id": "ref-for-paged-media"}, {"id": "ref-for-paged-media\u2460"}], "title": "4. \nThe viewport"}], "external": true};
-window.dfnpanelData['889e932f'] = {"dfnID": "889e932f", "url": "https://webidl.spec.whatwg.org/#Exposed", "dfnText": "Exposed", "refSections": [{"refs": [{"id": "ref-for-Exposed"}], "title": "9.2. \nInterface CSSViewportRule"}], "external": true};
-window.dfnpanelData['450958f7'] = {"dfnID": "450958f7", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-short", "dfnText": "unsigned short", "refSections": [{"refs": [{"id": "ref-for-idl-unsigned-short"}], "title": "9.1. \nInterface CSSRule"}], "external": true};
-window.dfnpanelData['at-ruledef-viewport'] = {"dfnID": "at-ruledef-viewport", "url": "#at-ruledef-viewport", "dfnText": "@viewport", "refSections": [{"refs": [{"id": "ref-for-at-ruledef-viewport"}, {"id": "ref-for-at-ruledef-viewport\u2460"}], "title": "4. \nThe viewport"}, {"refs": [{"id": "ref-for-at-ruledef-viewport\u2461"}, {"id": "ref-for-at-ruledef-viewport\u2462"}, {"id": "ref-for-at-ruledef-viewport\u2463"}, {"id": "ref-for-at-ruledef-viewport\u2464"}, {"id": "ref-for-at-ruledef-viewport\u2465"}, {"id": "ref-for-at-ruledef-viewport\u2466"}, {"id": "ref-for-at-ruledef-viewport\u2467"}], "title": "5. \nThe @viewport rule"}, {"refs": [{"id": "ref-for-at-ruledef-viewport\u2468"}, {"id": "ref-for-at-ruledef-viewport\u2460\u24ea"}], "title": "5.1. \nSyntax"}, {"refs": [{"id": "ref-for-at-ruledef-viewport\u2460\u2460"}], "title": "6. \nViewport descriptors"}, {"refs": [{"id": "ref-for-at-ruledef-viewport\u2460\u2461"}, {"id": "ref-for-at-ruledef-viewport\u2460\u2462"}], "title": "6.1. \nThe min-width and max-width descriptors"}, {"refs": [{"id": "ref-for-at-ruledef-viewport\u2460\u2463"}], "title": "6.2. \nThe width shorthand descriptor"}, {"refs": [{"id": "ref-for-at-ruledef-viewport\u2460\u2464"}, {"id": "ref-for-at-ruledef-viewport\u2460\u2465"}], "title": "6.3. \nThe min-height and max-height descriptors"}, {"refs": [{"id": "ref-for-at-ruledef-viewport\u2460\u2466"}], "title": "6.4. \nThe height shorthand descriptor"}, {"refs": [{"id": "ref-for-at-ruledef-viewport\u2460\u2467"}], "title": "6.5. \nThe zoom descriptor"}, {"refs": [{"id": "ref-for-at-ruledef-viewport\u2460\u2468"}], "title": "6.6. \nThe min-zoom descriptor"}, {"refs": [{"id": "ref-for-at-ruledef-viewport\u2461\u24ea"}], "title": "6.7. \nThe max-zoom descriptor"}, {"refs": [{"id": "ref-for-at-ruledef-viewport\u2461\u2460"}], "title": "6.8. \nThe user-zoom descriptor"}, {"refs": [{"id": "ref-for-at-ruledef-viewport\u2461\u2461"}], "title": "6.9. \nThe orientation descriptor"}, {"refs": [{"id": "ref-for-at-ruledef-viewport\u2461\u2462"}, {"id": "ref-for-at-ruledef-viewport\u2461\u2463"}, {"id": "ref-for-at-ruledef-viewport\u2461\u2464"}, {"id": "ref-for-at-ruledef-viewport\u2461\u2465"}, {"id": "ref-for-at-ruledef-viewport\u2461\u2466"}, {"id": "ref-for-at-ruledef-viewport\u2461\u2467"}, {"id": "ref-for-at-ruledef-viewport\u2461\u2468"}, {"id": "ref-for-at-ruledef-viewport\u2462\u24ea"}, {"id": "ref-for-at-ruledef-viewport\u2462\u2460"}, {"id": "ref-for-at-ruledef-viewport\u2462\u2461"}], "title": "8. \nMedia Queries"}, {"refs": [{"id": "ref-for-at-ruledef-viewport\u2462\u2462"}], "title": "9. \nCSSOM"}, {"refs": [{"id": "ref-for-at-ruledef-viewport\u2462\u2463"}, {"id": "ref-for-at-ruledef-viewport\u2462\u2464"}], "title": "9.2. \nInterface CSSViewportRule"}, {"refs": [{"id": "ref-for-at-ruledef-viewport\u2462\u2465"}], "title": "10. \nViewport <META> element"}, {"refs": [{"id": "ref-for-at-ruledef-viewport\u2462\u2466"}, {"id": "ref-for-at-ruledef-viewport\u2462\u2467"}], "title": "10.4. \nTranslation into @viewport descriptors"}, {"refs": [{"id": "ref-for-at-ruledef-viewport\u2462\u2468"}, {"id": "ref-for-at-ruledef-viewport\u2463\u24ea"}], "title": "\nThe width\nand height\nproperties"}, {"refs": [{"id": "ref-for-at-ruledef-viewport\u2463\u2460"}], "title": "\nThe initial-scale, minimum-scale, and maximum-scale properties"}, {"refs": [{"id": "ref-for-at-ruledef-viewport\u2463\u2461"}], "title": "\nThe user-scalable property"}, {"refs": [{"id": "ref-for-at-ruledef-viewport\u2463\u2462"}], "title": "12. \nUA stylesheets"}], "external": false};
-window.dfnpanelData['typedef-viewport-length'] = {"dfnID": "typedef-viewport-length", "url": "#typedef-viewport-length", "dfnText": "<viewport-length>", "refSections": [{"refs": [{"id": "ref-for-typedef-viewport-length"}, {"id": "ref-for-typedef-viewport-length\u2460"}], "title": "6.1. \nThe min-width and max-width descriptors"}, {"refs": [{"id": "ref-for-typedef-viewport-length\u2461"}, {"id": "ref-for-typedef-viewport-length\u2462"}, {"id": "ref-for-typedef-viewport-length\u2463"}], "title": "6.2. \nThe width shorthand descriptor"}, {"refs": [{"id": "ref-for-typedef-viewport-length\u2464"}, {"id": "ref-for-typedef-viewport-length\u2465"}], "title": "6.3. \nThe min-height and max-height descriptors"}, {"refs": [{"id": "ref-for-typedef-viewport-length\u2466"}, {"id": "ref-for-typedef-viewport-length\u2467"}, {"id": "ref-for-typedef-viewport-length\u2468"}], "title": "6.4. \nThe height shorthand descriptor"}, {"refs": [{"id": "ref-for-typedef-viewport-length\u2460\u24ea"}], "title": "10.3. extend-to-zoom"}, {"refs": [{"id": "ref-for-typedef-viewport-length\u2460\u2460"}], "title": "Appendix A. Changes"}], "external": false};
-window.dfnpanelData['valdef-viewport-length-auto'] = {"dfnID": "valdef-viewport-length-auto", "url": "#valdef-viewport-length-auto", "dfnText": "auto", "refSections": [{"refs": [{"id": "ref-for-valdef-viewport-length-auto"}], "title": "7.1. \nDefinitions"}, {"refs": [{"id": "ref-for-valdef-viewport-length-auto\u2460"}], "title": "\nResolve non-auto lengths to pixel lengths"}, {"refs": [{"id": "ref-for-valdef-viewport-length-auto\u2461"}, {"id": "ref-for-valdef-viewport-length-auto\u2462"}], "title": "\nResolve initial width\nand height from min/max\ndescriptors"}, {"refs": [{"id": "ref-for-valdef-viewport-length-auto\u2463"}, {"id": "ref-for-valdef-viewport-length-auto\u2464"}], "title": "\nResolve width value"}, {"refs": [{"id": "ref-for-valdef-viewport-length-auto\u2465"}], "title": "\nResolve height value"}, {"refs": [{"id": "ref-for-valdef-viewport-length-auto\u2466"}, {"id": "ref-for-valdef-viewport-length-auto\u2467"}], "title": "\nResolving 'extend-to-zoom'"}, {"refs": [{"id": "ref-for-valdef-viewport-length-auto\u2468"}], "title": "12.1. \nLarge screen UA styles"}], "external": false};
-window.dfnpanelData['descdef-viewport-zoom'] = {"dfnID": "descdef-viewport-zoom", "url": "#descdef-viewport-zoom", "dfnText": "zoom", "refSections": [{"refs": [{"id": "ref-for-descdef-viewport-zoom"}], "title": "Appendix A. Changes"}], "external": false};
-window.dfnpanelData['valdef-zoom-auto'] = {"dfnID": "valdef-zoom-auto", "url": "#valdef-zoom-auto", "dfnText": "auto", "refSections": [{"refs": [{"id": "ref-for-valdef-zoom-auto"}], "title": "6.5. \nThe zoom descriptor"}, {"refs": [{"id": "ref-for-valdef-zoom-auto\u2460"}, {"id": "ref-for-valdef-zoom-auto\u2461"}], "title": "6.6. \nThe min-zoom descriptor"}, {"refs": [{"id": "ref-for-valdef-zoom-auto\u2462"}, {"id": "ref-for-valdef-zoom-auto\u2463"}], "title": "6.7. \nThe max-zoom descriptor"}, {"refs": [{"id": "ref-for-valdef-zoom-auto\u2464"}, {"id": "ref-for-valdef-zoom-auto\u2465"}, {"id": "ref-for-valdef-zoom-auto\u2466"}], "title": "7.1. \nDefinitions"}, {"refs": [{"id": "ref-for-valdef-zoom-auto\u2467"}, {"id": "ref-for-valdef-zoom-auto\u2468"}], "title": "\nResolve min-zoom\nand max-zoom values"}, {"refs": [{"id": "ref-for-valdef-zoom-auto\u2460\u24ea"}], "title": "\nConstrain zoom value to\nthe [min-zoom, max-zoom] range"}, {"refs": [{"id": "ref-for-valdef-zoom-auto\u2460\u2460"}, {"id": "ref-for-valdef-zoom-auto\u2460\u2461"}, {"id": "ref-for-valdef-zoom-auto\u2460\u2462"}], "title": "\nResolving 'extend-to-zoom'"}, {"refs": [{"id": "ref-for-valdef-zoom-auto\u2460\u2463"}], "title": "\nThe width\nand height\nproperties"}, {"refs": [{"id": "ref-for-valdef-zoom-auto\u2460\u2464"}, {"id": "ref-for-valdef-zoom-auto\u2460\u2465"}, {"id": "ref-for-valdef-zoom-auto\u2460\u2466"}], "title": "11. \nHandling auto for zoom"}], "external": false};
-window.dfnpanelData['valdef-user-zoom-zoom'] = {"dfnID": "valdef-user-zoom-zoom", "url": "#valdef-user-zoom-zoom", "dfnText": "zoom", "refSections": [{"refs": [{"id": "ref-for-valdef-user-zoom-zoom"}, {"id": "ref-for-valdef-user-zoom-zoom\u2460"}], "title": "\nThe user-scalable property"}], "external": false};
-window.dfnpanelData['valdef-user-zoom-fixed'] = {"dfnID": "valdef-user-zoom-fixed", "url": "#valdef-user-zoom-fixed", "dfnText": "fixed", "refSections": [{"refs": [{"id": "ref-for-valdef-user-zoom-fixed"}, {"id": "ref-for-valdef-user-zoom-fixed\u2460"}], "title": "\nThe user-scalable property"}], "external": false};
-window.dfnpanelData['cssviewportrule'] = {"dfnID": "cssviewportrule", "url": "#cssviewportrule", "dfnText": "CSSViewportRule", "refSections": [{"refs": [{"id": "ref-for-cssviewportrule"}], "title": "9.2. \nInterface CSSViewportRule"}], "external": false};
-window.dfnpanelData['dom-cssviewportrule-style'] = {"dfnID": "dom-cssviewportrule-style", "url": "#dom-cssviewportrule-style", "dfnText": "style", "refSections": [{"refs": [{"id": "ref-for-dom-cssviewportrule-style"}], "title": "9.2. \nInterface CSSViewportRule"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -3303,11 +2864,461 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"00d635ac": {"dfnID":"00d635ac","dfnText":"vw","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-length-vw"}],"title":"6. \nViewport descriptors"}],"url":"https://drafts.csswg.org/css-values-4/#valdef-length-vw"},
+"15f5b381": {"dfnID":"15f5b381","dfnText":"<percentage>","external":true,"refSections":[{"refs":[{"id":"ref-for-percentage-value"}],"title":"6.1. \nThe min-width and max-width descriptors"},{"refs":[{"id":"ref-for-percentage-value\u2460"},{"id":"ref-for-percentage-value\u2461"}],"title":"6.5. \nThe zoom descriptor"},{"refs":[{"id":"ref-for-percentage-value\u2462"},{"id":"ref-for-percentage-value\u2463"}],"title":"6.6. \nThe min-zoom descriptor"},{"refs":[{"id":"ref-for-percentage-value\u2464"},{"id":"ref-for-percentage-value\u2465"}],"title":"6.7. \nThe max-zoom descriptor"}],"url":"https://drafts.csswg.org/css-values-4/#percentage-value"},
+"16310992": {"dfnID":"16310992","dfnText":"<number>","external":true,"refSections":[{"refs":[{"id":"ref-for-number-value"},{"id":"ref-for-number-value\u2460"}],"title":"6.5. \nThe zoom descriptor"},{"refs":[{"id":"ref-for-number-value\u2461"},{"id":"ref-for-number-value\u2462"}],"title":"6.6. \nThe min-zoom descriptor"},{"refs":[{"id":"ref-for-number-value\u2463"},{"id":"ref-for-number-value\u2464"}],"title":"6.7. \nThe max-zoom descriptor"}],"url":"https://drafts.csswg.org/css-values-4/#number-value"},
+"450958f7": {"dfnID":"450958f7","dfnText":"unsigned short","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-unsigned-short"}],"title":"9.1. \nInterface CSSRule"}],"url":"https://webidl.spec.whatwg.org/#idl-unsigned-short"},
+"4c9599fa": {"dfnID":"4c9599fa","dfnText":"min-height","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-min-height"}],"title":"6.3. \nThe min-height and max-height descriptors"},{"refs":[{"id":"ref-for-propdef-min-height\u2460"}],"title":"\nResolve non-auto lengths to pixel lengths"},{"refs":[{"id":"ref-for-propdef-min-height\u2461"}],"title":"\nThe width\nand height\nproperties"}],"url":"https://drafts.csswg.org/css-sizing-3/#propdef-min-height"},
+"5bc8bd12": {"dfnID":"5bc8bd12","dfnText":"direction","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-direction"},{"id":"ref-for-propdef-direction\u2460"}],"title":"4. \nThe viewport"}],"url":"https://drafts.csswg.org/css-writing-modes-3/#propdef-direction"},
+"5ee7eb9e": {"dfnID":"5ee7eb9e","dfnText":"@page","external":true,"refSections":[{"refs":[{"id":"ref-for-at-ruledef-page"},{"id":"ref-for-at-ruledef-page\u2460"}],"title":"4. \nThe viewport"},{"refs":[{"id":"ref-for-at-ruledef-page\u2461"}],"title":"5. \nThe @viewport rule"}],"url":"https://drafts.csswg.org/css-page-3/#at-ruledef-page"},
+"5f1b7f60": {"dfnID":"5f1b7f60","dfnText":"@media","external":true,"refSections":[{"refs":[{"id":"ref-for-at-ruledef-media"}],"title":"5.1. \nSyntax"}],"url":"https://drafts.csswg.org/css-conditional-3/#at-ruledef-media"},
+"5fa4f559": {"dfnID":"5fa4f559","dfnText":"vmax","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-length-vmax"}],"title":"6. \nViewport descriptors"}],"url":"https://drafts.csswg.org/css-values-4/#valdef-length-vmax"},
+"68019d7a": {"dfnID":"68019d7a","dfnText":"height","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-height"}],"title":"6.4. \nThe height shorthand descriptor"},{"refs":[{"id":"ref-for-propdef-height\u2460"}],"title":"\nThe width\nand height\nproperties"}],"url":"https://drafts.csswg.org/css-sizing-3/#propdef-height"},
+"6cf6b879": {"dfnID":"6cf6b879","dfnText":"vh","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-length-vh"}],"title":"6. \nViewport descriptors"}],"url":"https://drafts.csswg.org/css-values-4/#valdef-length-vh"},
+"6ec67710": {"dfnID":"6ec67710","dfnText":"|","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-one"},{"id":"ref-for-comb-one\u2460"}],"title":"6.1. \nThe min-width and max-width descriptors"},{"refs":[{"id":"ref-for-comb-one\u2461"},{"id":"ref-for-comb-one\u2462"}],"title":"6.5. \nThe zoom descriptor"},{"refs":[{"id":"ref-for-comb-one\u2463"},{"id":"ref-for-comb-one\u2464"}],"title":"6.6. \nThe min-zoom descriptor"},{"refs":[{"id":"ref-for-comb-one\u2465"},{"id":"ref-for-comb-one\u2466"}],"title":"6.7. \nThe max-zoom descriptor"},{"refs":[{"id":"ref-for-comb-one\u2467"}],"title":"6.8. \nThe user-zoom descriptor"},{"refs":[{"id":"ref-for-comb-one\u2468"},{"id":"ref-for-comb-one\u2460\u24ea"}],"title":"6.9. \nThe orientation descriptor"}],"url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"758665a5": {"dfnID":"758665a5","dfnText":"paged media","external":true,"refSections":[{"refs":[{"id":"ref-for-paged-media"},{"id":"ref-for-paged-media\u2460"}],"title":"4. \nThe viewport"}],"url":"https://drafts.csswg.org/mediaqueries-5/#paged-media"},
+"75cfb42f": {"dfnID":"75cfb42f","dfnText":"vmin","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-length-vmin"}],"title":"6. \nViewport descriptors"}],"url":"https://drafts.csswg.org/css-values-4/#valdef-length-vmin"},
+"88643fe0": {"dfnID":"88643fe0","dfnText":"width","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-width"}],"title":"6.2. \nThe width shorthand descriptor"},{"refs":[{"id":"ref-for-propdef-width\u2460"},{"id":"ref-for-propdef-width\u2461"}],"title":"\nThe width\nand height\nproperties"}],"url":"https://drafts.csswg.org/css-sizing-3/#propdef-width"},
+"889e932f": {"dfnID":"889e932f","dfnText":"Exposed","external":true,"refSections":[{"refs":[{"id":"ref-for-Exposed"}],"title":"9.2. \nInterface CSSViewportRule"}],"url":"https://webidl.spec.whatwg.org/#Exposed"},
+"88def535": {"dfnID":"88def535","dfnText":"min-width","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-min-width"},{"id":"ref-for-propdef-min-width\u2460"}],"title":"6.1. \nThe min-width and max-width descriptors"},{"refs":[{"id":"ref-for-propdef-min-width\u2461"},{"id":"ref-for-propdef-min-width\u2462"},{"id":"ref-for-propdef-min-width\u2463"}],"title":"6.2. \nThe width shorthand descriptor"},{"refs":[{"id":"ref-for-propdef-min-width\u2464"}],"title":"\nResolve non-auto lengths to pixel lengths"},{"refs":[{"id":"ref-for-propdef-min-width\u2465"}],"title":"\nThe width\nand height\nproperties"}],"url":"https://drafts.csswg.org/css-sizing-3/#propdef-min-width"},
+"938ba280": {"dfnID":"938ba280","dfnText":"{a,b}","external":true,"refSections":[{"refs":[{"id":"ref-for-mult-num-range"}],"title":"6.2. \nThe width shorthand descriptor"},{"refs":[{"id":"ref-for-mult-num-range\u2460"}],"title":"6.4. \nThe height shorthand descriptor"}],"url":"https://drafts.csswg.org/css-values-4/#mult-num-range"},
+"9e39189b": {"dfnID":"9e39189b","dfnText":"max-height","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-max-height"}],"title":"6.3. \nThe min-height and max-height descriptors"},{"refs":[{"id":"ref-for-propdef-max-height\u2460"}],"title":"\nResolve non-auto lengths to pixel lengths"},{"refs":[{"id":"ref-for-propdef-max-height\u2461"}],"title":"\nThe width\nand height\nproperties"}],"url":"https://drafts.csswg.org/css-sizing-3/#propdef-max-height"},
+"a82a20ef": {"dfnID":"a82a20ef","dfnText":"CSSStyleDeclaration","external":true,"refSections":[{"refs":[{"id":"ref-for-cssstyledeclaration"},{"id":"ref-for-cssstyledeclaration\u2460"}],"title":"9.2. \nInterface CSSViewportRule"}],"url":"https://drafts.csswg.org/cssom-1/#cssstyledeclaration"},
+"aba1ccaf": {"dfnID":"aba1ccaf","dfnText":"continuous media","external":true,"refSections":[{"refs":[{"id":"ref-for-continuous-media"}],"title":"1. \nIntroduction"},{"refs":[{"id":"ref-for-continuous-media\u2460"},{"id":"ref-for-continuous-media\u2461"},{"id":"ref-for-continuous-media\u2462"}],"title":"4. \nThe viewport"}],"url":"https://drafts.csswg.org/mediaqueries-5/#continuous-media"},
+"at-ruledef-viewport": {"dfnID":"at-ruledef-viewport","dfnText":"@viewport","external":false,"refSections":[{"refs":[{"id":"ref-for-at-ruledef-viewport"},{"id":"ref-for-at-ruledef-viewport\u2460"}],"title":"4. \nThe viewport"},{"refs":[{"id":"ref-for-at-ruledef-viewport\u2461"},{"id":"ref-for-at-ruledef-viewport\u2462"},{"id":"ref-for-at-ruledef-viewport\u2463"},{"id":"ref-for-at-ruledef-viewport\u2464"},{"id":"ref-for-at-ruledef-viewport\u2465"},{"id":"ref-for-at-ruledef-viewport\u2466"},{"id":"ref-for-at-ruledef-viewport\u2467"}],"title":"5. \nThe @viewport rule"},{"refs":[{"id":"ref-for-at-ruledef-viewport\u2468"},{"id":"ref-for-at-ruledef-viewport\u2460\u24ea"}],"title":"5.1. \nSyntax"},{"refs":[{"id":"ref-for-at-ruledef-viewport\u2460\u2460"}],"title":"6. \nViewport descriptors"},{"refs":[{"id":"ref-for-at-ruledef-viewport\u2460\u2461"},{"id":"ref-for-at-ruledef-viewport\u2460\u2462"}],"title":"6.1. \nThe min-width and max-width descriptors"},{"refs":[{"id":"ref-for-at-ruledef-viewport\u2460\u2463"}],"title":"6.2. \nThe width shorthand descriptor"},{"refs":[{"id":"ref-for-at-ruledef-viewport\u2460\u2464"},{"id":"ref-for-at-ruledef-viewport\u2460\u2465"}],"title":"6.3. \nThe min-height and max-height descriptors"},{"refs":[{"id":"ref-for-at-ruledef-viewport\u2460\u2466"}],"title":"6.4. \nThe height shorthand descriptor"},{"refs":[{"id":"ref-for-at-ruledef-viewport\u2460\u2467"}],"title":"6.5. \nThe zoom descriptor"},{"refs":[{"id":"ref-for-at-ruledef-viewport\u2460\u2468"}],"title":"6.6. \nThe min-zoom descriptor"},{"refs":[{"id":"ref-for-at-ruledef-viewport\u2461\u24ea"}],"title":"6.7. \nThe max-zoom descriptor"},{"refs":[{"id":"ref-for-at-ruledef-viewport\u2461\u2460"}],"title":"6.8. \nThe user-zoom descriptor"},{"refs":[{"id":"ref-for-at-ruledef-viewport\u2461\u2461"}],"title":"6.9. \nThe orientation descriptor"},{"refs":[{"id":"ref-for-at-ruledef-viewport\u2461\u2462"},{"id":"ref-for-at-ruledef-viewport\u2461\u2463"},{"id":"ref-for-at-ruledef-viewport\u2461\u2464"},{"id":"ref-for-at-ruledef-viewport\u2461\u2465"},{"id":"ref-for-at-ruledef-viewport\u2461\u2466"},{"id":"ref-for-at-ruledef-viewport\u2461\u2467"},{"id":"ref-for-at-ruledef-viewport\u2461\u2468"},{"id":"ref-for-at-ruledef-viewport\u2462\u24ea"},{"id":"ref-for-at-ruledef-viewport\u2462\u2460"},{"id":"ref-for-at-ruledef-viewport\u2462\u2461"}],"title":"8. \nMedia Queries"},{"refs":[{"id":"ref-for-at-ruledef-viewport\u2462\u2462"}],"title":"9. \nCSSOM"},{"refs":[{"id":"ref-for-at-ruledef-viewport\u2462\u2463"},{"id":"ref-for-at-ruledef-viewport\u2462\u2464"}],"title":"9.2. \nInterface CSSViewportRule"},{"refs":[{"id":"ref-for-at-ruledef-viewport\u2462\u2465"}],"title":"10. \nViewport <META> element"},{"refs":[{"id":"ref-for-at-ruledef-viewport\u2462\u2466"},{"id":"ref-for-at-ruledef-viewport\u2462\u2467"}],"title":"10.4. \nTranslation into @viewport descriptors"},{"refs":[{"id":"ref-for-at-ruledef-viewport\u2462\u2468"},{"id":"ref-for-at-ruledef-viewport\u2463\u24ea"}],"title":"\nThe width\nand height\nproperties"},{"refs":[{"id":"ref-for-at-ruledef-viewport\u2463\u2460"}],"title":"\nThe initial-scale, minimum-scale, and maximum-scale properties"},{"refs":[{"id":"ref-for-at-ruledef-viewport\u2463\u2461"}],"title":"\nThe user-scalable property"},{"refs":[{"id":"ref-for-at-ruledef-viewport\u2463\u2462"}],"title":"12. \nUA stylesheets"}],"url":"#at-ruledef-viewport"},
+"bf3ca8a7": {"dfnID":"bf3ca8a7","dfnText":"conditional group rule","external":true,"refSections":[{"refs":[{"id":"ref-for-conditional-group-rule"}],"title":"5.1. \nSyntax"}],"url":"https://drafts.csswg.org/css-conditional-3/#conditional-group-rule"},
+"c1ebc639": {"dfnID":"c1ebc639","dfnText":"@supports","external":true,"refSections":[{"refs":[{"id":"ref-for-at-ruledef-supports"}],"title":"5.1. \nSyntax"}],"url":"https://drafts.csswg.org/css-conditional-3/#at-ruledef-supports"},
+"c388d253": {"dfnID":"c388d253","dfnText":"inherit","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-all-inherit"}],"title":"5. \nThe @viewport rule"}],"url":"https://drafts.csswg.org/css-cascade-5/#valdef-all-inherit"},
+"cssviewportrule": {"dfnID":"cssviewportrule","dfnText":"CSSViewportRule","external":false,"refSections":[{"refs":[{"id":"ref-for-cssviewportrule"}],"title":"9.2. \nInterface CSSViewportRule"}],"url":"#cssviewportrule"},
+"descdef-viewport-zoom": {"dfnID":"descdef-viewport-zoom","dfnText":"zoom","external":false,"refSections":[{"refs":[{"id":"ref-for-descdef-viewport-zoom"}],"title":"Appendix A. Changes"}],"url":"#descdef-viewport-zoom"},
+"dom-cssviewportrule-style": {"dfnID":"dom-cssviewportrule-style","dfnText":"style","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-cssviewportrule-style"}],"title":"9.2. \nInterface CSSViewportRule"}],"url":"#dom-cssviewportrule-style"},
+"ebaeb088": {"dfnID":"ebaeb088","dfnText":"CSSRule","external":true,"refSections":[{"refs":[{"id":"ref-for-cssrule"}],"title":"9.1. \nInterface CSSRule"},{"refs":[{"id":"ref-for-cssrule\u2460"}],"title":"9.2. \nInterface CSSViewportRule"}],"url":"https://drafts.csswg.org/cssom-1/#cssrule"},
+"f08b32ef": {"dfnID":"f08b32ef","dfnText":"max-width","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-max-width"},{"id":"ref-for-propdef-max-width\u2460"}],"title":"6.1. \nThe min-width and max-width descriptors"},{"refs":[{"id":"ref-for-propdef-max-width\u2461"},{"id":"ref-for-propdef-max-width\u2462"},{"id":"ref-for-propdef-max-width\u2463"}],"title":"6.2. \nThe width shorthand descriptor"},{"refs":[{"id":"ref-for-propdef-max-width\u2464"}],"title":"\nResolve non-auto lengths to pixel lengths"},{"refs":[{"id":"ref-for-propdef-max-width\u2465"}],"title":"\nThe width\nand height\nproperties"}],"url":"https://drafts.csswg.org/css-sizing-3/#propdef-max-width"},
+"fb030e6c": {"dfnID":"fb030e6c","dfnText":"<length>","external":true,"refSections":[{"refs":[{"id":"ref-for-length-value"}],"title":"6.1. \nThe min-width and max-width descriptors"}],"url":"https://drafts.csswg.org/css-values-4/#length-value"},
+"fdf6efd5": {"dfnID":"fdf6efd5","dfnText":"font-size","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-font-size"}],"title":"6. \nViewport descriptors"}],"url":"https://drafts.csswg.org/css-fonts-4/#propdef-font-size"},
+"typedef-viewport-length": {"dfnID":"typedef-viewport-length","dfnText":"<viewport-length>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-viewport-length"},{"id":"ref-for-typedef-viewport-length\u2460"}],"title":"6.1. \nThe min-width and max-width descriptors"},{"refs":[{"id":"ref-for-typedef-viewport-length\u2461"},{"id":"ref-for-typedef-viewport-length\u2462"},{"id":"ref-for-typedef-viewport-length\u2463"}],"title":"6.2. \nThe width shorthand descriptor"},{"refs":[{"id":"ref-for-typedef-viewport-length\u2464"},{"id":"ref-for-typedef-viewport-length\u2465"}],"title":"6.3. \nThe min-height and max-height descriptors"},{"refs":[{"id":"ref-for-typedef-viewport-length\u2466"},{"id":"ref-for-typedef-viewport-length\u2467"},{"id":"ref-for-typedef-viewport-length\u2468"}],"title":"6.4. \nThe height shorthand descriptor"},{"refs":[{"id":"ref-for-typedef-viewport-length\u2460\u24ea"}],"title":"10.3. extend-to-zoom"},{"refs":[{"id":"ref-for-typedef-viewport-length\u2460\u2460"}],"title":"Appendix A. Changes"}],"url":"#typedef-viewport-length"},
+"valdef-user-zoom-fixed": {"dfnID":"valdef-user-zoom-fixed","dfnText":"fixed","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-user-zoom-fixed"},{"id":"ref-for-valdef-user-zoom-fixed\u2460"}],"title":"\nThe user-scalable property"}],"url":"#valdef-user-zoom-fixed"},
+"valdef-user-zoom-zoom": {"dfnID":"valdef-user-zoom-zoom","dfnText":"zoom","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-user-zoom-zoom"},{"id":"ref-for-valdef-user-zoom-zoom\u2460"}],"title":"\nThe user-scalable property"}],"url":"#valdef-user-zoom-zoom"},
+"valdef-viewport-length-auto": {"dfnID":"valdef-viewport-length-auto","dfnText":"auto","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-viewport-length-auto"}],"title":"7.1. \nDefinitions"},{"refs":[{"id":"ref-for-valdef-viewport-length-auto\u2460"}],"title":"\nResolve non-auto lengths to pixel lengths"},{"refs":[{"id":"ref-for-valdef-viewport-length-auto\u2461"},{"id":"ref-for-valdef-viewport-length-auto\u2462"}],"title":"\nResolve initial width\nand height from min/max\ndescriptors"},{"refs":[{"id":"ref-for-valdef-viewport-length-auto\u2463"},{"id":"ref-for-valdef-viewport-length-auto\u2464"}],"title":"\nResolve width value"},{"refs":[{"id":"ref-for-valdef-viewport-length-auto\u2465"}],"title":"\nResolve height value"},{"refs":[{"id":"ref-for-valdef-viewport-length-auto\u2466"},{"id":"ref-for-valdef-viewport-length-auto\u2467"}],"title":"\nResolving 'extend-to-zoom'"},{"refs":[{"id":"ref-for-valdef-viewport-length-auto\u2468"}],"title":"12.1. \nLarge screen UA styles"}],"url":"#valdef-viewport-length-auto"},
+"valdef-zoom-auto": {"dfnID":"valdef-zoom-auto","dfnText":"auto","external":false,"refSections":[{"refs":[{"id":"ref-for-valdef-zoom-auto"}],"title":"6.5. \nThe zoom descriptor"},{"refs":[{"id":"ref-for-valdef-zoom-auto\u2460"},{"id":"ref-for-valdef-zoom-auto\u2461"}],"title":"6.6. \nThe min-zoom descriptor"},{"refs":[{"id":"ref-for-valdef-zoom-auto\u2462"},{"id":"ref-for-valdef-zoom-auto\u2463"}],"title":"6.7. \nThe max-zoom descriptor"},{"refs":[{"id":"ref-for-valdef-zoom-auto\u2464"},{"id":"ref-for-valdef-zoom-auto\u2465"},{"id":"ref-for-valdef-zoom-auto\u2466"}],"title":"7.1. \nDefinitions"},{"refs":[{"id":"ref-for-valdef-zoom-auto\u2467"},{"id":"ref-for-valdef-zoom-auto\u2468"}],"title":"\nResolve min-zoom\nand max-zoom values"},{"refs":[{"id":"ref-for-valdef-zoom-auto\u2460\u24ea"}],"title":"\nConstrain zoom value to\nthe [min-zoom, max-zoom] range"},{"refs":[{"id":"ref-for-valdef-zoom-auto\u2460\u2460"},{"id":"ref-for-valdef-zoom-auto\u2460\u2461"},{"id":"ref-for-valdef-zoom-auto\u2460\u2462"}],"title":"\nResolving 'extend-to-zoom'"},{"refs":[{"id":"ref-for-valdef-zoom-auto\u2460\u2463"}],"title":"\nThe width\nand height\nproperties"},{"refs":[{"id":"ref-for-valdef-zoom-auto\u2460\u2464"},{"id":"ref-for-valdef-zoom-auto\u2460\u2465"},{"id":"ref-for-valdef-zoom-auto\u2460\u2466"}],"title":"11. \nHandling auto for zoom"}],"url":"#valdef-zoom-auto"},
+};
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+});
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        dfn.panelData = panelData;
+        insertDfnPopupAction(dfn);
+    }
+}
+
+function genDfnPanel(dfn, { dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel on",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel({dfnPanel});
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.dfn = dfn;
+    dfn.dfnPanel = dfnPanel;
+    return dfnPanel;
+}
+
+
+
+function hideAllDfnPanels() {
+    // Delete the currently-active dfn panel.
+    queryAll(".dfn-panel").forEach(dfnPanel=>hideDfnPanel({dfnPanel}));
+}
+
+function showDfnPanel(dfn) {
+    hideAllDfnPanels(); // Only display one at a time.
+
+    dfn.setAttribute("aria-expanded", "true");
+
+    const dfnPanel = genDfnPanel(dfn, dfn.panelData);
+
+    // Give the dfn a unique tabindex, and then
+    // give all the tabbable panel bits successive indexes.
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+
+    append(document.body, dfnPanel);
+    positionDfnPanel(dfnPanel);
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.dfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }
+}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel({dfn, dfnPanel}) {
+    if(!dfnPanel) dfnPanel = dfn.dfnPanel;
+    if(!dfn) dfn = dfnPanel.dfn;
+    dfn.dfnPanel = undefined;
+    dfnPanel.dfn = undefined;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.remove()
+}
+
+function toggleDfnPanel(dfn) {
+    if(dfn.dfnPanel) {
+        hideDfnPanel(dfn);
+    } else {
+        showDfnPanel(dfn);
+    }
+}
+
+function insertDfnPopupAction(dfn) {
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        toggleDfnPanel(dfn);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+function needsFor(type) {
+    switch(type) {
+        case "descriptor":
+        case "value":
+        case "element-attr":
+        case "attr-value":
+        case "element-state":
+        case "method":
+        case "constructor":
+        case "argument":
+        case "attribute":
+        case "const":
+        case "dict-member":
+        case "event":
+        case "enum-value":
+        case "stringifier":
+        case "serializer":
+        case "iterator":
+        case "maplike":
+        case "setlike":
+        case "state":
+        case "mode":
+        case "context":
+        case "facet": return true;
+
+        default: return false;
+    }
+}
+function refusesFor(type) {
+    switch(type) {
+        case "property":
+        case "element":
+        case "interface":
+        case "namespace":
+        case "callback":
+        case "dictionary":
+        case "enum":
+        case "exception":
+        case "typedef":
+        case "http-header":
+        case "permission": return true;
+
+        default: return false;
+    }
+}
+function linkFormatterFromType(type) {
+    switch(type) {
+        case 'scheme':
+        case 'permission':
+        case 'dfn': return (text) => `[=${text}=]`;
+
+        case 'abstract-op': return (text) => `[\$${text}\$]`;
+
+        case 'function':
+        case 'at-rule':
+        case 'selector':
+        case 'value': return (text) => `''${text}''`;
+
+        case 'http-header': return (text) => `[:${text}:]`;
+
+        case 'interface':
+        case 'constructor':
+        case 'method':
+        case 'argument':
+        case 'attribute':
+        case 'callback':
+        case 'dictionary':
+        case 'dict-member':
+        case 'enum':
+        case 'enum-value':
+        case 'exception':
+        case 'const':
+        case 'typedef':
+        case 'stringifier':
+        case 'serializer':
+        case 'iterator':
+        case 'maplike':
+        case 'setlike':
+        case 'extended-attribute':
+        case 'event':
+        case 'idl': return (text) => `{{${text}}}`;
+
+        case 'element-state':
+        case 'element-attr':
+        case 'attr-value':
+        case 'element': return (element) => `<{${element}}>`;
+
+        case 'grammar': return (text) => `${text} (within a <pre class=prod>)`;
+
+        case 'type': return (text)=> `<<${text}>>`;
+
+        case 'descriptor':
+        case 'property': return (text) => `'${text}'`;
+
+        default: return;
+    };
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!needsFor(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!refusesFor(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
 }
 </script>
 <script>/* Boilerplate: script-link-titles */
+"use strict";
+{
 let linkTitleData = {
- "https://drafts.csswg.org/css-values-4/#length-value": "Expands to: advance measure | cap | ch | cm | dvb | dvh | dvi | dvmax | dvmin | dvw | em | ex | ic | in | lh | lvb | lvh | lvi | lvmax | lvmin | lvw | mm | pc | pt | px | q | rcap | rch | rem | rex | ric | rlh | svb | svh | svi | svmax | svmin | svw | vb | vh | vi | vmax | vmin | vw"
+"https://drafts.csswg.org/css-values-4/#length-value": "Expands to: advance measure | cap | ch | cm | dvb | dvh | dvi | dvmax | dvmin | dvw | em | ex | ic | in | lh | lvb | lvh | lvi | lvmax | lvmin | lvw | mm | pc | pt | px | q | rcap | rch | rem | rex | ric | rlh | svb | svh | svi | svmax | svmin | svw | vb | vh | vi | vmax | vmin | vw",
 };
 
 function setTypeTitles() {
@@ -3319,33 +3330,14 @@ function setTypeTitles() {
 }
 
 document.addEventListener("DOMContentLoaded", setTypeTitles);
+}
 </script>
 <script>/* Boilerplate: script-position-annos */
 "use strict";
 {
-
 function repositionAnnoPanels(){
     const panels = [...document.querySelectorAll("[data-anno-for]")];
-    const main = document.querySelector("main");
-    let mainRect;
-    if(main) mainRect = main.getBoundingClientRect();
-    for(const panel of panels) {
-        const dfn = document.getElementById(panel.getAttribute("data-anno-for"));
-        if(!dfn) {
-            console.log("Can't find the annotation panel target:", panel);
-            continue;
-        }
-        const rect = dfn.getBoundingClientRect();
-        const top = window.scrollY + rect.top
-        panel.style.top = top + "px";
-        panel.top = top;
-        panel.height = rect.height;
-        panel.classList.remove("unpositioned");
-        const panelRect = panel.getBoundingClientRect()
-        if(main) {
-            panel.classList.toggle("overlapping-main", panelRect.left < mainRect.right)
-        }
-    }
+    hydratePanels(panels);
     let vSoFar = 0;
     for(const panel of panels.sort(cmpTops)) {
         if(panel.top < vSoFar) {
@@ -3353,6 +3345,39 @@ function repositionAnnoPanels(){
             panel.style.top = vSoFar + "px";
         }
         vSoFar = panel.top + panel.height + 15;
+    }
+}
+function hydratePanels(panels) {
+    const main = document.querySelector("main");
+    let mainRect;
+    if(main) mainRect = main.getBoundingClientRect();
+    // First display them all, if they're not already visible.
+    for(const panel of panels) {
+        panel.classList.remove("unpositioned");
+    }
+    // Measure them all
+    for(const panel of panels) {
+        const dfn = document.getElementById(panel.getAttribute("data-anno-for"));
+        if(!dfn) {
+            console.log("Can't find the annotation panel target:", panel);
+            continue;
+        }
+        panel.dfn = dfn;
+        panel.top = window.scrollY + dfn.getBoundingClientRect().top;
+        let panelRect = panel.getBoundingClientRect();
+        panel.height = panelRect.height;
+        if(main) {
+            panel.overlappingMain = panelRect.left < mainRect.right;
+        } else {
+            panel.overlappingMain = false;
+        }
+    }
+    // And finally position them
+    for(const panel of panels) {
+        const dfn = panel.dfn;
+        if(!dfn) continue;
+        panel.style.top = panel.top + "px";
+        panel.classList.toggle("overlapping-main", panel.overlappingMain);
     }
 }
 
@@ -3367,260 +3392,248 @@ window.addEventListener("resize", repositionAnnoPanels);
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
-                mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
+let refsData = {
+"#at-ruledef-viewport": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-device-adapt","spec":"css-device-adapt-1","status":"local","text":"@viewport","type":"at-rule","url":"#at-ruledef-viewport"},
+"#cssviewportrule": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-device-adapt","spec":"css-device-adapt-1","status":"local","text":"CSSViewportRule","type":"interface","url":"#cssviewportrule"},
+"#descdef-viewport-height": {"export":true,"for_":["@viewport"],"level":"1","normative":true,"shortname":"css-device-adapt","spec":"css-device-adapt-1","status":"local","text":"height","type":"descriptor","url":"#descdef-viewport-height"},
+"#descdef-viewport-max-height": {"export":true,"for_":["@viewport"],"level":"1","normative":true,"shortname":"css-device-adapt","spec":"css-device-adapt-1","status":"local","text":"max-height","type":"descriptor","url":"#descdef-viewport-max-height"},
+"#descdef-viewport-max-width": {"export":true,"for_":["@viewport"],"level":"1","normative":true,"shortname":"css-device-adapt","spec":"css-device-adapt-1","status":"local","text":"max-width","type":"descriptor","url":"#descdef-viewport-max-width"},
+"#descdef-viewport-max-zoom": {"export":true,"for_":["@viewport"],"level":"1","normative":true,"shortname":"css-device-adapt","spec":"css-device-adapt-1","status":"local","text":"max-zoom","type":"descriptor","url":"#descdef-viewport-max-zoom"},
+"#descdef-viewport-min-height": {"export":true,"for_":["@viewport"],"level":"1","normative":true,"shortname":"css-device-adapt","spec":"css-device-adapt-1","status":"local","text":"min-height","type":"descriptor","url":"#descdef-viewport-min-height"},
+"#descdef-viewport-min-width": {"export":true,"for_":["@viewport"],"level":"1","normative":true,"shortname":"css-device-adapt","spec":"css-device-adapt-1","status":"local","text":"min-width","type":"descriptor","url":"#descdef-viewport-min-width"},
+"#descdef-viewport-min-zoom": {"export":true,"for_":["@viewport"],"level":"1","normative":true,"shortname":"css-device-adapt","spec":"css-device-adapt-1","status":"local","text":"min-zoom","type":"descriptor","url":"#descdef-viewport-min-zoom"},
+"#descdef-viewport-orientation": {"export":true,"for_":["@viewport"],"level":"1","normative":true,"shortname":"css-device-adapt","spec":"css-device-adapt-1","status":"local","text":"orientation","type":"descriptor","url":"#descdef-viewport-orientation"},
+"#descdef-viewport-user-zoom": {"export":true,"for_":["@viewport"],"level":"1","normative":true,"shortname":"css-device-adapt","spec":"css-device-adapt-1","status":"local","text":"user-zoom","type":"descriptor","url":"#descdef-viewport-user-zoom"},
+"#descdef-viewport-width": {"export":true,"for_":["@viewport"],"level":"1","normative":true,"shortname":"css-device-adapt","spec":"css-device-adapt-1","status":"local","text":"width","type":"descriptor","url":"#descdef-viewport-width"},
+"#descdef-viewport-zoom": {"export":true,"for_":["@viewport"],"level":"1","normative":true,"shortname":"css-device-adapt","spec":"css-device-adapt-1","status":"local","text":"zoom","type":"descriptor","url":"#descdef-viewport-zoom"},
+"#dom-cssviewportrule-style": {"export":true,"for_":["CSSViewportRule"],"level":"1","normative":true,"shortname":"css-device-adapt","spec":"css-device-adapt-1","status":"local","text":"style","type":"attribute","url":"#dom-cssviewportrule-style"},
+"#typedef-viewport-length": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-device-adapt","spec":"css-device-adapt-1","status":"local","text":"<viewport-length>","type":"type","url":"#typedef-viewport-length"},
+"#valdef-user-zoom-fixed": {"export":true,"for_":["user-zoom"],"level":"1","normative":true,"shortname":"css-device-adapt","spec":"css-device-adapt-1","status":"local","text":"fixed","type":"value","url":"#valdef-user-zoom-fixed"},
+"#valdef-user-zoom-zoom": {"export":true,"for_":["user-zoom"],"level":"1","normative":true,"shortname":"css-device-adapt","spec":"css-device-adapt-1","status":"local","text":"zoom","type":"value","url":"#valdef-user-zoom-zoom"},
+"#valdef-viewport-length-auto": {"export":true,"for_":["viewport-length"],"level":"1","normative":true,"shortname":"css-device-adapt","spec":"css-device-adapt-1","status":"local","text":"auto","type":"value","url":"#valdef-viewport-length-auto"},
+"#valdef-zoom-auto": {"export":true,"for_":["zoom"],"level":"1","normative":true,"shortname":"css-device-adapt","spec":"css-device-adapt-1","status":"local","text":"auto","type":"value","url":"#valdef-zoom-auto"},
+"https://drafts.csswg.org/css-cascade-5/#valdef-all-inherit": {"export":true,"for_":["all"],"level":"5","normative":true,"shortname":"css-cascade","spec":"css-cascade-5","status":"current","text":"inherit","type":"value","url":"https://drafts.csswg.org/css-cascade-5/#valdef-all-inherit"},
+"https://drafts.csswg.org/css-conditional-3/#at-ruledef-media": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-conditional","spec":"css-conditional-3","status":"current","text":"@media","type":"at-rule","url":"https://drafts.csswg.org/css-conditional-3/#at-ruledef-media"},
+"https://drafts.csswg.org/css-conditional-3/#at-ruledef-supports": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-conditional","spec":"css-conditional-3","status":"current","text":"@supports","type":"at-rule","url":"https://drafts.csswg.org/css-conditional-3/#at-ruledef-supports"},
+"https://drafts.csswg.org/css-conditional-3/#conditional-group-rule": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-conditional","spec":"css-conditional-3","status":"current","text":"conditional group rule","type":"dfn","url":"https://drafts.csswg.org/css-conditional-3/#conditional-group-rule"},
+"https://drafts.csswg.org/css-fonts-4/#propdef-font-size": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-fonts","spec":"css-fonts-4","status":"current","text":"font-size","type":"property","url":"https://drafts.csswg.org/css-fonts-4/#propdef-font-size"},
+"https://drafts.csswg.org/css-page-3/#at-ruledef-page": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-page","spec":"css-page-3","status":"current","text":"@page","type":"at-rule","url":"https://drafts.csswg.org/css-page-3/#at-ruledef-page"},
+"https://drafts.csswg.org/css-sizing-3/#propdef-height": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-sizing","spec":"css-sizing-3","status":"current","text":"height","type":"property","url":"https://drafts.csswg.org/css-sizing-3/#propdef-height"},
+"https://drafts.csswg.org/css-sizing-3/#propdef-max-height": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-sizing","spec":"css-sizing-3","status":"current","text":"max-height","type":"property","url":"https://drafts.csswg.org/css-sizing-3/#propdef-max-height"},
+"https://drafts.csswg.org/css-sizing-3/#propdef-max-width": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-sizing","spec":"css-sizing-3","status":"current","text":"max-width","type":"property","url":"https://drafts.csswg.org/css-sizing-3/#propdef-max-width"},
+"https://drafts.csswg.org/css-sizing-3/#propdef-min-height": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-sizing","spec":"css-sizing-3","status":"current","text":"min-height","type":"property","url":"https://drafts.csswg.org/css-sizing-3/#propdef-min-height"},
+"https://drafts.csswg.org/css-sizing-3/#propdef-min-width": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-sizing","spec":"css-sizing-3","status":"current","text":"min-width","type":"property","url":"https://drafts.csswg.org/css-sizing-3/#propdef-min-width"},
+"https://drafts.csswg.org/css-sizing-3/#propdef-width": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-sizing","spec":"css-sizing-3","status":"current","text":"width","type":"property","url":"https://drafts.csswg.org/css-sizing-3/#propdef-width"},
+"https://drafts.csswg.org/css-values-4/#comb-one": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"|","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"https://drafts.csswg.org/css-values-4/#length-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<length>","type":"type","url":"https://drafts.csswg.org/css-values-4/#length-value"},
+"https://drafts.csswg.org/css-values-4/#mult-num-range": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"{a,b}","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#mult-num-range"},
+"https://drafts.csswg.org/css-values-4/#number-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<number>","type":"type","url":"https://drafts.csswg.org/css-values-4/#number-value"},
+"https://drafts.csswg.org/css-values-4/#percentage-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<percentage>","type":"type","url":"https://drafts.csswg.org/css-values-4/#percentage-value"},
+"https://drafts.csswg.org/css-values-4/#valdef-length-vh": {"export":true,"for_":["<length>"],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"vh","type":"value","url":"https://drafts.csswg.org/css-values-4/#valdef-length-vh"},
+"https://drafts.csswg.org/css-values-4/#valdef-length-vmax": {"export":true,"for_":["<length>"],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"vmax","type":"value","url":"https://drafts.csswg.org/css-values-4/#valdef-length-vmax"},
+"https://drafts.csswg.org/css-values-4/#valdef-length-vmin": {"export":true,"for_":["<length>"],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"vmin","type":"value","url":"https://drafts.csswg.org/css-values-4/#valdef-length-vmin"},
+"https://drafts.csswg.org/css-values-4/#valdef-length-vw": {"export":true,"for_":["<length>"],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"vw","type":"value","url":"https://drafts.csswg.org/css-values-4/#valdef-length-vw"},
+"https://drafts.csswg.org/css-writing-modes-3/#propdef-direction": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-3","status":"current","text":"direction","type":"property","url":"https://drafts.csswg.org/css-writing-modes-3/#propdef-direction"},
+"https://drafts.csswg.org/cssom-1/#cssrule": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"CSSRule","type":"interface","url":"https://drafts.csswg.org/cssom-1/#cssrule"},
+"https://drafts.csswg.org/cssom-1/#cssstyledeclaration": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"cssom","spec":"cssom-1","status":"current","text":"CSSStyleDeclaration","type":"interface","url":"https://drafts.csswg.org/cssom-1/#cssstyledeclaration"},
+"https://drafts.csswg.org/mediaqueries-5/#continuous-media": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"mediaqueries","spec":"mediaqueries-5","status":"current","text":"continuous media","type":"dfn","url":"https://drafts.csswg.org/mediaqueries-5/#continuous-media"},
+"https://drafts.csswg.org/mediaqueries-5/#paged-media": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"mediaqueries","spec":"mediaqueries-5","status":"current","text":"paged media","type":"dfn","url":"https://drafts.csswg.org/mediaqueries-5/#paged-media"},
+"https://webidl.spec.whatwg.org/#Exposed": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"Exposed","type":"extended-attribute","url":"https://webidl.spec.whatwg.org/#Exposed"},
+"https://webidl.spec.whatwg.org/#idl-unsigned-short": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"unsigned short","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-unsigned-short"},
+};
+
+function mkRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "Term: "),
+                mk.span({}, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    let forListElements;
+    if(forList.length == 0) {
+        forListElements = [];
+    } else if(forList.length == 1) {
+        forListElements = mk.li({},
+            mk.b({}, "For: "),
+            mk.span({}, forList[0]),
+        );
+    } else {
+        forListElements = mk.li({},
             mk.b({}, "For: "),
             mk.ul({},
                 ...forList.map(forItem =>
                     mk.li({},
-                        mk.span({}, `${forItem}`)
+                        mk.span({}, forItem)
                     ),
                 ),
             ),
         );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+    }
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    setupRefHintEventListeners(link, hintPanel);
+    return hintPanel;
+}
+
+function hideAllRefHints() {
+    queryAll(".ref-hint").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    if(refHint.teardownEventListeners) {
+        refHint.teardownEventListeners();
     }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+    refHint.remove();
+}
+
+function showRefHint(link) {
+    if(link.classList.contains("dfn-link")) return;
+    const url = link.getAttribute("href");
+    const ref = refsData[url];
+    if(!ref) return;
+
+    hideAllRefHints(); // Only display one at this time.
+
+    const refHint = mkRefHint(link, ref);
+    append(document.body, refHint);
+    link.setAttribute("aria-expanded", "true");
+    positionRefHint(refHint);
+}
+
+function setupRefHintEventListeners(link, refHint) {
+    if (refHint.teardownEventListeners) return;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
+
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
-
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
-    }
-
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
-        }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
-
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
-    }
-
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+document.addEventListener("DOMContentLoaded", () => {
+    document.body.addEventListener("mouseover", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
+    });
+    document.body.addEventListener("focus", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
     });
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['https://drafts.csswg.org/mediaqueries-5/#continuous-media'] = {"text": "continuous media", "type": "dfn", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-5/#continuous-media", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/mediaqueries-5/#paged-media'] = {"text": "paged media", "type": "dfn", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-5/#paged-media", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-page-3/#at-ruledef-page'] = {"text": "@page", "type": "at-rule", "spec": "css-page-3", "shortname": "css-page", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-page-3/#at-ruledef-page", "export": true, "normative": true, "for_": []};
-window.refsData['#at-ruledef-viewport'] = {"text": "@viewport", "type": "at-rule", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#at-ruledef-viewport", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-3/#propdef-direction'] = {"text": "direction", "type": "property", "spec": "css-writing-modes-3", "shortname": "css-writing-modes", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-3/#propdef-direction", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-cascade-5/#valdef-all-inherit'] = {"text": "inherit", "type": "value", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#valdef-all-inherit", "export": true, "normative": true, "for_": ["all"]};
-window.refsData['https://drafts.csswg.org/css-conditional-3/#conditional-group-rule'] = {"text": "conditional group rule", "type": "dfn", "spec": "css-conditional-3", "shortname": "css-conditional", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-conditional-3/#conditional-group-rule", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-conditional-3/#at-ruledef-media'] = {"text": "@media", "type": "at-rule", "spec": "css-conditional-3", "shortname": "css-conditional", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-conditional-3/#at-ruledef-media", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-conditional-3/#at-ruledef-supports'] = {"text": "@supports", "type": "at-rule", "spec": "css-conditional-3", "shortname": "css-conditional", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-conditional-3/#at-ruledef-supports", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font-size'] = {"text": "font-size", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-size", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#valdef-length-vw'] = {"text": "vw", "type": "value", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#valdef-length-vw", "export": true, "normative": true, "for_": ["<length>"]};
-window.refsData['https://drafts.csswg.org/css-values-4/#valdef-length-vh'] = {"text": "vh", "type": "value", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#valdef-length-vh", "export": true, "normative": true, "for_": ["<length>"]};
-window.refsData['https://drafts.csswg.org/css-values-4/#valdef-length-vmin'] = {"text": "vmin", "type": "value", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#valdef-length-vmin", "export": true, "normative": true, "for_": ["<length>"]};
-window.refsData['https://drafts.csswg.org/css-values-4/#valdef-length-vmax'] = {"text": "vmax", "type": "value", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#valdef-length-vmax", "export": true, "normative": true, "for_": ["<length>"]};
-window.refsData['https://drafts.csswg.org/css-sizing-3/#propdef-min-width'] = {"text": "min-width", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-min-width", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-sizing-3/#propdef-max-width'] = {"text": "max-width", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-max-width", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-viewport-length'] = {"text": "<viewport-length>", "type": "type", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#typedef-viewport-length", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#length-value'] = {"text": "<length>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#length-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#percentage-value'] = {"text": "<percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#percentage-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-sizing-3/#propdef-width'] = {"text": "width", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-width", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#mult-num-range'] = {"text": "{a,b}", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-num-range", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-sizing-3/#propdef-min-height'] = {"text": "min-height", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-min-height", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-sizing-3/#propdef-max-height'] = {"text": "max-height", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-max-height", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-sizing-3/#propdef-height'] = {"text": "height", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-height", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#number-value'] = {"text": "<number>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#number-value", "export": true, "normative": true, "for_": []};
-window.refsData['#valdef-zoom-auto'] = {"text": "auto", "type": "value", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#valdef-zoom-auto", "export": true, "normative": true, "for_": ["zoom"]};
-window.refsData['#valdef-viewport-length-auto'] = {"text": "auto", "type": "value", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#valdef-viewport-length-auto", "export": true, "normative": true, "for_": ["viewport-length"]};
-window.refsData['https://drafts.csswg.org/cssom-1/#cssrule'] = {"text": "CSSRule", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#cssrule", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-short'] = {"text": "unsigned short", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-short", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
-window.refsData['#cssviewportrule'] = {"text": "CSSViewportRule", "type": "interface", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#cssviewportrule", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/cssom-1/#cssstyledeclaration'] = {"text": "CSSStyleDeclaration", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#cssstyledeclaration", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-cssviewportrule-style'] = {"text": "style", "type": "attribute", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#dom-cssviewportrule-style", "export": true, "normative": true, "for_": ["CSSViewportRule"]};
-window.refsData['#valdef-user-zoom-zoom'] = {"text": "zoom", "type": "value", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#valdef-user-zoom-zoom", "export": true, "normative": true, "for_": ["user-zoom"]};
-window.refsData['#valdef-user-zoom-fixed'] = {"text": "fixed", "type": "value", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#valdef-user-zoom-fixed", "export": true, "normative": true, "for_": ["user-zoom"]};
-window.refsData['#descdef-viewport-zoom'] = {"text": "zoom", "type": "descriptor", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#descdef-viewport-zoom", "export": true, "normative": true, "for_": ["@viewport"]};window.refsData['#at-ruledef-viewport'] = {"text": "@viewport", "type": "at-rule", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#at-ruledef-viewport", "export": true, "normative": true, "for_": []};
-window.refsData['#descdef-viewport-height'] = {"text": "height", "type": "descriptor", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#descdef-viewport-height", "export": true, "normative": true, "for_": ["@viewport"]};
-window.refsData['#descdef-viewport-max-height'] = {"text": "max-height", "type": "descriptor", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#descdef-viewport-max-height", "export": true, "normative": true, "for_": ["@viewport"]};
-window.refsData['#descdef-viewport-max-width'] = {"text": "max-width", "type": "descriptor", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#descdef-viewport-max-width", "export": true, "normative": true, "for_": ["@viewport"]};
-window.refsData['#descdef-viewport-max-zoom'] = {"text": "max-zoom", "type": "descriptor", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#descdef-viewport-max-zoom", "export": true, "normative": true, "for_": ["@viewport"]};
-window.refsData['#descdef-viewport-min-height'] = {"text": "min-height", "type": "descriptor", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#descdef-viewport-min-height", "export": true, "normative": true, "for_": ["@viewport"]};
-window.refsData['#descdef-viewport-min-width'] = {"text": "min-width", "type": "descriptor", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#descdef-viewport-min-width", "export": true, "normative": true, "for_": ["@viewport"]};
-window.refsData['#descdef-viewport-min-zoom'] = {"text": "min-zoom", "type": "descriptor", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#descdef-viewport-min-zoom", "export": true, "normative": true, "for_": ["@viewport"]};
-window.refsData['#descdef-viewport-orientation'] = {"text": "orientation", "type": "descriptor", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#descdef-viewport-orientation", "export": true, "normative": true, "for_": ["@viewport"]};
-window.refsData['#descdef-viewport-user-zoom'] = {"text": "user-zoom", "type": "descriptor", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#descdef-viewport-user-zoom", "export": true, "normative": true, "for_": ["@viewport"]};
-window.refsData['#descdef-viewport-width'] = {"text": "width", "type": "descriptor", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#descdef-viewport-width", "export": true, "normative": true, "for_": ["@viewport"]};
-window.refsData['#descdef-viewport-zoom'] = {"text": "zoom", "type": "descriptor", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#descdef-viewport-zoom", "export": true, "normative": true, "for_": ["@viewport"]};
 </script>

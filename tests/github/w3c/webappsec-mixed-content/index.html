@@ -78,7 +78,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -484,7 +483,7 @@ a[href].issue-return {
 }
 
 .ref-hint {
-    display: none;
+    display: inline-block;
     position: absolute;
     z-index: 35;
     width: 20em;
@@ -500,16 +499,11 @@ a[href].issue-return {
     white-space: normal; /* in case it's moved into a pre */
 }
 
-.ref-hint.on {
-    display: inline-block;
-}
-
 .ref-hint * { margin: 0; padding: 0; text-indent: 0; }
 
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -1171,451 +1165,8 @@ encrypted and authenticated document.</p>
    <dt id="biblio-xml">[XML]
    <dd>Tim Bray; et al. <a href="https://www.w3.org/TR/xml/"><cite>Extensible Markup Language (XML) 1.0 (Fifth Edition)</cite></a>. 26 November 2008. REC. URL: <a href="https://www.w3.org/TR/xml/">https://www.w3.org/TR/xml/</a>
   </dl>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['f831c141'] = {"dfnID": "f831c141", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background-image", "dfnText": "background-image", "refSections": [{"refs": [{"id": "ref-for-propdef-background-image"}], "title": "3.1. Upgradeable Content"}], "external": true};
-window.dfnpanelData['a4cd8a8d'] = {"dfnID": "a4cd8a8d", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-image", "dfnText": "border-image", "refSections": [{"refs": [{"id": "ref-for-propdef-border-image"}], "title": "3.1. Upgradeable Content"}], "external": true};
-window.dfnpanelData['85394472'] = {"dfnID": "85394472", "url": "https://dom.spec.whatwg.org/#document", "dfnText": "Document", "refSections": [{"refs": [{"id": "ref-for-document"}], "title": "2. Key Concepts and Terminology"}, {"refs": [{"id": "ref-for-document\u2460"}, {"id": "ref-for-document\u2461"}], "title": "7.1. Form Submission"}], "external": true};
-window.dfnpanelData['5216e1a0'] = {"dfnID": "5216e1a0", "url": "https://dom.spec.whatwg.org/#concept-node-document", "dfnText": "node document", "refSections": [{"refs": [{"id": "ref-for-concept-node-document"}], "title": "5.2. Modifications to HTML"}], "external": true};
-window.dfnpanelData['347e8fe9'] = {"dfnID": "347e8fe9", "url": "https://dom.spec.whatwg.org/#concept-document-url", "dfnText": "url", "refSections": [{"refs": [{"id": "ref-for-concept-document-url"}, {"id": "ref-for-concept-document-url\u2460"}], "title": "5.2. Modifications to HTML"}], "external": true};
-window.dfnpanelData['857d5516'] = {"dfnID": "857d5516", "url": "https://fetch.spec.whatwg.org/#concept-request-client", "dfnText": "client", "refSections": [{"refs": [{"id": "ref-for-concept-request-client"}], "title": "4.1. Upgrade a mixed content request to a potentially trustworthy URL, if appropriate"}, {"refs": [{"id": "ref-for-concept-request-client\u2460"}], "title": "4.4. \n      Should fetching request be blocked as mixed content?\n    "}, {"refs": [{"id": "ref-for-concept-request-client\u2461"}], "title": "4.5. \n      Should response to request be blocked as mixed\n      content?\n    "}], "external": true};
-window.dfnpanelData['3ae34c95'] = {"dfnID": "3ae34c95", "url": "https://fetch.spec.whatwg.org/#concept-request-destination", "dfnText": "destination", "refSections": [{"refs": [{"id": "ref-for-concept-request-destination"}, {"id": "ref-for-concept-request-destination\u2460"}, {"id": "ref-for-concept-request-destination\u2461"}], "title": "3.1. Upgradeable Content"}, {"refs": [{"id": "ref-for-concept-request-destination\u2462"}, {"id": "ref-for-concept-request-destination\u2463"}], "title": "4.1. Upgrade a mixed content request to a potentially trustworthy URL, if appropriate"}, {"refs": [{"id": "ref-for-concept-request-destination\u2464"}], "title": "4.4. \n      Should fetching request be blocked as mixed content?\n    "}, {"refs": [{"id": "ref-for-concept-request-destination\u2465"}], "title": "4.5. \n      Should response to request be blocked as mixed\n      content?\n    "}], "external": true};
-window.dfnpanelData['fa4ea124'] = {"dfnID": "fa4ea124", "url": "https://fetch.spec.whatwg.org/#concept-request-initiator", "dfnText": "initiator", "refSections": [{"refs": [{"id": "ref-for-concept-request-initiator"}], "title": "3.1. Upgradeable Content"}, {"refs": [{"id": "ref-for-concept-request-initiator\u2460"}], "title": "4.1. Upgrade a mixed content request to a potentially trustworthy URL, if appropriate"}], "external": true};
-window.dfnpanelData['cb98f71f'] = {"dfnID": "cb98f71f", "url": "https://fetch.spec.whatwg.org/#concept-request-mode", "dfnText": "mode", "refSections": [{"refs": [{"id": "ref-for-concept-request-mode"}], "title": "4.1. Upgrade a mixed content request to a potentially trustworthy URL, if appropriate"}], "external": true};
-window.dfnpanelData['2889d1ec'] = {"dfnID": "2889d1ec", "url": "https://fetch.spec.whatwg.org/#navigation-request", "dfnText": "navigation request", "refSections": [{"refs": [{"id": "ref-for-navigation-request"}], "title": "3.2. Blockable Content"}], "external": true};
-window.dfnpanelData['55213b5b'] = {"dfnID": "55213b5b", "url": "https://fetch.spec.whatwg.org/#concept-request", "dfnText": "request", "refSections": [{"refs": [{"id": "ref-for-concept-request"}, {"id": "ref-for-concept-request\u2460"}, {"id": "ref-for-concept-request\u2461"}], "title": "2. Key Concepts and Terminology"}, {"refs": [{"id": "ref-for-concept-request\u2462"}], "title": "4.1. Upgrade a mixed content request to a potentially trustworthy URL, if appropriate"}, {"refs": [{"id": "ref-for-concept-request\u2463"}, {"id": "ref-for-concept-request\u2464"}], "title": "4.4. \n      Should fetching request be blocked as mixed content?\n    "}, {"refs": [{"id": "ref-for-concept-request\u2465"}], "title": "4.5. \n      Should response to request be blocked as mixed\n      content?\n    "}], "external": true};
-window.dfnpanelData['ee7bba09'] = {"dfnID": "ee7bba09", "url": "https://fetch.spec.whatwg.org/#concept-response", "dfnText": "response", "refSections": [{"refs": [{"id": "ref-for-concept-response"}, {"id": "ref-for-concept-response\u2460"}], "title": "2. Key Concepts and Terminology"}, {"refs": [{"id": "ref-for-concept-response\u2461"}], "title": "4.5. \n      Should response to request be blocked as mixed\n      content?\n    "}], "external": true};
-window.dfnpanelData['dc1cd39b'] = {"dfnID": "dc1cd39b", "url": "https://fetch.spec.whatwg.org/#concept-request-url", "dfnText": "url (for request)", "refSections": [{"refs": [{"id": "ref-for-concept-request-url"}], "title": "2. Key Concepts and Terminology"}, {"refs": [{"id": "ref-for-concept-request-url\u2460"}, {"id": "ref-for-concept-request-url\u2461"}, {"id": "ref-for-concept-request-url\u2462"}, {"id": "ref-for-concept-request-url\u2463"}], "title": "4.1. Upgrade a mixed content request to a potentially trustworthy URL, if appropriate"}, {"refs": [{"id": "ref-for-concept-request-url\u2464"}], "title": "4.4. \n      Should fetching request be blocked as mixed content?\n    "}], "external": true};
-window.dfnpanelData['3268a8eb'] = {"dfnID": "3268a8eb", "url": "https://fetch.spec.whatwg.org/#concept-response-url", "dfnText": "url (for response)", "refSections": [{"refs": [{"id": "ref-for-concept-response-url"}], "title": "2. Key Concepts and Terminology"}, {"refs": [{"id": "ref-for-concept-response-url\u2460"}], "title": "4.5. \n      Should response to request be blocked as mixed\n      content?\n    "}], "external": true};
-window.dfnpanelData['ff8d2a6f'] = {"dfnID": "ff8d2a6f", "url": "https://fetch.spec.whatwg.org/#concept-response-url-list", "dfnText": "url list", "refSections": [{"refs": [{"id": "ref-for-concept-response-url-list"}, {"id": "ref-for-concept-response-url-list\u2460"}], "title": "5.2. Modifications to HTML"}], "external": true};
-window.dfnpanelData['5f753d3e'] = {"dfnID": "5f753d3e", "url": "https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#attr-fs-action", "dfnText": "action", "refSections": [{"refs": [{"id": "ref-for-attr-fs-action"}, {"id": "ref-for-attr-fs-action\u2460"}], "title": "7.1. Form Submission"}], "external": true};
-window.dfnpanelData['35972864'] = {"dfnID": "35972864", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#nav-document", "dfnText": "active document", "refSections": [{"refs": [{"id": "ref-for-nav-document"}], "title": "5.2. Modifications to HTML"}], "external": true};
-window.dfnpanelData['2c82d279'] = {"dfnID": "2c82d279", "url": "https://html.spec.whatwg.org/multipage/media.html#audio", "dfnText": "audio", "refSections": [{"refs": [{"id": "ref-for-audio"}], "title": "3.1. Upgradeable Content"}], "external": true};
-window.dfnpanelData['3b2ff63e'] = {"dfnID": "3b2ff63e", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#concept-document-bc", "dfnText": "browsing context", "refSections": [{"refs": [{"id": "ref-for-concept-document-bc"}], "title": "2. Key Concepts and Terminology"}], "external": true};
-window.dfnpanelData['95430270'] = {"dfnID": "95430270", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#doc-container-document", "dfnText": "container document", "refSections": [{"refs": [{"id": "ref-for-doc-container-document"}], "title": "2. Key Concepts and Terminology"}], "external": true};
-window.dfnpanelData['621cb009'] = {"dfnID": "621cb009", "url": "https://html.spec.whatwg.org/multipage/links.html#downloading-hyperlinks", "dfnText": "download the hyperlink", "refSections": [{"refs": [{"id": "ref-for-downloading-hyperlinks"}], "title": "5.2. Modifications to HTML"}], "external": true};
-window.dfnpanelData['3e12e042'] = {"dfnID": "3e12e042", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object", "dfnText": "environment settings object", "refSections": [{"refs": [{"id": "ref-for-environment-settings-object"}, {"id": "ref-for-environment-settings-object\u2460"}], "title": "4.3. \n      Does settings prohibit mixed security contexts?\n    "}], "external": true};
-window.dfnpanelData['946a9318'] = {"dfnID": "946a9318", "url": "https://html.spec.whatwg.org/multipage/forms.html#the-form-element", "dfnText": "form", "refSections": [{"refs": [{"id": "ref-for-the-form-element"}, {"id": "ref-for-the-form-element\u2460"}, {"id": "ref-for-the-form-element\u2461"}, {"id": "ref-for-the-form-element\u2462"}, {"id": "ref-for-the-form-element\u2463"}], "title": "7.1. Form Submission"}], "external": true};
-window.dfnpanelData['f0811ff8'] = {"dfnID": "f0811ff8", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element", "dfnText": "img", "refSections": [{"refs": [{"id": "ref-for-the-img-element"}, {"id": "ref-for-the-img-element\u2460"}], "title": "3.1. Upgradeable Content"}], "external": true};
-window.dfnpanelData['43ac8374'] = {"dfnID": "43ac8374", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-origin", "dfnText": "origin", "refSections": [{"refs": [{"id": "ref-for-concept-settings-object-origin"}, {"id": "ref-for-concept-settings-object-origin\u2460"}], "title": "4.3. \n      Does settings prohibit mixed security contexts?\n    "}], "external": true};
-window.dfnpanelData['8e918a17'] = {"dfnID": "8e918a17", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#plugin", "dfnText": "plugin", "refSections": [{"refs": [{"id": "ref-for-plugin"}], "title": "3.2. Blockable Content"}], "external": true};
-window.dfnpanelData['9c4c1e66'] = {"dfnID": "9c4c1e66", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object", "dfnText": "relevant settings object", "refSections": [{"refs": [{"id": "ref-for-relevant-settings-object"}], "title": "4.3. \n      Does settings prohibit mixed security contexts?\n    "}, {"refs": [{"id": "ref-for-relevant-settings-object\u2460"}], "title": "7.1. Form Submission"}], "external": true};
-window.dfnpanelData['e5882acf'] = {"dfnID": "e5882acf", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#the-source-element", "dfnText": "source", "refSections": [{"refs": [{"id": "ref-for-the-source-element"}, {"id": "ref-for-the-source-element\u2460"}], "title": "3.1. Upgradeable Content"}], "external": true};
-window.dfnpanelData['085ddd0a'] = {"dfnID": "085ddd0a", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-environment-target-browsing-context", "dfnText": "target browsing context", "refSections": [{"refs": [{"id": "ref-for-concept-environment-target-browsing-context"}], "title": "4.4. \n      Should fetching request be blocked as mixed content?\n    "}, {"refs": [{"id": "ref-for-concept-environment-target-browsing-context\u2460"}], "title": "4.5. \n      Should response to request be blocked as mixed\n      content?\n    "}], "external": true};
-window.dfnpanelData['ae2a6342'] = {"dfnID": "ae2a6342", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context", "dfnText": "top-level browsing context", "refSections": [{"refs": [{"id": "ref-for-top-level-browsing-context"}], "title": "3.2. Blockable Content"}, {"refs": [{"id": "ref-for-top-level-browsing-context\u2460"}], "title": "4.3. \n      Does settings prohibit mixed security contexts?\n    "}, {"refs": [{"id": "ref-for-top-level-browsing-context\u2461"}], "title": "7.1. Form Submission"}], "external": true};
-window.dfnpanelData['0fe59991'] = {"dfnID": "0fe59991", "url": "https://html.spec.whatwg.org/multipage/images.html#use-srcset-or-picture", "dfnText": "use srcset or picture", "refSections": [{"refs": [{"id": "ref-for-use-srcset-or-picture"}], "title": "3.1. Upgradeable Content"}], "external": true};
-window.dfnpanelData['aa7bbf63'] = {"dfnID": "aa7bbf63", "url": "https://html.spec.whatwg.org/multipage/media.html#video", "dfnText": "video", "refSections": [{"refs": [{"id": "ref-for-video"}], "title": "3.1. Upgradeable Content"}], "external": true};
-window.dfnpanelData['96dabee7'] = {"dfnID": "96dabee7", "url": "https://w3c.github.io/webappsec-secure-contexts/#potentially-trustworthy-origin", "dfnText": "potentially trustworthy origin", "refSections": [{"refs": [{"id": "ref-for-potentially-trustworthy-origin"}, {"id": "ref-for-potentially-trustworthy-origin\u2460"}], "title": "4.3. \n      Does settings prohibit mixed security contexts?\n    "}], "external": true};
-window.dfnpanelData['9c5d9c4d'] = {"dfnID": "9c5d9c4d", "url": "https://w3c.github.io/webappsec-secure-contexts/#potentially-trustworthy-url", "dfnText": "potentially trustworthy url", "refSections": [{"refs": [{"id": "ref-for-potentially-trustworthy-url"}, {"id": "ref-for-potentially-trustworthy-url\u2460"}, {"id": "ref-for-potentially-trustworthy-url\u2461"}], "title": "2. Key Concepts and Terminology"}, {"refs": [{"id": "ref-for-potentially-trustworthy-url\u2462"}, {"id": "ref-for-potentially-trustworthy-url\u2463"}], "title": "4.1. Upgrade a mixed content request to a potentially trustworthy URL, if appropriate"}, {"refs": [{"id": "ref-for-potentially-trustworthy-url\u2464"}], "title": "4.4. \n      Should fetching request be blocked as mixed content?\n    "}, {"refs": [{"id": "ref-for-potentially-trustworthy-url\u2465"}], "title": "4.5. \n      Should response to request be blocked as mixed\n      content?\n    "}, {"refs": [{"id": "ref-for-potentially-trustworthy-url\u2466"}, {"id": "ref-for-potentially-trustworthy-url\u2467"}, {"id": "ref-for-potentially-trustworthy-url\u2468"}, {"id": "ref-for-potentially-trustworthy-url\u2460\u24ea"}], "title": "5.2. Modifications to HTML"}, {"refs": [{"id": "ref-for-potentially-trustworthy-url\u2460\u2460"}, {"id": "ref-for-potentially-trustworthy-url\u2460\u2461"}, {"id": "ref-for-potentially-trustworthy-url\u2460\u2462"}, {"id": "ref-for-potentially-trustworthy-url\u2460\u2463"}], "title": "7.1. Form Submission"}], "external": true};
-window.dfnpanelData['3a711be7'] = {"dfnID": "3a711be7", "url": "https://url.spec.whatwg.org/#concept-url-scheme", "dfnText": "scheme", "refSections": [{"refs": [{"id": "ref-for-concept-url-scheme"}, {"id": "ref-for-concept-url-scheme\u2460"}], "title": "4.1. Upgrade a mixed content request to a potentially trustworthy URL, if appropriate"}], "external": true};
-window.dfnpanelData['d06b2b8c'] = {"dfnID": "d06b2b8c", "url": "https://xhr.spec.whatwg.org/#xmlhttprequest", "dfnText": "XMLHttpRequest", "refSections": [{"refs": [{"id": "ref-for-xmlhttprequest"}], "title": "3.2. Blockable Content"}], "external": true};
-window.dfnpanelData['mixed-content'] = {"dfnID": "mixed-content", "url": "#mixed-content", "dfnText": "mixed content", "refSections": [{"refs": [{"id": "ref-for-mixed-content"}], "title": "3. Content Categories"}, {"refs": [{"id": "ref-for-mixed-content\u2460"}], "title": "3.1. Upgradeable Content"}, {"refs": [{"id": "ref-for-mixed-content\u2461"}], "title": "4.4. \n      Should fetching request be blocked as mixed content?\n    "}, {"refs": [{"id": "ref-for-mixed-content\u2462"}], "title": "4.5. \n      Should response to request be blocked as mixed\n      content?\n    "}], "external": false};
-window.dfnpanelData['unauthenticated-response'] = {"dfnID": "unauthenticated-response", "url": "#unauthenticated-response", "dfnText": "\n        unauthenticated response\n      ", "refSections": [{"refs": [{"id": "ref-for-unauthenticated-response"}], "title": "2. Key Concepts and Terminology"}, {"refs": [{"id": "ref-for-unauthenticated-response\u2460"}, {"id": "ref-for-unauthenticated-response\u2461"}], "title": "4.5. \n      Should response to request be blocked as mixed\n      content?\n    "}], "external": false};
-window.dfnpanelData['embedding-document'] = {"dfnID": "embedding-document", "url": "#embedding-document", "dfnText": "embedding document", "refSections": [{"refs": [{"id": "ref-for-embedding-document"}, {"id": "ref-for-embedding-document\u2460"}, {"id": "ref-for-embedding-document\u2461"}], "title": "4.3. \n      Does settings prohibit mixed security contexts?\n    "}], "external": false};
-window.dfnpanelData['upgradeable-mixed-content'] = {"dfnID": "upgradeable-mixed-content", "url": "#upgradeable-mixed-content", "dfnText": "upgradeable", "refSections": [{"refs": [{"id": "ref-for-upgradeable-mixed-content"}], "title": "2. Key Concepts and Terminology"}, {"refs": [{"id": "ref-for-upgradeable-mixed-content\u2460"}], "title": "3.2. Blockable Content"}, {"refs": [{"id": "ref-for-upgradeable-mixed-content\u2461"}], "title": "7.2. User Controls"}], "external": false};
-window.dfnpanelData['blockable-mixed-content'] = {"dfnID": "blockable-mixed-content", "url": "#blockable-mixed-content", "dfnText": "blockable", "refSections": [{"refs": [{"id": "ref-for-blockable-mixed-content"}], "title": "2. Key Concepts and Terminology"}, {"refs": [{"id": "ref-for-blockable-mixed-content\u2460"}], "title": "4.4. \n      Should fetching request be blocked as mixed content?\n    "}, {"refs": [{"id": "ref-for-blockable-mixed-content\u2461"}, {"id": "ref-for-blockable-mixed-content\u2462"}], "title": "4.5. \n      Should response to request be blocked as mixed\n      content?\n    "}, {"refs": [{"id": "ref-for-blockable-mixed-content\u2463"}], "title": "7.1. Form Submission"}, {"refs": [{"id": "ref-for-blockable-mixed-content\u2464"}], "title": "7.2. User Controls"}], "external": false};
-window.dfnpanelData['upgrade-algorithm'] = {"dfnID": "upgrade-algorithm", "url": "#upgrade-algorithm", "dfnText": "4.1. Upgrade a mixed content request to a potentially trustworthy URL, if appropriate", "refSections": [{"refs": [{"id": "ref-for-upgrade-algorithm"}], "title": "4.1. Upgrade a mixed content request to a potentially trustworthy URL, if appropriate"}, {"refs": [{"id": "ref-for-upgrade-algorithm"}], "title": "5.1. Modifications to Fetch"}], "external": false};
-window.dfnpanelData['should-block-fetch'] = {"dfnID": "should-block-fetch", "url": "#should-block-fetch", "dfnText": "4.4. \n      Should fetching request be blocked as mixed content?\n    ", "refSections": [{"refs": [{"id": "ref-for-should-block-fetch"}], "title": "3.1. Upgradeable Content"}, {"refs": [{"id": "ref-for-should-block-fetch"}], "title": "3.2. Blockable Content"}, {"refs": [{"id": "ref-for-should-block-fetch"}], "title": "4.4. \n      Should fetching request be blocked as mixed content?\n    "}, {"refs": [{"id": "ref-for-should-block-fetch"}], "title": "4.5. \n      Should response to request be blocked as mixed\n      content?\n    "}], "external": false};
-window.dfnpanelData['should-block-response'] = {"dfnID": "should-block-response", "url": "#should-block-response", "dfnText": "4.5. \n      Should response to request be blocked as mixed\n      content?\n    ", "refSections": [{"refs": [{"id": "ref-for-should-block-response"}], "title": "4.5. \n      Should response to request be blocked as mixed\n      content?\n    "}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -1809,258 +1360,702 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"085ddd0a": {"dfnID":"085ddd0a","dfnText":"target browsing context","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-environment-target-browsing-context"}],"title":"4.4. \n      Should fetching request be blocked as mixed content?\n    "},{"refs":[{"id":"ref-for-concept-environment-target-browsing-context\u2460"}],"title":"4.5. \n      Should response to request be blocked as mixed\n      content?\n    "}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#concept-environment-target-browsing-context"},
+"0fe59991": {"dfnID":"0fe59991","dfnText":"use srcset or picture","external":true,"refSections":[{"refs":[{"id":"ref-for-use-srcset-or-picture"}],"title":"3.1. Upgradeable Content"}],"url":"https://html.spec.whatwg.org/multipage/images.html#use-srcset-or-picture"},
+"2889d1ec": {"dfnID":"2889d1ec","dfnText":"navigation request","external":true,"refSections":[{"refs":[{"id":"ref-for-navigation-request"}],"title":"3.2. Blockable Content"}],"url":"https://fetch.spec.whatwg.org/#navigation-request"},
+"2c82d279": {"dfnID":"2c82d279","dfnText":"audio","external":true,"refSections":[{"refs":[{"id":"ref-for-audio"}],"title":"3.1. Upgradeable Content"}],"url":"https://html.spec.whatwg.org/multipage/media.html#audio"},
+"3268a8eb": {"dfnID":"3268a8eb","dfnText":"url (for response)","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-response-url"}],"title":"2. Key Concepts and Terminology"},{"refs":[{"id":"ref-for-concept-response-url\u2460"}],"title":"4.5. \n      Should response to request be blocked as mixed\n      content?\n    "}],"url":"https://fetch.spec.whatwg.org/#concept-response-url"},
+"347e8fe9": {"dfnID":"347e8fe9","dfnText":"url","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-document-url"},{"id":"ref-for-concept-document-url\u2460"}],"title":"5.2. Modifications to HTML"}],"url":"https://dom.spec.whatwg.org/#concept-document-url"},
+"35972864": {"dfnID":"35972864","dfnText":"active document","external":true,"refSections":[{"refs":[{"id":"ref-for-nav-document"}],"title":"5.2. Modifications to HTML"}],"url":"https://html.spec.whatwg.org/multipage/document-sequences.html#nav-document"},
+"3a711be7": {"dfnID":"3a711be7","dfnText":"scheme","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-url-scheme"},{"id":"ref-for-concept-url-scheme\u2460"}],"title":"4.1. Upgrade a mixed content request to a potentially trustworthy URL, if appropriate"}],"url":"https://url.spec.whatwg.org/#concept-url-scheme"},
+"3ae34c95": {"dfnID":"3ae34c95","dfnText":"destination","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-request-destination"},{"id":"ref-for-concept-request-destination\u2460"},{"id":"ref-for-concept-request-destination\u2461"}],"title":"3.1. Upgradeable Content"},{"refs":[{"id":"ref-for-concept-request-destination\u2462"},{"id":"ref-for-concept-request-destination\u2463"}],"title":"4.1. Upgrade a mixed content request to a potentially trustworthy URL, if appropriate"},{"refs":[{"id":"ref-for-concept-request-destination\u2464"}],"title":"4.4. \n      Should fetching request be blocked as mixed content?\n    "},{"refs":[{"id":"ref-for-concept-request-destination\u2465"}],"title":"4.5. \n      Should response to request be blocked as mixed\n      content?\n    "}],"url":"https://fetch.spec.whatwg.org/#concept-request-destination"},
+"3b2ff63e": {"dfnID":"3b2ff63e","dfnText":"browsing context","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-document-bc"}],"title":"2. Key Concepts and Terminology"}],"url":"https://html.spec.whatwg.org/multipage/document-sequences.html#concept-document-bc"},
+"3e12e042": {"dfnID":"3e12e042","dfnText":"environment settings object","external":true,"refSections":[{"refs":[{"id":"ref-for-environment-settings-object"},{"id":"ref-for-environment-settings-object\u2460"}],"title":"4.3. \n      Does settings prohibit mixed security contexts?\n    "}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object"},
+"43ac8374": {"dfnID":"43ac8374","dfnText":"origin","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-settings-object-origin"},{"id":"ref-for-concept-settings-object-origin\u2460"}],"title":"4.3. \n      Does settings prohibit mixed security contexts?\n    "}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-origin"},
+"5216e1a0": {"dfnID":"5216e1a0","dfnText":"node document","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-node-document"}],"title":"5.2. Modifications to HTML"}],"url":"https://dom.spec.whatwg.org/#concept-node-document"},
+"55213b5b": {"dfnID":"55213b5b","dfnText":"request","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-request"},{"id":"ref-for-concept-request\u2460"},{"id":"ref-for-concept-request\u2461"}],"title":"2. Key Concepts and Terminology"},{"refs":[{"id":"ref-for-concept-request\u2462"}],"title":"4.1. Upgrade a mixed content request to a potentially trustworthy URL, if appropriate"},{"refs":[{"id":"ref-for-concept-request\u2463"},{"id":"ref-for-concept-request\u2464"}],"title":"4.4. \n      Should fetching request be blocked as mixed content?\n    "},{"refs":[{"id":"ref-for-concept-request\u2465"}],"title":"4.5. \n      Should response to request be blocked as mixed\n      content?\n    "}],"url":"https://fetch.spec.whatwg.org/#concept-request"},
+"5f753d3e": {"dfnID":"5f753d3e","dfnText":"action","external":true,"refSections":[{"refs":[{"id":"ref-for-attr-fs-action"},{"id":"ref-for-attr-fs-action\u2460"}],"title":"7.1. Form Submission"}],"url":"https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#attr-fs-action"},
+"621cb009": {"dfnID":"621cb009","dfnText":"download the hyperlink","external":true,"refSections":[{"refs":[{"id":"ref-for-downloading-hyperlinks"}],"title":"5.2. Modifications to HTML"}],"url":"https://html.spec.whatwg.org/multipage/links.html#downloading-hyperlinks"},
+"85394472": {"dfnID":"85394472","dfnText":"Document","external":true,"refSections":[{"refs":[{"id":"ref-for-document"}],"title":"2. Key Concepts and Terminology"},{"refs":[{"id":"ref-for-document\u2460"},{"id":"ref-for-document\u2461"}],"title":"7.1. Form Submission"}],"url":"https://dom.spec.whatwg.org/#document"},
+"857d5516": {"dfnID":"857d5516","dfnText":"client","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-request-client"}],"title":"4.1. Upgrade a mixed content request to a potentially trustworthy URL, if appropriate"},{"refs":[{"id":"ref-for-concept-request-client\u2460"}],"title":"4.4. \n      Should fetching request be blocked as mixed content?\n    "},{"refs":[{"id":"ref-for-concept-request-client\u2461"}],"title":"4.5. \n      Should response to request be blocked as mixed\n      content?\n    "}],"url":"https://fetch.spec.whatwg.org/#concept-request-client"},
+"8e918a17": {"dfnID":"8e918a17","dfnText":"plugin","external":true,"refSections":[{"refs":[{"id":"ref-for-plugin"}],"title":"3.2. Blockable Content"}],"url":"https://html.spec.whatwg.org/multipage/infrastructure.html#plugin"},
+"946a9318": {"dfnID":"946a9318","dfnText":"form","external":true,"refSections":[{"refs":[{"id":"ref-for-the-form-element"},{"id":"ref-for-the-form-element\u2460"},{"id":"ref-for-the-form-element\u2461"},{"id":"ref-for-the-form-element\u2462"},{"id":"ref-for-the-form-element\u2463"}],"title":"7.1. Form Submission"}],"url":"https://html.spec.whatwg.org/multipage/forms.html#the-form-element"},
+"95430270": {"dfnID":"95430270","dfnText":"container document","external":true,"refSections":[{"refs":[{"id":"ref-for-doc-container-document"}],"title":"2. Key Concepts and Terminology"}],"url":"https://html.spec.whatwg.org/multipage/document-sequences.html#doc-container-document"},
+"96dabee7": {"dfnID":"96dabee7","dfnText":"potentially trustworthy origin","external":true,"refSections":[{"refs":[{"id":"ref-for-potentially-trustworthy-origin"},{"id":"ref-for-potentially-trustworthy-origin\u2460"}],"title":"4.3. \n      Does settings prohibit mixed security contexts?\n    "}],"url":"https://w3c.github.io/webappsec-secure-contexts/#potentially-trustworthy-origin"},
+"9c4c1e66": {"dfnID":"9c4c1e66","dfnText":"relevant settings object","external":true,"refSections":[{"refs":[{"id":"ref-for-relevant-settings-object"}],"title":"4.3. \n      Does settings prohibit mixed security contexts?\n    "},{"refs":[{"id":"ref-for-relevant-settings-object\u2460"}],"title":"7.1. Form Submission"}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object"},
+"9c5d9c4d": {"dfnID":"9c5d9c4d","dfnText":"potentially trustworthy url","external":true,"refSections":[{"refs":[{"id":"ref-for-potentially-trustworthy-url"},{"id":"ref-for-potentially-trustworthy-url\u2460"},{"id":"ref-for-potentially-trustworthy-url\u2461"}],"title":"2. Key Concepts and Terminology"},{"refs":[{"id":"ref-for-potentially-trustworthy-url\u2462"},{"id":"ref-for-potentially-trustworthy-url\u2463"}],"title":"4.1. Upgrade a mixed content request to a potentially trustworthy URL, if appropriate"},{"refs":[{"id":"ref-for-potentially-trustworthy-url\u2464"}],"title":"4.4. \n      Should fetching request be blocked as mixed content?\n    "},{"refs":[{"id":"ref-for-potentially-trustworthy-url\u2465"}],"title":"4.5. \n      Should response to request be blocked as mixed\n      content?\n    "},{"refs":[{"id":"ref-for-potentially-trustworthy-url\u2466"},{"id":"ref-for-potentially-trustworthy-url\u2467"},{"id":"ref-for-potentially-trustworthy-url\u2468"},{"id":"ref-for-potentially-trustworthy-url\u2460\u24ea"}],"title":"5.2. Modifications to HTML"},{"refs":[{"id":"ref-for-potentially-trustworthy-url\u2460\u2460"},{"id":"ref-for-potentially-trustworthy-url\u2460\u2461"},{"id":"ref-for-potentially-trustworthy-url\u2460\u2462"},{"id":"ref-for-potentially-trustworthy-url\u2460\u2463"}],"title":"7.1. Form Submission"}],"url":"https://w3c.github.io/webappsec-secure-contexts/#potentially-trustworthy-url"},
+"a4cd8a8d": {"dfnID":"a4cd8a8d","dfnText":"border-image","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-border-image"}],"title":"3.1. Upgradeable Content"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-border-image"},
+"aa7bbf63": {"dfnID":"aa7bbf63","dfnText":"video","external":true,"refSections":[{"refs":[{"id":"ref-for-video"}],"title":"3.1. Upgradeable Content"}],"url":"https://html.spec.whatwg.org/multipage/media.html#video"},
+"ae2a6342": {"dfnID":"ae2a6342","dfnText":"top-level browsing context","external":true,"refSections":[{"refs":[{"id":"ref-for-top-level-browsing-context"}],"title":"3.2. Blockable Content"},{"refs":[{"id":"ref-for-top-level-browsing-context\u2460"}],"title":"4.3. \n      Does settings prohibit mixed security contexts?\n    "},{"refs":[{"id":"ref-for-top-level-browsing-context\u2461"}],"title":"7.1. Form Submission"}],"url":"https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context"},
+"blockable-mixed-content": {"dfnID":"blockable-mixed-content","dfnText":"blockable","external":false,"refSections":[{"refs":[{"id":"ref-for-blockable-mixed-content"}],"title":"2. Key Concepts and Terminology"},{"refs":[{"id":"ref-for-blockable-mixed-content\u2460"}],"title":"4.4. \n      Should fetching request be blocked as mixed content?\n    "},{"refs":[{"id":"ref-for-blockable-mixed-content\u2461"},{"id":"ref-for-blockable-mixed-content\u2462"}],"title":"4.5. \n      Should response to request be blocked as mixed\n      content?\n    "},{"refs":[{"id":"ref-for-blockable-mixed-content\u2463"}],"title":"7.1. Form Submission"},{"refs":[{"id":"ref-for-blockable-mixed-content\u2464"}],"title":"7.2. User Controls"}],"url":"#blockable-mixed-content"},
+"cb98f71f": {"dfnID":"cb98f71f","dfnText":"mode","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-request-mode"}],"title":"4.1. Upgrade a mixed content request to a potentially trustworthy URL, if appropriate"}],"url":"https://fetch.spec.whatwg.org/#concept-request-mode"},
+"d06b2b8c": {"dfnID":"d06b2b8c","dfnText":"XMLHttpRequest","external":true,"refSections":[{"refs":[{"id":"ref-for-xmlhttprequest"}],"title":"3.2. Blockable Content"}],"url":"https://xhr.spec.whatwg.org/#xmlhttprequest"},
+"dc1cd39b": {"dfnID":"dc1cd39b","dfnText":"url (for request)","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-request-url"}],"title":"2. Key Concepts and Terminology"},{"refs":[{"id":"ref-for-concept-request-url\u2460"},{"id":"ref-for-concept-request-url\u2461"},{"id":"ref-for-concept-request-url\u2462"},{"id":"ref-for-concept-request-url\u2463"}],"title":"4.1. Upgrade a mixed content request to a potentially trustworthy URL, if appropriate"},{"refs":[{"id":"ref-for-concept-request-url\u2464"}],"title":"4.4. \n      Should fetching request be blocked as mixed content?\n    "}],"url":"https://fetch.spec.whatwg.org/#concept-request-url"},
+"e5882acf": {"dfnID":"e5882acf","dfnText":"source","external":true,"refSections":[{"refs":[{"id":"ref-for-the-source-element"},{"id":"ref-for-the-source-element\u2460"}],"title":"3.1. Upgradeable Content"}],"url":"https://html.spec.whatwg.org/multipage/embedded-content.html#the-source-element"},
+"ee7bba09": {"dfnID":"ee7bba09","dfnText":"response","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-response"},{"id":"ref-for-concept-response\u2460"}],"title":"2. Key Concepts and Terminology"},{"refs":[{"id":"ref-for-concept-response\u2461"}],"title":"4.5. \n      Should response to request be blocked as mixed\n      content?\n    "}],"url":"https://fetch.spec.whatwg.org/#concept-response"},
+"embedding-document": {"dfnID":"embedding-document","dfnText":"embedding document","external":false,"refSections":[{"refs":[{"id":"ref-for-embedding-document"},{"id":"ref-for-embedding-document\u2460"},{"id":"ref-for-embedding-document\u2461"}],"title":"4.3. \n      Does settings prohibit mixed security contexts?\n    "}],"url":"#embedding-document"},
+"f0811ff8": {"dfnID":"f0811ff8","dfnText":"img","external":true,"refSections":[{"refs":[{"id":"ref-for-the-img-element"},{"id":"ref-for-the-img-element\u2460"}],"title":"3.1. Upgradeable Content"}],"url":"https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element"},
+"f831c141": {"dfnID":"f831c141","dfnText":"background-image","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-background-image"}],"title":"3.1. Upgradeable Content"}],"url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-background-image"},
+"fa4ea124": {"dfnID":"fa4ea124","dfnText":"initiator","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-request-initiator"}],"title":"3.1. Upgradeable Content"},{"refs":[{"id":"ref-for-concept-request-initiator\u2460"}],"title":"4.1. Upgrade a mixed content request to a potentially trustworthy URL, if appropriate"}],"url":"https://fetch.spec.whatwg.org/#concept-request-initiator"},
+"ff8d2a6f": {"dfnID":"ff8d2a6f","dfnText":"url list","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-response-url-list"},{"id":"ref-for-concept-response-url-list\u2460"}],"title":"5.2. Modifications to HTML"}],"url":"https://fetch.spec.whatwg.org/#concept-response-url-list"},
+"mixed-content": {"dfnID":"mixed-content","dfnText":"mixed content","external":false,"refSections":[{"refs":[{"id":"ref-for-mixed-content"}],"title":"3. Content Categories"},{"refs":[{"id":"ref-for-mixed-content\u2460"}],"title":"3.1. Upgradeable Content"},{"refs":[{"id":"ref-for-mixed-content\u2461"}],"title":"4.4. \n      Should fetching request be blocked as mixed content?\n    "},{"refs":[{"id":"ref-for-mixed-content\u2462"}],"title":"4.5. \n      Should response to request be blocked as mixed\n      content?\n    "}],"url":"#mixed-content"},
+"should-block-fetch": {"dfnID":"should-block-fetch","dfnText":"4.4. \n      Should fetching request be blocked as mixed content?\n    ","external":false,"refSections":[{"refs":[{"id":"ref-for-should-block-fetch"}],"title":"3.1. Upgradeable Content"},{"refs":[{"id":"ref-for-should-block-fetch"}],"title":"3.2. Blockable Content"},{"refs":[{"id":"ref-for-should-block-fetch"}],"title":"4.4. \n      Should fetching request be blocked as mixed content?\n    "},{"refs":[{"id":"ref-for-should-block-fetch"}],"title":"4.5. \n      Should response to request be blocked as mixed\n      content?\n    "}],"url":"#should-block-fetch"},
+"should-block-response": {"dfnID":"should-block-response","dfnText":"4.5. \n      Should response to request be blocked as mixed\n      content?\n    ","external":false,"refSections":[{"refs":[{"id":"ref-for-should-block-response"}],"title":"4.5. \n      Should response to request be blocked as mixed\n      content?\n    "}],"url":"#should-block-response"},
+"unauthenticated-response": {"dfnID":"unauthenticated-response","dfnText":"\n        unauthenticated response\n      ","external":false,"refSections":[{"refs":[{"id":"ref-for-unauthenticated-response"}],"title":"2. Key Concepts and Terminology"},{"refs":[{"id":"ref-for-unauthenticated-response\u2460"},{"id":"ref-for-unauthenticated-response\u2461"}],"title":"4.5. \n      Should response to request be blocked as mixed\n      content?\n    "}],"url":"#unauthenticated-response"},
+"upgrade-algorithm": {"dfnID":"upgrade-algorithm","dfnText":"4.1. Upgrade a mixed content request to a potentially trustworthy URL, if appropriate","external":false,"refSections":[{"refs":[{"id":"ref-for-upgrade-algorithm"}],"title":"4.1. Upgrade a mixed content request to a potentially trustworthy URL, if appropriate"},{"refs":[{"id":"ref-for-upgrade-algorithm"}],"title":"5.1. Modifications to Fetch"}],"url":"#upgrade-algorithm"},
+"upgradeable-mixed-content": {"dfnID":"upgradeable-mixed-content","dfnText":"upgradeable","external":false,"refSections":[{"refs":[{"id":"ref-for-upgradeable-mixed-content"}],"title":"2. Key Concepts and Terminology"},{"refs":[{"id":"ref-for-upgradeable-mixed-content\u2460"}],"title":"3.2. Blockable Content"},{"refs":[{"id":"ref-for-upgradeable-mixed-content\u2461"}],"title":"7.2. User Controls"}],"url":"#upgradeable-mixed-content"},
+};
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+});
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        dfn.panelData = panelData;
+        insertDfnPopupAction(dfn);
+    }
+}
+
+function genDfnPanel(dfn, { dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel on",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel({dfnPanel});
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.dfn = dfn;
+    dfn.dfnPanel = dfnPanel;
+    return dfnPanel;
+}
+
+
+
+function hideAllDfnPanels() {
+    // Delete the currently-active dfn panel.
+    queryAll(".dfn-panel").forEach(dfnPanel=>hideDfnPanel({dfnPanel}));
+}
+
+function showDfnPanel(dfn) {
+    hideAllDfnPanels(); // Only display one at a time.
+
+    dfn.setAttribute("aria-expanded", "true");
+
+    const dfnPanel = genDfnPanel(dfn, dfn.panelData);
+
+    // Give the dfn a unique tabindex, and then
+    // give all the tabbable panel bits successive indexes.
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+
+    append(document.body, dfnPanel);
+    positionDfnPanel(dfnPanel);
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.dfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }
+}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel({dfn, dfnPanel}) {
+    if(!dfnPanel) dfnPanel = dfn.dfnPanel;
+    if(!dfn) dfn = dfnPanel.dfn;
+    dfn.dfnPanel = undefined;
+    dfnPanel.dfn = undefined;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.remove()
+}
+
+function toggleDfnPanel(dfn) {
+    if(dfn.dfnPanel) {
+        hideDfnPanel(dfn);
+    } else {
+        showDfnPanel(dfn);
+    }
+}
+
+function insertDfnPopupAction(dfn) {
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        toggleDfnPanel(dfn);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+function needsFor(type) {
+    switch(type) {
+        case "descriptor":
+        case "value":
+        case "element-attr":
+        case "attr-value":
+        case "element-state":
+        case "method":
+        case "constructor":
+        case "argument":
+        case "attribute":
+        case "const":
+        case "dict-member":
+        case "event":
+        case "enum-value":
+        case "stringifier":
+        case "serializer":
+        case "iterator":
+        case "maplike":
+        case "setlike":
+        case "state":
+        case "mode":
+        case "context":
+        case "facet": return true;
+
+        default: return false;
+    }
+}
+function refusesFor(type) {
+    switch(type) {
+        case "property":
+        case "element":
+        case "interface":
+        case "namespace":
+        case "callback":
+        case "dictionary":
+        case "enum":
+        case "exception":
+        case "typedef":
+        case "http-header":
+        case "permission": return true;
+
+        default: return false;
+    }
+}
+function linkFormatterFromType(type) {
+    switch(type) {
+        case 'scheme':
+        case 'permission':
+        case 'dfn': return (text) => `[=${text}=]`;
+
+        case 'abstract-op': return (text) => `[\$${text}\$]`;
+
+        case 'function':
+        case 'at-rule':
+        case 'selector':
+        case 'value': return (text) => `''${text}''`;
+
+        case 'http-header': return (text) => `[:${text}:]`;
+
+        case 'interface':
+        case 'constructor':
+        case 'method':
+        case 'argument':
+        case 'attribute':
+        case 'callback':
+        case 'dictionary':
+        case 'dict-member':
+        case 'enum':
+        case 'enum-value':
+        case 'exception':
+        case 'const':
+        case 'typedef':
+        case 'stringifier':
+        case 'serializer':
+        case 'iterator':
+        case 'maplike':
+        case 'setlike':
+        case 'extended-attribute':
+        case 'event':
+        case 'idl': return (text) => `{{${text}}}`;
+
+        case 'element-state':
+        case 'element-attr':
+        case 'attr-value':
+        case 'element': return (element) => `<{${element}}>`;
+
+        case 'grammar': return (text) => `${text} (within a <pre class=prod>)`;
+
+        case 'type': return (text)=> `<<${text}>>`;
+
+        case 'descriptor':
+        case 'property': return (text) => `'${text}'`;
+
+        default: return;
+    };
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!needsFor(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!refusesFor(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
 }
 </script>
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
-                mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
+let refsData = {
+"#blockable-mixed-content": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"mixed-content-2","spec":"mixed-content-2-2","status":"local","text":"blockable","type":"dfn","url":"#blockable-mixed-content"},
+"#embedding-document": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"mixed-content-2","spec":"mixed-content-2-2","status":"local","text":"embedding document","type":"dfn","url":"#embedding-document"},
+"#mixed-content": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"mixed-content-2","spec":"mixed-content-2-2","status":"local","text":"mixed content","type":"dfn","url":"#mixed-content"},
+"#unauthenticated-response": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"mixed-content-2","spec":"mixed-content-2-2","status":"local","text":"unauthenticated response","type":"dfn","url":"#unauthenticated-response"},
+"#upgradeable-mixed-content": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"mixed-content-2","spec":"mixed-content-2-2","status":"local","text":"upgradeable","type":"dfn","url":"#upgradeable-mixed-content"},
+"https://dom.spec.whatwg.org/#concept-document-url": {"export":true,"for_":["Document"],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"url","type":"dfn","url":"https://dom.spec.whatwg.org/#concept-document-url"},
+"https://dom.spec.whatwg.org/#concept-node-document": {"export":true,"for_":["Node"],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"node document","type":"dfn","url":"https://dom.spec.whatwg.org/#concept-node-document"},
+"https://dom.spec.whatwg.org/#document": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"Document","type":"interface","url":"https://dom.spec.whatwg.org/#document"},
+"https://drafts.csswg.org/css-backgrounds-3/#propdef-background-image": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"current","text":"background-image","type":"property","url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-background-image"},
+"https://drafts.csswg.org/css-backgrounds-3/#propdef-border-image": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-backgrounds","spec":"css-backgrounds-3","status":"current","text":"border-image","type":"property","url":"https://drafts.csswg.org/css-backgrounds-3/#propdef-border-image"},
+"https://fetch.spec.whatwg.org/#concept-request": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"request","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-request"},
+"https://fetch.spec.whatwg.org/#concept-request-client": {"export":true,"for_":["request"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"client","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-request-client"},
+"https://fetch.spec.whatwg.org/#concept-request-destination": {"export":true,"for_":["request"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"destination","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-request-destination"},
+"https://fetch.spec.whatwg.org/#concept-request-initiator": {"export":true,"for_":["request"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"initiator","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-request-initiator"},
+"https://fetch.spec.whatwg.org/#concept-request-mode": {"export":true,"for_":["request"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"mode","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-request-mode"},
+"https://fetch.spec.whatwg.org/#concept-request-url": {"export":true,"for_":["request"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"url","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-request-url"},
+"https://fetch.spec.whatwg.org/#concept-response": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"response","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-response"},
+"https://fetch.spec.whatwg.org/#concept-response-url": {"export":true,"for_":["response"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"url","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-response-url"},
+"https://fetch.spec.whatwg.org/#concept-response-url-list": {"export":true,"for_":["response"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"url list","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-response-url-list"},
+"https://fetch.spec.whatwg.org/#navigation-request": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"navigation request","type":"dfn","url":"https://fetch.spec.whatwg.org/#navigation-request"},
+"https://html.spec.whatwg.org/multipage/document-sequences.html#concept-document-bc": {"export":true,"for_":["Document"],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"browsing context","type":"dfn","url":"https://html.spec.whatwg.org/multipage/document-sequences.html#concept-document-bc"},
+"https://html.spec.whatwg.org/multipage/document-sequences.html#doc-container-document": {"export":false,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"container document","type":"dfn","url":"https://html.spec.whatwg.org/multipage/document-sequences.html#doc-container-document"},
+"https://html.spec.whatwg.org/multipage/document-sequences.html#nav-document": {"export":true,"for_":["navigable"],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"active document","type":"dfn","url":"https://html.spec.whatwg.org/multipage/document-sequences.html#nav-document"},
+"https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"top-level browsing context","type":"dfn","url":"https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context"},
+"https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"img","type":"element","url":"https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element"},
+"https://html.spec.whatwg.org/multipage/embedded-content.html#the-source-element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"source","type":"element","url":"https://html.spec.whatwg.org/multipage/embedded-content.html#the-source-element"},
+"https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#attr-fs-action": {"export":true,"for_":["form","button"],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"action","type":"element-attr","url":"https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#attr-fs-action"},
+"https://html.spec.whatwg.org/multipage/forms.html#the-form-element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"form","type":"element","url":"https://html.spec.whatwg.org/multipage/forms.html#the-form-element"},
+"https://html.spec.whatwg.org/multipage/images.html#use-srcset-or-picture": {"export":false,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"use srcset or picture","type":"dfn","url":"https://html.spec.whatwg.org/multipage/images.html#use-srcset-or-picture"},
+"https://html.spec.whatwg.org/multipage/infrastructure.html#plugin": {"export":false,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"plugin","type":"dfn","url":"https://html.spec.whatwg.org/multipage/infrastructure.html#plugin"},
+"https://html.spec.whatwg.org/multipage/links.html#downloading-hyperlinks": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"download the hyperlink","type":"dfn","url":"https://html.spec.whatwg.org/multipage/links.html#downloading-hyperlinks"},
+"https://html.spec.whatwg.org/multipage/media.html#audio": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"audio","type":"element","url":"https://html.spec.whatwg.org/multipage/media.html#audio"},
+"https://html.spec.whatwg.org/multipage/media.html#video": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"video","type":"element","url":"https://html.spec.whatwg.org/multipage/media.html#video"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#concept-environment-target-browsing-context": {"export":true,"for_":["environment"],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"target browsing context","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#concept-environment-target-browsing-context"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-origin": {"export":true,"for_":["environment settings object"],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"origin","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-origin"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"environment settings object","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"relevant settings object","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object"},
+"https://url.spec.whatwg.org/#concept-url-scheme": {"export":true,"for_":["url"],"level":"1","normative":true,"shortname":"url","spec":"url","status":"current","text":"scheme","type":"dfn","url":"https://url.spec.whatwg.org/#concept-url-scheme"},
+"https://w3c.github.io/webappsec-secure-contexts/#potentially-trustworthy-origin": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"secure-contexts","spec":"secure-contexts","status":"current","text":"potentially trustworthy origin","type":"dfn","url":"https://w3c.github.io/webappsec-secure-contexts/#potentially-trustworthy-origin"},
+"https://w3c.github.io/webappsec-secure-contexts/#potentially-trustworthy-url": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"secure-contexts","spec":"secure-contexts","status":"current","text":"potentially trustworthy url","type":"dfn","url":"https://w3c.github.io/webappsec-secure-contexts/#potentially-trustworthy-url"},
+"https://xhr.spec.whatwg.org/#xmlhttprequest": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"xhr","spec":"xhr","status":"current","text":"XMLHttpRequest","type":"interface","url":"https://xhr.spec.whatwg.org/#xmlhttprequest"},
+};
+
+function mkRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "Term: "),
+                mk.span({}, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    let forListElements;
+    if(forList.length == 0) {
+        forListElements = [];
+    } else if(forList.length == 1) {
+        forListElements = mk.li({},
+            mk.b({}, "For: "),
+            mk.span({}, forList[0]),
+        );
+    } else {
+        forListElements = mk.li({},
             mk.b({}, "For: "),
             mk.ul({},
                 ...forList.map(forItem =>
                     mk.li({},
-                        mk.span({}, `${forItem}`)
+                        mk.span({}, forItem)
                     ),
                 ),
             ),
         );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+    }
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    setupRefHintEventListeners(link, hintPanel);
+    return hintPanel;
+}
+
+function hideAllRefHints() {
+    queryAll(".ref-hint").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    if(refHint.teardownEventListeners) {
+        refHint.teardownEventListeners();
     }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+    refHint.remove();
+}
+
+function showRefHint(link) {
+    if(link.classList.contains("dfn-link")) return;
+    const url = link.getAttribute("href");
+    const ref = refsData[url];
+    if(!ref) return;
+
+    hideAllRefHints(); // Only display one at this time.
+
+    const refHint = mkRefHint(link, ref);
+    append(document.body, refHint);
+    link.setAttribute("aria-expanded", "true");
+    positionRefHint(refHint);
+}
+
+function setupRefHintEventListeners(link, refHint) {
+    if (refHint.teardownEventListeners) return;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
+
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
-
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
-    }
-
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
-        }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
-
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
-    }
-
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+document.addEventListener("DOMContentLoaded", () => {
+    document.body.addEventListener("mouseover", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
+    });
+    document.body.addEventListener("focus", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
     });
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['https://fetch.spec.whatwg.org/#concept-request'] = {"text": "request", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#concept-request-url'] = {"text": "url", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-url", "export": true, "normative": true, "for_": ["request"]};
-window.refsData['https://w3c.github.io/webappsec-secure-contexts/#potentially-trustworthy-url'] = {"text": "potentially trustworthy url", "type": "dfn", "spec": "secure-contexts", "shortname": "secure-contexts", "level": "1", "status": "current", "url": "https://w3c.github.io/webappsec-secure-contexts/#potentially-trustworthy-url", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#concept-response'] = {"text": "response", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response", "export": true, "normative": true, "for_": []};
-window.refsData['#unauthenticated-response'] = {"text": "unauthenticated response", "type": "dfn", "spec": "mixed-content-2-2", "shortname": "mixed-content-2", "level": "2", "status": "local", "url": "#unauthenticated-response", "export": true, "normative": true, "for_": []};
-window.refsData['#blockable-mixed-content'] = {"text": "blockable", "type": "dfn", "spec": "mixed-content-2-2", "shortname": "mixed-content-2", "level": "2", "status": "local", "url": "#blockable-mixed-content", "export": true, "normative": true, "for_": []};
-window.refsData['#upgradeable-mixed-content'] = {"text": "upgradeable", "type": "dfn", "spec": "mixed-content-2-2", "shortname": "mixed-content-2", "level": "2", "status": "local", "url": "#upgradeable-mixed-content", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#concept-response-url'] = {"text": "url", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response-url", "export": true, "normative": true, "for_": ["response"]};
-window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#concept-document-bc'] = {"text": "browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#concept-document-bc", "export": true, "normative": true, "for_": ["Document"]};
-window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#doc-container-document'] = {"text": "container document", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#doc-container-document", "export": false, "normative": true, "for_": []};
-window.refsData['#mixed-content'] = {"text": "mixed content", "type": "dfn", "spec": "mixed-content-2-2", "shortname": "mixed-content-2", "level": "2", "status": "local", "url": "#mixed-content", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#concept-request-initiator'] = {"text": "initiator", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-initiator", "export": true, "normative": true, "for_": ["request"]};
-window.refsData['https://fetch.spec.whatwg.org/#concept-request-destination'] = {"text": "destination", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-destination", "export": true, "normative": true, "for_": ["request"]};
-window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element'] = {"text": "img", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-background-image'] = {"text": "background-image", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background-image", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border-image'] = {"text": "border-image", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-image", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/images.html#use-srcset-or-picture'] = {"text": "use srcset or picture", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/images.html#use-srcset-or-picture", "export": false, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/media.html#video'] = {"text": "video", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#video", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#the-source-element'] = {"text": "source", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#the-source-element", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/media.html#audio'] = {"text": "audio", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#audio", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#plugin'] = {"text": "plugin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#plugin", "export": false, "normative": true, "for_": []};
-window.refsData['https://xhr.spec.whatwg.org/#xmlhttprequest'] = {"text": "XMLHttpRequest", "type": "interface", "spec": "xhr", "shortname": "xhr", "level": "1", "status": "current", "url": "https://xhr.spec.whatwg.org/#xmlhttprequest", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#navigation-request'] = {"text": "navigation request", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#navigation-request", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context'] = {"text": "top-level browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#concept-request-client'] = {"text": "client", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-client", "export": true, "normative": true, "for_": ["request"]};
-window.refsData['https://fetch.spec.whatwg.org/#concept-request-mode'] = {"text": "mode", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-mode", "export": true, "normative": true, "for_": ["request"]};
-window.refsData['https://url.spec.whatwg.org/#concept-url-scheme'] = {"text": "scheme", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-scheme", "export": true, "normative": true, "for_": ["url"]};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object'] = {"text": "environment settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-origin'] = {"text": "origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-origin", "export": true, "normative": true, "for_": ["environment settings object"]};
-window.refsData['https://w3c.github.io/webappsec-secure-contexts/#potentially-trustworthy-origin'] = {"text": "potentially trustworthy origin", "type": "dfn", "spec": "secure-contexts", "shortname": "secure-contexts", "level": "1", "status": "current", "url": "https://w3c.github.io/webappsec-secure-contexts/#potentially-trustworthy-origin", "export": true, "normative": true, "for_": []};
-window.refsData['#embedding-document'] = {"text": "embedding document", "type": "dfn", "spec": "mixed-content-2-2", "shortname": "mixed-content-2", "level": "2", "status": "local", "url": "#embedding-document", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object'] = {"text": "relevant settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-environment-target-browsing-context'] = {"text": "target browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-environment-target-browsing-context", "export": true, "normative": true, "for_": ["environment"]};
-window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#nav-document'] = {"text": "active document", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#nav-document", "export": true, "normative": true, "for_": ["navigable"]};
-window.refsData['https://dom.spec.whatwg.org/#concept-document-url'] = {"text": "url", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-document-url", "export": true, "normative": true, "for_": ["Document"]};
-window.refsData['https://fetch.spec.whatwg.org/#concept-response-url-list'] = {"text": "url list", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response-url-list", "export": true, "normative": true, "for_": ["response"]};
-window.refsData['https://html.spec.whatwg.org/multipage/links.html#downloading-hyperlinks'] = {"text": "download the hyperlink", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/links.html#downloading-hyperlinks", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#concept-node-document'] = {"text": "node document", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-node-document", "export": true, "normative": true, "for_": ["Node"]};
-window.refsData['https://html.spec.whatwg.org/multipage/forms.html#the-form-element'] = {"text": "form", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/forms.html#the-form-element", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#attr-fs-action'] = {"text": "action", "type": "element-attr", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#attr-fs-action", "export": true, "normative": true, "for_": ["form", "button"]};
 </script>

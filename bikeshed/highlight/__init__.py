@@ -1,0 +1,1 @@
+from .highlight import addSyntaxHighlighting

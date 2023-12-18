@@ -78,7 +78,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -484,7 +483,7 @@ a[href].issue-return {
 }
 
 .ref-hint {
-    display: none;
+    display: inline-block;
     position: absolute;
     z-index: 35;
     width: 20em;
@@ -500,16 +499,11 @@ a[href].issue-return {
     white-space: normal; /* in case it's moved into a pre */
 }
 
-.ref-hint.on {
-    display: inline-block;
-}
-
 .ref-hint * { margin: 0; padding: 0; text-indent: 0; }
 
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -569,7 +563,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -626,7 +619,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -1137,438 +1129,8 @@ because we need to be able to interpret the values to compute the condition and 
 One way to address this would be to mandate that both <a class="production css" data-link-type="type" href="#typedef-consequent">&lt;consequent></a> and <a class="production css" data-link-type="type" href="#typedef-antecedent">&lt;antecedent></a> need to be of the same type.
 How much does that limit use cases? <a class="issue-return" href="#issue-4928eaeb" title="Jump to section">↵</a></div>
   </div>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['9cd25054'] = {"dfnID": "9cd25054", "url": "https://drafts.csswg.org/css-cascade-5/#computed-value", "dfnText": "computed value", "refSections": [{"refs": [{"id": "ref-for-computed-value"}], "title": "2.2. Logical comparisons: The <condition> type"}, {"refs": [{"id": "ref-for-computed-value\u2460"}, {"id": "ref-for-computed-value\u2461"}], "title": "2.2.1. \nComputed Value"}], "external": true};
-window.dfnpanelData['a4eb3c57'] = {"dfnID": "a4eb3c57", "url": "https://drafts.csswg.org/css-cascade-5/#used-value", "dfnText": "used value", "refSections": [{"refs": [{"id": "ref-for-used-value"}, {"id": "ref-for-used-value\u2460"}], "title": "2.2.1. \nComputed Value"}], "external": true};
-window.dfnpanelData['8144e597'] = {"dfnID": "8144e597", "url": "https://drafts.csswg.org/css-syntax-3/#typedef-declaration-value", "dfnText": "<declaration-value>", "refSections": [{"refs": [{"id": "ref-for-typedef-declaration-value"}, {"id": "ref-for-typedef-declaration-value\u2460"}, {"id": "ref-for-typedef-declaration-value\u2461"}, {"id": "ref-for-typedef-declaration-value\u2462"}], "title": "3. Inline conditionals: The if() function"}], "external": true};
-window.dfnpanelData['68150e76'] = {"dfnID": "68150e76", "url": "https://drafts.csswg.org/css-values-4/#mult-zero-plus", "dfnText": "*", "refSections": [{"refs": [{"id": "ref-for-mult-zero-plus"}, {"id": "ref-for-mult-zero-plus\u2460"}], "title": "2.2. Logical comparisons: The <condition> type"}], "external": true};
-window.dfnpanelData['9f9120ff'] = {"dfnID": "9f9120ff", "url": "https://drafts.csswg.org/css-values-4/#comb-comma", "dfnText": ",", "refSections": [{"refs": [{"id": "ref-for-comb-comma"}, {"id": "ref-for-comb-comma\u2460"}], "title": "3. Inline conditionals: The if() function"}], "external": true};
-window.dfnpanelData['3559c926'] = {"dfnID": "3559c926", "url": "https://drafts.csswg.org/css-values-4/#angle-value", "dfnText": "<angle>", "refSections": [{"refs": [{"id": "ref-for-angle-value"}], "title": "2.2. Logical comparisons: The <condition> type"}], "external": true};
-window.dfnpanelData['5751a02c'] = {"dfnID": "5751a02c", "url": "https://drafts.csswg.org/css-values-4/#typedef-dimension", "dfnText": "<dimension>", "refSections": [{"refs": [{"id": "ref-for-typedef-dimension"}], "title": "2.2. Logical comparisons: The <condition> type"}], "external": true};
-window.dfnpanelData['9213678e'] = {"dfnID": "9213678e", "url": "https://drafts.csswg.org/css-values-4/#typedef-ident", "dfnText": "<ident>", "refSections": [{"refs": [{"id": "ref-for-typedef-ident"}], "title": "2.2. Logical comparisons: The <condition> type"}], "external": true};
-window.dfnpanelData['fb030e6c'] = {"dfnID": "fb030e6c", "url": "https://drafts.csswg.org/css-values-4/#length-value", "dfnText": "<length>", "refSections": [{"refs": [{"id": "ref-for-length-value"}], "title": "1.2. Relation between units of the same type"}, {"refs": [{"id": "ref-for-length-value\u2460"}, {"id": "ref-for-length-value\u2461"}], "title": "2.2. Logical comparisons: The <condition> type"}], "external": true};
-window.dfnpanelData['16310992'] = {"dfnID": "16310992", "url": "https://drafts.csswg.org/css-values-4/#number-value", "dfnText": "<number>", "refSections": [{"refs": [{"id": "ref-for-number-value"}], "title": "2.2. Logical comparisons: The <condition> type"}], "external": true};
-window.dfnpanelData['15f5b381'] = {"dfnID": "15f5b381", "url": "https://drafts.csswg.org/css-values-4/#percentage-value", "dfnText": "<percentage>", "refSections": [{"refs": [{"id": "ref-for-percentage-value"}], "title": "2.2. Logical comparisons: The <condition> type"}], "external": true};
-window.dfnpanelData['537cf076'] = {"dfnID": "537cf076", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "dfnText": "?", "refSections": [{"refs": [{"id": "ref-for-mult-opt"}, {"id": "ref-for-mult-opt\u2460"}], "title": "3. Inline conditionals: The if() function"}], "external": true};
-window.dfnpanelData['80694ce7'] = {"dfnID": "80694ce7", "url": "https://drafts.csswg.org/css-values-4/#calculation-tree", "dfnText": "calculation tree", "refSections": [{"refs": [{"id": "ref-for-calculation-tree"}, {"id": "ref-for-calculation-tree\u2460"}], "title": "2.2.1. \nComputed Value"}], "external": true};
-window.dfnpanelData['17fc5603'] = {"dfnID": "17fc5603", "url": "https://drafts.csswg.org/css-values-4/#canonical-unit", "dfnText": "canonical unit", "refSections": [{"refs": [{"id": "ref-for-canonical-unit"}], "title": "2.2. Logical comparisons: The <condition> type"}], "external": true};
-window.dfnpanelData['358fd6ff'] = {"dfnID": "358fd6ff", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "dfnText": "css-wide keywords", "refSections": [{"refs": [{"id": "ref-for-css-wide-keywords"}], "title": "1.3. Value Definitions"}], "external": true};
-window.dfnpanelData['e8ff0bb4'] = {"dfnID": "e8ff0bb4", "url": "https://drafts.csswg.org/css-values-4/#em", "dfnText": "em", "refSections": [{"refs": [{"id": "ref-for-em"}], "title": "2.2.1. \nComputed Value"}], "external": true};
-window.dfnpanelData['9ddea951'] = {"dfnID": "9ddea951", "url": "https://drafts.csswg.org/css-values-4/#px", "dfnText": "px", "refSections": [{"refs": [{"id": "ref-for-px"}], "title": "2.2.1. \nComputed Value"}], "external": true};
-window.dfnpanelData['6ec67710'] = {"dfnID": "6ec67710", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "dfnText": "|", "refSections": [{"refs": [{"id": "ref-for-comb-one"}], "title": "2.1. Boolean constants: true and false"}, {"refs": [{"id": "ref-for-comb-one\u2460"}, {"id": "ref-for-comb-one\u2461"}, {"id": "ref-for-comb-one\u2462"}, {"id": "ref-for-comb-one\u2463"}, {"id": "ref-for-comb-one\u2464"}, {"id": "ref-for-comb-one\u2465"}, {"id": "ref-for-comb-one\u2466"}, {"id": "ref-for-comb-one\u2467"}, {"id": "ref-for-comb-one\u2468"}, {"id": "ref-for-comb-one\u2460\u24ea"}, {"id": "ref-for-comb-one\u2460\u2460"}], "title": "2.2. Logical comparisons: The <condition> type"}], "external": true};
-window.dfnpanelData['f0390851'] = {"dfnID": "f0390851", "url": "https://drafts.csswg.org/css-variables-2/#invalid-at-computed-value-time", "dfnText": "invalid at computed-value time", "refSections": [{"refs": [{"id": "ref-for-invalid-at-computed-value-time"}], "title": "3. Inline conditionals: The if() function"}], "external": true};
-window.dfnpanelData['dbba942a'] = {"dfnID": "dbba942a", "url": "https://drafts.csswg.org/css-variables-2/#funcdef-var", "dfnText": "var()", "refSections": [{"refs": [{"id": "ref-for-funcdef-var"}, {"id": "ref-for-funcdef-var\u2460"}], "title": "3. Inline conditionals: The if() function"}], "external": true};
-window.dfnpanelData['f8b3bc81'] = {"dfnID": "f8b3bc81", "url": "https://drafts.csswg.org/mediaqueries-5/#valdef-custom-media-false", "dfnText": "false", "refSections": [{"refs": [{"id": "ref-for-valdef-custom-media-false"}], "title": "2.1. Boolean constants: true and false"}, {"refs": [{"id": "ref-for-valdef-custom-media-false\u2460"}], "title": "2.2. Logical comparisons: The <condition> type"}], "external": true};
-window.dfnpanelData['c4484b93'] = {"dfnID": "c4484b93", "url": "https://drafts.csswg.org/mediaqueries-5/#valdef-custom-media-true", "dfnText": "true", "refSections": [{"refs": [{"id": "ref-for-valdef-custom-media-true"}], "title": "2.1. Boolean constants: true and false"}], "external": true};
-window.dfnpanelData['typedef-boolean-constant'] = {"dfnID": "typedef-boolean-constant", "url": "#typedef-boolean-constant", "dfnText": "<boolean-constant>", "refSections": [{"refs": [{"id": "ref-for-typedef-boolean-constant"}, {"id": "ref-for-typedef-boolean-constant\u2460"}], "title": "2.2. Logical comparisons: The <condition> type"}, {"refs": [{"id": "ref-for-typedef-boolean-constant\u2461"}], "title": "2.2.1. \nComputed Value"}], "external": false};
-window.dfnpanelData['typedef-condition'] = {"dfnID": "typedef-condition", "url": "#typedef-condition", "dfnText": "<condition>", "refSections": [{"refs": [{"id": "ref-for-typedef-condition"}, {"id": "ref-for-typedef-condition\u2460"}, {"id": "ref-for-typedef-condition\u2461"}, {"id": "ref-for-typedef-condition\u2462"}, {"id": "ref-for-typedef-condition\u2463"}, {"id": "ref-for-typedef-condition\u2464"}], "title": "2.2. Logical comparisons: The <condition> type"}, {"refs": [{"id": "ref-for-typedef-condition\u2465"}, {"id": "ref-for-typedef-condition\u2466"}, {"id": "ref-for-typedef-condition\u2467"}], "title": "2.2.1. \nComputed Value"}, {"refs": [{"id": "ref-for-typedef-condition\u2468"}, {"id": "ref-for-typedef-condition\u2460\u24ea"}], "title": "3. Inline conditionals: The if() function"}], "external": false};
-window.dfnpanelData['typedef-condition-in-parens'] = {"dfnID": "typedef-condition-in-parens", "url": "#typedef-condition-in-parens", "dfnText": "<condition-in-parens>", "refSections": [{"refs": [{"id": "ref-for-typedef-condition-in-parens"}, {"id": "ref-for-typedef-condition-in-parens\u2460"}, {"id": "ref-for-typedef-condition-in-parens\u2461"}, {"id": "ref-for-typedef-condition-in-parens\u2462"}, {"id": "ref-for-typedef-condition-in-parens\u2463"}, {"id": "ref-for-typedef-condition-in-parens\u2464"}, {"id": "ref-for-typedef-condition-in-parens\u2465"}, {"id": "ref-for-typedef-condition-in-parens\u2466"}, {"id": "ref-for-typedef-condition-in-parens\u2467"}, {"id": "ref-for-typedef-condition-in-parens\u2468"}, {"id": "ref-for-typedef-condition-in-parens\u2460\u24ea"}, {"id": "ref-for-typedef-condition-in-parens\u2460\u2460"}, {"id": "ref-for-typedef-condition-in-parens\u2460\u2461"}, {"id": "ref-for-typedef-condition-in-parens\u2460\u2462"}, {"id": "ref-for-typedef-condition-in-parens\u2460\u2463"}, {"id": "ref-for-typedef-condition-in-parens\u2460\u2464"}], "title": "2.2. Logical comparisons: The <condition> type"}], "external": false};
-window.dfnpanelData['typedef-atomic-condition'] = {"dfnID": "typedef-atomic-condition", "url": "#typedef-atomic-condition", "dfnText": "<atomic-condition>", "refSections": [{"refs": [{"id": "ref-for-typedef-atomic-condition"}, {"id": "ref-for-typedef-atomic-condition\u2460"}], "title": "2.2. Logical comparisons: The <condition> type"}], "external": false};
-window.dfnpanelData['typedef-comparison-operand'] = {"dfnID": "typedef-comparison-operand", "url": "#typedef-comparison-operand", "dfnText": "<comparison-operand>", "refSections": [{"refs": [{"id": "ref-for-typedef-comparison-operand"}, {"id": "ref-for-typedef-comparison-operand\u2460"}, {"id": "ref-for-typedef-comparison-operand\u2461"}, {"id": "ref-for-typedef-comparison-operand\u2462"}, {"id": "ref-for-typedef-comparison-operand\u2463"}], "title": "2.2. Logical comparisons: The <condition> type"}], "external": false};
-window.dfnpanelData['typedef-comparison-operator'] = {"dfnID": "typedef-comparison-operator", "url": "#typedef-comparison-operator", "dfnText": "<comparison-operator>", "refSections": [{"refs": [{"id": "ref-for-typedef-comparison-operator"}], "title": "2.2. Logical comparisons: The <condition> type"}], "external": false};
-window.dfnpanelData['funcdef-if'] = {"dfnID": "funcdef-if", "url": "#funcdef-if", "dfnText": "if()", "refSections": [{"refs": [{"id": "ref-for-funcdef-if"}, {"id": "ref-for-funcdef-if\u2460"}, {"id": "ref-for-funcdef-if\u2461"}, {"id": "ref-for-funcdef-if\u2462"}, {"id": "ref-for-funcdef-if\u2463"}, {"id": "ref-for-funcdef-if\u2464"}], "title": "3. Inline conditionals: The if() function"}], "external": false};
-window.dfnpanelData['typedef-consequent'] = {"dfnID": "typedef-consequent", "url": "#typedef-consequent", "dfnText": "<consequent>", "refSections": [{"refs": [{"id": "ref-for-typedef-consequent"}, {"id": "ref-for-typedef-consequent\u2460"}, {"id": "ref-for-typedef-consequent\u2461"}, {"id": "ref-for-typedef-consequent\u2462"}], "title": "3. Inline conditionals: The if() function"}], "external": false};
-window.dfnpanelData['typedef-antecedent'] = {"dfnID": "typedef-antecedent", "url": "#typedef-antecedent", "dfnText": "<antecedent>", "refSections": [{"refs": [{"id": "ref-for-typedef-antecedent"}, {"id": "ref-for-typedef-antecedent\u2460"}, {"id": "ref-for-typedef-antecedent\u2461"}, {"id": "ref-for-typedef-antecedent\u2462"}, {"id": "ref-for-typedef-antecedent\u2463"}], "title": "3. Inline conditionals: The if() function"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -1762,12 +1324,456 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"15f5b381": {"dfnID":"15f5b381","dfnText":"<percentage>","external":true,"refSections":[{"refs":[{"id":"ref-for-percentage-value"}],"title":"2.2. Logical comparisons: The <condition> type"}],"url":"https://drafts.csswg.org/css-values-4/#percentage-value"},
+"16310992": {"dfnID":"16310992","dfnText":"<number>","external":true,"refSections":[{"refs":[{"id":"ref-for-number-value"}],"title":"2.2. Logical comparisons: The <condition> type"}],"url":"https://drafts.csswg.org/css-values-4/#number-value"},
+"17fc5603": {"dfnID":"17fc5603","dfnText":"canonical unit","external":true,"refSections":[{"refs":[{"id":"ref-for-canonical-unit"}],"title":"2.2. Logical comparisons: The <condition> type"}],"url":"https://drafts.csswg.org/css-values-4/#canonical-unit"},
+"3559c926": {"dfnID":"3559c926","dfnText":"<angle>","external":true,"refSections":[{"refs":[{"id":"ref-for-angle-value"}],"title":"2.2. Logical comparisons: The <condition> type"}],"url":"https://drafts.csswg.org/css-values-4/#angle-value"},
+"358fd6ff": {"dfnID":"358fd6ff","dfnText":"css-wide keywords","external":true,"refSections":[{"refs":[{"id":"ref-for-css-wide-keywords"}],"title":"1.3. Value Definitions"}],"url":"https://drafts.csswg.org/css-values-4/#css-wide-keywords"},
+"537cf076": {"dfnID":"537cf076","dfnText":"?","external":true,"refSections":[{"refs":[{"id":"ref-for-mult-opt"},{"id":"ref-for-mult-opt\u2460"}],"title":"3. Inline conditionals: The if() function"}],"url":"https://drafts.csswg.org/css-values-4/#mult-opt"},
+"5751a02c": {"dfnID":"5751a02c","dfnText":"<dimension>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-dimension"}],"title":"2.2. Logical comparisons: The <condition> type"}],"url":"https://drafts.csswg.org/css-values-4/#typedef-dimension"},
+"68150e76": {"dfnID":"68150e76","dfnText":"*","external":true,"refSections":[{"refs":[{"id":"ref-for-mult-zero-plus"},{"id":"ref-for-mult-zero-plus\u2460"}],"title":"2.2. Logical comparisons: The <condition> type"}],"url":"https://drafts.csswg.org/css-values-4/#mult-zero-plus"},
+"6ec67710": {"dfnID":"6ec67710","dfnText":"|","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-one"}],"title":"2.1. Boolean constants: true and false"},{"refs":[{"id":"ref-for-comb-one\u2460"},{"id":"ref-for-comb-one\u2461"},{"id":"ref-for-comb-one\u2462"},{"id":"ref-for-comb-one\u2463"},{"id":"ref-for-comb-one\u2464"},{"id":"ref-for-comb-one\u2465"},{"id":"ref-for-comb-one\u2466"},{"id":"ref-for-comb-one\u2467"},{"id":"ref-for-comb-one\u2468"},{"id":"ref-for-comb-one\u2460\u24ea"},{"id":"ref-for-comb-one\u2460\u2460"}],"title":"2.2. Logical comparisons: The <condition> type"}],"url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"80694ce7": {"dfnID":"80694ce7","dfnText":"calculation tree","external":true,"refSections":[{"refs":[{"id":"ref-for-calculation-tree"},{"id":"ref-for-calculation-tree\u2460"}],"title":"2.2.1. \nComputed Value"}],"url":"https://drafts.csswg.org/css-values-4/#calculation-tree"},
+"8144e597": {"dfnID":"8144e597","dfnText":"<declaration-value>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-declaration-value"},{"id":"ref-for-typedef-declaration-value\u2460"},{"id":"ref-for-typedef-declaration-value\u2461"},{"id":"ref-for-typedef-declaration-value\u2462"}],"title":"3. Inline conditionals: The if() function"}],"url":"https://drafts.csswg.org/css-syntax-3/#typedef-declaration-value"},
+"9213678e": {"dfnID":"9213678e","dfnText":"<ident>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-ident"}],"title":"2.2. Logical comparisons: The <condition> type"}],"url":"https://drafts.csswg.org/css-values-4/#typedef-ident"},
+"9cd25054": {"dfnID":"9cd25054","dfnText":"computed value","external":true,"refSections":[{"refs":[{"id":"ref-for-computed-value"}],"title":"2.2. Logical comparisons: The <condition> type"},{"refs":[{"id":"ref-for-computed-value\u2460"},{"id":"ref-for-computed-value\u2461"}],"title":"2.2.1. \nComputed Value"}],"url":"https://drafts.csswg.org/css-cascade-5/#computed-value"},
+"9ddea951": {"dfnID":"9ddea951","dfnText":"px","external":true,"refSections":[{"refs":[{"id":"ref-for-px"}],"title":"2.2.1. \nComputed Value"}],"url":"https://drafts.csswg.org/css-values-4/#px"},
+"9f9120ff": {"dfnID":"9f9120ff","dfnText":",","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-comma"},{"id":"ref-for-comb-comma\u2460"}],"title":"3. Inline conditionals: The if() function"}],"url":"https://drafts.csswg.org/css-values-4/#comb-comma"},
+"a4eb3c57": {"dfnID":"a4eb3c57","dfnText":"used value","external":true,"refSections":[{"refs":[{"id":"ref-for-used-value"},{"id":"ref-for-used-value\u2460"}],"title":"2.2.1. \nComputed Value"}],"url":"https://drafts.csswg.org/css-cascade-5/#used-value"},
+"c4484b93": {"dfnID":"c4484b93","dfnText":"true","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-custom-media-true"}],"title":"2.1. Boolean constants: true and false"}],"url":"https://drafts.csswg.org/mediaqueries-5/#valdef-custom-media-true"},
+"dbba942a": {"dfnID":"dbba942a","dfnText":"var()","external":true,"refSections":[{"refs":[{"id":"ref-for-funcdef-var"},{"id":"ref-for-funcdef-var\u2460"}],"title":"3. Inline conditionals: The if() function"}],"url":"https://drafts.csswg.org/css-variables-2/#funcdef-var"},
+"e8ff0bb4": {"dfnID":"e8ff0bb4","dfnText":"em","external":true,"refSections":[{"refs":[{"id":"ref-for-em"}],"title":"2.2.1. \nComputed Value"}],"url":"https://drafts.csswg.org/css-values-4/#em"},
+"f0390851": {"dfnID":"f0390851","dfnText":"invalid at computed-value time","external":true,"refSections":[{"refs":[{"id":"ref-for-invalid-at-computed-value-time"}],"title":"3. Inline conditionals: The if() function"}],"url":"https://drafts.csswg.org/css-variables-2/#invalid-at-computed-value-time"},
+"f8b3bc81": {"dfnID":"f8b3bc81","dfnText":"false","external":true,"refSections":[{"refs":[{"id":"ref-for-valdef-custom-media-false"}],"title":"2.1. Boolean constants: true and false"},{"refs":[{"id":"ref-for-valdef-custom-media-false\u2460"}],"title":"2.2. Logical comparisons: The <condition> type"}],"url":"https://drafts.csswg.org/mediaqueries-5/#valdef-custom-media-false"},
+"fb030e6c": {"dfnID":"fb030e6c","dfnText":"<length>","external":true,"refSections":[{"refs":[{"id":"ref-for-length-value"}],"title":"1.2. Relation between units of the same type"},{"refs":[{"id":"ref-for-length-value\u2460"},{"id":"ref-for-length-value\u2461"}],"title":"2.2. Logical comparisons: The <condition> type"}],"url":"https://drafts.csswg.org/css-values-4/#length-value"},
+"funcdef-if": {"dfnID":"funcdef-if","dfnText":"if()","external":false,"refSections":[{"refs":[{"id":"ref-for-funcdef-if"},{"id":"ref-for-funcdef-if\u2460"},{"id":"ref-for-funcdef-if\u2461"},{"id":"ref-for-funcdef-if\u2462"},{"id":"ref-for-funcdef-if\u2463"},{"id":"ref-for-funcdef-if\u2464"}],"title":"3. Inline conditionals: The if() function"}],"url":"#funcdef-if"},
+"typedef-antecedent": {"dfnID":"typedef-antecedent","dfnText":"<antecedent>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-antecedent"},{"id":"ref-for-typedef-antecedent\u2460"},{"id":"ref-for-typedef-antecedent\u2461"},{"id":"ref-for-typedef-antecedent\u2462"},{"id":"ref-for-typedef-antecedent\u2463"}],"title":"3. Inline conditionals: The if() function"}],"url":"#typedef-antecedent"},
+"typedef-atomic-condition": {"dfnID":"typedef-atomic-condition","dfnText":"<atomic-condition>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-atomic-condition"},{"id":"ref-for-typedef-atomic-condition\u2460"}],"title":"2.2. Logical comparisons: The <condition> type"}],"url":"#typedef-atomic-condition"},
+"typedef-boolean-constant": {"dfnID":"typedef-boolean-constant","dfnText":"<boolean-constant>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-boolean-constant"},{"id":"ref-for-typedef-boolean-constant\u2460"}],"title":"2.2. Logical comparisons: The <condition> type"},{"refs":[{"id":"ref-for-typedef-boolean-constant\u2461"}],"title":"2.2.1. \nComputed Value"}],"url":"#typedef-boolean-constant"},
+"typedef-comparison-operand": {"dfnID":"typedef-comparison-operand","dfnText":"<comparison-operand>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-comparison-operand"},{"id":"ref-for-typedef-comparison-operand\u2460"},{"id":"ref-for-typedef-comparison-operand\u2461"},{"id":"ref-for-typedef-comparison-operand\u2462"},{"id":"ref-for-typedef-comparison-operand\u2463"}],"title":"2.2. Logical comparisons: The <condition> type"}],"url":"#typedef-comparison-operand"},
+"typedef-comparison-operator": {"dfnID":"typedef-comparison-operator","dfnText":"<comparison-operator>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-comparison-operator"}],"title":"2.2. Logical comparisons: The <condition> type"}],"url":"#typedef-comparison-operator"},
+"typedef-condition": {"dfnID":"typedef-condition","dfnText":"<condition>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-condition"},{"id":"ref-for-typedef-condition\u2460"},{"id":"ref-for-typedef-condition\u2461"},{"id":"ref-for-typedef-condition\u2462"},{"id":"ref-for-typedef-condition\u2463"},{"id":"ref-for-typedef-condition\u2464"}],"title":"2.2. Logical comparisons: The <condition> type"},{"refs":[{"id":"ref-for-typedef-condition\u2465"},{"id":"ref-for-typedef-condition\u2466"},{"id":"ref-for-typedef-condition\u2467"}],"title":"2.2.1. \nComputed Value"},{"refs":[{"id":"ref-for-typedef-condition\u2468"},{"id":"ref-for-typedef-condition\u2460\u24ea"}],"title":"3. Inline conditionals: The if() function"}],"url":"#typedef-condition"},
+"typedef-condition-in-parens": {"dfnID":"typedef-condition-in-parens","dfnText":"<condition-in-parens>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-condition-in-parens"},{"id":"ref-for-typedef-condition-in-parens\u2460"},{"id":"ref-for-typedef-condition-in-parens\u2461"},{"id":"ref-for-typedef-condition-in-parens\u2462"},{"id":"ref-for-typedef-condition-in-parens\u2463"},{"id":"ref-for-typedef-condition-in-parens\u2464"},{"id":"ref-for-typedef-condition-in-parens\u2465"},{"id":"ref-for-typedef-condition-in-parens\u2466"},{"id":"ref-for-typedef-condition-in-parens\u2467"},{"id":"ref-for-typedef-condition-in-parens\u2468"},{"id":"ref-for-typedef-condition-in-parens\u2460\u24ea"},{"id":"ref-for-typedef-condition-in-parens\u2460\u2460"},{"id":"ref-for-typedef-condition-in-parens\u2460\u2461"},{"id":"ref-for-typedef-condition-in-parens\u2460\u2462"},{"id":"ref-for-typedef-condition-in-parens\u2460\u2463"},{"id":"ref-for-typedef-condition-in-parens\u2460\u2464"}],"title":"2.2. Logical comparisons: The <condition> type"}],"url":"#typedef-condition-in-parens"},
+"typedef-consequent": {"dfnID":"typedef-consequent","dfnText":"<consequent>","external":false,"refSections":[{"refs":[{"id":"ref-for-typedef-consequent"},{"id":"ref-for-typedef-consequent\u2460"},{"id":"ref-for-typedef-consequent\u2461"},{"id":"ref-for-typedef-consequent\u2462"}],"title":"3. Inline conditionals: The if() function"}],"url":"#typedef-consequent"},
+};
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+});
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        dfn.panelData = panelData;
+        insertDfnPopupAction(dfn);
+    }
+}
+
+function genDfnPanel(dfn, { dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel on",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel({dfnPanel});
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.dfn = dfn;
+    dfn.dfnPanel = dfnPanel;
+    return dfnPanel;
+}
+
+
+
+function hideAllDfnPanels() {
+    // Delete the currently-active dfn panel.
+    queryAll(".dfn-panel").forEach(dfnPanel=>hideDfnPanel({dfnPanel}));
+}
+
+function showDfnPanel(dfn) {
+    hideAllDfnPanels(); // Only display one at a time.
+
+    dfn.setAttribute("aria-expanded", "true");
+
+    const dfnPanel = genDfnPanel(dfn, dfn.panelData);
+
+    // Give the dfn a unique tabindex, and then
+    // give all the tabbable panel bits successive indexes.
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+
+    append(document.body, dfnPanel);
+    positionDfnPanel(dfnPanel);
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.dfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }
+}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel({dfn, dfnPanel}) {
+    if(!dfnPanel) dfnPanel = dfn.dfnPanel;
+    if(!dfn) dfn = dfnPanel.dfn;
+    dfn.dfnPanel = undefined;
+    dfnPanel.dfn = undefined;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.remove()
+}
+
+function toggleDfnPanel(dfn) {
+    if(dfn.dfnPanel) {
+        hideDfnPanel(dfn);
+    } else {
+        showDfnPanel(dfn);
+    }
+}
+
+function insertDfnPopupAction(dfn) {
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        toggleDfnPanel(dfn);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+function needsFor(type) {
+    switch(type) {
+        case "descriptor":
+        case "value":
+        case "element-attr":
+        case "attr-value":
+        case "element-state":
+        case "method":
+        case "constructor":
+        case "argument":
+        case "attribute":
+        case "const":
+        case "dict-member":
+        case "event":
+        case "enum-value":
+        case "stringifier":
+        case "serializer":
+        case "iterator":
+        case "maplike":
+        case "setlike":
+        case "state":
+        case "mode":
+        case "context":
+        case "facet": return true;
+
+        default: return false;
+    }
+}
+function refusesFor(type) {
+    switch(type) {
+        case "property":
+        case "element":
+        case "interface":
+        case "namespace":
+        case "callback":
+        case "dictionary":
+        case "enum":
+        case "exception":
+        case "typedef":
+        case "http-header":
+        case "permission": return true;
+
+        default: return false;
+    }
+}
+function linkFormatterFromType(type) {
+    switch(type) {
+        case 'scheme':
+        case 'permission':
+        case 'dfn': return (text) => `[=${text}=]`;
+
+        case 'abstract-op': return (text) => `[\$${text}\$]`;
+
+        case 'function':
+        case 'at-rule':
+        case 'selector':
+        case 'value': return (text) => `''${text}''`;
+
+        case 'http-header': return (text) => `[:${text}:]`;
+
+        case 'interface':
+        case 'constructor':
+        case 'method':
+        case 'argument':
+        case 'attribute':
+        case 'callback':
+        case 'dictionary':
+        case 'dict-member':
+        case 'enum':
+        case 'enum-value':
+        case 'exception':
+        case 'const':
+        case 'typedef':
+        case 'stringifier':
+        case 'serializer':
+        case 'iterator':
+        case 'maplike':
+        case 'setlike':
+        case 'extended-attribute':
+        case 'event':
+        case 'idl': return (text) => `{{${text}}}`;
+
+        case 'element-state':
+        case 'element-attr':
+        case 'attr-value':
+        case 'element': return (element) => `<{${element}}>`;
+
+        case 'grammar': return (text) => `${text} (within a <pre class=prod>)`;
+
+        case 'type': return (text)=> `<<${text}>>`;
+
+        case 'descriptor':
+        case 'property': return (text) => `'${text}'`;
+
+        default: return;
+    };
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!needsFor(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!refusesFor(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
 }
 </script>
 <script>/* Boilerplate: script-link-titles */
+"use strict";
+{
 let linkTitleData = {
- "https://drafts.csswg.org/css-values-4/#angle-value": "Expands to: deg | grad | rad | turn",
- "https://drafts.csswg.org/css-values-4/#length-value": "Expands to: advance measure | cap | ch | cm | dvb | dvh | dvi | dvmax | dvmin | dvw | em | ex | ic | in | lh | lvb | lvh | lvi | lvmax | lvmin | lvw | mm | pc | pt | px | q | rcap | rch | rem | rex | ric | rlh | svb | svh | svi | svmax | svmin | svw | vb | vh | vi | vmax | vmin | vw"
+"https://drafts.csswg.org/css-values-4/#angle-value": "Expands to: deg | grad | rad | turn",
+"https://drafts.csswg.org/css-values-4/#length-value": "Expands to: advance measure | cap | ch | cm | dvb | dvh | dvi | dvmax | dvmin | dvw | em | ex | ic | in | lh | lvb | lvh | lvi | lvmax | lvmin | lvw | mm | pc | pt | px | q | rcap | rch | rem | rex | ric | rlh | svb | svh | svi | svmax | svmin | svw | vb | vh | vi | vmax | vmin | vw",
 };
 
 function setTypeTitles() {
@@ -1779,247 +1785,237 @@ function setTypeTitles() {
 }
 
 document.addEventListener("DOMContentLoaded", setTypeTitles);
+}
 </script>
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
-                mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
+let refsData = {
+"#funcdef-if": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-conditional-values","spec":"css-conditional-values-1","status":"local","text":"if()","type":"function","url":"#funcdef-if"},
+"#typedef-antecedent": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-conditional-values","spec":"css-conditional-values-1","status":"local","text":"<antecedent>","type":"type","url":"#typedef-antecedent"},
+"#typedef-atomic-condition": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-conditional-values","spec":"css-conditional-values-1","status":"local","text":"<atomic-condition>","type":"type","url":"#typedef-atomic-condition"},
+"#typedef-boolean-constant": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-conditional-values","spec":"css-conditional-values-1","status":"local","text":"<boolean-constant>","type":"type","url":"#typedef-boolean-constant"},
+"#typedef-comparison-operand": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-conditional-values","spec":"css-conditional-values-1","status":"local","text":"<comparison-operand>","type":"type","url":"#typedef-comparison-operand"},
+"#typedef-comparison-operator": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-conditional-values","spec":"css-conditional-values-1","status":"local","text":"<comparison-operator>","type":"type","url":"#typedef-comparison-operator"},
+"#typedef-condition": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-conditional-values","spec":"css-conditional-values-1","status":"local","text":"<condition>","type":"type","url":"#typedef-condition"},
+"#typedef-condition-in-parens": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-conditional-values","spec":"css-conditional-values-1","status":"local","text":"<condition-in-parens>","type":"type","url":"#typedef-condition-in-parens"},
+"#typedef-consequent": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-conditional-values","spec":"css-conditional-values-1","status":"local","text":"<consequent>","type":"type","url":"#typedef-consequent"},
+"https://drafts.csswg.org/css-cascade-5/#computed-value": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-cascade","spec":"css-cascade-5","status":"current","text":"computed value","type":"dfn","url":"https://drafts.csswg.org/css-cascade-5/#computed-value"},
+"https://drafts.csswg.org/css-cascade-5/#used-value": {"export":true,"for_":[],"level":"5","normative":true,"shortname":"css-cascade","spec":"css-cascade-5","status":"current","text":"used value","type":"dfn","url":"https://drafts.csswg.org/css-cascade-5/#used-value"},
+"https://drafts.csswg.org/css-syntax-3/#typedef-declaration-value": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-syntax","spec":"css-syntax-3","status":"current","text":"<declaration-value>","type":"type","url":"https://drafts.csswg.org/css-syntax-3/#typedef-declaration-value"},
+"https://drafts.csswg.org/css-values-4/#angle-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<angle>","type":"type","url":"https://drafts.csswg.org/css-values-4/#angle-value"},
+"https://drafts.csswg.org/css-values-4/#calculation-tree": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"calculation tree","type":"dfn","url":"https://drafts.csswg.org/css-values-4/#calculation-tree"},
+"https://drafts.csswg.org/css-values-4/#canonical-unit": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"canonical unit","type":"dfn","url":"https://drafts.csswg.org/css-values-4/#canonical-unit"},
+"https://drafts.csswg.org/css-values-4/#comb-comma": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":",","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-comma"},
+"https://drafts.csswg.org/css-values-4/#comb-one": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"|","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"https://drafts.csswg.org/css-values-4/#css-wide-keywords": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"css-wide keywords","type":"dfn","url":"https://drafts.csswg.org/css-values-4/#css-wide-keywords"},
+"https://drafts.csswg.org/css-values-4/#em": {"export":true,"for_":["<length>"],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"em","type":"value","url":"https://drafts.csswg.org/css-values-4/#em"},
+"https://drafts.csswg.org/css-values-4/#length-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<length>","type":"type","url":"https://drafts.csswg.org/css-values-4/#length-value"},
+"https://drafts.csswg.org/css-values-4/#mult-opt": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"?","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#mult-opt"},
+"https://drafts.csswg.org/css-values-4/#mult-zero-plus": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"*","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#mult-zero-plus"},
+"https://drafts.csswg.org/css-values-4/#number-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<number>","type":"type","url":"https://drafts.csswg.org/css-values-4/#number-value"},
+"https://drafts.csswg.org/css-values-4/#percentage-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<percentage>","type":"type","url":"https://drafts.csswg.org/css-values-4/#percentage-value"},
+"https://drafts.csswg.org/css-values-4/#px": {"export":true,"for_":["<length>"],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"px","type":"value","url":"https://drafts.csswg.org/css-values-4/#px"},
+"https://drafts.csswg.org/css-values-4/#typedef-dimension": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<dimension>","type":"type","url":"https://drafts.csswg.org/css-values-4/#typedef-dimension"},
+"https://drafts.csswg.org/css-values-4/#typedef-ident": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<ident>","type":"type","url":"https://drafts.csswg.org/css-values-4/#typedef-ident"},
+"https://drafts.csswg.org/css-variables-2/#funcdef-var": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-variables","spec":"css-variables-2","status":"current","text":"var()","type":"function","url":"https://drafts.csswg.org/css-variables-2/#funcdef-var"},
+"https://drafts.csswg.org/css-variables-2/#invalid-at-computed-value-time": {"export":true,"for_":[],"level":"2","normative":true,"shortname":"css-variables","spec":"css-variables-2","status":"current","text":"invalid at computed-value time","type":"dfn","url":"https://drafts.csswg.org/css-variables-2/#invalid-at-computed-value-time"},
+"https://drafts.csswg.org/mediaqueries-5/#valdef-custom-media-false": {"export":true,"for_":["@custom-media"],"level":"5","normative":true,"shortname":"mediaqueries","spec":"mediaqueries-5","status":"current","text":"false","type":"value","url":"https://drafts.csswg.org/mediaqueries-5/#valdef-custom-media-false"},
+"https://drafts.csswg.org/mediaqueries-5/#valdef-custom-media-true": {"export":true,"for_":["@custom-media"],"level":"5","normative":true,"shortname":"mediaqueries","spec":"mediaqueries-5","status":"current","text":"true","type":"value","url":"https://drafts.csswg.org/mediaqueries-5/#valdef-custom-media-true"},
+};
+
+function mkRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "Term: "),
+                mk.span({}, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    let forListElements;
+    if(forList.length == 0) {
+        forListElements = [];
+    } else if(forList.length == 1) {
+        forListElements = mk.li({},
+            mk.b({}, "For: "),
+            mk.span({}, forList[0]),
+        );
+    } else {
+        forListElements = mk.li({},
             mk.b({}, "For: "),
             mk.ul({},
                 ...forList.map(forItem =>
                     mk.li({},
-                        mk.span({}, `${forItem}`)
+                        mk.span({}, forItem)
                     ),
                 ),
             ),
         );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+    }
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    setupRefHintEventListeners(link, hintPanel);
+    return hintPanel;
+}
+
+function hideAllRefHints() {
+    queryAll(".ref-hint").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    if(refHint.teardownEventListeners) {
+        refHint.teardownEventListeners();
     }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+    refHint.remove();
+}
+
+function showRefHint(link) {
+    if(link.classList.contains("dfn-link")) return;
+    const url = link.getAttribute("href");
+    const ref = refsData[url];
+    if(!ref) return;
+
+    hideAllRefHints(); // Only display one at this time.
+
+    const refHint = mkRefHint(link, ref);
+    append(document.body, refHint);
+    link.setAttribute("aria-expanded", "true");
+    positionRefHint(refHint);
+}
+
+function setupRefHintEventListeners(link, refHint) {
+    if (refHint.teardownEventListeners) return;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
+
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
-
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
-    }
-
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
-        }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
-
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
-    }
-
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+document.addEventListener("DOMContentLoaded", () => {
+    document.body.addEventListener("mouseover", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
+    });
+    document.body.addEventListener("focus", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
     });
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['https://drafts.csswg.org/css-values-4/#length-value'] = {"text": "<length>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#length-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#css-wide-keywords'] = {"text": "css-wide keywords", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/mediaqueries-5/#valdef-custom-media-true'] = {"text": "true", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-5/#valdef-custom-media-true", "export": true, "normative": true, "for_": ["@custom-media"]};
-window.refsData['https://drafts.csswg.org/mediaqueries-5/#valdef-custom-media-false'] = {"text": "false", "type": "value", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-5/#valdef-custom-media-false", "export": true, "normative": true, "for_": ["@custom-media"]};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-condition'] = {"text": "<condition>", "type": "type", "spec": "css-conditional-values-1", "shortname": "css-conditional-values", "level": "1", "status": "local", "url": "#typedef-condition", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-condition-in-parens'] = {"text": "<condition-in-parens>", "type": "type", "spec": "css-conditional-values-1", "shortname": "css-conditional-values", "level": "1", "status": "local", "url": "#typedef-condition-in-parens", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#mult-zero-plus'] = {"text": "*", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-zero-plus", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-atomic-condition'] = {"text": "<atomic-condition>", "type": "type", "spec": "css-conditional-values-1", "shortname": "css-conditional-values", "level": "1", "status": "local", "url": "#typedef-atomic-condition", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-comparison-operand'] = {"text": "<comparison-operand>", "type": "type", "spec": "css-conditional-values-1", "shortname": "css-conditional-values", "level": "1", "status": "local", "url": "#typedef-comparison-operand", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-comparison-operator'] = {"text": "<comparison-operator>", "type": "type", "spec": "css-conditional-values-1", "shortname": "css-conditional-values", "level": "1", "status": "local", "url": "#typedef-comparison-operator", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-boolean-constant'] = {"text": "<boolean-constant>", "type": "type", "spec": "css-conditional-values-1", "shortname": "css-conditional-values", "level": "1", "status": "local", "url": "#typedef-boolean-constant", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#typedef-dimension'] = {"text": "<dimension>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#typedef-dimension", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#number-value'] = {"text": "<number>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#number-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#percentage-value'] = {"text": "<percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#percentage-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#typedef-ident'] = {"text": "<ident>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#typedef-ident", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-cascade-5/#computed-value'] = {"text": "computed value", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#computed-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#canonical-unit'] = {"text": "canonical unit", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#canonical-unit", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#angle-value'] = {"text": "<angle>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#angle-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#calculation-tree'] = {"text": "calculation tree", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#calculation-tree", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#em'] = {"text": "em", "type": "value", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#em", "export": true, "normative": true, "for_": ["<length>"]};
-window.refsData['https://drafts.csswg.org/css-values-4/#px'] = {"text": "px", "type": "value", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#px", "export": true, "normative": true, "for_": ["<length>"]};
-window.refsData['https://drafts.csswg.org/css-cascade-5/#used-value'] = {"text": "used value", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#used-value", "export": true, "normative": true, "for_": []};
-window.refsData['#funcdef-if'] = {"text": "if()", "type": "function", "spec": "css-conditional-values-1", "shortname": "css-conditional-values", "level": "1", "status": "local", "url": "#funcdef-if", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-comma'] = {"text": ",", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-comma", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-consequent'] = {"text": "<consequent>", "type": "type", "spec": "css-conditional-values-1", "shortname": "css-conditional-values", "level": "1", "status": "local", "url": "#typedef-consequent", "export": true, "normative": true, "for_": []};
-window.refsData['#typedef-antecedent'] = {"text": "<antecedent>", "type": "type", "spec": "css-conditional-values-1", "shortname": "css-conditional-values", "level": "1", "status": "local", "url": "#typedef-antecedent", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#mult-opt'] = {"text": "?", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-syntax-3/#typedef-declaration-value'] = {"text": "<declaration-value>", "type": "type", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#typedef-declaration-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-variables-2/#invalid-at-computed-value-time'] = {"text": "invalid at computed-value time", "type": "dfn", "spec": "css-variables-2", "shortname": "css-variables", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-variables-2/#invalid-at-computed-value-time", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-variables-2/#funcdef-var'] = {"text": "var()", "type": "function", "spec": "css-variables-2", "shortname": "css-variables", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-variables-2/#funcdef-var", "export": true, "normative": true, "for_": []};
 </script>

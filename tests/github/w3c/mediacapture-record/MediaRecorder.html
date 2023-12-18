@@ -95,7 +95,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -469,6 +468,11 @@ figcaption:not(.no-marker)::before {
     }
 }
 </style>
+<style>/* Boilerplate: style-idl-highlighting */
+pre.idl.highlight {
+    background: var(--borderedblock-bg, var(--def-bg));
+}
+</style>
 <style>/* Boilerplate: style-issues */
 a[href].issue-return {
     float: right;
@@ -501,7 +505,7 @@ a[href].issue-return {
 }
 
 .ref-hint {
-    display: none;
+    display: inline-block;
     position: absolute;
     z-index: 35;
     width: 20em;
@@ -517,16 +521,11 @@ a[href].issue-return {
     white-space: normal; /* in case it's moved into a pre */
 }
 
-.ref-hint.on {
-    display: inline-block;
-}
-
 .ref-hint * { margin: 0; padding: 0; text-indent: 0; }
 
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -586,7 +585,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -643,7 +641,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -720,14 +717,14 @@ D50 2deg illuminant, L in [0,100], a and b in [-128, 128]
 5 = lab(85,-10,-50)
 6 = lab(85,35,-15)
 */
-var { cursor: pointer; }
-var.selected0 { background-color: #F4D200; box-shadow: 0 0 0 2px #F4D200; }
-var.selected1 { background-color: #FF87A2; box-shadow: 0 0 0 2px #FF87A2; }
-var.selected2 { background-color: #96E885; box-shadow: 0 0 0 2px #96E885; }
-var.selected3 { background-color: #3EEED2; box-shadow: 0 0 0 2px #3EEED2; }
-var.selected4 { background-color: #EACFB6; box-shadow: 0 0 0 2px #EACFB6; }
-var.selected5 { background-color: #82DDFF; box-shadow: 0 0 0 2px #82DDFF; }
-var.selected6 { background-color: #FFBCF2; box-shadow: 0 0 0 2px #FFBCF2; }
+[data-algorithm] var { cursor: pointer; }
+var[data-var-color="0"] { background-color: #F4D200; box-shadow: 0 0 0 2px #F4D200; }
+var[data-var-color="1"] { background-color: #FF87A2; box-shadow: 0 0 0 2px #FF87A2; }
+var[data-var-color="2"] { background-color: #96E885; box-shadow: 0 0 0 2px #96E885; }
+var[data-var-color="3"] { background-color: #3EEED2; box-shadow: 0 0 0 2px #3EEED2; }
+var[data-var-color="4"] { background-color: #EACFB6; box-shadow: 0 0 0 2px #EACFB6; }
+var[data-var-color="5"] { background-color: #82DDFF; box-shadow: 0 0 0 2px #82DDFF; }
+var[data-var-color="6"] { background-color: #FFBCF2; box-shadow: 0 0 0 2px #FFBCF2; }
 </style>
  <body class="h-entry">
   <div class="head">
@@ -1801,499 +1798,8 @@ the <code class="idl"><a data-link-type="idl" href="https://www.w3.org/TR/mediac
 };
 
 </pre>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['a0c6f7f7'] = {"dfnID": "a0c6f7f7", "url": "https://www.w3.org/TR/hr-time/#dom-domhighrestimestamp", "dfnText": "DOMHighResTimeStamp", "refSections": [{"refs": [{"id": "ref-for-dom-domhighrestimestamp"}], "title": "3. Blob Event"}, {"refs": [{"id": "ref-for-dom-domhighrestimestamp\u2460"}, {"id": "ref-for-dom-domhighrestimestamp\u2461"}], "title": "3.2. Attributes"}, {"refs": [{"id": "ref-for-dom-domhighrestimestamp\u2462"}], "title": "3.3. BlobEventInit"}, {"refs": [{"id": "ref-for-dom-domhighrestimestamp\u2463"}], "title": "3.3.1. Members"}], "external": true};
-window.dfnpanelData['d5648194'] = {"dfnID": "d5648194", "url": "https://www.w3.org/TR/mediacapture-streams/#mediastream", "dfnText": "MediaStream", "refSections": [{"refs": [{"id": "ref-for-mediastream"}], "title": "Unnumbered Section"}, {"refs": [{"id": "ref-for-mediastream\u2460"}, {"id": "ref-for-mediastream\u2461"}], "title": "2. Media Recorder API"}, {"refs": [{"id": "ref-for-mediastream\u2462"}, {"id": "ref-for-mediastream\u2463"}], "title": "2.2. Attributes"}, {"refs": [{"id": "ref-for-mediastream\u2464"}], "title": "2.3. Methods"}, {"refs": [{"id": "ref-for-mediastream\u2465"}, {"id": "ref-for-mediastream\u2466"}], "title": "4.3. Exception Summary"}, {"refs": [{"id": "ref-for-mediastream\u2467"}, {"id": "ref-for-mediastream\u2468"}], "title": "6. Privacy and Security Considerations"}, {"refs": [{"id": "ref-for-mediastream\u2460\u24ea"}, {"id": "ref-for-mediastream\u2460\u2460"}], "title": "7.2. Recording webcam video and audio"}], "external": true};
-window.dfnpanelData['610b91f5'] = {"dfnID": "610b91f5", "url": "https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack", "dfnText": "MediaStreamTrack", "refSections": [{"refs": [{"id": "ref-for-mediastreamtrack"}], "title": "1. Overview"}, {"refs": [{"id": "ref-for-mediastreamtrack\u2460"}], "title": "4.1. General principles"}, {"refs": [{"id": "ref-for-mediastreamtrack\u2461"}], "title": "4.3. Exception Summary"}, {"refs": [{"id": "ref-for-mediastreamtrack\u2462"}], "title": "7.2. Recording webcam video and audio"}], "external": true};
-window.dfnpanelData['6777aaf6'] = {"dfnID": "6777aaf6", "url": "https://www.w3.org/TR/fingerprinting-guidance/#dfn-active-fingerprinting", "dfnText": "active fingerprinting", "refSections": [{"refs": [{"id": "ref-for-dfn-active-fingerprinting"}], "title": "6.2. Fingerprinting"}], "external": true};
-window.dfnpanelData['e84f56af'] = {"dfnID": "e84f56af", "url": "https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-enabled", "dfnText": "enabled", "refSections": [{"refs": [{"id": "ref-for-dom-mediastreamtrack-enabled"}], "title": "2.3. Methods"}], "external": true};
-window.dfnpanelData['49807975'] = {"dfnID": "49807975", "url": "https://www.w3.org/TR/mediacapture-streams/#idl-def-MediaStreamTrackState.ended", "dfnText": "ended", "refSections": [{"refs": [{"id": "ref-for-idl-def-MediaStreamTrackState.ended"}], "title": "2.3. Methods"}, {"refs": [{"id": "ref-for-idl-def-MediaStreamTrackState.ended\u2460"}], "title": "7.2. Recording webcam video and audio"}], "external": true};
-window.dfnpanelData['37ae6f63'] = {"dfnID": "37ae6f63", "url": "https://www.w3.org/TR/fingerprinting-guidance/#dfn-fingerprinting-surface", "dfnText": "fingerprinting surface", "refSections": [{"refs": [{"id": "ref-for-dfn-fingerprinting-surface"}], "title": "6.2. Fingerprinting"}], "external": true};
-window.dfnpanelData['321b1ad4'] = {"dfnID": "321b1ad4", "url": "https://www.w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia", "dfnText": "getUserMedia()", "refSections": [{"refs": [{"id": "ref-for-dom-mediadevices-getusermedia"}], "title": "7.2. Recording webcam video and audio"}], "external": true};
-window.dfnpanelData['95042a38'] = {"dfnID": "95042a38", "url": "https://www.w3.org/TR/mediacapture-streams/#stream-inactive", "dfnText": "inactive", "refSections": [{"refs": [{"id": "ref-for-stream-inactive"}], "title": "2.3. Methods"}], "external": true};
-window.dfnpanelData['d211886f'] = {"dfnID": "d211886f", "url": "https://www.w3.org/TR/webrtc-identity/#isolated-media-streams", "dfnText": "isolation properties", "refSections": [{"refs": [{"id": "ref-for-isolated-media-streams"}, {"id": "ref-for-isolated-media-streams\u2460"}, {"id": "ref-for-isolated-media-streams\u2461"}], "title": "2.3. Methods"}, {"refs": [{"id": "ref-for-isolated-media-streams\u2462"}], "title": "4.3. Exception Summary"}], "external": true};
-window.dfnpanelData['b9241099'] = {"dfnID": "b9241099", "url": "https://www.w3.org/TR/mediacapture-streams/#idl-def-MediaStreamTrackState.live", "dfnText": "live", "refSections": [{"refs": [{"id": "ref-for-idl-def-MediaStreamTrackState.live"}], "title": "2.3. Methods"}], "external": true};
-window.dfnpanelData['85f64689'] = {"dfnID": "85f64689", "url": "https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-muted", "dfnText": "muted", "refSections": [{"refs": [{"id": "ref-for-dom-mediastreamtrack-muted"}], "title": "2.3. Methods"}], "external": true};
-window.dfnpanelData['592405e6'] = {"dfnID": "592405e6", "url": "https://www.w3.org/TR/mediacapture-streams/#track-set", "dfnText": "track set", "refSections": [{"refs": [{"id": "ref-for-track-set"}, {"id": "ref-for-track-set\u2460"}, {"id": "ref-for-track-set\u2461"}], "title": "2.3. Methods"}], "external": true};
-window.dfnpanelData['129bdae8'] = {"dfnID": "129bdae8", "url": "https://dom.spec.whatwg.org/#event", "dfnText": "Event", "refSections": [{"refs": [{"id": "ref-for-event"}], "title": "3. Blob Event"}, {"refs": [{"id": "ref-for-event\u2460"}], "title": "4.2. MediaRecorderErrorEvent"}, {"refs": [{"id": "ref-for-event\u2461"}, {"id": "ref-for-event\u2462"}, {"id": "ref-for-event\u2463"}, {"id": "ref-for-event\u2464"}], "title": "5. Event summary"}], "external": true};
-window.dfnpanelData['44a7708c'] = {"dfnID": "44a7708c", "url": "https://dom.spec.whatwg.org/#dictdef-eventinit", "dfnText": "EventInit", "refSections": [{"refs": [{"id": "ref-for-dictdef-eventinit"}], "title": "4.2. MediaRecorderErrorEvent"}], "external": true};
-window.dfnpanelData['2bc0cdf4'] = {"dfnID": "2bc0cdf4", "url": "https://dom.spec.whatwg.org/#eventtarget", "dfnText": "EventTarget", "refSections": [{"refs": [{"id": "ref-for-eventtarget"}], "title": "2. Media Recorder API"}], "external": true};
-window.dfnpanelData['5fd23811'] = {"dfnID": "5fd23811", "url": "https://dom.spec.whatwg.org/#concept-event-fire", "dfnText": "fire an event", "refSections": [{"refs": [{"id": "ref-for-concept-event-fire"}, {"id": "ref-for-concept-event-fire\u2460"}, {"id": "ref-for-concept-event-fire\u2461"}, {"id": "ref-for-concept-event-fire\u2462"}, {"id": "ref-for-concept-event-fire\u2463"}, {"id": "ref-for-concept-event-fire\u2464"}, {"id": "ref-for-concept-event-fire\u2465"}, {"id": "ref-for-concept-event-fire\u2466"}], "title": "2.3. Methods"}, {"refs": [{"id": "ref-for-concept-event-fire\u2467"}], "title": "2.4. Data handling"}, {"refs": [{"id": "ref-for-concept-event-fire\u2468"}, {"id": "ref-for-concept-event-fire\u2460\u24ea"}], "title": "4.1. General principles"}, {"refs": [{"id": "f95f167f0"}], "title": "5. Event summary"}], "external": true};
-window.dfnpanelData['851a073b'] = {"dfnID": "851a073b", "url": "https://fetch.spec.whatwg.org/#concept-fetch-resume", "dfnText": "resumed", "refSections": [{"refs": [{"id": "ref-for-concept-fetch-resume"}], "title": "2.3. Methods"}], "external": true};
-window.dfnpanelData['b7d73f5b'] = {"dfnID": "b7d73f5b", "url": "https://w3c.github.io/FileAPI/#dfn-Blob", "dfnText": "Blob", "refSections": [{"refs": [{"id": "ref-for-dfn-Blob"}], "title": "1. Overview"}, {"refs": [{"id": "ref-for-dfn-Blob\u2460"}], "title": "2.2. Attributes"}, {"refs": [{"id": "ref-for-dfn-Blob\u2461"}, {"id": "ref-for-dfn-Blob\u2462"}, {"id": "ref-for-dfn-Blob\u2463"}, {"id": "ref-for-dfn-Blob\u2464"}, {"id": "ref-for-dfn-Blob\u2465"}], "title": "2.3. Methods"}, {"refs": [{"id": "ref-for-dfn-Blob\u2466"}], "title": "2.4. Data handling"}, {"refs": [{"id": "ref-for-dfn-Blob\u2467"}], "title": "3. Blob Event"}, {"refs": [{"id": "ref-for-dfn-Blob\u2468"}, {"id": "ref-for-dfn-Blob\u2460\u24ea"}], "title": "3.2. Attributes"}, {"refs": [{"id": "ref-for-dfn-Blob\u2460\u2460"}], "title": "3.3. BlobEventInit"}, {"refs": [{"id": "ref-for-dfn-Blob\u2460\u2461"}, {"id": "ref-for-dfn-Blob\u2460\u2462"}], "title": "3.3.1. Members"}, {"refs": [{"id": "ref-for-dfn-Blob\u2460\u2463"}, {"id": "ref-for-dfn-Blob\u2460\u2464"}], "title": "4.1. General principles"}, {"refs": [{"id": "ref-for-dfn-Blob\u2460\u2465"}], "title": "5. Event summary"}], "external": true};
-window.dfnpanelData['e303c02d'] = {"dfnID": "e303c02d", "url": "https://w3c.github.io/FileAPI/#dfn-type", "dfnText": "type", "refSections": [{"refs": [{"id": "ref-for-dfn-type"}], "title": "3.2. Attributes"}, {"refs": [{"id": "ref-for-dfn-type\u2460"}], "title": "6.2. Fingerprinting"}], "external": true};
-window.dfnpanelData['f0951476'] = {"dfnID": "f0951476", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler", "dfnText": "EventHandler", "refSections": [{"refs": [{"id": "ref-for-eventhandler"}, {"id": "ref-for-eventhandler\u2460"}, {"id": "ref-for-eventhandler\u2461"}, {"id": "ref-for-eventhandler\u2462"}, {"id": "ref-for-eventhandler\u2463"}, {"id": "ref-for-eventhandler\u2464"}], "title": "2. Media Recorder API"}, {"refs": [{"id": "ref-for-eventhandler\u2465"}, {"id": "ref-for-eventhandler\u2466"}, {"id": "ref-for-eventhandler\u2467"}, {"id": "ref-for-eventhandler\u2468"}, {"id": "ref-for-eventhandler\u2460\u24ea"}, {"id": "ref-for-eventhandler\u2460\u2460"}], "title": "2.2. Attributes"}], "external": true};
-window.dfnpanelData['a72449dd'] = {"dfnID": "a72449dd", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel", "dfnText": "in parallel", "refSections": [{"refs": [{"id": "ref-for-in-parallel"}], "title": "2.3. Methods"}], "external": true};
-window.dfnpanelData['65181da8'] = {"dfnID": "65181da8", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#secure-context", "dfnText": "secure context", "refSections": [{"refs": [{"id": "ref-for-secure-context"}], "title": "6. Privacy and Security Considerations"}], "external": true};
-window.dfnpanelData['dca2de17'] = {"dfnID": "dca2de17", "url": "https://webidl.spec.whatwg.org/#idl-DOMException", "dfnText": "DOMException", "refSections": [{"refs": [{"id": "ref-for-idl-DOMException"}], "title": "2.1. Constructors"}, {"refs": [{"id": "ref-for-idl-DOMException\u2460"}, {"id": "ref-for-idl-DOMException\u2461"}, {"id": "ref-for-idl-DOMException\u2462"}, {"id": "ref-for-idl-DOMException\u2463"}, {"id": "ref-for-idl-DOMException\u2464"}, {"id": "ref-for-idl-DOMException\u2465"}, {"id": "ref-for-idl-DOMException\u2466"}], "title": "2.3. Methods"}, {"refs": [{"id": "ref-for-idl-DOMException\u2467"}], "title": "4.1. General principles"}, {"refs": [{"id": "ref-for-idl-DOMException\u2468"}, {"id": "ref-for-idl-DOMException\u2460\u24ea"}, {"id": "ref-for-idl-DOMException\u2460\u2460"}], "title": "4.2. MediaRecorderErrorEvent"}, {"refs": [{"id": "ref-for-idl-DOMException\u2460\u2461"}], "title": "4.2.2. Attributes"}, {"refs": [{"id": "ref-for-idl-DOMException\u2460\u2462"}, {"id": "ref-for-idl-DOMException\u2460\u2463"}, {"id": "ref-for-idl-DOMException\u2460\u2464"}], "title": "4.2.3. MediaRecorderErrorEventInit"}, {"refs": [{"id": "ref-for-idl-DOMException\u2460\u2465"}], "title": "4.3. Exception Summary"}], "external": true};
-window.dfnpanelData['bcda9d2a'] = {"dfnID": "bcda9d2a", "url": "https://heycam.github.io/webidl/#idl-DOMString", "dfnText": "DOMString", "refSections": [{"refs": [{"id": "ref-for-idl-DOMString"}, {"id": "ref-for-idl-DOMString\u2460"}], "title": "2. Media Recorder API"}, {"refs": [{"id": "ref-for-idl-DOMString\u2461"}], "title": "2.2. Attributes"}, {"refs": [{"id": "ref-for-idl-DOMString\u2462"}], "title": "2.5. MediaRecorderOptions"}, {"refs": [{"id": "ref-for-idl-DOMString\u2463"}], "title": "2.5.1. Members"}, {"refs": [{"id": "ref-for-idl-DOMString\u2464"}], "title": "3. Blob Event"}, {"refs": [{"id": "ref-for-idl-DOMString\u2465"}], "title": "4.2. MediaRecorderErrorEvent"}], "external": true};
-window.dfnpanelData['889e932f'] = {"dfnID": "889e932f", "url": "https://webidl.spec.whatwg.org/#Exposed", "dfnText": "Exposed", "refSections": [{"refs": [{"id": "ref-for-Exposed"}], "title": "2. Media Recorder API"}, {"refs": [{"id": "ref-for-Exposed\u2460"}], "title": "3. Blob Event"}, {"refs": [{"id": "ref-for-Exposed\u2461"}], "title": "4.2. MediaRecorderErrorEvent"}], "external": true};
-window.dfnpanelData['cae6bf57'] = {"dfnID": "cae6bf57", "url": "https://webidl.spec.whatwg.org/#invalidmodificationerror", "dfnText": "InvalidModificationError", "refSections": [{"refs": [{"id": "ref-for-invalidmodificationerror"}], "title": "2.3. Methods"}, {"refs": [{"id": "ref-for-invalidmodificationerror\u2460"}], "title": "4.3. Exception Summary"}], "external": true};
-window.dfnpanelData['797018a7'] = {"dfnID": "797018a7", "url": "https://webidl.spec.whatwg.org/#invalidstateerror", "dfnText": "InvalidStateError", "refSections": [{"refs": [{"id": "ref-for-invalidstateerror"}, {"id": "ref-for-invalidstateerror\u2460"}, {"id": "ref-for-invalidstateerror\u2461"}, {"id": "ref-for-invalidstateerror\u2462"}], "title": "2.3. Methods"}, {"refs": [{"id": "ref-for-invalidstateerror\u2463"}], "title": "4.3. Exception Summary"}], "external": true};
-window.dfnpanelData['3182eb71'] = {"dfnID": "3182eb71", "url": "https://webidl.spec.whatwg.org/#notsupportederror", "dfnText": "NotSupportedError", "refSections": [{"refs": [{"id": "ref-for-notsupportederror"}], "title": "2.1. Constructors"}, {"refs": [{"id": "ref-for-notsupportederror\u2460"}, {"id": "ref-for-notsupportederror\u2461"}], "title": "2.3. Methods"}, {"refs": [{"id": "ref-for-notsupportederror\u2462"}], "title": "4.3. Exception Summary"}], "external": true};
-window.dfnpanelData['a5c91173'] = {"dfnID": "a5c91173", "url": "https://webidl.spec.whatwg.org/#SameObject", "dfnText": "SameObject", "refSections": [{"refs": [{"id": "ref-for-SameObject"}], "title": "3. Blob Event"}, {"refs": [{"id": "ref-for-SameObject\u2460"}], "title": "4.2. MediaRecorderErrorEvent"}], "external": true};
-window.dfnpanelData['c3e881ef'] = {"dfnID": "c3e881ef", "url": "https://webidl.spec.whatwg.org/#securityerror", "dfnText": "SecurityError", "refSections": [{"refs": [{"id": "ref-for-securityerror"}, {"id": "ref-for-securityerror\u2460"}], "title": "2.3. Methods"}, {"refs": [{"id": "ref-for-securityerror\u2461"}], "title": "4.3. Exception Summary"}], "external": true};
-window.dfnpanelData['81dd847b'] = {"dfnID": "81dd847b", "url": "https://webidl.spec.whatwg.org/#unknownerror", "dfnText": "UnknownError", "refSections": [{"refs": [{"id": "ref-for-unknownerror"}], "title": "2.3. Methods"}], "external": true};
-window.dfnpanelData['5372cca8'] = {"dfnID": "5372cca8", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "dfnText": "boolean", "refSections": [{"refs": [{"id": "ref-for-idl-boolean"}], "title": "2. Media Recorder API"}], "external": true};
-window.dfnpanelData['5f90bbfb'] = {"dfnID": "5f90bbfb", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "dfnText": "undefined", "refSections": [{"refs": [{"id": "ref-for-idl-undefined"}, {"id": "ref-for-idl-undefined\u2460"}, {"id": "ref-for-idl-undefined\u2461"}, {"id": "ref-for-idl-undefined\u2462"}, {"id": "ref-for-idl-undefined\u2463"}], "title": "2. Media Recorder API"}], "external": true};
-window.dfnpanelData['e97a9688'] = {"dfnID": "e97a9688", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-long", "dfnText": "unsigned long", "refSections": [{"refs": [{"id": "ref-for-idl-unsigned-long"}, {"id": "ref-for-idl-unsigned-long\u2460"}, {"id": "ref-for-idl-unsigned-long\u2461"}], "title": "2. Media Recorder API"}, {"refs": [{"id": "ref-for-idl-unsigned-long\u2462"}, {"id": "ref-for-idl-unsigned-long\u2463"}], "title": "2.2. Attributes"}, {"refs": [{"id": "ref-for-idl-unsigned-long\u2464"}, {"id": "ref-for-idl-unsigned-long\u2465"}, {"id": "ref-for-idl-unsigned-long\u2466"}], "title": "2.5. MediaRecorderOptions"}, {"refs": [{"id": "ref-for-idl-unsigned-long\u2467"}, {"id": "ref-for-idl-unsigned-long\u2468"}, {"id": "ref-for-idl-unsigned-long\u2460\u24ea"}], "title": "2.5.1. Members"}], "external": true};
-window.dfnpanelData['mediarecorder'] = {"dfnID": "mediarecorder", "url": "#mediarecorder", "dfnText": "MediaRecorder", "refSections": [{"refs": [{"id": "ref-for-mediarecorder"}], "title": "1. Overview"}, {"refs": [{"id": "ref-for-mediarecorder\u2460"}], "title": "2.1. Constructors"}, {"refs": [{"id": "ref-for-mediarecorder\u2461"}, {"id": "ref-for-mediarecorder\u2462"}], "title": "2.2. Attributes"}, {"refs": [{"id": "ref-for-mediarecorder\u2463"}, {"id": "ref-for-mediarecorder\u2464"}, {"id": "ref-for-mediarecorder\u2465"}, {"id": "ref-for-mediarecorder\u2466"}, {"id": "ref-for-mediarecorder\u2467"}, {"id": "ref-for-mediarecorder\u2468"}, {"id": "ref-for-mediarecorder\u2460\u24ea"}, {"id": "ref-for-mediarecorder\u2460\u2460"}, {"id": "ref-for-mediarecorder\u2460\u2461"}, {"id": "ref-for-mediarecorder\u2460\u2462"}, {"id": "ref-for-mediarecorder\u2460\u2463"}], "title": "2.3. Methods"}, {"refs": [{"id": "ref-for-mediarecorder\u2460\u2464"}], "title": "5. Event summary"}, {"refs": [{"id": "ref-for-mediarecorder\u2460\u2465"}], "title": "6. Privacy and Security Considerations"}, {"refs": [{"id": "ref-for-mediarecorder\u2460\u2466"}], "title": "6.1. Resource exhaustion"}, {"refs": [{"id": "ref-for-mediarecorder\u2460\u2467"}], "title": "6.2. Fingerprinting"}, {"refs": [{"id": "ref-for-mediarecorder\u2460\u2468"}], "title": "7.1. Check for MediaRecorder and content types"}], "external": false};
-window.dfnpanelData['dom-mediarecorder-start-timeslice-timeslice'] = {"dfnID": "dom-mediarecorder-start-timeslice-timeslice", "url": "#dom-mediarecorder-start-timeslice-timeslice", "dfnText": "timeslice", "refSections": [{"refs": [{"id": "ref-for-dom-mediarecorder-start-timeslice-timeslice"}], "title": "2.3. Methods"}, {"refs": [{"id": "ref-for-dom-mediarecorder-start-timeslice-timeslice\u2460"}], "title": "6.1. Resource exhaustion"}], "external": false};
-window.dfnpanelData['dom-mediarecorder-mediarecorder'] = {"dfnID": "dom-mediarecorder-mediarecorder", "url": "#dom-mediarecorder-mediarecorder", "dfnText": "MediaRecorder(MediaStream stream, optional MediaRecorderOptions options = {})", "refSections": [{"refs": [{"id": "ref-for-dom-mediarecorder-mediarecorder"}], "title": "2. Media Recorder API"}, {"refs": [{"id": "ref-for-dom-mediarecorder-mediarecorder\u2460"}], "title": "2.1. Constructors"}], "external": false};
-window.dfnpanelData['constrainedmimetype'] = {"dfnID": "constrainedmimetype", "url": "#constrainedmimetype", "dfnText": "[[ConstrainedMimeType]]", "refSections": [{"refs": [{"id": "ref-for-constrainedmimetype"}], "title": "2.1. Constructors"}, {"refs": [{"id": "ref-for-constrainedmimetype\u2460"}, {"id": "ref-for-constrainedmimetype\u2461"}, {"id": "ref-for-constrainedmimetype\u2462"}, {"id": "ref-for-constrainedmimetype\u2463"}], "title": "2.3. Methods"}], "external": false};
-window.dfnpanelData['constrainedbitspersecond'] = {"dfnID": "constrainedbitspersecond", "url": "#constrainedbitspersecond", "dfnText": "[[ConstrainedBitsPerSecond]]", "refSections": [{"refs": [{"id": "ref-for-constrainedbitspersecond"}, {"id": "ref-for-constrainedbitspersecond\u2460"}], "title": "2.1. Constructors"}, {"refs": [{"id": "ref-for-constrainedbitspersecond\u2461"}, {"id": "ref-for-constrainedbitspersecond\u2462"}, {"id": "ref-for-constrainedbitspersecond\u2463"}, {"id": "ref-for-constrainedbitspersecond\u2464"}], "title": "2.3. Methods"}], "external": false};
-window.dfnpanelData['dom-mediarecorder-stream'] = {"dfnID": "dom-mediarecorder-stream", "url": "#dom-mediarecorder-stream", "dfnText": "stream", "refSections": [{"refs": [{"id": "ref-for-dom-mediarecorder-stream"}], "title": "2. Media Recorder API"}, {"refs": [{"id": "ref-for-dom-mediarecorder-stream\u2460"}], "title": "2.1. Constructors"}, {"refs": [{"id": "ref-for-dom-mediarecorder-stream\u2461"}, {"id": "ref-for-dom-mediarecorder-stream\u2462"}], "title": "2.3. Methods"}, {"refs": [{"id": "ref-for-dom-mediarecorder-stream\u2463"}, {"id": "ref-for-dom-mediarecorder-stream\u2464"}], "title": "5. Event summary"}], "external": false};
-window.dfnpanelData['dom-mediarecorder-mimetype'] = {"dfnID": "dom-mediarecorder-mimetype", "url": "#dom-mediarecorder-mimetype", "dfnText": "mimeType", "refSections": [{"refs": [{"id": "ref-for-dom-mediarecorder-mimetype"}], "title": "2. Media Recorder API"}, {"refs": [{"id": "ref-for-dom-mediarecorder-mimetype\u2460"}], "title": "2.1. Constructors"}, {"refs": [{"id": "ref-for-dom-mediarecorder-mimetype\u2461"}], "title": "2.2. Attributes"}, {"refs": [{"id": "ref-for-dom-mediarecorder-mimetype\u2462"}, {"id": "ref-for-dom-mediarecorder-mimetype\u2463"}], "title": "2.3. Methods"}], "external": false};
-window.dfnpanelData['dom-mediarecorder-state'] = {"dfnID": "dom-mediarecorder-state", "url": "#dom-mediarecorder-state", "dfnText": "state", "refSections": [{"refs": [{"id": "ref-for-dom-mediarecorder-state"}], "title": "2. Media Recorder API"}, {"refs": [{"id": "ref-for-dom-mediarecorder-state\u2460"}], "title": "2.1. Constructors"}, {"refs": [{"id": "ref-for-dom-mediarecorder-state\u2461"}, {"id": "ref-for-dom-mediarecorder-state\u2462"}, {"id": "ref-for-dom-mediarecorder-state\u2463"}, {"id": "ref-for-dom-mediarecorder-state\u2464"}, {"id": "ref-for-dom-mediarecorder-state\u2465"}, {"id": "ref-for-dom-mediarecorder-state\u2466"}, {"id": "ref-for-dom-mediarecorder-state\u2467"}, {"id": "ref-for-dom-mediarecorder-state\u2468"}, {"id": "ref-for-dom-mediarecorder-state\u2460\u24ea"}, {"id": "ref-for-dom-mediarecorder-state\u2460\u2460"}, {"id": "ref-for-dom-mediarecorder-state\u2460\u2461"}, {"id": "ref-for-dom-mediarecorder-state\u2460\u2462"}], "title": "2.3. Methods"}, {"refs": [{"id": "ref-for-dom-mediarecorder-state\u2460\u2463"}], "title": "2.4. Data handling"}], "external": false};
-window.dfnpanelData['dom-mediarecorder-onstart'] = {"dfnID": "dom-mediarecorder-onstart", "url": "#dom-mediarecorder-onstart", "dfnText": "onstart", "refSections": [{"refs": [{"id": "ref-for-dom-mediarecorder-onstart"}], "title": "2. Media Recorder API"}], "external": false};
-window.dfnpanelData['dom-mediarecorder-onstop'] = {"dfnID": "dom-mediarecorder-onstop", "url": "#dom-mediarecorder-onstop", "dfnText": "onstop", "refSections": [{"refs": [{"id": "ref-for-dom-mediarecorder-onstop"}], "title": "2. Media Recorder API"}], "external": false};
-window.dfnpanelData['dom-mediarecorder-ondataavailable'] = {"dfnID": "dom-mediarecorder-ondataavailable", "url": "#dom-mediarecorder-ondataavailable", "dfnText": "ondataavailable", "refSections": [{"refs": [{"id": "ref-for-dom-mediarecorder-ondataavailable"}], "title": "1. Overview"}, {"refs": [{"id": "ref-for-dom-mediarecorder-ondataavailable\u2460"}], "title": "2. Media Recorder API"}, {"refs": [{"id": "ref-for-dom-mediarecorder-ondataavailable\u2461"}], "title": "6.2. Fingerprinting"}, {"refs": [{"id": "ref-for-dom-mediarecorder-ondataavailable\u2462"}], "title": "7.2. Recording webcam video and audio"}], "external": false};
-window.dfnpanelData['dom-mediarecorder-onpause'] = {"dfnID": "dom-mediarecorder-onpause", "url": "#dom-mediarecorder-onpause", "dfnText": "onpause", "refSections": [{"refs": [{"id": "ref-for-dom-mediarecorder-onpause"}], "title": "2. Media Recorder API"}], "external": false};
-window.dfnpanelData['dom-mediarecorder-onresume'] = {"dfnID": "dom-mediarecorder-onresume", "url": "#dom-mediarecorder-onresume", "dfnText": "onresume", "refSections": [{"refs": [{"id": "ref-for-dom-mediarecorder-onresume"}], "title": "2. Media Recorder API"}], "external": false};
-window.dfnpanelData['dom-mediarecorder-onerror'] = {"dfnID": "dom-mediarecorder-onerror", "url": "#dom-mediarecorder-onerror", "dfnText": "onerror", "refSections": [{"refs": [{"id": "ref-for-dom-mediarecorder-onerror"}], "title": "2. Media Recorder API"}], "external": false};
-window.dfnpanelData['dom-mediarecorder-videobitspersecond'] = {"dfnID": "dom-mediarecorder-videobitspersecond", "url": "#dom-mediarecorder-videobitspersecond", "dfnText": "videoBitsPerSecond", "refSections": [{"refs": [{"id": "ref-for-dom-mediarecorder-videobitspersecond"}], "title": "2. Media Recorder API"}, {"refs": [{"id": "ref-for-dom-mediarecorder-videobitspersecond\u2460"}, {"id": "ref-for-dom-mediarecorder-videobitspersecond\u2461"}, {"id": "ref-for-dom-mediarecorder-videobitspersecond\u2462"}], "title": "2.1. Constructors"}, {"refs": [{"id": "ref-for-dom-mediarecorder-videobitspersecond\u2463"}, {"id": "ref-for-dom-mediarecorder-videobitspersecond\u2464"}, {"id": "ref-for-dom-mediarecorder-videobitspersecond\u2465"}, {"id": "ref-for-dom-mediarecorder-videobitspersecond\u2466"}, {"id": "ref-for-dom-mediarecorder-videobitspersecond\u2467"}], "title": "2.3. Methods"}], "external": false};
-window.dfnpanelData['dom-mediarecorder-audiobitspersecond'] = {"dfnID": "dom-mediarecorder-audiobitspersecond", "url": "#dom-mediarecorder-audiobitspersecond", "dfnText": "audioBitsPerSecond", "refSections": [{"refs": [{"id": "ref-for-dom-mediarecorder-audiobitspersecond"}], "title": "2. Media Recorder API"}, {"refs": [{"id": "ref-for-dom-mediarecorder-audiobitspersecond\u2460"}, {"id": "ref-for-dom-mediarecorder-audiobitspersecond\u2461"}, {"id": "ref-for-dom-mediarecorder-audiobitspersecond\u2462"}], "title": "2.1. Constructors"}, {"refs": [{"id": "ref-for-dom-mediarecorder-audiobitspersecond\u2463"}, {"id": "ref-for-dom-mediarecorder-audiobitspersecond\u2464"}, {"id": "ref-for-dom-mediarecorder-audiobitspersecond\u2465"}, {"id": "ref-for-dom-mediarecorder-audiobitspersecond\u2466"}, {"id": "ref-for-dom-mediarecorder-audiobitspersecond\u2467"}], "title": "2.3. Methods"}], "external": false};
-window.dfnpanelData['dom-mediarecorder-audiobitratemode'] = {"dfnID": "dom-mediarecorder-audiobitratemode", "url": "#dom-mediarecorder-audiobitratemode", "dfnText": "audioBitrateMode", "refSections": [{"refs": [{"id": "ref-for-dom-mediarecorder-audiobitratemode"}], "title": "2. Media Recorder API"}, {"refs": [{"id": "ref-for-dom-mediarecorder-audiobitratemode\u2460"}, {"id": "ref-for-dom-mediarecorder-audiobitratemode\u2461"}], "title": "2.1. Constructors"}, {"refs": [{"id": "ref-for-dom-mediarecorder-audiobitratemode\u2462"}], "title": "2.3. Methods"}], "external": false};
-window.dfnpanelData['dom-mediarecorder-start'] = {"dfnID": "dom-mediarecorder-start", "url": "#dom-mediarecorder-start", "dfnText": "start(optional unsigned long timeslice)", "refSections": [{"refs": [{"id": "ref-for-dom-mediarecorder-start"}], "title": "1. Overview"}, {"refs": [{"id": "ref-for-dom-mediarecorder-start\u2460"}], "title": "2. Media Recorder API"}, {"refs": [{"id": "ref-for-dom-mediarecorder-start\u2461"}], "title": "2.3. Methods"}, {"refs": [{"id": "ref-for-dom-mediarecorder-start\u2462"}], "title": "4.2.3. MediaRecorderErrorEventInit"}, {"refs": [{"id": "ref-for-dom-mediarecorder-start\u2463"}], "title": "6.1. Resource exhaustion"}], "external": false};
-window.dfnpanelData['abstract-opdef-inactivate-the-recorder'] = {"dfnID": "abstract-opdef-inactivate-the-recorder", "url": "#abstract-opdef-inactivate-the-recorder", "dfnText": "Inactivate the recorder", "refSections": [{"refs": [{"id": "ref-for-abstract-opdef-inactivate-the-recorder"}, {"id": "ref-for-abstract-opdef-inactivate-the-recorder\u2460"}, {"id": "ref-for-abstract-opdef-inactivate-the-recorder\u2461"}, {"id": "ref-for-abstract-opdef-inactivate-the-recorder\u2462"}, {"id": "ref-for-abstract-opdef-inactivate-the-recorder\u2463"}], "title": "2.3. Methods"}], "external": false};
-window.dfnpanelData['dom-mediarecorder-stop'] = {"dfnID": "dom-mediarecorder-stop", "url": "#dom-mediarecorder-stop", "dfnText": "stop()", "refSections": [{"refs": [{"id": "ref-for-dom-mediarecorder-stop"}], "title": "1. Overview"}, {"refs": [{"id": "ref-for-dom-mediarecorder-stop\u2460"}], "title": "2. Media Recorder API"}, {"refs": [{"id": "ref-for-dom-mediarecorder-stop\u2461"}, {"id": "ref-for-dom-mediarecorder-stop\u2462"}], "title": "2.3. Methods"}, {"refs": [{"id": "ref-for-dom-mediarecorder-stop\u2463"}], "title": "7.2. Recording webcam video and audio"}], "external": false};
-window.dfnpanelData['dom-mediarecorder-pause'] = {"dfnID": "dom-mediarecorder-pause", "url": "#dom-mediarecorder-pause", "dfnText": "pause()", "refSections": [{"refs": [{"id": "ref-for-dom-mediarecorder-pause"}], "title": "2. Media Recorder API"}, {"refs": [{"id": "ref-for-dom-mediarecorder-pause\u2460"}, {"id": "ref-for-dom-mediarecorder-pause\u2461"}], "title": "2.3. Methods"}], "external": false};
-window.dfnpanelData['dom-mediarecorder-resume'] = {"dfnID": "dom-mediarecorder-resume", "url": "#dom-mediarecorder-resume", "dfnText": "resume()", "refSections": [{"refs": [{"id": "ref-for-dom-mediarecorder-resume"}], "title": "2. Media Recorder API"}, {"refs": [{"id": "ref-for-dom-mediarecorder-resume\u2460"}], "title": "2.3. Methods"}], "external": false};
-window.dfnpanelData['dom-mediarecorder-requestdata'] = {"dfnID": "dom-mediarecorder-requestdata", "url": "#dom-mediarecorder-requestdata", "dfnText": "requestData()", "refSections": [{"refs": [{"id": "ref-for-dom-mediarecorder-requestdata"}], "title": "2. Media Recorder API"}, {"refs": [{"id": "ref-for-dom-mediarecorder-requestdata\u2460"}, {"id": "ref-for-dom-mediarecorder-requestdata\u2461"}, {"id": "ref-for-dom-mediarecorder-requestdata\u2462"}], "title": "2.3. Methods"}], "external": false};
-window.dfnpanelData['dom-mediarecorder-istypesupported'] = {"dfnID": "dom-mediarecorder-istypesupported", "url": "#dom-mediarecorder-istypesupported", "dfnText": "isTypeSupported(DOMString type)\n    ", "refSections": [{"refs": [{"id": "ref-for-dom-mediarecorder-istypesupported"}], "title": "2. Media Recorder API"}, {"refs": [{"id": "ref-for-dom-mediarecorder-istypesupported\u2460"}], "title": "6.2. Fingerprinting"}], "external": false};
-window.dfnpanelData['abstract-opdef-is-type-supported'] = {"dfnID": "abstract-opdef-is-type-supported", "url": "#abstract-opdef-is-type-supported", "dfnText": "is type supported", "refSections": [{"refs": [{"id": "ref-for-abstract-opdef-is-type-supported"}], "title": "2.1. Constructors"}, {"refs": [{"id": "ref-for-abstract-opdef-is-type-supported\u2460"}], "title": "2.3. Methods"}], "external": false};
-window.dfnpanelData['fire-a-blob-event'] = {"dfnID": "fire-a-blob-event", "url": "#fire-a-blob-event", "dfnText": "fire a blob event", "refSections": [{"refs": [{"id": "ref-for-fire-a-blob-event"}, {"id": "ref-for-fire-a-blob-event\u2460"}, {"id": "ref-for-fire-a-blob-event\u2461"}, {"id": "ref-for-fire-a-blob-event\u2462"}, {"id": "ref-for-fire-a-blob-event\u2463"}, {"id": "ref-for-fire-a-blob-event\u2464"}, {"id": "ref-for-fire-a-blob-event\u2465"}], "title": "2.3. Methods"}, {"refs": [{"id": "ref-for-fire-a-blob-event\u2466"}], "title": "4.1. General principles"}], "external": false};
-window.dfnpanelData['dictdef-mediarecorderoptions'] = {"dfnID": "dictdef-mediarecorderoptions", "url": "#dictdef-mediarecorderoptions", "dfnText": "MediaRecorderOptions", "refSections": [{"refs": [{"id": "ref-for-dictdef-mediarecorderoptions"}], "title": "2. Media Recorder API"}, {"refs": [{"id": "ref-for-dictdef-mediarecorderoptions\u2460"}, {"id": "ref-for-dictdef-mediarecorderoptions\u2461"}], "title": "6.2. Fingerprinting"}], "external": false};
-window.dfnpanelData['dom-mediarecorderoptions-mimetype'] = {"dfnID": "dom-mediarecorderoptions-mimetype", "url": "#dom-mediarecorderoptions-mimetype", "dfnText": "mimeType", "refSections": [{"refs": [{"id": "ref-for-dom-mediarecorderoptions-mimetype"}, {"id": "ref-for-dom-mediarecorderoptions-mimetype\u2460"}], "title": "2.1. Constructors"}, {"refs": [{"id": "ref-for-dom-mediarecorderoptions-mimetype\u2461"}], "title": "2.5. MediaRecorderOptions"}, {"refs": [{"id": "ref-for-dom-mediarecorderoptions-mimetype\u2462"}], "title": "2.5.1. Members"}], "external": false};
-window.dfnpanelData['dom-mediarecorderoptions-audiobitspersecond'] = {"dfnID": "dom-mediarecorderoptions-audiobitspersecond", "url": "#dom-mediarecorderoptions-audiobitspersecond", "dfnText": "audioBitsPerSecond", "refSections": [{"refs": [{"id": "ref-for-dom-mediarecorderoptions-audiobitspersecond"}], "title": "2.1. Constructors"}, {"refs": [{"id": "ref-for-dom-mediarecorderoptions-audiobitspersecond\u2460"}], "title": "2.5. MediaRecorderOptions"}, {"refs": [{"id": "ref-for-dom-mediarecorderoptions-audiobitspersecond\u2461"}], "title": "2.5.1. Members"}], "external": false};
-window.dfnpanelData['dom-mediarecorderoptions-videobitspersecond'] = {"dfnID": "dom-mediarecorderoptions-videobitspersecond", "url": "#dom-mediarecorderoptions-videobitspersecond", "dfnText": "videoBitsPerSecond", "refSections": [{"refs": [{"id": "ref-for-dom-mediarecorderoptions-videobitspersecond"}], "title": "2.1. Constructors"}, {"refs": [{"id": "ref-for-dom-mediarecorderoptions-videobitspersecond\u2460"}], "title": "2.5. MediaRecorderOptions"}, {"refs": [{"id": "ref-for-dom-mediarecorderoptions-videobitspersecond\u2461"}], "title": "2.5.1. Members"}], "external": false};
-window.dfnpanelData['dom-mediarecorderoptions-bitspersecond'] = {"dfnID": "dom-mediarecorderoptions-bitspersecond", "url": "#dom-mediarecorderoptions-bitspersecond", "dfnText": "bitsPerSecond", "refSections": [{"refs": [{"id": "ref-for-dom-mediarecorderoptions-bitspersecond"}], "title": "2.1. Constructors"}, {"refs": [{"id": "ref-for-dom-mediarecorderoptions-bitspersecond\u2460"}], "title": "2.5. MediaRecorderOptions"}], "external": false};
-window.dfnpanelData['dom-mediarecorderoptions-audiobitratemode'] = {"dfnID": "dom-mediarecorderoptions-audiobitratemode", "url": "#dom-mediarecorderoptions-audiobitratemode", "dfnText": "audioBitrateMode", "refSections": [{"refs": [{"id": "ref-for-dom-mediarecorderoptions-audiobitratemode"}, {"id": "ref-for-dom-mediarecorderoptions-audiobitratemode\u2460"}], "title": "2.1. Constructors"}, {"refs": [{"id": "ref-for-dom-mediarecorderoptions-audiobitratemode\u2461"}], "title": "2.5. MediaRecorderOptions"}], "external": false};
-window.dfnpanelData['enumdef-bitratemode'] = {"dfnID": "enumdef-bitratemode", "url": "#enumdef-bitratemode", "dfnText": "BitrateMode", "refSections": [{"refs": [{"id": "ref-for-enumdef-bitratemode"}], "title": "2. Media Recorder API"}, {"refs": [{"id": "ref-for-enumdef-bitratemode\u2460"}], "title": "2.1. Constructors"}, {"refs": [{"id": "ref-for-enumdef-bitratemode\u2461"}, {"id": "ref-for-enumdef-bitratemode\u2462"}], "title": "2.2. Attributes"}, {"refs": [{"id": "ref-for-enumdef-bitratemode\u2463"}], "title": "2.3. Methods"}, {"refs": [{"id": "ref-for-enumdef-bitratemode\u2464"}], "title": "2.5. MediaRecorderOptions"}, {"refs": [{"id": "ref-for-enumdef-bitratemode\u2465"}, {"id": "ref-for-enumdef-bitratemode\u2466"}], "title": "2.5.1. Members"}], "external": false};
-window.dfnpanelData['dom-bitratemode-constant'] = {"dfnID": "dom-bitratemode-constant", "url": "#dom-bitratemode-constant", "dfnText": "constant", "refSections": [{"refs": [{"id": "ref-for-dom-bitratemode-constant"}], "title": "2.6. BitrateMode"}], "external": false};
-window.dfnpanelData['dom-bitratemode-variable'] = {"dfnID": "dom-bitratemode-variable", "url": "#dom-bitratemode-variable", "dfnText": "variable", "refSections": [{"refs": [{"id": "ref-for-dom-bitratemode-variable"}], "title": "2.6. BitrateMode"}], "external": false};
-window.dfnpanelData['enumdef-recordingstate'] = {"dfnID": "enumdef-recordingstate", "url": "#enumdef-recordingstate", "dfnText": "RecordingState", "refSections": [{"refs": [{"id": "ref-for-enumdef-recordingstate"}], "title": "2. Media Recorder API"}, {"refs": [{"id": "ref-for-enumdef-recordingstate\u2460"}], "title": "2.2. Attributes"}], "external": false};
-window.dfnpanelData['dom-recordingstate-inactive'] = {"dfnID": "dom-recordingstate-inactive", "url": "#dom-recordingstate-inactive", "dfnText": "inactive", "refSections": [{"refs": [{"id": "ref-for-dom-recordingstate-inactive"}], "title": "2.1. Constructors"}, {"refs": [{"id": "ref-for-dom-recordingstate-inactive\u2460"}, {"id": "ref-for-dom-recordingstate-inactive\u2461"}, {"id": "ref-for-dom-recordingstate-inactive\u2462"}, {"id": "ref-for-dom-recordingstate-inactive\u2463"}, {"id": "ref-for-dom-recordingstate-inactive\u2464"}, {"id": "ref-for-dom-recordingstate-inactive\u2465"}], "title": "2.3. Methods"}, {"refs": [{"id": "ref-for-dom-recordingstate-inactive\u2466"}], "title": "2.7. RecordingState"}], "external": false};
-window.dfnpanelData['dom-recordingstate-recording'] = {"dfnID": "dom-recordingstate-recording", "url": "#dom-recordingstate-recording", "dfnText": "recording", "refSections": [{"refs": [{"id": "ref-for-dom-recordingstate-recording"}, {"id": "ref-for-dom-recordingstate-recording\u2460"}, {"id": "ref-for-dom-recordingstate-recording\u2461"}], "title": "2.3. Methods"}, {"refs": [{"id": "ref-for-dom-recordingstate-recording\u2462"}], "title": "2.4. Data handling"}, {"refs": [{"id": "ref-for-dom-recordingstate-recording\u2463"}], "title": "2.7. RecordingState"}], "external": false};
-window.dfnpanelData['dom-recordingstate-paused'] = {"dfnID": "dom-recordingstate-paused", "url": "#dom-recordingstate-paused", "dfnText": "paused", "refSections": [{"refs": [{"id": "ref-for-dom-recordingstate-paused"}, {"id": "ref-for-dom-recordingstate-paused\u2460"}], "title": "2.3. Methods"}, {"refs": [{"id": "ref-for-dom-recordingstate-paused\u2461"}], "title": "2.7. RecordingState"}], "external": false};
-window.dfnpanelData['blobevent'] = {"dfnID": "blobevent", "url": "#blobevent", "dfnText": "BlobEvent", "refSections": [{"refs": [{"id": "ref-for-blobevent"}], "title": "2.4. Data handling"}, {"refs": [{"id": "ref-for-blobevent\u2460"}, {"id": "ref-for-blobevent\u2461"}], "title": "3.2. Attributes"}, {"refs": [{"id": "ref-for-blobevent\u2462"}, {"id": "ref-for-blobevent\u2463"}], "title": "3.3.1. Members"}, {"refs": [{"id": "ref-for-blobevent\u2464"}], "title": "5. Event summary"}], "external": false};
-window.dfnpanelData['dom-blobevent-blobevent'] = {"dfnID": "dom-blobevent-blobevent", "url": "#dom-blobevent-blobevent", "dfnText": "BlobEvent(DOMString type, BlobEventInit eventInitDict)", "refSections": [{"refs": [{"id": "ref-for-dom-blobevent-blobevent"}], "title": "3. Blob Event"}], "external": false};
-window.dfnpanelData['dom-blobevent-data'] = {"dfnID": "dom-blobevent-data", "url": "#dom-blobevent-data", "dfnText": "data", "refSections": [{"refs": [{"id": "ref-for-dom-blobevent-data"}], "title": "2.2. Attributes"}, {"refs": [{"id": "ref-for-dom-blobevent-data\u2460"}], "title": "2.4. Data handling"}, {"refs": [{"id": "ref-for-dom-blobevent-data\u2461"}], "title": "3. Blob Event"}, {"refs": [{"id": "ref-for-dom-blobevent-data\u2462"}], "title": "3.2. Attributes"}, {"refs": [{"id": "ref-for-dom-blobevent-data\u2463"}], "title": "5. Event summary"}], "external": false};
-window.dfnpanelData['dom-blobevent-timecode'] = {"dfnID": "dom-blobevent-timecode", "url": "#dom-blobevent-timecode", "dfnText": "timecode", "refSections": [{"refs": [{"id": "ref-for-dom-blobevent-timecode"}], "title": "3. Blob Event"}, {"refs": [{"id": "ref-for-dom-blobevent-timecode\u2460"}], "title": "3.2. Attributes"}], "external": false};
-window.dfnpanelData['dictdef-blobeventinit'] = {"dfnID": "dictdef-blobeventinit", "url": "#dictdef-blobeventinit", "dfnText": "BlobEventInit", "refSections": [{"refs": [{"id": "ref-for-dictdef-blobeventinit"}], "title": "3. Blob Event"}], "external": false};
-window.dfnpanelData['dom-blobeventinit-data'] = {"dfnID": "dom-blobeventinit-data", "url": "#dom-blobeventinit-data", "dfnText": "data", "refSections": [{"refs": [{"id": "ref-for-dom-blobeventinit-data"}], "title": "3.3. BlobEventInit"}], "external": false};
-window.dfnpanelData['dom-blobeventinit-timecode'] = {"dfnID": "dom-blobeventinit-timecode", "url": "#dom-blobeventinit-timecode", "dfnText": "timecode", "refSections": [{"refs": [{"id": "ref-for-dom-blobeventinit-timecode"}], "title": "3.3. BlobEventInit"}], "external": false};
-window.dfnpanelData['fire-an-error-event'] = {"dfnID": "fire-an-error-event", "url": "#fire-an-error-event", "dfnText": "fire an error event", "refSections": [{"refs": [{"id": "ref-for-fire-an-error-event"}, {"id": "ref-for-fire-an-error-event\u2460"}, {"id": "ref-for-fire-an-error-event\u2461"}], "title": "2.3. Methods"}], "external": false};
-window.dfnpanelData['dictdef-mediarecordererroreventinit'] = {"dfnID": "dictdef-mediarecordererroreventinit", "url": "#dictdef-mediarecordererroreventinit", "dfnText": "MediaRecorderErrorEventInit", "refSections": [{"refs": [{"id": "ref-for-dictdef-mediarecordererroreventinit"}], "title": "4.2. MediaRecorderErrorEvent"}], "external": false};
-window.dfnpanelData['mediarecordererrorevent'] = {"dfnID": "mediarecordererrorevent", "url": "#mediarecordererrorevent", "dfnText": "MediaRecorderErrorEvent", "refSections": [{"refs": [{"id": "ref-for-mediarecordererrorevent"}], "title": "2.2. Attributes"}, {"refs": [{"id": "ref-for-mediarecordererrorevent\u2460"}], "title": "4.1. General principles"}, {"refs": [{"id": "ref-for-mediarecordererrorevent\u2461"}, {"id": "ref-for-mediarecordererrorevent\u2462"}], "title": "4.2. MediaRecorderErrorEvent"}, {"refs": [{"id": "ref-for-mediarecordererrorevent\u2463"}], "title": "4.2.1. Constructors"}, {"refs": [{"id": "ref-for-mediarecordererrorevent\u2464"}], "title": "5. Event summary"}], "external": false};
-window.dfnpanelData['dom-mediarecordererrorevent-mediarecordererrorevent'] = {"dfnID": "dom-mediarecordererrorevent-mediarecordererrorevent", "url": "#dom-mediarecordererrorevent-mediarecordererrorevent", "dfnText": "MediaRecorderErrorEvent(DOMString type, MediaRecorderErrorEventInit eventInitDict)", "refSections": [{"refs": [{"id": "ref-for-dom-mediarecordererrorevent-mediarecordererrorevent"}], "title": "4.2. MediaRecorderErrorEvent"}], "external": false};
-window.dfnpanelData['dom-mediarecordererrorevent-error'] = {"dfnID": "dom-mediarecordererrorevent-error", "url": "#dom-mediarecordererrorevent-error", "dfnText": "error", "refSections": [{"refs": [{"id": "ref-for-dom-mediarecordererrorevent-error"}, {"id": "ref-for-dom-mediarecordererrorevent-error\u2460"}], "title": "4.2. MediaRecorderErrorEvent"}], "external": false};
-window.dfnpanelData['dom-mediarecordererroreventinit-error'] = {"dfnID": "dom-mediarecordererroreventinit-error", "url": "#dom-mediarecordererroreventinit-error", "dfnText": "error", "refSections": [{"refs": [{"id": "ref-for-dom-mediarecordererroreventinit-error"}], "title": "4.2. MediaRecorderErrorEvent"}], "external": false};
-window.dfnpanelData['eventdef-mediarecorder-start'] = {"dfnID": "eventdef-mediarecorder-start", "url": "#eventdef-mediarecorder-start", "dfnText": "start", "refSections": [{"refs": [{"id": "ref-for-eventdef-mediarecorder-start"}], "title": "2.2. Attributes"}, {"refs": [{"id": "ref-for-eventdef-mediarecorder-start\u2460"}], "title": "2.3. Methods"}], "external": false};
-window.dfnpanelData['eventdef-mediarecorder-stop'] = {"dfnID": "eventdef-mediarecorder-stop", "url": "#eventdef-mediarecorder-stop", "dfnText": "stop", "refSections": [{"refs": [{"id": "ref-for-eventdef-mediarecorder-stop"}], "title": "2.2. Attributes"}, {"refs": [{"id": "ref-for-eventdef-mediarecorder-stop\u2460"}, {"id": "ref-for-eventdef-mediarecorder-stop\u2461"}, {"id": "ref-for-eventdef-mediarecorder-stop\u2462"}, {"id": "ref-for-eventdef-mediarecorder-stop\u2463"}, {"id": "ref-for-eventdef-mediarecorder-stop\u2464"}], "title": "2.3. Methods"}, {"refs": [{"id": "ref-for-eventdef-mediarecorder-stop\u2465"}], "title": "4.1. General principles"}], "external": false};
-window.dfnpanelData['eventdef-mediarecorder-dataavailable'] = {"dfnID": "eventdef-mediarecorder-dataavailable", "url": "#eventdef-mediarecorder-dataavailable", "dfnText": "dataavailable", "refSections": [{"refs": [{"id": "ref-for-eventdef-mediarecorder-dataavailable"}], "title": "2.2. Attributes"}, {"refs": [{"id": "ref-for-eventdef-mediarecorder-dataavailable\u2460"}, {"id": "ref-for-eventdef-mediarecorder-dataavailable\u2461"}, {"id": "ref-for-eventdef-mediarecorder-dataavailable\u2462"}, {"id": "ref-for-eventdef-mediarecorder-dataavailable\u2463"}, {"id": "ref-for-eventdef-mediarecorder-dataavailable\u2464"}, {"id": "ref-for-eventdef-mediarecorder-dataavailable\u2465"}, {"id": "ref-for-eventdef-mediarecorder-dataavailable\u2466"}], "title": "2.3. Methods"}], "external": false};
-window.dfnpanelData['eventdef-mediarecorder-pause'] = {"dfnID": "eventdef-mediarecorder-pause", "url": "#eventdef-mediarecorder-pause", "dfnText": "pause", "refSections": [{"refs": [{"id": "ref-for-eventdef-mediarecorder-pause"}], "title": "2.2. Attributes"}, {"refs": [{"id": "ref-for-eventdef-mediarecorder-pause\u2460"}], "title": "2.3. Methods"}], "external": false};
-window.dfnpanelData['eventdef-mediarecorder-resume'] = {"dfnID": "eventdef-mediarecorder-resume", "url": "#eventdef-mediarecorder-resume", "dfnText": "resume", "refSections": [{"refs": [{"id": "ref-for-eventdef-mediarecorder-resume"}], "title": "2.2. Attributes"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -2487,407 +1993,888 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"129bdae8": {"dfnID":"129bdae8","dfnText":"Event","external":true,"refSections":[{"refs":[{"id":"ref-for-event"}],"title":"3. Blob Event"},{"refs":[{"id":"ref-for-event\u2460"}],"title":"4.2. MediaRecorderErrorEvent"},{"refs":[{"id":"ref-for-event\u2461"},{"id":"ref-for-event\u2462"},{"id":"ref-for-event\u2463"},{"id":"ref-for-event\u2464"}],"title":"5. Event summary"}],"url":"https://dom.spec.whatwg.org/#event"},
+"2bc0cdf4": {"dfnID":"2bc0cdf4","dfnText":"EventTarget","external":true,"refSections":[{"refs":[{"id":"ref-for-eventtarget"}],"title":"2. Media Recorder API"}],"url":"https://dom.spec.whatwg.org/#eventtarget"},
+"3182eb71": {"dfnID":"3182eb71","dfnText":"NotSupportedError","external":true,"refSections":[{"refs":[{"id":"ref-for-notsupportederror"}],"title":"2.1. Constructors"},{"refs":[{"id":"ref-for-notsupportederror\u2460"},{"id":"ref-for-notsupportederror\u2461"}],"title":"2.3. Methods"},{"refs":[{"id":"ref-for-notsupportederror\u2462"}],"title":"4.3. Exception Summary"}],"url":"https://webidl.spec.whatwg.org/#notsupportederror"},
+"321b1ad4": {"dfnID":"321b1ad4","dfnText":"getUserMedia()","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-mediadevices-getusermedia"}],"title":"7.2. Recording webcam video and audio"}],"url":"https://www.w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia"},
+"37ae6f63": {"dfnID":"37ae6f63","dfnText":"fingerprinting surface","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-fingerprinting-surface"}],"title":"6.2. Fingerprinting"}],"url":"https://www.w3.org/TR/fingerprinting-guidance/#dfn-fingerprinting-surface"},
+"44a7708c": {"dfnID":"44a7708c","dfnText":"EventInit","external":true,"refSections":[{"refs":[{"id":"ref-for-dictdef-eventinit"}],"title":"4.2. MediaRecorderErrorEvent"}],"url":"https://dom.spec.whatwg.org/#dictdef-eventinit"},
+"49807975": {"dfnID":"49807975","dfnText":"ended","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-def-MediaStreamTrackState.ended"}],"title":"2.3. Methods"},{"refs":[{"id":"ref-for-idl-def-MediaStreamTrackState.ended\u2460"}],"title":"7.2. Recording webcam video and audio"}],"url":"https://www.w3.org/TR/mediacapture-streams/#idl-def-MediaStreamTrackState.ended"},
+"5372cca8": {"dfnID":"5372cca8","dfnText":"boolean","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-boolean"}],"title":"2. Media Recorder API"}],"url":"https://webidl.spec.whatwg.org/#idl-boolean"},
+"592405e6": {"dfnID":"592405e6","dfnText":"track set","external":true,"refSections":[{"refs":[{"id":"ref-for-track-set"},{"id":"ref-for-track-set\u2460"},{"id":"ref-for-track-set\u2461"}],"title":"2.3. Methods"}],"url":"https://www.w3.org/TR/mediacapture-streams/#track-set"},
+"5f90bbfb": {"dfnID":"5f90bbfb","dfnText":"undefined","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-undefined"},{"id":"ref-for-idl-undefined\u2460"},{"id":"ref-for-idl-undefined\u2461"},{"id":"ref-for-idl-undefined\u2462"},{"id":"ref-for-idl-undefined\u2463"}],"title":"2. Media Recorder API"}],"url":"https://webidl.spec.whatwg.org/#idl-undefined"},
+"5fd23811": {"dfnID":"5fd23811","dfnText":"fire an event","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-event-fire"},{"id":"ref-for-concept-event-fire\u2460"},{"id":"ref-for-concept-event-fire\u2461"},{"id":"ref-for-concept-event-fire\u2462"},{"id":"ref-for-concept-event-fire\u2463"},{"id":"ref-for-concept-event-fire\u2464"},{"id":"ref-for-concept-event-fire\u2465"},{"id":"ref-for-concept-event-fire\u2466"}],"title":"2.3. Methods"},{"refs":[{"id":"ref-for-concept-event-fire\u2467"}],"title":"2.4. Data handling"},{"refs":[{"id":"ref-for-concept-event-fire\u2468"},{"id":"ref-for-concept-event-fire\u2460\u24ea"}],"title":"4.1. General principles"},{"refs":[{"id":"f95f167f0"}],"title":"5. Event summary"}],"url":"https://dom.spec.whatwg.org/#concept-event-fire"},
+"610b91f5": {"dfnID":"610b91f5","dfnText":"MediaStreamTrack","external":true,"refSections":[{"refs":[{"id":"ref-for-mediastreamtrack"}],"title":"1. Overview"},{"refs":[{"id":"ref-for-mediastreamtrack\u2460"}],"title":"4.1. General principles"},{"refs":[{"id":"ref-for-mediastreamtrack\u2461"}],"title":"4.3. Exception Summary"},{"refs":[{"id":"ref-for-mediastreamtrack\u2462"}],"title":"7.2. Recording webcam video and audio"}],"url":"https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack"},
+"65181da8": {"dfnID":"65181da8","dfnText":"secure context","external":true,"refSections":[{"refs":[{"id":"ref-for-secure-context"}],"title":"6. Privacy and Security Considerations"}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#secure-context"},
+"6777aaf6": {"dfnID":"6777aaf6","dfnText":"active fingerprinting","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-active-fingerprinting"}],"title":"6.2. Fingerprinting"}],"url":"https://www.w3.org/TR/fingerprinting-guidance/#dfn-active-fingerprinting"},
+"797018a7": {"dfnID":"797018a7","dfnText":"InvalidStateError","external":true,"refSections":[{"refs":[{"id":"ref-for-invalidstateerror"},{"id":"ref-for-invalidstateerror\u2460"},{"id":"ref-for-invalidstateerror\u2461"},{"id":"ref-for-invalidstateerror\u2462"}],"title":"2.3. Methods"},{"refs":[{"id":"ref-for-invalidstateerror\u2463"}],"title":"4.3. Exception Summary"}],"url":"https://webidl.spec.whatwg.org/#invalidstateerror"},
+"81dd847b": {"dfnID":"81dd847b","dfnText":"UnknownError","external":true,"refSections":[{"refs":[{"id":"ref-for-unknownerror"}],"title":"2.3. Methods"}],"url":"https://webidl.spec.whatwg.org/#unknownerror"},
+"851a073b": {"dfnID":"851a073b","dfnText":"resumed","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-fetch-resume"}],"title":"2.3. Methods"}],"url":"https://fetch.spec.whatwg.org/#concept-fetch-resume"},
+"85f64689": {"dfnID":"85f64689","dfnText":"muted","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-mediastreamtrack-muted"}],"title":"2.3. Methods"}],"url":"https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-muted"},
+"889e932f": {"dfnID":"889e932f","dfnText":"Exposed","external":true,"refSections":[{"refs":[{"id":"ref-for-Exposed"}],"title":"2. Media Recorder API"},{"refs":[{"id":"ref-for-Exposed\u2460"}],"title":"3. Blob Event"},{"refs":[{"id":"ref-for-Exposed\u2461"}],"title":"4.2. MediaRecorderErrorEvent"}],"url":"https://webidl.spec.whatwg.org/#Exposed"},
+"95042a38": {"dfnID":"95042a38","dfnText":"inactive","external":true,"refSections":[{"refs":[{"id":"ref-for-stream-inactive"}],"title":"2.3. Methods"}],"url":"https://www.w3.org/TR/mediacapture-streams/#stream-inactive"},
+"a0c6f7f7": {"dfnID":"a0c6f7f7","dfnText":"DOMHighResTimeStamp","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-domhighrestimestamp"}],"title":"3. Blob Event"},{"refs":[{"id":"ref-for-dom-domhighrestimestamp\u2460"},{"id":"ref-for-dom-domhighrestimestamp\u2461"}],"title":"3.2. Attributes"},{"refs":[{"id":"ref-for-dom-domhighrestimestamp\u2462"}],"title":"3.3. BlobEventInit"},{"refs":[{"id":"ref-for-dom-domhighrestimestamp\u2463"}],"title":"3.3.1. Members"}],"url":"https://www.w3.org/TR/hr-time/#dom-domhighrestimestamp"},
+"a5c91173": {"dfnID":"a5c91173","dfnText":"SameObject","external":true,"refSections":[{"refs":[{"id":"ref-for-SameObject"}],"title":"3. Blob Event"},{"refs":[{"id":"ref-for-SameObject\u2460"}],"title":"4.2. MediaRecorderErrorEvent"}],"url":"https://webidl.spec.whatwg.org/#SameObject"},
+"a72449dd": {"dfnID":"a72449dd","dfnText":"in parallel","external":true,"refSections":[{"refs":[{"id":"ref-for-in-parallel"}],"title":"2.3. Methods"}],"url":"https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel"},
+"abstract-opdef-inactivate-the-recorder": {"dfnID":"abstract-opdef-inactivate-the-recorder","dfnText":"Inactivate the recorder","external":false,"refSections":[{"refs":[{"id":"ref-for-abstract-opdef-inactivate-the-recorder"},{"id":"ref-for-abstract-opdef-inactivate-the-recorder\u2460"},{"id":"ref-for-abstract-opdef-inactivate-the-recorder\u2461"},{"id":"ref-for-abstract-opdef-inactivate-the-recorder\u2462"},{"id":"ref-for-abstract-opdef-inactivate-the-recorder\u2463"}],"title":"2.3. Methods"}],"url":"#abstract-opdef-inactivate-the-recorder"},
+"abstract-opdef-is-type-supported": {"dfnID":"abstract-opdef-is-type-supported","dfnText":"is type supported","external":false,"refSections":[{"refs":[{"id":"ref-for-abstract-opdef-is-type-supported"}],"title":"2.1. Constructors"},{"refs":[{"id":"ref-for-abstract-opdef-is-type-supported\u2460"}],"title":"2.3. Methods"}],"url":"#abstract-opdef-is-type-supported"},
+"b7d73f5b": {"dfnID":"b7d73f5b","dfnText":"Blob","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-Blob"}],"title":"1. Overview"},{"refs":[{"id":"ref-for-dfn-Blob\u2460"}],"title":"2.2. Attributes"},{"refs":[{"id":"ref-for-dfn-Blob\u2461"},{"id":"ref-for-dfn-Blob\u2462"},{"id":"ref-for-dfn-Blob\u2463"},{"id":"ref-for-dfn-Blob\u2464"},{"id":"ref-for-dfn-Blob\u2465"}],"title":"2.3. Methods"},{"refs":[{"id":"ref-for-dfn-Blob\u2466"}],"title":"2.4. Data handling"},{"refs":[{"id":"ref-for-dfn-Blob\u2467"}],"title":"3. Blob Event"},{"refs":[{"id":"ref-for-dfn-Blob\u2468"},{"id":"ref-for-dfn-Blob\u2460\u24ea"}],"title":"3.2. Attributes"},{"refs":[{"id":"ref-for-dfn-Blob\u2460\u2460"}],"title":"3.3. BlobEventInit"},{"refs":[{"id":"ref-for-dfn-Blob\u2460\u2461"},{"id":"ref-for-dfn-Blob\u2460\u2462"}],"title":"3.3.1. Members"},{"refs":[{"id":"ref-for-dfn-Blob\u2460\u2463"},{"id":"ref-for-dfn-Blob\u2460\u2464"}],"title":"4.1. General principles"},{"refs":[{"id":"ref-for-dfn-Blob\u2460\u2465"}],"title":"5. Event summary"}],"url":"https://w3c.github.io/FileAPI/#dfn-Blob"},
+"b9241099": {"dfnID":"b9241099","dfnText":"live","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-def-MediaStreamTrackState.live"}],"title":"2.3. Methods"}],"url":"https://www.w3.org/TR/mediacapture-streams/#idl-def-MediaStreamTrackState.live"},
+"bcda9d2a": {"dfnID":"bcda9d2a","dfnText":"DOMString","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-DOMString"},{"id":"ref-for-idl-DOMString\u2460"}],"title":"2. Media Recorder API"},{"refs":[{"id":"ref-for-idl-DOMString\u2461"}],"title":"2.2. Attributes"},{"refs":[{"id":"ref-for-idl-DOMString\u2462"}],"title":"2.5. MediaRecorderOptions"},{"refs":[{"id":"ref-for-idl-DOMString\u2463"}],"title":"2.5.1. Members"},{"refs":[{"id":"ref-for-idl-DOMString\u2464"}],"title":"3. Blob Event"},{"refs":[{"id":"ref-for-idl-DOMString\u2465"}],"title":"4.2. MediaRecorderErrorEvent"}],"url":"https://heycam.github.io/webidl/#idl-DOMString"},
+"blobevent": {"dfnID":"blobevent","dfnText":"BlobEvent","external":false,"refSections":[{"refs":[{"id":"ref-for-blobevent"}],"title":"2.4. Data handling"},{"refs":[{"id":"ref-for-blobevent\u2460"},{"id":"ref-for-blobevent\u2461"}],"title":"3.2. Attributes"},{"refs":[{"id":"ref-for-blobevent\u2462"},{"id":"ref-for-blobevent\u2463"}],"title":"3.3.1. Members"},{"refs":[{"id":"ref-for-blobevent\u2464"}],"title":"5. Event summary"}],"url":"#blobevent"},
+"c3e881ef": {"dfnID":"c3e881ef","dfnText":"SecurityError","external":true,"refSections":[{"refs":[{"id":"ref-for-securityerror"},{"id":"ref-for-securityerror\u2460"}],"title":"2.3. Methods"},{"refs":[{"id":"ref-for-securityerror\u2461"}],"title":"4.3. Exception Summary"}],"url":"https://webidl.spec.whatwg.org/#securityerror"},
+"cae6bf57": {"dfnID":"cae6bf57","dfnText":"InvalidModificationError","external":true,"refSections":[{"refs":[{"id":"ref-for-invalidmodificationerror"}],"title":"2.3. Methods"},{"refs":[{"id":"ref-for-invalidmodificationerror\u2460"}],"title":"4.3. Exception Summary"}],"url":"https://webidl.spec.whatwg.org/#invalidmodificationerror"},
+"constrainedbitspersecond": {"dfnID":"constrainedbitspersecond","dfnText":"[[ConstrainedBitsPerSecond]]","external":false,"refSections":[{"refs":[{"id":"ref-for-constrainedbitspersecond"},{"id":"ref-for-constrainedbitspersecond\u2460"}],"title":"2.1. Constructors"},{"refs":[{"id":"ref-for-constrainedbitspersecond\u2461"},{"id":"ref-for-constrainedbitspersecond\u2462"},{"id":"ref-for-constrainedbitspersecond\u2463"},{"id":"ref-for-constrainedbitspersecond\u2464"}],"title":"2.3. Methods"}],"url":"#constrainedbitspersecond"},
+"constrainedmimetype": {"dfnID":"constrainedmimetype","dfnText":"[[ConstrainedMimeType]]","external":false,"refSections":[{"refs":[{"id":"ref-for-constrainedmimetype"}],"title":"2.1. Constructors"},{"refs":[{"id":"ref-for-constrainedmimetype\u2460"},{"id":"ref-for-constrainedmimetype\u2461"},{"id":"ref-for-constrainedmimetype\u2462"},{"id":"ref-for-constrainedmimetype\u2463"}],"title":"2.3. Methods"}],"url":"#constrainedmimetype"},
+"d211886f": {"dfnID":"d211886f","dfnText":"isolation properties","external":true,"refSections":[{"refs":[{"id":"ref-for-isolated-media-streams"},{"id":"ref-for-isolated-media-streams\u2460"},{"id":"ref-for-isolated-media-streams\u2461"}],"title":"2.3. Methods"},{"refs":[{"id":"ref-for-isolated-media-streams\u2462"}],"title":"4.3. Exception Summary"}],"url":"https://www.w3.org/TR/webrtc-identity/#isolated-media-streams"},
+"d5648194": {"dfnID":"d5648194","dfnText":"MediaStream","external":true,"refSections":[{"refs":[{"id":"ref-for-mediastream"}],"title":"Unnumbered Section"},{"refs":[{"id":"ref-for-mediastream\u2460"},{"id":"ref-for-mediastream\u2461"}],"title":"2. Media Recorder API"},{"refs":[{"id":"ref-for-mediastream\u2462"},{"id":"ref-for-mediastream\u2463"}],"title":"2.2. Attributes"},{"refs":[{"id":"ref-for-mediastream\u2464"}],"title":"2.3. Methods"},{"refs":[{"id":"ref-for-mediastream\u2465"},{"id":"ref-for-mediastream\u2466"}],"title":"4.3. Exception Summary"},{"refs":[{"id":"ref-for-mediastream\u2467"},{"id":"ref-for-mediastream\u2468"}],"title":"6. Privacy and Security Considerations"},{"refs":[{"id":"ref-for-mediastream\u2460\u24ea"},{"id":"ref-for-mediastream\u2460\u2460"}],"title":"7.2. Recording webcam video and audio"}],"url":"https://www.w3.org/TR/mediacapture-streams/#mediastream"},
+"dca2de17": {"dfnID":"dca2de17","dfnText":"DOMException","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-DOMException"}],"title":"2.1. Constructors"},{"refs":[{"id":"ref-for-idl-DOMException\u2460"},{"id":"ref-for-idl-DOMException\u2461"},{"id":"ref-for-idl-DOMException\u2462"},{"id":"ref-for-idl-DOMException\u2463"},{"id":"ref-for-idl-DOMException\u2464"},{"id":"ref-for-idl-DOMException\u2465"},{"id":"ref-for-idl-DOMException\u2466"}],"title":"2.3. Methods"},{"refs":[{"id":"ref-for-idl-DOMException\u2467"}],"title":"4.1. General principles"},{"refs":[{"id":"ref-for-idl-DOMException\u2468"},{"id":"ref-for-idl-DOMException\u2460\u24ea"},{"id":"ref-for-idl-DOMException\u2460\u2460"}],"title":"4.2. MediaRecorderErrorEvent"},{"refs":[{"id":"ref-for-idl-DOMException\u2460\u2461"}],"title":"4.2.2. Attributes"},{"refs":[{"id":"ref-for-idl-DOMException\u2460\u2462"},{"id":"ref-for-idl-DOMException\u2460\u2463"},{"id":"ref-for-idl-DOMException\u2460\u2464"}],"title":"4.2.3. MediaRecorderErrorEventInit"},{"refs":[{"id":"ref-for-idl-DOMException\u2460\u2465"}],"title":"4.3. Exception Summary"}],"url":"https://webidl.spec.whatwg.org/#idl-DOMException"},
+"dictdef-blobeventinit": {"dfnID":"dictdef-blobeventinit","dfnText":"BlobEventInit","external":false,"refSections":[{"refs":[{"id":"ref-for-dictdef-blobeventinit"}],"title":"3. Blob Event"}],"url":"#dictdef-blobeventinit"},
+"dictdef-mediarecordererroreventinit": {"dfnID":"dictdef-mediarecordererroreventinit","dfnText":"MediaRecorderErrorEventInit","external":false,"refSections":[{"refs":[{"id":"ref-for-dictdef-mediarecordererroreventinit"}],"title":"4.2. MediaRecorderErrorEvent"}],"url":"#dictdef-mediarecordererroreventinit"},
+"dictdef-mediarecorderoptions": {"dfnID":"dictdef-mediarecorderoptions","dfnText":"MediaRecorderOptions","external":false,"refSections":[{"refs":[{"id":"ref-for-dictdef-mediarecorderoptions"}],"title":"2. Media Recorder API"},{"refs":[{"id":"ref-for-dictdef-mediarecorderoptions\u2460"},{"id":"ref-for-dictdef-mediarecorderoptions\u2461"}],"title":"6.2. Fingerprinting"}],"url":"#dictdef-mediarecorderoptions"},
+"dom-bitratemode-constant": {"dfnID":"dom-bitratemode-constant","dfnText":"constant","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-bitratemode-constant"}],"title":"2.6. BitrateMode"}],"url":"#dom-bitratemode-constant"},
+"dom-bitratemode-variable": {"dfnID":"dom-bitratemode-variable","dfnText":"variable","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-bitratemode-variable"}],"title":"2.6. BitrateMode"}],"url":"#dom-bitratemode-variable"},
+"dom-blobevent-blobevent": {"dfnID":"dom-blobevent-blobevent","dfnText":"BlobEvent(DOMString type, BlobEventInit eventInitDict)","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-blobevent-blobevent"}],"title":"3. Blob Event"}],"url":"#dom-blobevent-blobevent"},
+"dom-blobevent-data": {"dfnID":"dom-blobevent-data","dfnText":"data","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-blobevent-data"}],"title":"2.2. Attributes"},{"refs":[{"id":"ref-for-dom-blobevent-data\u2460"}],"title":"2.4. Data handling"},{"refs":[{"id":"ref-for-dom-blobevent-data\u2461"}],"title":"3. Blob Event"},{"refs":[{"id":"ref-for-dom-blobevent-data\u2462"}],"title":"3.2. Attributes"},{"refs":[{"id":"ref-for-dom-blobevent-data\u2463"}],"title":"5. Event summary"}],"url":"#dom-blobevent-data"},
+"dom-blobevent-timecode": {"dfnID":"dom-blobevent-timecode","dfnText":"timecode","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-blobevent-timecode"}],"title":"3. Blob Event"},{"refs":[{"id":"ref-for-dom-blobevent-timecode\u2460"}],"title":"3.2. Attributes"}],"url":"#dom-blobevent-timecode"},
+"dom-blobeventinit-data": {"dfnID":"dom-blobeventinit-data","dfnText":"data","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-blobeventinit-data"}],"title":"3.3. BlobEventInit"}],"url":"#dom-blobeventinit-data"},
+"dom-blobeventinit-timecode": {"dfnID":"dom-blobeventinit-timecode","dfnText":"timecode","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-blobeventinit-timecode"}],"title":"3.3. BlobEventInit"}],"url":"#dom-blobeventinit-timecode"},
+"dom-mediarecorder-audiobitratemode": {"dfnID":"dom-mediarecorder-audiobitratemode","dfnText":"audioBitrateMode","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-mediarecorder-audiobitratemode"}],"title":"2. Media Recorder API"},{"refs":[{"id":"ref-for-dom-mediarecorder-audiobitratemode\u2460"},{"id":"ref-for-dom-mediarecorder-audiobitratemode\u2461"}],"title":"2.1. Constructors"},{"refs":[{"id":"ref-for-dom-mediarecorder-audiobitratemode\u2462"}],"title":"2.3. Methods"}],"url":"#dom-mediarecorder-audiobitratemode"},
+"dom-mediarecorder-audiobitspersecond": {"dfnID":"dom-mediarecorder-audiobitspersecond","dfnText":"audioBitsPerSecond","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-mediarecorder-audiobitspersecond"}],"title":"2. Media Recorder API"},{"refs":[{"id":"ref-for-dom-mediarecorder-audiobitspersecond\u2460"},{"id":"ref-for-dom-mediarecorder-audiobitspersecond\u2461"},{"id":"ref-for-dom-mediarecorder-audiobitspersecond\u2462"}],"title":"2.1. Constructors"},{"refs":[{"id":"ref-for-dom-mediarecorder-audiobitspersecond\u2463"},{"id":"ref-for-dom-mediarecorder-audiobitspersecond\u2464"},{"id":"ref-for-dom-mediarecorder-audiobitspersecond\u2465"},{"id":"ref-for-dom-mediarecorder-audiobitspersecond\u2466"},{"id":"ref-for-dom-mediarecorder-audiobitspersecond\u2467"}],"title":"2.3. Methods"}],"url":"#dom-mediarecorder-audiobitspersecond"},
+"dom-mediarecorder-istypesupported": {"dfnID":"dom-mediarecorder-istypesupported","dfnText":"isTypeSupported(DOMString type)\n    ","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-mediarecorder-istypesupported"}],"title":"2. Media Recorder API"},{"refs":[{"id":"ref-for-dom-mediarecorder-istypesupported\u2460"}],"title":"6.2. Fingerprinting"}],"url":"#dom-mediarecorder-istypesupported"},
+"dom-mediarecorder-mediarecorder": {"dfnID":"dom-mediarecorder-mediarecorder","dfnText":"MediaRecorder(MediaStream stream, optional MediaRecorderOptions options = {})","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-mediarecorder-mediarecorder"}],"title":"2. Media Recorder API"},{"refs":[{"id":"ref-for-dom-mediarecorder-mediarecorder\u2460"}],"title":"2.1. Constructors"}],"url":"#dom-mediarecorder-mediarecorder"},
+"dom-mediarecorder-mimetype": {"dfnID":"dom-mediarecorder-mimetype","dfnText":"mimeType","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-mediarecorder-mimetype"}],"title":"2. Media Recorder API"},{"refs":[{"id":"ref-for-dom-mediarecorder-mimetype\u2460"}],"title":"2.1. Constructors"},{"refs":[{"id":"ref-for-dom-mediarecorder-mimetype\u2461"}],"title":"2.2. Attributes"},{"refs":[{"id":"ref-for-dom-mediarecorder-mimetype\u2462"},{"id":"ref-for-dom-mediarecorder-mimetype\u2463"}],"title":"2.3. Methods"}],"url":"#dom-mediarecorder-mimetype"},
+"dom-mediarecorder-ondataavailable": {"dfnID":"dom-mediarecorder-ondataavailable","dfnText":"ondataavailable","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-mediarecorder-ondataavailable"}],"title":"1. Overview"},{"refs":[{"id":"ref-for-dom-mediarecorder-ondataavailable\u2460"}],"title":"2. Media Recorder API"},{"refs":[{"id":"ref-for-dom-mediarecorder-ondataavailable\u2461"}],"title":"6.2. Fingerprinting"},{"refs":[{"id":"ref-for-dom-mediarecorder-ondataavailable\u2462"}],"title":"7.2. Recording webcam video and audio"}],"url":"#dom-mediarecorder-ondataavailable"},
+"dom-mediarecorder-onerror": {"dfnID":"dom-mediarecorder-onerror","dfnText":"onerror","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-mediarecorder-onerror"}],"title":"2. Media Recorder API"}],"url":"#dom-mediarecorder-onerror"},
+"dom-mediarecorder-onpause": {"dfnID":"dom-mediarecorder-onpause","dfnText":"onpause","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-mediarecorder-onpause"}],"title":"2. Media Recorder API"}],"url":"#dom-mediarecorder-onpause"},
+"dom-mediarecorder-onresume": {"dfnID":"dom-mediarecorder-onresume","dfnText":"onresume","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-mediarecorder-onresume"}],"title":"2. Media Recorder API"}],"url":"#dom-mediarecorder-onresume"},
+"dom-mediarecorder-onstart": {"dfnID":"dom-mediarecorder-onstart","dfnText":"onstart","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-mediarecorder-onstart"}],"title":"2. Media Recorder API"}],"url":"#dom-mediarecorder-onstart"},
+"dom-mediarecorder-onstop": {"dfnID":"dom-mediarecorder-onstop","dfnText":"onstop","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-mediarecorder-onstop"}],"title":"2. Media Recorder API"}],"url":"#dom-mediarecorder-onstop"},
+"dom-mediarecorder-pause": {"dfnID":"dom-mediarecorder-pause","dfnText":"pause()","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-mediarecorder-pause"}],"title":"2. Media Recorder API"},{"refs":[{"id":"ref-for-dom-mediarecorder-pause\u2460"},{"id":"ref-for-dom-mediarecorder-pause\u2461"}],"title":"2.3. Methods"}],"url":"#dom-mediarecorder-pause"},
+"dom-mediarecorder-requestdata": {"dfnID":"dom-mediarecorder-requestdata","dfnText":"requestData()","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-mediarecorder-requestdata"}],"title":"2. Media Recorder API"},{"refs":[{"id":"ref-for-dom-mediarecorder-requestdata\u2460"},{"id":"ref-for-dom-mediarecorder-requestdata\u2461"},{"id":"ref-for-dom-mediarecorder-requestdata\u2462"}],"title":"2.3. Methods"}],"url":"#dom-mediarecorder-requestdata"},
+"dom-mediarecorder-resume": {"dfnID":"dom-mediarecorder-resume","dfnText":"resume()","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-mediarecorder-resume"}],"title":"2. Media Recorder API"},{"refs":[{"id":"ref-for-dom-mediarecorder-resume\u2460"}],"title":"2.3. Methods"}],"url":"#dom-mediarecorder-resume"},
+"dom-mediarecorder-start": {"dfnID":"dom-mediarecorder-start","dfnText":"start(optional unsigned long timeslice)","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-mediarecorder-start"}],"title":"1. Overview"},{"refs":[{"id":"ref-for-dom-mediarecorder-start\u2460"}],"title":"2. Media Recorder API"},{"refs":[{"id":"ref-for-dom-mediarecorder-start\u2461"}],"title":"2.3. Methods"},{"refs":[{"id":"ref-for-dom-mediarecorder-start\u2462"}],"title":"4.2.3. MediaRecorderErrorEventInit"},{"refs":[{"id":"ref-for-dom-mediarecorder-start\u2463"}],"title":"6.1. Resource exhaustion"}],"url":"#dom-mediarecorder-start"},
+"dom-mediarecorder-start-timeslice-timeslice": {"dfnID":"dom-mediarecorder-start-timeslice-timeslice","dfnText":"timeslice","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-mediarecorder-start-timeslice-timeslice"}],"title":"2.3. Methods"},{"refs":[{"id":"ref-for-dom-mediarecorder-start-timeslice-timeslice\u2460"}],"title":"6.1. Resource exhaustion"}],"url":"#dom-mediarecorder-start-timeslice-timeslice"},
+"dom-mediarecorder-state": {"dfnID":"dom-mediarecorder-state","dfnText":"state","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-mediarecorder-state"}],"title":"2. Media Recorder API"},{"refs":[{"id":"ref-for-dom-mediarecorder-state\u2460"}],"title":"2.1. Constructors"},{"refs":[{"id":"ref-for-dom-mediarecorder-state\u2461"},{"id":"ref-for-dom-mediarecorder-state\u2462"},{"id":"ref-for-dom-mediarecorder-state\u2463"},{"id":"ref-for-dom-mediarecorder-state\u2464"},{"id":"ref-for-dom-mediarecorder-state\u2465"},{"id":"ref-for-dom-mediarecorder-state\u2466"},{"id":"ref-for-dom-mediarecorder-state\u2467"},{"id":"ref-for-dom-mediarecorder-state\u2468"},{"id":"ref-for-dom-mediarecorder-state\u2460\u24ea"},{"id":"ref-for-dom-mediarecorder-state\u2460\u2460"},{"id":"ref-for-dom-mediarecorder-state\u2460\u2461"},{"id":"ref-for-dom-mediarecorder-state\u2460\u2462"}],"title":"2.3. Methods"},{"refs":[{"id":"ref-for-dom-mediarecorder-state\u2460\u2463"}],"title":"2.4. Data handling"}],"url":"#dom-mediarecorder-state"},
+"dom-mediarecorder-stop": {"dfnID":"dom-mediarecorder-stop","dfnText":"stop()","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-mediarecorder-stop"}],"title":"1. Overview"},{"refs":[{"id":"ref-for-dom-mediarecorder-stop\u2460"}],"title":"2. Media Recorder API"},{"refs":[{"id":"ref-for-dom-mediarecorder-stop\u2461"},{"id":"ref-for-dom-mediarecorder-stop\u2462"}],"title":"2.3. Methods"},{"refs":[{"id":"ref-for-dom-mediarecorder-stop\u2463"}],"title":"7.2. Recording webcam video and audio"}],"url":"#dom-mediarecorder-stop"},
+"dom-mediarecorder-stream": {"dfnID":"dom-mediarecorder-stream","dfnText":"stream","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-mediarecorder-stream"}],"title":"2. Media Recorder API"},{"refs":[{"id":"ref-for-dom-mediarecorder-stream\u2460"}],"title":"2.1. Constructors"},{"refs":[{"id":"ref-for-dom-mediarecorder-stream\u2461"},{"id":"ref-for-dom-mediarecorder-stream\u2462"}],"title":"2.3. Methods"},{"refs":[{"id":"ref-for-dom-mediarecorder-stream\u2463"},{"id":"ref-for-dom-mediarecorder-stream\u2464"}],"title":"5. Event summary"}],"url":"#dom-mediarecorder-stream"},
+"dom-mediarecorder-videobitspersecond": {"dfnID":"dom-mediarecorder-videobitspersecond","dfnText":"videoBitsPerSecond","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-mediarecorder-videobitspersecond"}],"title":"2. Media Recorder API"},{"refs":[{"id":"ref-for-dom-mediarecorder-videobitspersecond\u2460"},{"id":"ref-for-dom-mediarecorder-videobitspersecond\u2461"},{"id":"ref-for-dom-mediarecorder-videobitspersecond\u2462"}],"title":"2.1. Constructors"},{"refs":[{"id":"ref-for-dom-mediarecorder-videobitspersecond\u2463"},{"id":"ref-for-dom-mediarecorder-videobitspersecond\u2464"},{"id":"ref-for-dom-mediarecorder-videobitspersecond\u2465"},{"id":"ref-for-dom-mediarecorder-videobitspersecond\u2466"},{"id":"ref-for-dom-mediarecorder-videobitspersecond\u2467"}],"title":"2.3. Methods"}],"url":"#dom-mediarecorder-videobitspersecond"},
+"dom-mediarecordererrorevent-error": {"dfnID":"dom-mediarecordererrorevent-error","dfnText":"error","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-mediarecordererrorevent-error"},{"id":"ref-for-dom-mediarecordererrorevent-error\u2460"}],"title":"4.2. MediaRecorderErrorEvent"}],"url":"#dom-mediarecordererrorevent-error"},
+"dom-mediarecordererrorevent-mediarecordererrorevent": {"dfnID":"dom-mediarecordererrorevent-mediarecordererrorevent","dfnText":"MediaRecorderErrorEvent(DOMString type, MediaRecorderErrorEventInit eventInitDict)","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-mediarecordererrorevent-mediarecordererrorevent"}],"title":"4.2. MediaRecorderErrorEvent"}],"url":"#dom-mediarecordererrorevent-mediarecordererrorevent"},
+"dom-mediarecordererroreventinit-error": {"dfnID":"dom-mediarecordererroreventinit-error","dfnText":"error","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-mediarecordererroreventinit-error"}],"title":"4.2. MediaRecorderErrorEvent"}],"url":"#dom-mediarecordererroreventinit-error"},
+"dom-mediarecorderoptions-audiobitratemode": {"dfnID":"dom-mediarecorderoptions-audiobitratemode","dfnText":"audioBitrateMode","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-mediarecorderoptions-audiobitratemode"},{"id":"ref-for-dom-mediarecorderoptions-audiobitratemode\u2460"}],"title":"2.1. Constructors"},{"refs":[{"id":"ref-for-dom-mediarecorderoptions-audiobitratemode\u2461"}],"title":"2.5. MediaRecorderOptions"}],"url":"#dom-mediarecorderoptions-audiobitratemode"},
+"dom-mediarecorderoptions-audiobitspersecond": {"dfnID":"dom-mediarecorderoptions-audiobitspersecond","dfnText":"audioBitsPerSecond","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-mediarecorderoptions-audiobitspersecond"}],"title":"2.1. Constructors"},{"refs":[{"id":"ref-for-dom-mediarecorderoptions-audiobitspersecond\u2460"}],"title":"2.5. MediaRecorderOptions"},{"refs":[{"id":"ref-for-dom-mediarecorderoptions-audiobitspersecond\u2461"}],"title":"2.5.1. Members"}],"url":"#dom-mediarecorderoptions-audiobitspersecond"},
+"dom-mediarecorderoptions-bitspersecond": {"dfnID":"dom-mediarecorderoptions-bitspersecond","dfnText":"bitsPerSecond","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-mediarecorderoptions-bitspersecond"}],"title":"2.1. Constructors"},{"refs":[{"id":"ref-for-dom-mediarecorderoptions-bitspersecond\u2460"}],"title":"2.5. MediaRecorderOptions"}],"url":"#dom-mediarecorderoptions-bitspersecond"},
+"dom-mediarecorderoptions-mimetype": {"dfnID":"dom-mediarecorderoptions-mimetype","dfnText":"mimeType","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-mediarecorderoptions-mimetype"},{"id":"ref-for-dom-mediarecorderoptions-mimetype\u2460"}],"title":"2.1. Constructors"},{"refs":[{"id":"ref-for-dom-mediarecorderoptions-mimetype\u2461"}],"title":"2.5. MediaRecorderOptions"},{"refs":[{"id":"ref-for-dom-mediarecorderoptions-mimetype\u2462"}],"title":"2.5.1. Members"}],"url":"#dom-mediarecorderoptions-mimetype"},
+"dom-mediarecorderoptions-videobitspersecond": {"dfnID":"dom-mediarecorderoptions-videobitspersecond","dfnText":"videoBitsPerSecond","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-mediarecorderoptions-videobitspersecond"}],"title":"2.1. Constructors"},{"refs":[{"id":"ref-for-dom-mediarecorderoptions-videobitspersecond\u2460"}],"title":"2.5. MediaRecorderOptions"},{"refs":[{"id":"ref-for-dom-mediarecorderoptions-videobitspersecond\u2461"}],"title":"2.5.1. Members"}],"url":"#dom-mediarecorderoptions-videobitspersecond"},
+"dom-recordingstate-inactive": {"dfnID":"dom-recordingstate-inactive","dfnText":"inactive","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-recordingstate-inactive"}],"title":"2.1. Constructors"},{"refs":[{"id":"ref-for-dom-recordingstate-inactive\u2460"},{"id":"ref-for-dom-recordingstate-inactive\u2461"},{"id":"ref-for-dom-recordingstate-inactive\u2462"},{"id":"ref-for-dom-recordingstate-inactive\u2463"},{"id":"ref-for-dom-recordingstate-inactive\u2464"},{"id":"ref-for-dom-recordingstate-inactive\u2465"}],"title":"2.3. Methods"},{"refs":[{"id":"ref-for-dom-recordingstate-inactive\u2466"}],"title":"2.7. RecordingState"}],"url":"#dom-recordingstate-inactive"},
+"dom-recordingstate-paused": {"dfnID":"dom-recordingstate-paused","dfnText":"paused","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-recordingstate-paused"},{"id":"ref-for-dom-recordingstate-paused\u2460"}],"title":"2.3. Methods"},{"refs":[{"id":"ref-for-dom-recordingstate-paused\u2461"}],"title":"2.7. RecordingState"}],"url":"#dom-recordingstate-paused"},
+"dom-recordingstate-recording": {"dfnID":"dom-recordingstate-recording","dfnText":"recording","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-recordingstate-recording"},{"id":"ref-for-dom-recordingstate-recording\u2460"},{"id":"ref-for-dom-recordingstate-recording\u2461"}],"title":"2.3. Methods"},{"refs":[{"id":"ref-for-dom-recordingstate-recording\u2462"}],"title":"2.4. Data handling"},{"refs":[{"id":"ref-for-dom-recordingstate-recording\u2463"}],"title":"2.7. RecordingState"}],"url":"#dom-recordingstate-recording"},
+"e303c02d": {"dfnID":"e303c02d","dfnText":"type","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-type"}],"title":"3.2. Attributes"},{"refs":[{"id":"ref-for-dfn-type\u2460"}],"title":"6.2. Fingerprinting"}],"url":"https://w3c.github.io/FileAPI/#dfn-type"},
+"e84f56af": {"dfnID":"e84f56af","dfnText":"enabled","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-mediastreamtrack-enabled"}],"title":"2.3. Methods"}],"url":"https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-enabled"},
+"e97a9688": {"dfnID":"e97a9688","dfnText":"unsigned long","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-unsigned-long"},{"id":"ref-for-idl-unsigned-long\u2460"},{"id":"ref-for-idl-unsigned-long\u2461"}],"title":"2. Media Recorder API"},{"refs":[{"id":"ref-for-idl-unsigned-long\u2462"},{"id":"ref-for-idl-unsigned-long\u2463"}],"title":"2.2. Attributes"},{"refs":[{"id":"ref-for-idl-unsigned-long\u2464"},{"id":"ref-for-idl-unsigned-long\u2465"},{"id":"ref-for-idl-unsigned-long\u2466"}],"title":"2.5. MediaRecorderOptions"},{"refs":[{"id":"ref-for-idl-unsigned-long\u2467"},{"id":"ref-for-idl-unsigned-long\u2468"},{"id":"ref-for-idl-unsigned-long\u2460\u24ea"}],"title":"2.5.1. Members"}],"url":"https://webidl.spec.whatwg.org/#idl-unsigned-long"},
+"enumdef-bitratemode": {"dfnID":"enumdef-bitratemode","dfnText":"BitrateMode","external":false,"refSections":[{"refs":[{"id":"ref-for-enumdef-bitratemode"}],"title":"2. Media Recorder API"},{"refs":[{"id":"ref-for-enumdef-bitratemode\u2460"}],"title":"2.1. Constructors"},{"refs":[{"id":"ref-for-enumdef-bitratemode\u2461"},{"id":"ref-for-enumdef-bitratemode\u2462"}],"title":"2.2. Attributes"},{"refs":[{"id":"ref-for-enumdef-bitratemode\u2463"}],"title":"2.3. Methods"},{"refs":[{"id":"ref-for-enumdef-bitratemode\u2464"}],"title":"2.5. MediaRecorderOptions"},{"refs":[{"id":"ref-for-enumdef-bitratemode\u2465"},{"id":"ref-for-enumdef-bitratemode\u2466"}],"title":"2.5.1. Members"}],"url":"#enumdef-bitratemode"},
+"enumdef-recordingstate": {"dfnID":"enumdef-recordingstate","dfnText":"RecordingState","external":false,"refSections":[{"refs":[{"id":"ref-for-enumdef-recordingstate"}],"title":"2. Media Recorder API"},{"refs":[{"id":"ref-for-enumdef-recordingstate\u2460"}],"title":"2.2. Attributes"}],"url":"#enumdef-recordingstate"},
+"eventdef-mediarecorder-dataavailable": {"dfnID":"eventdef-mediarecorder-dataavailable","dfnText":"dataavailable","external":false,"refSections":[{"refs":[{"id":"ref-for-eventdef-mediarecorder-dataavailable"}],"title":"2.2. Attributes"},{"refs":[{"id":"ref-for-eventdef-mediarecorder-dataavailable\u2460"},{"id":"ref-for-eventdef-mediarecorder-dataavailable\u2461"},{"id":"ref-for-eventdef-mediarecorder-dataavailable\u2462"},{"id":"ref-for-eventdef-mediarecorder-dataavailable\u2463"},{"id":"ref-for-eventdef-mediarecorder-dataavailable\u2464"},{"id":"ref-for-eventdef-mediarecorder-dataavailable\u2465"},{"id":"ref-for-eventdef-mediarecorder-dataavailable\u2466"}],"title":"2.3. Methods"}],"url":"#eventdef-mediarecorder-dataavailable"},
+"eventdef-mediarecorder-pause": {"dfnID":"eventdef-mediarecorder-pause","dfnText":"pause","external":false,"refSections":[{"refs":[{"id":"ref-for-eventdef-mediarecorder-pause"}],"title":"2.2. Attributes"},{"refs":[{"id":"ref-for-eventdef-mediarecorder-pause\u2460"}],"title":"2.3. Methods"}],"url":"#eventdef-mediarecorder-pause"},
+"eventdef-mediarecorder-resume": {"dfnID":"eventdef-mediarecorder-resume","dfnText":"resume","external":false,"refSections":[{"refs":[{"id":"ref-for-eventdef-mediarecorder-resume"}],"title":"2.2. Attributes"}],"url":"#eventdef-mediarecorder-resume"},
+"eventdef-mediarecorder-start": {"dfnID":"eventdef-mediarecorder-start","dfnText":"start","external":false,"refSections":[{"refs":[{"id":"ref-for-eventdef-mediarecorder-start"}],"title":"2.2. Attributes"},{"refs":[{"id":"ref-for-eventdef-mediarecorder-start\u2460"}],"title":"2.3. Methods"}],"url":"#eventdef-mediarecorder-start"},
+"eventdef-mediarecorder-stop": {"dfnID":"eventdef-mediarecorder-stop","dfnText":"stop","external":false,"refSections":[{"refs":[{"id":"ref-for-eventdef-mediarecorder-stop"}],"title":"2.2. Attributes"},{"refs":[{"id":"ref-for-eventdef-mediarecorder-stop\u2460"},{"id":"ref-for-eventdef-mediarecorder-stop\u2461"},{"id":"ref-for-eventdef-mediarecorder-stop\u2462"},{"id":"ref-for-eventdef-mediarecorder-stop\u2463"},{"id":"ref-for-eventdef-mediarecorder-stop\u2464"}],"title":"2.3. Methods"},{"refs":[{"id":"ref-for-eventdef-mediarecorder-stop\u2465"}],"title":"4.1. General principles"}],"url":"#eventdef-mediarecorder-stop"},
+"f0951476": {"dfnID":"f0951476","dfnText":"EventHandler","external":true,"refSections":[{"refs":[{"id":"ref-for-eventhandler"},{"id":"ref-for-eventhandler\u2460"},{"id":"ref-for-eventhandler\u2461"},{"id":"ref-for-eventhandler\u2462"},{"id":"ref-for-eventhandler\u2463"},{"id":"ref-for-eventhandler\u2464"}],"title":"2. Media Recorder API"},{"refs":[{"id":"ref-for-eventhandler\u2465"},{"id":"ref-for-eventhandler\u2466"},{"id":"ref-for-eventhandler\u2467"},{"id":"ref-for-eventhandler\u2468"},{"id":"ref-for-eventhandler\u2460\u24ea"},{"id":"ref-for-eventhandler\u2460\u2460"}],"title":"2.2. Attributes"}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler"},
+"fire-a-blob-event": {"dfnID":"fire-a-blob-event","dfnText":"fire a blob event","external":false,"refSections":[{"refs":[{"id":"ref-for-fire-a-blob-event"},{"id":"ref-for-fire-a-blob-event\u2460"},{"id":"ref-for-fire-a-blob-event\u2461"},{"id":"ref-for-fire-a-blob-event\u2462"},{"id":"ref-for-fire-a-blob-event\u2463"},{"id":"ref-for-fire-a-blob-event\u2464"},{"id":"ref-for-fire-a-blob-event\u2465"}],"title":"2.3. Methods"},{"refs":[{"id":"ref-for-fire-a-blob-event\u2466"}],"title":"4.1. General principles"}],"url":"#fire-a-blob-event"},
+"fire-an-error-event": {"dfnID":"fire-an-error-event","dfnText":"fire an error event","external":false,"refSections":[{"refs":[{"id":"ref-for-fire-an-error-event"},{"id":"ref-for-fire-an-error-event\u2460"},{"id":"ref-for-fire-an-error-event\u2461"}],"title":"2.3. Methods"}],"url":"#fire-an-error-event"},
+"mediarecorder": {"dfnID":"mediarecorder","dfnText":"MediaRecorder","external":false,"refSections":[{"refs":[{"id":"ref-for-mediarecorder"}],"title":"1. Overview"},{"refs":[{"id":"ref-for-mediarecorder\u2460"}],"title":"2.1. Constructors"},{"refs":[{"id":"ref-for-mediarecorder\u2461"},{"id":"ref-for-mediarecorder\u2462"}],"title":"2.2. Attributes"},{"refs":[{"id":"ref-for-mediarecorder\u2463"},{"id":"ref-for-mediarecorder\u2464"},{"id":"ref-for-mediarecorder\u2465"},{"id":"ref-for-mediarecorder\u2466"},{"id":"ref-for-mediarecorder\u2467"},{"id":"ref-for-mediarecorder\u2468"},{"id":"ref-for-mediarecorder\u2460\u24ea"},{"id":"ref-for-mediarecorder\u2460\u2460"},{"id":"ref-for-mediarecorder\u2460\u2461"},{"id":"ref-for-mediarecorder\u2460\u2462"},{"id":"ref-for-mediarecorder\u2460\u2463"}],"title":"2.3. Methods"},{"refs":[{"id":"ref-for-mediarecorder\u2460\u2464"}],"title":"5. Event summary"},{"refs":[{"id":"ref-for-mediarecorder\u2460\u2465"}],"title":"6. Privacy and Security Considerations"},{"refs":[{"id":"ref-for-mediarecorder\u2460\u2466"}],"title":"6.1. Resource exhaustion"},{"refs":[{"id":"ref-for-mediarecorder\u2460\u2467"}],"title":"6.2. Fingerprinting"},{"refs":[{"id":"ref-for-mediarecorder\u2460\u2468"}],"title":"7.1. Check for MediaRecorder and content types"}],"url":"#mediarecorder"},
+"mediarecordererrorevent": {"dfnID":"mediarecordererrorevent","dfnText":"MediaRecorderErrorEvent","external":false,"refSections":[{"refs":[{"id":"ref-for-mediarecordererrorevent"}],"title":"2.2. Attributes"},{"refs":[{"id":"ref-for-mediarecordererrorevent\u2460"}],"title":"4.1. General principles"},{"refs":[{"id":"ref-for-mediarecordererrorevent\u2461"},{"id":"ref-for-mediarecordererrorevent\u2462"}],"title":"4.2. MediaRecorderErrorEvent"},{"refs":[{"id":"ref-for-mediarecordererrorevent\u2463"}],"title":"4.2.1. Constructors"},{"refs":[{"id":"ref-for-mediarecordererrorevent\u2464"}],"title":"5. Event summary"}],"url":"#mediarecordererrorevent"},
+};
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+});
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        dfn.panelData = panelData;
+        insertDfnPopupAction(dfn);
+    }
+}
+
+function genDfnPanel(dfn, { dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel on",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel({dfnPanel});
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.dfn = dfn;
+    dfn.dfnPanel = dfnPanel;
+    return dfnPanel;
+}
+
+
+
+function hideAllDfnPanels() {
+    // Delete the currently-active dfn panel.
+    queryAll(".dfn-panel").forEach(dfnPanel=>hideDfnPanel({dfnPanel}));
+}
+
+function showDfnPanel(dfn) {
+    hideAllDfnPanels(); // Only display one at a time.
+
+    dfn.setAttribute("aria-expanded", "true");
+
+    const dfnPanel = genDfnPanel(dfn, dfn.panelData);
+
+    // Give the dfn a unique tabindex, and then
+    // give all the tabbable panel bits successive indexes.
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+
+    append(document.body, dfnPanel);
+    positionDfnPanel(dfnPanel);
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.dfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }
+}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel({dfn, dfnPanel}) {
+    if(!dfnPanel) dfnPanel = dfn.dfnPanel;
+    if(!dfn) dfn = dfnPanel.dfn;
+    dfn.dfnPanel = undefined;
+    dfnPanel.dfn = undefined;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.remove()
+}
+
+function toggleDfnPanel(dfn) {
+    if(dfn.dfnPanel) {
+        hideDfnPanel(dfn);
+    } else {
+        showDfnPanel(dfn);
+    }
+}
+
+function insertDfnPopupAction(dfn) {
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        toggleDfnPanel(dfn);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+function needsFor(type) {
+    switch(type) {
+        case "descriptor":
+        case "value":
+        case "element-attr":
+        case "attr-value":
+        case "element-state":
+        case "method":
+        case "constructor":
+        case "argument":
+        case "attribute":
+        case "const":
+        case "dict-member":
+        case "event":
+        case "enum-value":
+        case "stringifier":
+        case "serializer":
+        case "iterator":
+        case "maplike":
+        case "setlike":
+        case "state":
+        case "mode":
+        case "context":
+        case "facet": return true;
+
+        default: return false;
+    }
+}
+function refusesFor(type) {
+    switch(type) {
+        case "property":
+        case "element":
+        case "interface":
+        case "namespace":
+        case "callback":
+        case "dictionary":
+        case "enum":
+        case "exception":
+        case "typedef":
+        case "http-header":
+        case "permission": return true;
+
+        default: return false;
+    }
+}
+function linkFormatterFromType(type) {
+    switch(type) {
+        case 'scheme':
+        case 'permission':
+        case 'dfn': return (text) => `[=${text}=]`;
+
+        case 'abstract-op': return (text) => `[\$${text}\$]`;
+
+        case 'function':
+        case 'at-rule':
+        case 'selector':
+        case 'value': return (text) => `''${text}''`;
+
+        case 'http-header': return (text) => `[:${text}:]`;
+
+        case 'interface':
+        case 'constructor':
+        case 'method':
+        case 'argument':
+        case 'attribute':
+        case 'callback':
+        case 'dictionary':
+        case 'dict-member':
+        case 'enum':
+        case 'enum-value':
+        case 'exception':
+        case 'const':
+        case 'typedef':
+        case 'stringifier':
+        case 'serializer':
+        case 'iterator':
+        case 'maplike':
+        case 'setlike':
+        case 'extended-attribute':
+        case 'event':
+        case 'idl': return (text) => `{{${text}}}`;
+
+        case 'element-state':
+        case 'element-attr':
+        case 'attr-value':
+        case 'element': return (element) => `<{${element}}>`;
+
+        case 'grammar': return (text) => `${text} (within a <pre class=prod>)`;
+
+        case 'type': return (text)=> `<<${text}>>`;
+
+        case 'descriptor':
+        case 'property': return (text) => `'${text}'`;
+
+        default: return;
+    };
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!needsFor(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!refusesFor(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
 }
 </script>
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
-                mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
+let refsData = {
+"#abstract-opdef-inactivate-the-recorder": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"Inactivate the recorder","type":"abstract-op","url":"#abstract-opdef-inactivate-the-recorder"},
+"#abstract-opdef-is-type-supported": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"is type supported","type":"abstract-op","url":"#abstract-opdef-is-type-supported"},
+"#blobevent": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"BlobEvent","type":"interface","url":"#blobevent"},
+"#constrainedbitspersecond": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"[[constrainedbitspersecond]]","type":"dfn","url":"#constrainedbitspersecond"},
+"#constrainedmimetype": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"[[constrainedmimetype]]","type":"dfn","url":"#constrainedmimetype"},
+"#dictdef-blobeventinit": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"BlobEventInit","type":"dictionary","url":"#dictdef-blobeventinit"},
+"#dictdef-mediarecordererroreventinit": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"MediaRecorderErrorEventInit","type":"dictionary","url":"#dictdef-mediarecordererroreventinit"},
+"#dictdef-mediarecorderoptions": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"MediaRecorderOptions","type":"dictionary","url":"#dictdef-mediarecorderoptions"},
+"#dom-bitratemode-constant": {"export":true,"for_":["BitrateMode"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"\"constant\"","type":"enum-value","url":"#dom-bitratemode-constant"},
+"#dom-bitratemode-variable": {"export":true,"for_":["BitrateMode"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"\"variable\"","type":"enum-value","url":"#dom-bitratemode-variable"},
+"#dom-blobevent-blobevent": {"export":true,"for_":["BlobEvent"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"BlobEvent(type, eventInitDict)","type":"constructor","url":"#dom-blobevent-blobevent"},
+"#dom-blobevent-data": {"export":true,"for_":["BlobEvent"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"data","type":"attribute","url":"#dom-blobevent-data"},
+"#dom-blobevent-timecode": {"export":true,"for_":["BlobEvent"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"timecode","type":"attribute","url":"#dom-blobevent-timecode"},
+"#dom-blobeventinit-data": {"export":true,"for_":["BlobEventInit"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"data","type":"dict-member","url":"#dom-blobeventinit-data"},
+"#dom-blobeventinit-timecode": {"export":true,"for_":["BlobEventInit"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"timecode","type":"dict-member","url":"#dom-blobeventinit-timecode"},
+"#dom-mediarecorder-audiobitratemode": {"export":true,"for_":["MediaRecorder"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"audioBitrateMode","type":"attribute","url":"#dom-mediarecorder-audiobitratemode"},
+"#dom-mediarecorder-audiobitspersecond": {"export":true,"for_":["MediaRecorder"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"audioBitsPerSecond","type":"attribute","url":"#dom-mediarecorder-audiobitspersecond"},
+"#dom-mediarecorder-istypesupported": {"export":true,"for_":["MediaRecorder"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"isTypeSupported(type)","type":"method","url":"#dom-mediarecorder-istypesupported"},
+"#dom-mediarecorder-mediarecorder": {"export":true,"for_":["MediaRecorder"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"MediaRecorder(stream, options)","type":"constructor","url":"#dom-mediarecorder-mediarecorder"},
+"#dom-mediarecorder-mimetype": {"export":true,"for_":["MediaRecorder"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"mimeType","type":"attribute","url":"#dom-mediarecorder-mimetype"},
+"#dom-mediarecorder-ondataavailable": {"export":true,"for_":["MediaRecorder"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"ondataavailable","type":"attribute","url":"#dom-mediarecorder-ondataavailable"},
+"#dom-mediarecorder-onerror": {"export":true,"for_":["MediaRecorder"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"onerror","type":"attribute","url":"#dom-mediarecorder-onerror"},
+"#dom-mediarecorder-onpause": {"export":true,"for_":["MediaRecorder"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"onpause","type":"attribute","url":"#dom-mediarecorder-onpause"},
+"#dom-mediarecorder-onresume": {"export":true,"for_":["MediaRecorder"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"onresume","type":"attribute","url":"#dom-mediarecorder-onresume"},
+"#dom-mediarecorder-onstart": {"export":true,"for_":["MediaRecorder"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"onstart","type":"attribute","url":"#dom-mediarecorder-onstart"},
+"#dom-mediarecorder-onstop": {"export":true,"for_":["MediaRecorder"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"onstop","type":"attribute","url":"#dom-mediarecorder-onstop"},
+"#dom-mediarecorder-pause": {"export":true,"for_":["MediaRecorder"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"pause()","type":"method","url":"#dom-mediarecorder-pause"},
+"#dom-mediarecorder-requestdata": {"export":true,"for_":["MediaRecorder"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"requestData()","type":"method","url":"#dom-mediarecorder-requestdata"},
+"#dom-mediarecorder-resume": {"export":true,"for_":["MediaRecorder"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"resume()","type":"method","url":"#dom-mediarecorder-resume"},
+"#dom-mediarecorder-start": {"export":true,"for_":["MediaRecorder"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"start()","type":"method","url":"#dom-mediarecorder-start"},
+"#dom-mediarecorder-start-timeslice-timeslice": {"export":true,"for_":["MediaRecorder/start()","MediaRecorder/start(timeslice)"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"timeslice","type":"argument","url":"#dom-mediarecorder-start-timeslice-timeslice"},
+"#dom-mediarecorder-state": {"export":true,"for_":["MediaRecorder"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"state","type":"attribute","url":"#dom-mediarecorder-state"},
+"#dom-mediarecorder-stop": {"export":true,"for_":["MediaRecorder"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"stop()","type":"method","url":"#dom-mediarecorder-stop"},
+"#dom-mediarecorder-stream": {"export":true,"for_":["MediaRecorder"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"stream","type":"attribute","url":"#dom-mediarecorder-stream"},
+"#dom-mediarecorder-videobitspersecond": {"export":true,"for_":["MediaRecorder"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"videoBitsPerSecond","type":"attribute","url":"#dom-mediarecorder-videobitspersecond"},
+"#dom-mediarecordererrorevent-error": {"export":true,"for_":["MediaRecorderErrorEvent"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"error","type":"attribute","url":"#dom-mediarecordererrorevent-error"},
+"#dom-mediarecordererrorevent-mediarecordererrorevent": {"export":true,"for_":["MediaRecorderErrorEvent"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"MediaRecorderErrorEvent(type, eventInitDict)","type":"constructor","url":"#dom-mediarecordererrorevent-mediarecordererrorevent"},
+"#dom-mediarecordererroreventinit-error": {"export":true,"for_":["MediaRecorderErrorEventInit"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"error","type":"dict-member","url":"#dom-mediarecordererroreventinit-error"},
+"#dom-mediarecorderoptions-audiobitratemode": {"export":true,"for_":["MediaRecorderOptions"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"audioBitrateMode","type":"dict-member","url":"#dom-mediarecorderoptions-audiobitratemode"},
+"#dom-mediarecorderoptions-audiobitspersecond": {"export":true,"for_":["MediaRecorderOptions"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"audioBitsPerSecond","type":"dict-member","url":"#dom-mediarecorderoptions-audiobitspersecond"},
+"#dom-mediarecorderoptions-bitspersecond": {"export":true,"for_":["MediaRecorderOptions"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"bitsPerSecond","type":"dict-member","url":"#dom-mediarecorderoptions-bitspersecond"},
+"#dom-mediarecorderoptions-mimetype": {"export":true,"for_":["MediaRecorderOptions"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"mimeType","type":"dict-member","url":"#dom-mediarecorderoptions-mimetype"},
+"#dom-mediarecorderoptions-videobitspersecond": {"export":true,"for_":["MediaRecorderOptions"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"videoBitsPerSecond","type":"dict-member","url":"#dom-mediarecorderoptions-videobitspersecond"},
+"#dom-recordingstate-inactive": {"export":true,"for_":["RecordingState"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"inactive","type":"enum-value","url":"#dom-recordingstate-inactive"},
+"#dom-recordingstate-paused": {"export":true,"for_":["RecordingState"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"paused","type":"enum-value","url":"#dom-recordingstate-paused"},
+"#dom-recordingstate-recording": {"export":true,"for_":["RecordingState"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"recording","type":"enum-value","url":"#dom-recordingstate-recording"},
+"#enumdef-bitratemode": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"BitrateMode","type":"enum","url":"#enumdef-bitratemode"},
+"#enumdef-recordingstate": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"RecordingState","type":"enum","url":"#enumdef-recordingstate"},
+"#eventdef-mediarecorder-dataavailable": {"export":true,"for_":["MediaRecorder"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"dataavailable","type":"event","url":"#eventdef-mediarecorder-dataavailable"},
+"#eventdef-mediarecorder-pause": {"export":true,"for_":["MediaRecorder"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"pause","type":"event","url":"#eventdef-mediarecorder-pause"},
+"#eventdef-mediarecorder-resume": {"export":true,"for_":["MediaRecorder"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"resume","type":"event","url":"#eventdef-mediarecorder-resume"},
+"#eventdef-mediarecorder-start": {"export":true,"for_":["MediaRecorder"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"start","type":"event","url":"#eventdef-mediarecorder-start"},
+"#eventdef-mediarecorder-stop": {"export":true,"for_":["MediaRecorder"],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"stop","type":"event","url":"#eventdef-mediarecorder-stop"},
+"#fire-a-blob-event": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"fire a blob event","type":"dfn","url":"#fire-a-blob-event"},
+"#fire-an-error-event": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"fire an error event","type":"dfn","url":"#fire-an-error-event"},
+"#mediarecorder": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"MediaRecorder","type":"interface","url":"#mediarecorder"},
+"#mediarecordererrorevent": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mediastream-recording","spec":"mediastream-recording","status":"local","text":"MediaRecorderErrorEvent","type":"interface","url":"#mediarecordererrorevent"},
+"https://dom.spec.whatwg.org/#concept-event-fire": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"fire an event","type":"dfn","url":"https://dom.spec.whatwg.org/#concept-event-fire"},
+"https://dom.spec.whatwg.org/#dictdef-eventinit": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"EventInit","type":"dictionary","url":"https://dom.spec.whatwg.org/#dictdef-eventinit"},
+"https://dom.spec.whatwg.org/#event": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"Event","type":"interface","url":"https://dom.spec.whatwg.org/#event"},
+"https://dom.spec.whatwg.org/#eventtarget": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"EventTarget","type":"interface","url":"https://dom.spec.whatwg.org/#eventtarget"},
+"https://fetch.spec.whatwg.org/#concept-fetch-resume": {"export":true,"for_":["fetch"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"resumed","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-fetch-resume"},
+"https://heycam.github.io/webidl/#idl-DOMString": {"export":true,"for_":[],"level":"","normative":true,"shortname":"webidl","spec":"webidl","status":"anchor-block","text":"DOMString","type":"interface","url":"https://heycam.github.io/webidl/#idl-DOMString"},
+"https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"in parallel","type":"dfn","url":"https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"EventHandler","type":"typedef","url":"https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#secure-context": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"secure context","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#secure-context"},
+"https://w3c.github.io/FileAPI/#dfn-Blob": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"fileapi","spec":"fileapi","status":"current","text":"Blob","type":"interface","url":"https://w3c.github.io/FileAPI/#dfn-Blob"},
+"https://w3c.github.io/FileAPI/#dfn-type": {"export":true,"for_":["Blob"],"level":"1","normative":true,"shortname":"fileapi","spec":"fileapi","status":"current","text":"type","type":"attribute","url":"https://w3c.github.io/FileAPI/#dfn-type"},
+"https://webidl.spec.whatwg.org/#Exposed": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"Exposed","type":"extended-attribute","url":"https://webidl.spec.whatwg.org/#Exposed"},
+"https://webidl.spec.whatwg.org/#SameObject": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"SameObject","type":"extended-attribute","url":"https://webidl.spec.whatwg.org/#SameObject"},
+"https://webidl.spec.whatwg.org/#idl-DOMException": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"DOMException","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-DOMException"},
+"https://webidl.spec.whatwg.org/#idl-boolean": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"boolean","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-boolean"},
+"https://webidl.spec.whatwg.org/#idl-undefined": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"undefined","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-undefined"},
+"https://webidl.spec.whatwg.org/#idl-unsigned-long": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"unsigned long","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-unsigned-long"},
+"https://webidl.spec.whatwg.org/#invalidmodificationerror": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"InvalidModificationError","type":"exception","url":"https://webidl.spec.whatwg.org/#invalidmodificationerror"},
+"https://webidl.spec.whatwg.org/#invalidstateerror": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"InvalidStateError","type":"exception","url":"https://webidl.spec.whatwg.org/#invalidstateerror"},
+"https://webidl.spec.whatwg.org/#notsupportederror": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"NotSupportedError","type":"exception","url":"https://webidl.spec.whatwg.org/#notsupportederror"},
+"https://webidl.spec.whatwg.org/#securityerror": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"SecurityError","type":"exception","url":"https://webidl.spec.whatwg.org/#securityerror"},
+"https://webidl.spec.whatwg.org/#unknownerror": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"UnknownError","type":"exception","url":"https://webidl.spec.whatwg.org/#unknownerror"},
+"https://www.w3.org/TR/fingerprinting-guidance/#dfn-active-fingerprinting": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mediastream-recording","spec":"","status":"anchor-block","text":"active fingerprinting","type":"dfn","url":"https://www.w3.org/TR/fingerprinting-guidance/#dfn-active-fingerprinting"},
+"https://www.w3.org/TR/fingerprinting-guidance/#dfn-fingerprinting-surface": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mediastream-recording","spec":"","status":"anchor-block","text":"fingerprinting surface","type":"dfn","url":"https://www.w3.org/TR/fingerprinting-guidance/#dfn-fingerprinting-surface"},
+"https://www.w3.org/TR/hr-time/#dom-domhighrestimestamp": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mediastream-recording","spec":"","status":"anchor-block","text":"DOMHighResTimeStamp","type":"interface","url":"https://www.w3.org/TR/hr-time/#dom-domhighrestimestamp"},
+"https://www.w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mediastream-recording","spec":"","status":"anchor-block","text":"getUserMedia()","type":"method","url":"https://www.w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia"},
+"https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-enabled": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mediastream-recording","spec":"","status":"anchor-block","text":"enabled","type":"attribute","url":"https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-enabled"},
+"https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-muted": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mediastream-recording","spec":"","status":"anchor-block","text":"muted","type":"attribute","url":"https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-muted"},
+"https://www.w3.org/TR/mediacapture-streams/#idl-def-MediaStreamTrackState.ended": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mediastream-recording","spec":"","status":"anchor-block","text":"ended","type":"enum-value","url":"https://www.w3.org/TR/mediacapture-streams/#idl-def-MediaStreamTrackState.ended"},
+"https://www.w3.org/TR/mediacapture-streams/#idl-def-MediaStreamTrackState.live": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mediastream-recording","spec":"","status":"anchor-block","text":"live","type":"enum-value","url":"https://www.w3.org/TR/mediacapture-streams/#idl-def-MediaStreamTrackState.live"},
+"https://www.w3.org/TR/mediacapture-streams/#mediastream": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mediastream-recording","spec":"","status":"anchor-block","text":"MediaStream","type":"interface","url":"https://www.w3.org/TR/mediacapture-streams/#mediastream"},
+"https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mediastream-recording","spec":"","status":"anchor-block","text":"MediaStreamTrack","type":"interface","url":"https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack"},
+"https://www.w3.org/TR/mediacapture-streams/#stream-inactive": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mediastream-recording","spec":"","status":"anchor-block","text":"inactive","type":"dfn","url":"https://www.w3.org/TR/mediacapture-streams/#stream-inactive"},
+"https://www.w3.org/TR/mediacapture-streams/#track-set": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mediastream-recording","spec":"","status":"anchor-block","text":"track set","type":"dfn","url":"https://www.w3.org/TR/mediacapture-streams/#track-set"},
+"https://www.w3.org/TR/webrtc-identity/#isolated-media-streams": {"export":true,"for_":[],"level":"","normative":true,"shortname":"mediastream-recording","spec":"","status":"anchor-block","text":"isolation properties","type":"dfn","url":"https://www.w3.org/TR/webrtc-identity/#isolated-media-streams"},
+};
+
+function mkRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "Term: "),
+                mk.span({}, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    let forListElements;
+    if(forList.length == 0) {
+        forListElements = [];
+    } else if(forList.length == 1) {
+        forListElements = mk.li({},
+            mk.b({}, "For: "),
+            mk.span({}, forList[0]),
+        );
+    } else {
+        forListElements = mk.li({},
             mk.b({}, "For: "),
             mk.ul({},
                 ...forList.map(forItem =>
                     mk.li({},
-                        mk.span({}, `${forItem}`)
+                        mk.span({}, forItem)
                     ),
                 ),
             ),
         );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+    }
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    setupRefHintEventListeners(link, hintPanel);
+    return hintPanel;
+}
+
+function hideAllRefHints() {
+    queryAll(".ref-hint").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    if(refHint.teardownEventListeners) {
+        refHint.teardownEventListeners();
     }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+    refHint.remove();
+}
+
+function showRefHint(link) {
+    if(link.classList.contains("dfn-link")) return;
+    const url = link.getAttribute("href");
+    const ref = refsData[url];
+    if(!ref) return;
+
+    hideAllRefHints(); // Only display one at this time.
+
+    const refHint = mkRefHint(link, ref);
+    append(document.body, refHint);
+    link.setAttribute("aria-expanded", "true");
+    positionRefHint(refHint);
+}
+
+function setupRefHintEventListeners(link, refHint) {
+    if (refHint.teardownEventListeners) return;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
+
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
-
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
-    }
-
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
-        }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
-
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
-    }
-
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+document.addEventListener("DOMContentLoaded", () => {
+    document.body.addEventListener("mouseover", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
+    });
+    document.body.addEventListener("focus", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
     });
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
 </script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['https://www.w3.org/TR/mediacapture-streams/#mediastream'] = {"text": "MediaStream", "type": "interface", "spec": "", "shortname": "mediastream-recording", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#mediastream", "export": true, "normative": true, "for_": []};
-window.refsData['#mediarecorder'] = {"text": "MediaRecorder", "type": "interface", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#mediarecorder", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-mediarecorder-start'] = {"text": "start()", "type": "method", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-start", "export": true, "normative": true, "for_": ["MediaRecorder"]};
-window.refsData['#dom-mediarecorder-stop'] = {"text": "stop()", "type": "method", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-stop", "export": true, "normative": true, "for_": ["MediaRecorder"]};
-window.refsData['https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack'] = {"text": "MediaStreamTrack", "type": "interface", "spec": "", "shortname": "mediastream-recording", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-mediarecorder-ondataavailable'] = {"text": "ondataavailable", "type": "attribute", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-ondataavailable", "export": true, "normative": true, "for_": ["MediaRecorder"]};
-window.refsData['https://w3c.github.io/FileAPI/#dfn-Blob'] = {"text": "Blob", "type": "interface", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#dfn-Blob", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#eventtarget'] = {"text": "EventTarget", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#eventtarget", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-mediarecorder-mediarecorder'] = {"text": "MediaRecorder(stream, options)", "type": "constructor", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-mediarecorder", "export": true, "normative": true, "for_": ["MediaRecorder"]};
-window.refsData['#dictdef-mediarecorderoptions'] = {"text": "MediaRecorderOptions", "type": "dictionary", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dictdef-mediarecorderoptions", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-mediarecorder-stream'] = {"text": "stream", "type": "attribute", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-stream", "export": true, "normative": true, "for_": ["MediaRecorder"]};
-window.refsData['https://heycam.github.io/webidl/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "", "status": "anchor-block", "url": "https://heycam.github.io/webidl/#idl-DOMString", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-mediarecorder-mimetype'] = {"text": "mimeType", "type": "attribute", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-mimetype", "export": true, "normative": true, "for_": ["MediaRecorder"]};
-window.refsData['#enumdef-recordingstate'] = {"text": "RecordingState", "type": "enum", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#enumdef-recordingstate", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-mediarecorder-state'] = {"text": "state", "type": "attribute", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-state", "export": true, "normative": true, "for_": ["MediaRecorder"]};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler'] = {"text": "EventHandler", "type": "typedef", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-mediarecorder-onstart'] = {"text": "onstart", "type": "attribute", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-onstart", "export": true, "normative": true, "for_": ["MediaRecorder"]};
-window.refsData['#dom-mediarecorder-onstop'] = {"text": "onstop", "type": "attribute", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-onstop", "export": true, "normative": true, "for_": ["MediaRecorder"]};
-window.refsData['#dom-mediarecorder-onpause'] = {"text": "onpause", "type": "attribute", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-onpause", "export": true, "normative": true, "for_": ["MediaRecorder"]};
-window.refsData['#dom-mediarecorder-onresume'] = {"text": "onresume", "type": "attribute", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-onresume", "export": true, "normative": true, "for_": ["MediaRecorder"]};
-window.refsData['#dom-mediarecorder-onerror'] = {"text": "onerror", "type": "attribute", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-onerror", "export": true, "normative": true, "for_": ["MediaRecorder"]};
-window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-long'] = {"text": "unsigned long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-long", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-mediarecorder-videobitspersecond'] = {"text": "videoBitsPerSecond", "type": "attribute", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-videobitspersecond", "export": true, "normative": true, "for_": ["MediaRecorder"]};
-window.refsData['#dom-mediarecorder-audiobitspersecond'] = {"text": "audioBitsPerSecond", "type": "attribute", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-audiobitspersecond", "export": true, "normative": true, "for_": ["MediaRecorder"]};
-window.refsData['#enumdef-bitratemode'] = {"text": "BitrateMode", "type": "enum", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#enumdef-bitratemode", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-mediarecorder-audiobitratemode'] = {"text": "audioBitrateMode", "type": "attribute", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-audiobitratemode", "export": true, "normative": true, "for_": ["MediaRecorder"]};
-window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-mediarecorder-pause'] = {"text": "pause()", "type": "method", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-pause", "export": true, "normative": true, "for_": ["MediaRecorder"]};
-window.refsData['#dom-mediarecorder-resume'] = {"text": "resume()", "type": "method", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-resume", "export": true, "normative": true, "for_": ["MediaRecorder"]};
-window.refsData['#dom-mediarecorder-requestdata'] = {"text": "requestData()", "type": "method", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-requestdata", "export": true, "normative": true, "for_": ["MediaRecorder"]};
-window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-mediarecorder-istypesupported'] = {"text": "isTypeSupported(type)", "type": "method", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-istypesupported", "export": true, "normative": true, "for_": ["MediaRecorder"]};
-window.refsData['#abstract-opdef-is-type-supported'] = {"text": "is type supported", "type": "abstract-op", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#abstract-opdef-is-type-supported", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-mediarecorderoptions-mimetype'] = {"text": "mimeType", "type": "dict-member", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorderoptions-mimetype", "export": true, "normative": true, "for_": ["MediaRecorderOptions"]};
-window.refsData['https://webidl.spec.whatwg.org/#notsupportederror'] = {"text": "NotSupportedError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#notsupportederror", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-DOMException'] = {"text": "DOMException", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMException", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-mediarecorderoptions-bitspersecond'] = {"text": "bitsPerSecond", "type": "dict-member", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorderoptions-bitspersecond", "export": true, "normative": true, "for_": ["MediaRecorderOptions"]};
-window.refsData['#constrainedmimetype'] = {"text": "[[constrainedmimetype]]", "type": "dfn", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#constrainedmimetype", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-recordingstate-inactive'] = {"text": "inactive", "type": "enum-value", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-recordingstate-inactive", "export": true, "normative": true, "for_": ["RecordingState"]};
-window.refsData['#dom-mediarecorderoptions-videobitspersecond'] = {"text": "videoBitsPerSecond", "type": "dict-member", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorderoptions-videobitspersecond", "export": true, "normative": true, "for_": ["MediaRecorderOptions"]};
-window.refsData['#dom-mediarecorderoptions-audiobitspersecond'] = {"text": "audioBitsPerSecond", "type": "dict-member", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorderoptions-audiobitspersecond", "export": true, "normative": true, "for_": ["MediaRecorderOptions"]};
-window.refsData['#constrainedbitspersecond'] = {"text": "[[constrainedbitspersecond]]", "type": "dfn", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#constrainedbitspersecond", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-mediarecorderoptions-audiobitratemode'] = {"text": "audioBitrateMode", "type": "dict-member", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorderoptions-audiobitratemode", "export": true, "normative": true, "for_": ["MediaRecorderOptions"]};
-window.refsData['#eventdef-mediarecorder-start'] = {"text": "start", "type": "event", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#eventdef-mediarecorder-start", "export": true, "normative": true, "for_": ["MediaRecorder"]};
-window.refsData['#eventdef-mediarecorder-stop'] = {"text": "stop", "type": "event", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#eventdef-mediarecorder-stop", "export": true, "normative": true, "for_": ["MediaRecorder"]};
-window.refsData['#eventdef-mediarecorder-dataavailable'] = {"text": "dataavailable", "type": "event", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#eventdef-mediarecorder-dataavailable", "export": true, "normative": true, "for_": ["MediaRecorder"]};
-window.refsData['#dom-blobevent-data'] = {"text": "data", "type": "attribute", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-blobevent-data", "export": true, "normative": true, "for_": ["BlobEvent"]};
-window.refsData['#eventdef-mediarecorder-pause'] = {"text": "pause", "type": "event", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#eventdef-mediarecorder-pause", "export": true, "normative": true, "for_": ["MediaRecorder"]};
-window.refsData['#eventdef-mediarecorder-resume'] = {"text": "resume", "type": "event", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#eventdef-mediarecorder-resume", "export": true, "normative": true, "for_": ["MediaRecorder"]};
-window.refsData['#mediarecordererrorevent'] = {"text": "MediaRecorderErrorEvent", "type": "interface", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#mediarecordererrorevent", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/mediacapture-streams/#idl-def-MediaStreamTrackState.live'] = {"text": "live", "type": "enum-value", "spec": "", "shortname": "mediastream-recording", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#idl-def-MediaStreamTrackState.live", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/mediacapture-streams/#track-set'] = {"text": "track set", "type": "dfn", "spec": "", "shortname": "mediastream-recording", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#track-set", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#invalidstateerror'] = {"text": "InvalidStateError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invalidstateerror", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/webrtc-identity/#isolated-media-streams'] = {"text": "isolation properties", "type": "dfn", "spec": "", "shortname": "mediastream-recording", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/webrtc-identity/#isolated-media-streams", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#securityerror'] = {"text": "SecurityError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#securityerror", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/mediacapture-streams/#stream-inactive'] = {"text": "inactive", "type": "dfn", "spec": "", "shortname": "mediastream-recording", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#stream-inactive", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-recordingstate-recording'] = {"text": "recording", "type": "enum-value", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-recordingstate-recording", "export": true, "normative": true, "for_": ["RecordingState"]};
-window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel'] = {"text": "in parallel", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#concept-event-fire'] = {"text": "fire an event", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-event-fire", "export": true, "normative": true, "for_": []};
-window.refsData['#abstract-opdef-inactivate-the-recorder'] = {"text": "Inactivate the recorder", "type": "abstract-op", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#abstract-opdef-inactivate-the-recorder", "export": true, "normative": true, "for_": []};
-window.refsData['#fire-an-error-event'] = {"text": "fire an error event", "type": "dfn", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#fire-an-error-event", "export": true, "normative": true, "for_": []};
-window.refsData['#fire-a-blob-event'] = {"text": "fire a blob event", "type": "dfn", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#fire-a-blob-event", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#invalidmodificationerror'] = {"text": "InvalidModificationError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invalidmodificationerror", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#unknownerror'] = {"text": "UnknownError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#unknownerror", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/mediacapture-streams/#idl-def-MediaStreamTrackState.ended'] = {"text": "ended", "type": "enum-value", "spec": "", "shortname": "mediastream-recording", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#idl-def-MediaStreamTrackState.ended", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-mediarecorder-start-timeslice-timeslice'] = {"text": "timeslice", "type": "argument", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecorder-start-timeslice-timeslice", "export": true, "normative": true, "for_": ["MediaRecorder/start()", "MediaRecorder/start(timeslice)"]};
-window.refsData['https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-muted'] = {"text": "muted", "type": "attribute", "spec": "", "shortname": "mediastream-recording", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-muted", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-enabled'] = {"text": "enabled", "type": "attribute", "spec": "", "shortname": "mediastream-recording", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-enabled", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-recordingstate-paused'] = {"text": "paused", "type": "enum-value", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-recordingstate-paused", "export": true, "normative": true, "for_": ["RecordingState"]};
-window.refsData['https://fetch.spec.whatwg.org/#concept-fetch-resume'] = {"text": "resumed", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-fetch-resume", "export": true, "normative": true, "for_": ["fetch"]};
-window.refsData['#blobevent'] = {"text": "BlobEvent", "type": "interface", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#blobevent", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-bitratemode-constant'] = {"text": "\"constant\"", "type": "enum-value", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-bitratemode-constant", "export": true, "normative": true, "for_": ["BitrateMode"]};
-window.refsData['#dom-bitratemode-variable'] = {"text": "\"variable\"", "type": "enum-value", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-bitratemode-variable", "export": true, "normative": true, "for_": ["BitrateMode"]};
-window.refsData['https://dom.spec.whatwg.org/#event'] = {"text": "Event", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#event", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-blobevent-blobevent'] = {"text": "BlobEvent(type, eventInitDict)", "type": "constructor", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-blobevent-blobevent", "export": true, "normative": true, "for_": ["BlobEvent"]};
-window.refsData['#dictdef-blobeventinit'] = {"text": "BlobEventInit", "type": "dictionary", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dictdef-blobeventinit", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#SameObject'] = {"text": "SameObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SameObject", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/hr-time/#dom-domhighrestimestamp'] = {"text": "DOMHighResTimeStamp", "type": "interface", "spec": "", "shortname": "mediastream-recording", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/hr-time/#dom-domhighrestimestamp", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-blobevent-timecode'] = {"text": "timecode", "type": "attribute", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-blobevent-timecode", "export": true, "normative": true, "for_": ["BlobEvent"]};
-window.refsData['https://w3c.github.io/FileAPI/#dfn-type'] = {"text": "type", "type": "attribute", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#dfn-type", "export": true, "normative": true, "for_": ["Blob"]};
-window.refsData['#dom-blobeventinit-data'] = {"text": "data", "type": "dict-member", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-blobeventinit-data", "export": true, "normative": true, "for_": ["BlobEventInit"]};
-window.refsData['#dom-blobeventinit-timecode'] = {"text": "timecode", "type": "dict-member", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-blobeventinit-timecode", "export": true, "normative": true, "for_": ["BlobEventInit"]};
-window.refsData['#dom-mediarecordererrorevent-error'] = {"text": "error", "type": "attribute", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecordererrorevent-error", "export": true, "normative": true, "for_": ["MediaRecorderErrorEvent"]};
-window.refsData['https://dom.spec.whatwg.org/#dictdef-eventinit'] = {"text": "EventInit", "type": "dictionary", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dictdef-eventinit", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-mediarecordererroreventinit-error'] = {"text": "error", "type": "dict-member", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecordererroreventinit-error", "export": true, "normative": true, "for_": ["MediaRecorderErrorEventInit"]};
-window.refsData['#dom-mediarecordererrorevent-mediarecordererrorevent'] = {"text": "MediaRecorderErrorEvent(type, eventInitDict)", "type": "constructor", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dom-mediarecordererrorevent-mediarecordererrorevent", "export": true, "normative": true, "for_": ["MediaRecorderErrorEvent"]};
-window.refsData['#dictdef-mediarecordererroreventinit'] = {"text": "MediaRecorderErrorEventInit", "type": "dictionary", "spec": "mediastream-recording", "shortname": "mediastream-recording", "level": "", "status": "local", "url": "#dictdef-mediarecordererroreventinit", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#secure-context'] = {"text": "secure context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#secure-context", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/fingerprinting-guidance/#dfn-active-fingerprinting'] = {"text": "active fingerprinting", "type": "dfn", "spec": "", "shortname": "mediastream-recording", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/fingerprinting-guidance/#dfn-active-fingerprinting", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/fingerprinting-guidance/#dfn-fingerprinting-surface'] = {"text": "fingerprinting surface", "type": "dfn", "spec": "", "shortname": "mediastream-recording", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/fingerprinting-guidance/#dfn-fingerprinting-surface", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia'] = {"text": "getUserMedia()", "type": "method", "spec": "", "shortname": "mediastream-recording", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia", "export": true, "normative": true, "for_": []};
-</script>
 <script>/* Boilerplate: script-var-click-highlighting */
+"use strict";
+{
 /*
 Color-choosing design:
 
-Colors are ordered by goodness.
-Each color has a usage count (initially zero).
-Each variable has a last-used color.
-
-* If the var has a last-used color, and that color's usage is 0,
-    return that color.
-* Otherwise, return the lowest-indexed color with the lowest usage.
-    Increment the color's usage and set it as the last-used color
-    for that var.
-* On unclicking, decrement usage of the color.
+* Colors are ordered by goodness.
+* On clicking a var, give it the earliest color
+    with the lowest usage in the algorithm.
+* On re-clicking, re-use the var's most recent color
+    if that's not currently being used elsewhere.
 */
-"use strict";
-{
-    document.addEventListener("click", e=>{
-        if(e.target.nodeName == "VAR") {
-            highlightSameAlgoVars(e.target);
-        }
-    });
-    const indexCounts = new Map();
-    const indexNames = new Map();
-    function highlightSameAlgoVars(v) {
-        // Find the algorithm container.
-        let algoContainer = null;
-        let searchEl = v;
-        while(algoContainer == null && searchEl != document.body) {
-            searchEl = searchEl.parentNode;
-            if(searchEl.hasAttribute("data-algorithm")) {
-                algoContainer = searchEl;
-            }
-        }
 
-        // Not highlighting document-global vars,
-        // too likely to be unrelated.
-        if(algoContainer == null) return;
+const COLOR_COUNT = 7;
 
-        const algoName = algoContainer.getAttribute("data-algorithm");
-        const varName = getVarName(v);
-        const addClass = !v.classList.contains("selected");
-        let highlightClass = null;
-        if(addClass) {
-            const index = chooseHighlightIndex(algoName, varName);
-            indexCounts.get(algoName)[index] += 1;
-            indexNames.set(algoName+"///"+varName, index);
-            highlightClass = nameFromIndex(index);
-        } else {
-            const index = previousHighlightIndex(algoName, varName);
-            indexCounts.get(algoName)[index] -= 1;
-            highlightClass = nameFromIndex(index);
-        }
+document.addEventListener("click", e=>{
+    if(e.target.nodeName == "VAR") {
+        highlightSameAlgoVars(e.target);
+    }
+});
 
-        // Find all same-name vars, and toggle their class appropriately.
+function highlightSameAlgoVars(v) {
+    // Find the algorithm container.
+    let algoContainer = findAlgoContainer(v);
+
+    // Not highlighting document-global vars,
+    // too likely to be unrelated.
+    if(algoContainer == null) return;
+
+    const varName = nameFromVar(v);
+    if(!v.hasAttribute("data-var-color")) {
+        const newColor = chooseHighlightColor(algoContainer, v);
         for(const el of algoContainer.querySelectorAll("var")) {
-            if(getVarName(el) == varName) {
-                el.classList.toggle("selected", addClass);
-                el.classList.toggle(highlightClass, addClass);
+            if(nameFromVar(el) == varName) {
+                el.setAttribute("data-var-color", newColor);
+                el.setAttribute("data-var-last-color", newColor);
+            }
+        }
+    } else {
+        for(const el of algoContainer.querySelectorAll("var")) {
+            if(nameFromVar(el) == varName) {
+                el.removeAttribute("data-var-color");
             }
         }
     }
-    function getVarName(el) {
-        return el.textContent.replace(/(\s|\xa0)+/, " ").trim();
+}
+function findAlgoContainer(el) {
+    while(el != document.body) {
+        if(el.hasAttribute("data-algorithm")) return el;
+        el = el.parentNode;
     }
-    function chooseHighlightIndex(algoName, varName) {
-        let indexes = null;
-        if(indexCounts.has(algoName)) {
-            indexes = indexCounts.get(algoName);
-        } else {
-            // 7 classes right now
-            indexes = [0,0,0,0,0,0,0];
-            indexCounts.set(algoName, indexes);
-        }
+    return null;
+}
+function nameFromVar(el) {
+    return el.textContent.replace(/(\s|\xa0)+/, " ").trim();
+}
+function colorCountsFromContainer(container) {
+    const namesFromColor = Array.from({length:COLOR_COUNT}, x=>new Set());
+    for(let v of container.querySelectorAll("var[data-var-color]")) {
+        let color = +v.getAttribute("data-var-color");
+        namesFromColor[color].add(nameFromVar(v));
+    }
 
-        // If the element was recently unclicked,
-        // *and* that color is still unclaimed,
-        // give it back the same color.
-        const lastIndex = previousHighlightIndex(algoName, varName);
-        if(indexes[lastIndex] === 0) return lastIndex;
-
-        // Find the earliest index with the lowest count.
-        const minCount = Math.min.apply(null, indexes);
-        let index = null;
-        for(var i = 0; i < indexes.length; i++) {
-            if(indexes[i] == minCount) {
-                return i;
-            }
+    return namesFromColor.map(x=>x.size);
+}
+function leastUsedColor(colors) {
+    // Find the earliest color with the lowest count.
+    let minCount = Infinity;
+    let minColor = null;
+    for(var i = 0; i < colors.length; i++) {
+        if(colors[i] < minCount) {
+            minColor = i;
+            minCount = colors[i];
         }
     }
-    function previousHighlightIndex(algoName, varName) {
-        return indexNames.get(algoName+"///"+varName);
+    return minColor;
+}
+function chooseHighlightColor(container, v) {
+    const colorCounts = colorCountsFromContainer(container);
+    if(v.hasAttribute("data-var-last-color")) {
+        let color = +v.getAttribute("data-var-last-color");
+        if(colorCounts[color] == 0) return color;
     }
-    function nameFromIndex(index) {
-        return "selected" + index;
-    }
+    return leastUsedColor(colorCounts);
+}
 }
 </script>

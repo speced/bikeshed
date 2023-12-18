@@ -80,7 +80,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -486,7 +485,7 @@ a[href].issue-return {
 }
 
 .ref-hint {
-    display: none;
+    display: inline-block;
     position: absolute;
     z-index: 35;
     width: 20em;
@@ -502,16 +501,11 @@ a[href].issue-return {
     white-space: normal; /* in case it's moved into a pre */
 }
 
-.ref-hint.on {
-    display: inline-block;
-}
-
 .ref-hint * { margin: 0; padding: 0; text-indent: 0; }
 
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -1141,457 +1135,8 @@ the following <a data-link-type="dfn" href="https://w3c.github.io/webappsec-perm
    <div class="issue"> Should we tie low-entropy-ness to allowlists, generally? <a class="issue-return" href="#issue-0277eb34" title="Jump to section">↵</a></div>
    <div class="issue"> Links for image features are broken, need to actually define that and link to them. <a class="issue-return" href="#issue-707decdc" title="Jump to section">↵</a></div>
   </div>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['a6a8ec88'] = {"dfnID": "a6a8ec88", "url": "https://fetch.spec.whatwg.org/#concept-header-list-append", "dfnText": "append", "refSections": [{"refs": [{"id": "ref-for-concept-header-list-append"}, {"id": "ref-for-concept-header-list-append\u2460"}], "title": "5. Request processing"}], "external": true};
-window.dfnpanelData['857d5516'] = {"dfnID": "857d5516", "url": "https://fetch.spec.whatwg.org/#concept-request-client", "dfnText": "client", "refSections": [{"refs": [{"id": "ref-for-concept-request-client"}], "title": "4.5. Extending environment settings object"}, {"refs": [{"id": "ref-for-concept-request-client\u2460"}, {"id": "ref-for-concept-request-client\u2461"}, {"id": "ref-for-concept-request-client\u2462"}], "title": "5. Request processing"}], "external": true};
-window.dfnpanelData['d5434eef'] = {"dfnID": "d5434eef", "url": "https://fetch.spec.whatwg.org/#header-list-contains", "dfnText": "contains", "refSections": [{"refs": [{"id": "ref-for-header-list-contains"}, {"id": "ref-for-header-list-contains\u2460"}, {"id": "ref-for-header-list-contains\u2461"}], "title": "5. Request processing"}], "external": true};
-window.dfnpanelData['1ca75be9'] = {"dfnID": "1ca75be9", "url": "https://fetch.spec.whatwg.org/#header-list-contains", "dfnText": "does not contain", "refSections": [{"refs": [{"id": "ref-for-header-list-contains"}, {"id": "ref-for-header-list-contains\u2460"}, {"id": "ref-for-header-list-contains\u2461"}], "title": "5. Request processing"}], "external": true};
-window.dfnpanelData['a33db89a'] = {"dfnID": "a33db89a", "url": "https://fetch.spec.whatwg.org/#concept-fetch", "dfnText": "fetch", "refSections": [{"refs": [{"id": "ref-for-concept-fetch"}], "title": "4.5. Extending environment settings object"}, {"refs": [{"id": "ref-for-concept-fetch\u2460"}], "title": "6. Integration with Fetch"}], "external": true};
-window.dfnpanelData['c9e7c11a'] = {"dfnID": "c9e7c11a", "url": "https://fetch.spec.whatwg.org/#concept-header", "dfnText": "header", "refSections": [{"refs": [{"id": "ref-for-concept-header"}], "title": "5. Request processing"}], "external": true};
-window.dfnpanelData['6ee0eab1'] = {"dfnID": "6ee0eab1", "url": "https://fetch.spec.whatwg.org/#concept-request-header-list", "dfnText": "header list", "refSections": [{"refs": [{"id": "ref-for-concept-request-header-list"}, {"id": "ref-for-concept-request-header-list\u2460"}, {"id": "ref-for-concept-request-header-list\u2461"}, {"id": "ref-for-concept-request-header-list\u2462"}, {"id": "ref-for-concept-request-header-list\u2463"}, {"id": "ref-for-concept-request-header-list\u2464"}], "title": "5. Request processing"}], "external": true};
-window.dfnpanelData['8acee9c8'] = {"dfnID": "8acee9c8", "url": "https://fetch.spec.whatwg.org/#concept-http-redirect-fetch", "dfnText": "http-redirect fetch", "refSections": [{"refs": [{"id": "ref-for-concept-http-redirect-fetch"}], "title": "6. Integration with Fetch"}], "external": true};
-window.dfnpanelData['4b84a0bc'] = {"dfnID": "4b84a0bc", "url": "https://fetch.spec.whatwg.org/#concept-header-name", "dfnText": "name", "refSections": [{"refs": [{"id": "ref-for-concept-header-name"}], "title": "5. Request processing"}, {"refs": [{"id": "ref-for-concept-header-name\u2460"}], "title": "7.3. Low entropy hint table"}], "external": true};
-window.dfnpanelData['162d2b51'] = {"dfnID": "162d2b51", "url": "https://fetch.spec.whatwg.org/#concept-request-request", "dfnText": "request", "refSections": [{"refs": [{"id": "ref-for-concept-request-request"}], "title": "4.5. Extending environment settings object"}], "external": true};
-window.dfnpanelData['839611db'] = {"dfnID": "839611db", "url": "https://fetch.spec.whatwg.org/#subresource-request", "dfnText": "subresource request", "refSections": [{"refs": [{"id": "ref-for-subresource-request"}], "title": "5. Request processing"}], "external": true};
-window.dfnpanelData['8a608b90'] = {"dfnID": "8a608b90", "url": "https://fetch.spec.whatwg.org/#concept-header-value", "dfnText": "value", "refSections": [{"refs": [{"id": "ref-for-concept-header-value"}], "title": "7.3. Low entropy hint table"}], "external": true};
-window.dfnpanelData['6d88ab2e'] = {"dfnID": "6d88ab2e", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window-bc", "dfnText": "browsing context", "refSections": [{"refs": [{"id": "ref-for-window-bc"}], "title": "3.3. Initialize Client Hints set"}, {"refs": [{"id": "ref-for-window-bc\u2460"}], "title": "3.4. Accept-CH state (http-equiv=\"accept-ch\")"}], "external": true};
-window.dfnpanelData['5a88c1c3'] = {"dfnID": "5a88c1c3", "url": "https://html.spec.whatwg.org/multipage/semantics.html#attr-meta-content", "dfnText": "content", "refSections": [{"refs": [{"id": "ref-for-attr-meta-content"}, {"id": "ref-for-attr-meta-content\u2460"}], "title": "3.4. Accept-CH state (http-equiv=\"accept-ch\")"}], "external": true};
-window.dfnpanelData['3e12e042'] = {"dfnID": "3e12e042", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object", "dfnText": "environment settings object", "refSections": [{"refs": [{"id": "ref-for-environment-settings-object"}], "title": "3.4. Accept-CH state (http-equiv=\"accept-ch\")"}, {"refs": [{"id": "ref-for-environment-settings-object\u2460"}, {"id": "ref-for-environment-settings-object\u2461"}], "title": "4.5. Extending environment settings object"}], "external": true};
-window.dfnpanelData['8a30477b'] = {"dfnID": "8a30477b", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-global", "dfnText": "global object", "refSections": [{"refs": [{"id": "ref-for-concept-settings-object-global"}], "title": "3.3. Initialize Client Hints set"}, {"refs": [{"id": "ref-for-concept-settings-object-global\u2460"}], "title": "3.4. Accept-CH state (http-equiv=\"accept-ch\")"}], "external": true};
-window.dfnpanelData['273ad187'] = {"dfnID": "273ad187", "url": "https://html.spec.whatwg.org/multipage/semantics.html#the-head-element", "dfnText": "head", "refSections": [{"refs": [{"id": "ref-for-the-head-element"}], "title": "3.4. Accept-CH state (http-equiv=\"accept-ch\")"}], "external": true};
-window.dfnpanelData['64b89595'] = {"dfnID": "64b89595", "url": "https://html.spec.whatwg.org/multipage/semantics.html#meta", "dfnText": "meta", "refSections": [{"refs": [{"id": "ref-for-meta"}, {"id": "ref-for-meta\u2460"}, {"id": "ref-for-meta\u2461"}, {"id": "ref-for-meta\u2462"}], "title": "3.4. Accept-CH state (http-equiv=\"accept-ch\")"}], "external": true};
-window.dfnpanelData['086e3aff'] = {"dfnID": "086e3aff", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-origin", "dfnText": "origin", "refSections": [{"refs": [{"id": "ref-for-concept-origin"}], "title": "3.2. Accept-CH cache"}, {"refs": [{"id": "ref-for-concept-origin\u2460"}], "title": "3.3. Initialize Client Hints set"}], "external": true};
-window.dfnpanelData['43ac8374'] = {"dfnID": "43ac8374", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-origin", "dfnText": "origin (for environment settings object)", "refSections": [{"refs": [{"id": "ref-for-concept-settings-object-origin"}], "title": "3.3. Initialize Client Hints set"}], "external": true};
-window.dfnpanelData['9c4c1e66'] = {"dfnID": "9c4c1e66", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object", "dfnText": "relevant settings object", "refSections": [{"refs": [{"id": "ref-for-relevant-settings-object"}], "title": "3.4. Accept-CH state (http-equiv=\"accept-ch\")"}, {"refs": [{"id": "ref-for-relevant-settings-object\u2460"}], "title": "4.1. Document object initialization"}], "external": true};
-window.dfnpanelData['7393da89'] = {"dfnID": "7393da89", "url": "https://html.spec.whatwg.org/multipage/browsers.html#same-origin", "dfnText": "same origin", "refSections": [{"refs": [{"id": "ref-for-same-origin"}], "title": "3.2. Accept-CH cache"}], "external": true};
-window.dfnpanelData['ae2a6342'] = {"dfnID": "ae2a6342", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context", "dfnText": "top-level browsing context", "refSections": [{"refs": [{"id": "ref-for-top-level-browsing-context"}], "title": "3.3. Initialize Client Hints set"}, {"refs": [{"id": "ref-for-top-level-browsing-context\u2460"}], "title": "3.4. Accept-CH state (http-equiv=\"accept-ch\")"}], "external": true};
-window.dfnpanelData['a3b18719'] = {"dfnID": "a3b18719", "url": "https://infra.spec.whatwg.org/#set-append", "dfnText": "append", "refSections": [{"refs": [{"id": "ref-for-set-append"}], "title": "3.2. Accept-CH cache"}, {"refs": [{"id": "ref-for-set-append\u2460"}], "title": "3.3. Initialize Client Hints set"}, {"refs": [{"id": "ref-for-set-append\u2461"}], "title": "3.4. Accept-CH state (http-equiv=\"accept-ch\")"}], "external": true};
-window.dfnpanelData['7838e1c1'] = {"dfnID": "7838e1c1", "url": "https://infra.spec.whatwg.org/#byte-lowercase", "dfnText": "byte-lowercase", "refSections": [{"refs": [{"id": "ref-for-byte-lowercase"}], "title": "7.1. Client hints token"}], "external": true};
-window.dfnpanelData['027e3e49'] = {"dfnID": "027e3e49", "url": "https://infra.spec.whatwg.org/#list-clone", "dfnText": "clone", "refSections": [{"refs": [{"id": "ref-for-list-clone"}], "title": "4.2. Worker initialization"}], "external": true};
-window.dfnpanelData['16d07e10'] = {"dfnID": "16d07e10", "url": "https://infra.spec.whatwg.org/#list-iterate", "dfnText": "for each", "refSections": [{"refs": [{"id": "ref-for-list-iterate"}, {"id": "ref-for-list-iterate\u2460"}], "title": "5. Request processing"}], "external": true};
-window.dfnpanelData['d14a6f26'] = {"dfnID": "d14a6f26", "url": "https://infra.spec.whatwg.org/#map-key", "dfnText": "key", "refSections": [{"refs": [{"id": "ref-for-map-key"}], "title": "3.2. Accept-CH cache"}], "external": true};
-window.dfnpanelData['84b454ff'] = {"dfnID": "84b454ff", "url": "https://infra.spec.whatwg.org/#ordered-map", "dfnText": "ordered map", "refSections": [{"refs": [{"id": "ref-for-ordered-map"}], "title": "3.2. Accept-CH cache"}], "external": true};
-window.dfnpanelData['692595fe'] = {"dfnID": "692595fe", "url": "https://infra.spec.whatwg.org/#ordered-set", "dfnText": "ordered set", "refSections": [{"refs": [{"id": "ref-for-ordered-set"}], "title": "3.1. Client hints set"}, {"refs": [{"id": "ref-for-ordered-set\u2460"}], "title": "3.2. Accept-CH cache"}], "external": true};
-window.dfnpanelData['15e48c39'] = {"dfnID": "15e48c39", "url": "https://infra.spec.whatwg.org/#ordered-set", "dfnText": "set", "refSections": [{"refs": [{"id": "ref-for-ordered-set"}], "title": "3.1. Client hints set"}, {"refs": [{"id": "ref-for-ordered-set\u2460"}], "title": "3.2. Accept-CH cache"}], "external": true};
-window.dfnpanelData['0e6b2056'] = {"dfnID": "0e6b2056", "url": "https://infra.spec.whatwg.org/#map-set", "dfnText": "set (for map)", "refSections": [{"refs": [{"id": "ref-for-map-set"}], "title": "3.2. Accept-CH cache"}], "external": true};
-window.dfnpanelData['1570624a'] = {"dfnID": "1570624a", "url": "https://w3c.github.io/webappsec-permissions-policy/#policy-controlled-feature-default-allowlist", "dfnText": "default allowlist", "refSections": [{"refs": [{"id": "ref-for-policy-controlled-feature-default-allowlist"}, {"id": "ref-for-policy-controlled-feature-default-allowlist\u2460"}, {"id": "ref-for-policy-controlled-feature-default-allowlist\u2461"}, {"id": "ref-for-policy-controlled-feature-default-allowlist\u2462"}, {"id": "ref-for-policy-controlled-feature-default-allowlist\u2463"}, {"id": "ref-for-policy-controlled-feature-default-allowlist\u2464"}, {"id": "ref-for-policy-controlled-feature-default-allowlist\u2465"}, {"id": "ref-for-policy-controlled-feature-default-allowlist\u2466"}, {"id": "ref-for-policy-controlled-feature-default-allowlist\u2467"}, {"id": "ref-for-policy-controlled-feature-default-allowlist\u2468"}, {"id": "ref-for-policy-controlled-feature-default-allowlist\u2460\u24ea"}, {"id": "ref-for-policy-controlled-feature-default-allowlist\u2460\u2460"}, {"id": "ref-for-policy-controlled-feature-default-allowlist\u2460\u2461"}, {"id": "ref-for-policy-controlled-feature-default-allowlist\u2460\u2462"}, {"id": "ref-for-policy-controlled-feature-default-allowlist\u2460\u2463"}, {"id": "ref-for-policy-controlled-feature-default-allowlist\u2460\u2464"}], "title": "7.2. Policy-controlled features"}], "external": true};
-window.dfnpanelData['cc890cc1'] = {"dfnID": "cc890cc1", "url": "https://w3c.github.io/webappsec-permissions-policy/#policy-controlled-feature", "dfnText": "policy-controlled feature", "refSections": [{"refs": [{"id": "ref-for-policy-controlled-feature"}], "title": "7.2. Policy-controlled features"}], "external": true};
-window.dfnpanelData['client-hints-set'] = {"dfnID": "client-hints-set", "url": "#client-hints-set", "dfnText": "client hints set", "refSections": [{"refs": [{"id": "ref-for-client-hints-set"}, {"id": "ref-for-client-hints-set\u2460"}], "title": "3.2. Accept-CH cache"}, {"refs": [{"id": "ref-for-client-hints-set\u2461"}], "title": "4.5. Extending environment settings object"}], "external": false};
-window.dfnpanelData['accept-ch-cache'] = {"dfnID": "accept-ch-cache", "url": "#accept-ch-cache", "dfnText": "Accept-CH cache", "refSections": [{"refs": [{"id": "ref-for-accept-ch-cache"}, {"id": "ref-for-accept-ch-cache\u2460"}, {"id": "ref-for-accept-ch-cache\u2461"}], "title": "3.2. Accept-CH cache"}, {"refs": [{"id": "ref-for-accept-ch-cache\u2462"}], "title": "3.4. Accept-CH state (http-equiv=\"accept-ch\")"}], "external": false};
-window.dfnpanelData['accept-ch-cache-origin'] = {"dfnID": "accept-ch-cache-origin", "url": "#accept-ch-cache-origin", "dfnText": "origin", "refSections": [{"refs": [{"id": "ref-for-accept-ch-cache-origin"}, {"id": "ref-for-accept-ch-cache-origin\u2460"}], "title": "3.2. Accept-CH cache"}], "external": false};
-window.dfnpanelData['accept-ch-cache-client-hints-set'] = {"dfnID": "accept-ch-cache-client-hints-set", "url": "#accept-ch-cache-client-hints-set", "dfnText": "client hints set", "refSections": [{"refs": [{"id": "ref-for-accept-ch-cache-client-hints-set"}], "title": "3.2. Accept-CH cache"}], "external": false};
-window.dfnpanelData['add-a-new-accept-ch-cache-entry'] = {"dfnID": "add-a-new-accept-ch-cache-entry", "url": "#add-a-new-accept-ch-cache-entry", "dfnText": "add a new Accept-CH cache entry", "refSections": [{"refs": [{"id": "ref-for-add-a-new-accept-ch-cache-entry"}], "title": "3.3. Initialize Client Hints set"}], "external": false};
-window.dfnpanelData['retrieve-the-client-hints-set'] = {"dfnID": "retrieve-the-client-hints-set", "url": "#retrieve-the-client-hints-set", "dfnText": "retrieve the client hints set", "refSections": [{"refs": [{"id": "ref-for-retrieve-the-client-hints-set"}], "title": "3.3. Initialize Client Hints set"}], "external": false};
-window.dfnpanelData['abstract-opdef-initialize-the-client-hints-set'] = {"dfnID": "abstract-opdef-initialize-the-client-hints-set", "url": "#abstract-opdef-initialize-the-client-hints-set", "dfnText": "initialize the Client Hints set", "refSections": [{"refs": [{"id": "ref-for-abstract-opdef-initialize-the-client-hints-set"}], "title": "4.1. Document object initialization"}], "external": false};
-window.dfnpanelData['accept-ch-state'] = {"dfnID": "accept-ch-state", "url": "#accept-ch-state", "dfnText": "Accept-CH state", "refSections": [{"refs": [{"id": "ref-for-accept-ch-state"}], "title": "4.4. Pragma directives"}], "external": false};
-window.dfnpanelData['accept-ch'] = {"dfnID": "accept-ch", "url": "#accept-ch", "dfnText": "accept-ch", "refSections": [{"refs": [{"id": "ref-for-accept-ch"}], "title": "3.4. Accept-CH state (http-equiv=\"accept-ch\")"}], "external": false};
-window.dfnpanelData['environment-settings-object-client-hints-set'] = {"dfnID": "environment-settings-object-client-hints-set", "url": "#environment-settings-object-client-hints-set", "dfnText": "client hints set", "refSections": [{"refs": [{"id": "ref-for-environment-settings-object-client-hints-set"}, {"id": "ref-for-environment-settings-object-client-hints-set\u2460"}, {"id": "ref-for-environment-settings-object-client-hints-set\u2461"}], "title": "3.3. Initialize Client Hints set"}, {"refs": [{"id": "ref-for-environment-settings-object-client-hints-set\u2462"}, {"id": "ref-for-environment-settings-object-client-hints-set\u2463"}], "title": "3.4. Accept-CH state (http-equiv=\"accept-ch\")"}, {"refs": [{"id": "ref-for-environment-settings-object-client-hints-set\u2464"}, {"id": "ref-for-environment-settings-object-client-hints-set\u2465"}], "title": "4.2. Worker initialization"}, {"refs": [{"id": "ref-for-environment-settings-object-client-hints-set\u2466"}, {"id": "ref-for-environment-settings-object-client-hints-set\u2467"}], "title": "5. Request processing"}], "external": false};
-window.dfnpanelData['abstract-opdef-append-client-hints-to-request'] = {"dfnID": "abstract-opdef-append-client-hints-to-request", "url": "#abstract-opdef-append-client-hints-to-request", "dfnText": "append client hints to request", "refSections": [{"refs": [{"id": "ref-for-abstract-opdef-append-client-hints-to-request"}], "title": "6. Integration with Fetch"}], "external": false};
-window.dfnpanelData['abstract-opdef-remove-client-hints-from-redirect-if-needed'] = {"dfnID": "abstract-opdef-remove-client-hints-from-redirect-if-needed", "url": "#abstract-opdef-remove-client-hints-from-redirect-if-needed", "dfnText": "remove client hints from redirect if needed", "refSections": [{"refs": [{"id": "ref-for-abstract-opdef-remove-client-hints-from-redirect-if-needed"}], "title": "6. Integration with Fetch"}], "external": false};
-window.dfnpanelData['client-hints-token'] = {"dfnID": "client-hints-token", "url": "#client-hints-token", "dfnText": "client hints token", "refSections": [{"refs": [{"id": "ref-for-client-hints-token"}], "title": "3.1. Client hints set"}, {"refs": [{"id": "ref-for-client-hints-token\u2460"}], "title": "3.3. Initialize Client Hints set"}, {"refs": [{"id": "ref-for-client-hints-token\u2461"}, {"id": "ref-for-client-hints-token\u2462"}], "title": "3.4. Accept-CH state (http-equiv=\"accept-ch\")"}, {"refs": [{"id": "ref-for-client-hints-token\u2463"}], "title": "5. Request processing"}], "external": false};
-window.dfnpanelData['low-entropy-hint-table'] = {"dfnID": "low-entropy-hint-table", "url": "#low-entropy-hint-table", "dfnText": "low entropy hint table", "refSections": [{"refs": [{"id": "ref-for-low-entropy-hint-table"}], "title": "5. Request processing"}], "external": false};
-window.dfnpanelData['find-client-hint-value'] = {"dfnID": "find-client-hint-value", "url": "#find-client-hint-value", "dfnText": "find client hint value", "refSections": [{"refs": [{"id": "ref-for-find-client-hint-value"}], "title": "5. Request processing"}], "external": false};
-window.dfnpanelData['field-name'] = {"dfnID": "field-name", "url": "#field-name", "dfnText": "field-name", "refSections": [{"refs": [{"id": "ref-for-field-name"}], "title": "3.3. Initialize Client Hints set"}, {"refs": [{"id": "ref-for-field-name\u2460"}], "title": "3.4. Accept-CH state (http-equiv=\"accept-ch\")"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -1785,265 +1330,715 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"027e3e49": {"dfnID":"027e3e49","dfnText":"clone","external":true,"refSections":[{"refs":[{"id":"ref-for-list-clone"}],"title":"4.2. Worker initialization"}],"url":"https://infra.spec.whatwg.org/#list-clone"},
+"086e3aff": {"dfnID":"086e3aff","dfnText":"origin","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-origin"}],"title":"3.2. Accept-CH cache"},{"refs":[{"id":"ref-for-concept-origin\u2460"}],"title":"3.3. Initialize Client Hints set"}],"url":"https://html.spec.whatwg.org/multipage/browsers.html#concept-origin"},
+"0e6b2056": {"dfnID":"0e6b2056","dfnText":"set (for map)","external":true,"refSections":[{"refs":[{"id":"ref-for-map-set"}],"title":"3.2. Accept-CH cache"}],"url":"https://infra.spec.whatwg.org/#map-set"},
+"1570624a": {"dfnID":"1570624a","dfnText":"default allowlist","external":true,"refSections":[{"refs":[{"id":"ref-for-policy-controlled-feature-default-allowlist"},{"id":"ref-for-policy-controlled-feature-default-allowlist\u2460"},{"id":"ref-for-policy-controlled-feature-default-allowlist\u2461"},{"id":"ref-for-policy-controlled-feature-default-allowlist\u2462"},{"id":"ref-for-policy-controlled-feature-default-allowlist\u2463"},{"id":"ref-for-policy-controlled-feature-default-allowlist\u2464"},{"id":"ref-for-policy-controlled-feature-default-allowlist\u2465"},{"id":"ref-for-policy-controlled-feature-default-allowlist\u2466"},{"id":"ref-for-policy-controlled-feature-default-allowlist\u2467"},{"id":"ref-for-policy-controlled-feature-default-allowlist\u2468"},{"id":"ref-for-policy-controlled-feature-default-allowlist\u2460\u24ea"},{"id":"ref-for-policy-controlled-feature-default-allowlist\u2460\u2460"},{"id":"ref-for-policy-controlled-feature-default-allowlist\u2460\u2461"},{"id":"ref-for-policy-controlled-feature-default-allowlist\u2460\u2462"},{"id":"ref-for-policy-controlled-feature-default-allowlist\u2460\u2463"},{"id":"ref-for-policy-controlled-feature-default-allowlist\u2460\u2464"}],"title":"7.2. Policy-controlled features"}],"url":"https://w3c.github.io/webappsec-permissions-policy/#policy-controlled-feature-default-allowlist"},
+"15e48c39": {"dfnID":"15e48c39","dfnText":"set","external":true,"refSections":[{"refs":[{"id":"ref-for-ordered-set"}],"title":"3.1. Client hints set"},{"refs":[{"id":"ref-for-ordered-set\u2460"}],"title":"3.2. Accept-CH cache"}],"url":"https://infra.spec.whatwg.org/#ordered-set"},
+"162d2b51": {"dfnID":"162d2b51","dfnText":"request","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-request-request"}],"title":"4.5. Extending environment settings object"}],"url":"https://fetch.spec.whatwg.org/#concept-request-request"},
+"16d07e10": {"dfnID":"16d07e10","dfnText":"for each","external":true,"refSections":[{"refs":[{"id":"ref-for-list-iterate"},{"id":"ref-for-list-iterate\u2460"}],"title":"5. Request processing"}],"url":"https://infra.spec.whatwg.org/#list-iterate"},
+"1ca75be9": {"dfnID":"1ca75be9","dfnText":"does not contain","external":true,"refSections":[{"refs":[{"id":"ref-for-header-list-contains"},{"id":"ref-for-header-list-contains\u2460"},{"id":"ref-for-header-list-contains\u2461"}],"title":"5. Request processing"}],"url":"https://fetch.spec.whatwg.org/#header-list-contains"},
+"273ad187": {"dfnID":"273ad187","dfnText":"head","external":true,"refSections":[{"refs":[{"id":"ref-for-the-head-element"}],"title":"3.4. Accept-CH state (http-equiv=\"accept-ch\")"}],"url":"https://html.spec.whatwg.org/multipage/semantics.html#the-head-element"},
+"3e12e042": {"dfnID":"3e12e042","dfnText":"environment settings object","external":true,"refSections":[{"refs":[{"id":"ref-for-environment-settings-object"}],"title":"3.4. Accept-CH state (http-equiv=\"accept-ch\")"},{"refs":[{"id":"ref-for-environment-settings-object\u2460"},{"id":"ref-for-environment-settings-object\u2461"}],"title":"4.5. Extending environment settings object"}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object"},
+"43ac8374": {"dfnID":"43ac8374","dfnText":"origin (for environment settings object)","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-settings-object-origin"}],"title":"3.3. Initialize Client Hints set"}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-origin"},
+"4b84a0bc": {"dfnID":"4b84a0bc","dfnText":"name","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-header-name"}],"title":"5. Request processing"},{"refs":[{"id":"ref-for-concept-header-name\u2460"}],"title":"7.3. Low entropy hint table"}],"url":"https://fetch.spec.whatwg.org/#concept-header-name"},
+"5a88c1c3": {"dfnID":"5a88c1c3","dfnText":"content","external":true,"refSections":[{"refs":[{"id":"ref-for-attr-meta-content"},{"id":"ref-for-attr-meta-content\u2460"}],"title":"3.4. Accept-CH state (http-equiv=\"accept-ch\")"}],"url":"https://html.spec.whatwg.org/multipage/semantics.html#attr-meta-content"},
+"64b89595": {"dfnID":"64b89595","dfnText":"meta","external":true,"refSections":[{"refs":[{"id":"ref-for-meta"},{"id":"ref-for-meta\u2460"},{"id":"ref-for-meta\u2461"},{"id":"ref-for-meta\u2462"}],"title":"3.4. Accept-CH state (http-equiv=\"accept-ch\")"}],"url":"https://html.spec.whatwg.org/multipage/semantics.html#meta"},
+"692595fe": {"dfnID":"692595fe","dfnText":"ordered set","external":true,"refSections":[{"refs":[{"id":"ref-for-ordered-set"}],"title":"3.1. Client hints set"},{"refs":[{"id":"ref-for-ordered-set\u2460"}],"title":"3.2. Accept-CH cache"}],"url":"https://infra.spec.whatwg.org/#ordered-set"},
+"6d88ab2e": {"dfnID":"6d88ab2e","dfnText":"browsing context","external":true,"refSections":[{"refs":[{"id":"ref-for-window-bc"}],"title":"3.3. Initialize Client Hints set"},{"refs":[{"id":"ref-for-window-bc\u2460"}],"title":"3.4. Accept-CH state (http-equiv=\"accept-ch\")"}],"url":"https://html.spec.whatwg.org/multipage/nav-history-apis.html#window-bc"},
+"6ee0eab1": {"dfnID":"6ee0eab1","dfnText":"header list","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-request-header-list"},{"id":"ref-for-concept-request-header-list\u2460"},{"id":"ref-for-concept-request-header-list\u2461"},{"id":"ref-for-concept-request-header-list\u2462"},{"id":"ref-for-concept-request-header-list\u2463"},{"id":"ref-for-concept-request-header-list\u2464"}],"title":"5. Request processing"}],"url":"https://fetch.spec.whatwg.org/#concept-request-header-list"},
+"7393da89": {"dfnID":"7393da89","dfnText":"same origin","external":true,"refSections":[{"refs":[{"id":"ref-for-same-origin"}],"title":"3.2. Accept-CH cache"}],"url":"https://html.spec.whatwg.org/multipage/browsers.html#same-origin"},
+"7838e1c1": {"dfnID":"7838e1c1","dfnText":"byte-lowercase","external":true,"refSections":[{"refs":[{"id":"ref-for-byte-lowercase"}],"title":"7.1. Client hints token"}],"url":"https://infra.spec.whatwg.org/#byte-lowercase"},
+"839611db": {"dfnID":"839611db","dfnText":"subresource request","external":true,"refSections":[{"refs":[{"id":"ref-for-subresource-request"}],"title":"5. Request processing"}],"url":"https://fetch.spec.whatwg.org/#subresource-request"},
+"84b454ff": {"dfnID":"84b454ff","dfnText":"ordered map","external":true,"refSections":[{"refs":[{"id":"ref-for-ordered-map"}],"title":"3.2. Accept-CH cache"}],"url":"https://infra.spec.whatwg.org/#ordered-map"},
+"857d5516": {"dfnID":"857d5516","dfnText":"client","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-request-client"}],"title":"4.5. Extending environment settings object"},{"refs":[{"id":"ref-for-concept-request-client\u2460"},{"id":"ref-for-concept-request-client\u2461"},{"id":"ref-for-concept-request-client\u2462"}],"title":"5. Request processing"}],"url":"https://fetch.spec.whatwg.org/#concept-request-client"},
+"8a30477b": {"dfnID":"8a30477b","dfnText":"global object","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-settings-object-global"}],"title":"3.3. Initialize Client Hints set"},{"refs":[{"id":"ref-for-concept-settings-object-global\u2460"}],"title":"3.4. Accept-CH state (http-equiv=\"accept-ch\")"}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-global"},
+"8a608b90": {"dfnID":"8a608b90","dfnText":"value","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-header-value"}],"title":"7.3. Low entropy hint table"}],"url":"https://fetch.spec.whatwg.org/#concept-header-value"},
+"8acee9c8": {"dfnID":"8acee9c8","dfnText":"http-redirect fetch","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-http-redirect-fetch"}],"title":"6. Integration with Fetch"}],"url":"https://fetch.spec.whatwg.org/#concept-http-redirect-fetch"},
+"9c4c1e66": {"dfnID":"9c4c1e66","dfnText":"relevant settings object","external":true,"refSections":[{"refs":[{"id":"ref-for-relevant-settings-object"}],"title":"3.4. Accept-CH state (http-equiv=\"accept-ch\")"},{"refs":[{"id":"ref-for-relevant-settings-object\u2460"}],"title":"4.1. Document object initialization"}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object"},
+"a33db89a": {"dfnID":"a33db89a","dfnText":"fetch","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-fetch"}],"title":"4.5. Extending environment settings object"},{"refs":[{"id":"ref-for-concept-fetch\u2460"}],"title":"6. Integration with Fetch"}],"url":"https://fetch.spec.whatwg.org/#concept-fetch"},
+"a3b18719": {"dfnID":"a3b18719","dfnText":"append","external":true,"refSections":[{"refs":[{"id":"ref-for-set-append"}],"title":"3.2. Accept-CH cache"},{"refs":[{"id":"ref-for-set-append\u2460"}],"title":"3.3. Initialize Client Hints set"},{"refs":[{"id":"ref-for-set-append\u2461"}],"title":"3.4. Accept-CH state (http-equiv=\"accept-ch\")"}],"url":"https://infra.spec.whatwg.org/#set-append"},
+"a6a8ec88": {"dfnID":"a6a8ec88","dfnText":"append","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-header-list-append"},{"id":"ref-for-concept-header-list-append\u2460"}],"title":"5. Request processing"}],"url":"https://fetch.spec.whatwg.org/#concept-header-list-append"},
+"abstract-opdef-append-client-hints-to-request": {"dfnID":"abstract-opdef-append-client-hints-to-request","dfnText":"append client hints to request","external":false,"refSections":[{"refs":[{"id":"ref-for-abstract-opdef-append-client-hints-to-request"}],"title":"6. Integration with Fetch"}],"url":"#abstract-opdef-append-client-hints-to-request"},
+"abstract-opdef-initialize-the-client-hints-set": {"dfnID":"abstract-opdef-initialize-the-client-hints-set","dfnText":"initialize the Client Hints set","external":false,"refSections":[{"refs":[{"id":"ref-for-abstract-opdef-initialize-the-client-hints-set"}],"title":"4.1. Document object initialization"}],"url":"#abstract-opdef-initialize-the-client-hints-set"},
+"abstract-opdef-remove-client-hints-from-redirect-if-needed": {"dfnID":"abstract-opdef-remove-client-hints-from-redirect-if-needed","dfnText":"remove client hints from redirect if needed","external":false,"refSections":[{"refs":[{"id":"ref-for-abstract-opdef-remove-client-hints-from-redirect-if-needed"}],"title":"6. Integration with Fetch"}],"url":"#abstract-opdef-remove-client-hints-from-redirect-if-needed"},
+"accept-ch": {"dfnID":"accept-ch","dfnText":"accept-ch","external":false,"refSections":[{"refs":[{"id":"ref-for-accept-ch"}],"title":"3.4. Accept-CH state (http-equiv=\"accept-ch\")"}],"url":"#accept-ch"},
+"accept-ch-cache": {"dfnID":"accept-ch-cache","dfnText":"Accept-CH cache","external":false,"refSections":[{"refs":[{"id":"ref-for-accept-ch-cache"},{"id":"ref-for-accept-ch-cache\u2460"},{"id":"ref-for-accept-ch-cache\u2461"}],"title":"3.2. Accept-CH cache"},{"refs":[{"id":"ref-for-accept-ch-cache\u2462"}],"title":"3.4. Accept-CH state (http-equiv=\"accept-ch\")"}],"url":"#accept-ch-cache"},
+"accept-ch-cache-client-hints-set": {"dfnID":"accept-ch-cache-client-hints-set","dfnText":"client hints set","external":false,"refSections":[{"refs":[{"id":"ref-for-accept-ch-cache-client-hints-set"}],"title":"3.2. Accept-CH cache"}],"url":"#accept-ch-cache-client-hints-set"},
+"accept-ch-cache-origin": {"dfnID":"accept-ch-cache-origin","dfnText":"origin","external":false,"refSections":[{"refs":[{"id":"ref-for-accept-ch-cache-origin"},{"id":"ref-for-accept-ch-cache-origin\u2460"}],"title":"3.2. Accept-CH cache"}],"url":"#accept-ch-cache-origin"},
+"accept-ch-state": {"dfnID":"accept-ch-state","dfnText":"Accept-CH state","external":false,"refSections":[{"refs":[{"id":"ref-for-accept-ch-state"}],"title":"4.4. Pragma directives"}],"url":"#accept-ch-state"},
+"add-a-new-accept-ch-cache-entry": {"dfnID":"add-a-new-accept-ch-cache-entry","dfnText":"add a new Accept-CH cache entry","external":false,"refSections":[{"refs":[{"id":"ref-for-add-a-new-accept-ch-cache-entry"}],"title":"3.3. Initialize Client Hints set"}],"url":"#add-a-new-accept-ch-cache-entry"},
+"ae2a6342": {"dfnID":"ae2a6342","dfnText":"top-level browsing context","external":true,"refSections":[{"refs":[{"id":"ref-for-top-level-browsing-context"}],"title":"3.3. Initialize Client Hints set"},{"refs":[{"id":"ref-for-top-level-browsing-context\u2460"}],"title":"3.4. Accept-CH state (http-equiv=\"accept-ch\")"}],"url":"https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context"},
+"c9e7c11a": {"dfnID":"c9e7c11a","dfnText":"header","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-header"}],"title":"5. Request processing"}],"url":"https://fetch.spec.whatwg.org/#concept-header"},
+"cc890cc1": {"dfnID":"cc890cc1","dfnText":"policy-controlled feature","external":true,"refSections":[{"refs":[{"id":"ref-for-policy-controlled-feature"}],"title":"7.2. Policy-controlled features"}],"url":"https://w3c.github.io/webappsec-permissions-policy/#policy-controlled-feature"},
+"client-hints-set": {"dfnID":"client-hints-set","dfnText":"client hints set","external":false,"refSections":[{"refs":[{"id":"ref-for-client-hints-set"},{"id":"ref-for-client-hints-set\u2460"}],"title":"3.2. Accept-CH cache"},{"refs":[{"id":"ref-for-client-hints-set\u2461"}],"title":"4.5. Extending environment settings object"}],"url":"#client-hints-set"},
+"client-hints-token": {"dfnID":"client-hints-token","dfnText":"client hints token","external":false,"refSections":[{"refs":[{"id":"ref-for-client-hints-token"}],"title":"3.1. Client hints set"},{"refs":[{"id":"ref-for-client-hints-token\u2460"}],"title":"3.3. Initialize Client Hints set"},{"refs":[{"id":"ref-for-client-hints-token\u2461"},{"id":"ref-for-client-hints-token\u2462"}],"title":"3.4. Accept-CH state (http-equiv=\"accept-ch\")"},{"refs":[{"id":"ref-for-client-hints-token\u2463"}],"title":"5. Request processing"}],"url":"#client-hints-token"},
+"d14a6f26": {"dfnID":"d14a6f26","dfnText":"key","external":true,"refSections":[{"refs":[{"id":"ref-for-map-key"}],"title":"3.2. Accept-CH cache"}],"url":"https://infra.spec.whatwg.org/#map-key"},
+"d5434eef": {"dfnID":"d5434eef","dfnText":"contains","external":true,"refSections":[{"refs":[{"id":"ref-for-header-list-contains"},{"id":"ref-for-header-list-contains\u2460"},{"id":"ref-for-header-list-contains\u2461"}],"title":"5. Request processing"}],"url":"https://fetch.spec.whatwg.org/#header-list-contains"},
+"environment-settings-object-client-hints-set": {"dfnID":"environment-settings-object-client-hints-set","dfnText":"client hints set","external":false,"refSections":[{"refs":[{"id":"ref-for-environment-settings-object-client-hints-set"},{"id":"ref-for-environment-settings-object-client-hints-set\u2460"},{"id":"ref-for-environment-settings-object-client-hints-set\u2461"}],"title":"3.3. Initialize Client Hints set"},{"refs":[{"id":"ref-for-environment-settings-object-client-hints-set\u2462"},{"id":"ref-for-environment-settings-object-client-hints-set\u2463"}],"title":"3.4. Accept-CH state (http-equiv=\"accept-ch\")"},{"refs":[{"id":"ref-for-environment-settings-object-client-hints-set\u2464"},{"id":"ref-for-environment-settings-object-client-hints-set\u2465"}],"title":"4.2. Worker initialization"},{"refs":[{"id":"ref-for-environment-settings-object-client-hints-set\u2466"},{"id":"ref-for-environment-settings-object-client-hints-set\u2467"}],"title":"5. Request processing"}],"url":"#environment-settings-object-client-hints-set"},
+"field-name": {"dfnID":"field-name","dfnText":"field-name","external":false,"refSections":[{"refs":[{"id":"ref-for-field-name"}],"title":"3.3. Initialize Client Hints set"},{"refs":[{"id":"ref-for-field-name\u2460"}],"title":"3.4. Accept-CH state (http-equiv=\"accept-ch\")"}],"url":"#field-name"},
+"find-client-hint-value": {"dfnID":"find-client-hint-value","dfnText":"find client hint value","external":false,"refSections":[{"refs":[{"id":"ref-for-find-client-hint-value"}],"title":"5. Request processing"}],"url":"#find-client-hint-value"},
+"low-entropy-hint-table": {"dfnID":"low-entropy-hint-table","dfnText":"low entropy hint table","external":false,"refSections":[{"refs":[{"id":"ref-for-low-entropy-hint-table"}],"title":"5. Request processing"}],"url":"#low-entropy-hint-table"},
+"retrieve-the-client-hints-set": {"dfnID":"retrieve-the-client-hints-set","dfnText":"retrieve the client hints set","external":false,"refSections":[{"refs":[{"id":"ref-for-retrieve-the-client-hints-set"}],"title":"3.3. Initialize Client Hints set"}],"url":"#retrieve-the-client-hints-set"},
+};
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+});
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        dfn.panelData = panelData;
+        insertDfnPopupAction(dfn);
+    }
+}
+
+function genDfnPanel(dfn, { dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel on",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel({dfnPanel});
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.dfn = dfn;
+    dfn.dfnPanel = dfnPanel;
+    return dfnPanel;
+}
+
+
+
+function hideAllDfnPanels() {
+    // Delete the currently-active dfn panel.
+    queryAll(".dfn-panel").forEach(dfnPanel=>hideDfnPanel({dfnPanel}));
+}
+
+function showDfnPanel(dfn) {
+    hideAllDfnPanels(); // Only display one at a time.
+
+    dfn.setAttribute("aria-expanded", "true");
+
+    const dfnPanel = genDfnPanel(dfn, dfn.panelData);
+
+    // Give the dfn a unique tabindex, and then
+    // give all the tabbable panel bits successive indexes.
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+
+    append(document.body, dfnPanel);
+    positionDfnPanel(dfnPanel);
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.dfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }
+}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel({dfn, dfnPanel}) {
+    if(!dfnPanel) dfnPanel = dfn.dfnPanel;
+    if(!dfn) dfn = dfnPanel.dfn;
+    dfn.dfnPanel = undefined;
+    dfnPanel.dfn = undefined;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.remove()
+}
+
+function toggleDfnPanel(dfn) {
+    if(dfn.dfnPanel) {
+        hideDfnPanel(dfn);
+    } else {
+        showDfnPanel(dfn);
+    }
+}
+
+function insertDfnPopupAction(dfn) {
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        toggleDfnPanel(dfn);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+function needsFor(type) {
+    switch(type) {
+        case "descriptor":
+        case "value":
+        case "element-attr":
+        case "attr-value":
+        case "element-state":
+        case "method":
+        case "constructor":
+        case "argument":
+        case "attribute":
+        case "const":
+        case "dict-member":
+        case "event":
+        case "enum-value":
+        case "stringifier":
+        case "serializer":
+        case "iterator":
+        case "maplike":
+        case "setlike":
+        case "state":
+        case "mode":
+        case "context":
+        case "facet": return true;
+
+        default: return false;
+    }
+}
+function refusesFor(type) {
+    switch(type) {
+        case "property":
+        case "element":
+        case "interface":
+        case "namespace":
+        case "callback":
+        case "dictionary":
+        case "enum":
+        case "exception":
+        case "typedef":
+        case "http-header":
+        case "permission": return true;
+
+        default: return false;
+    }
+}
+function linkFormatterFromType(type) {
+    switch(type) {
+        case 'scheme':
+        case 'permission':
+        case 'dfn': return (text) => `[=${text}=]`;
+
+        case 'abstract-op': return (text) => `[\$${text}\$]`;
+
+        case 'function':
+        case 'at-rule':
+        case 'selector':
+        case 'value': return (text) => `''${text}''`;
+
+        case 'http-header': return (text) => `[:${text}:]`;
+
+        case 'interface':
+        case 'constructor':
+        case 'method':
+        case 'argument':
+        case 'attribute':
+        case 'callback':
+        case 'dictionary':
+        case 'dict-member':
+        case 'enum':
+        case 'enum-value':
+        case 'exception':
+        case 'const':
+        case 'typedef':
+        case 'stringifier':
+        case 'serializer':
+        case 'iterator':
+        case 'maplike':
+        case 'setlike':
+        case 'extended-attribute':
+        case 'event':
+        case 'idl': return (text) => `{{${text}}}`;
+
+        case 'element-state':
+        case 'element-attr':
+        case 'attr-value':
+        case 'element': return (element) => `<{${element}}>`;
+
+        case 'grammar': return (text) => `${text} (within a <pre class=prod>)`;
+
+        case 'type': return (text)=> `<<${text}>>`;
+
+        case 'descriptor':
+        case 'property': return (text) => `'${text}'`;
+
+        default: return;
+    };
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!needsFor(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!refusesFor(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
 }
 </script>
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
-                mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
+let refsData = {
+"#abstract-opdef-append-client-hints-to-request": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"clienthintsinfra","spec":"clienthintsinfra-1","status":"local","text":"append client hints to request","type":"abstract-op","url":"#abstract-opdef-append-client-hints-to-request"},
+"#abstract-opdef-initialize-the-client-hints-set": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"clienthintsinfra","spec":"clienthintsinfra-1","status":"local","text":"initialize the Client Hints set","type":"abstract-op","url":"#abstract-opdef-initialize-the-client-hints-set"},
+"#abstract-opdef-remove-client-hints-from-redirect-if-needed": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"clienthintsinfra","spec":"clienthintsinfra-1","status":"local","text":"remove client hints from redirect if needed","type":"abstract-op","url":"#abstract-opdef-remove-client-hints-from-redirect-if-needed"},
+"#accept-ch": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"clienthintsinfra","spec":"clienthintsinfra-1","status":"local","text":"accept-ch","type":"dfn","url":"#accept-ch"},
+"#accept-ch-cache": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"clienthintsinfra","spec":"clienthintsinfra-1","status":"local","text":"accept-ch cache","type":"dfn","url":"#accept-ch-cache"},
+"#accept-ch-cache-client-hints-set": {"export":true,"for_":["accept-ch-cache"],"level":"1","normative":true,"shortname":"clienthintsinfra","spec":"clienthintsinfra-1","status":"local","text":"client hints set","type":"dfn","url":"#accept-ch-cache-client-hints-set"},
+"#accept-ch-cache-origin": {"export":true,"for_":["accept-ch-cache"],"level":"1","normative":true,"shortname":"clienthintsinfra","spec":"clienthintsinfra-1","status":"local","text":"origin","type":"dfn","url":"#accept-ch-cache-origin"},
+"#accept-ch-state": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"clienthintsinfra","spec":"clienthintsinfra-1","status":"local","text":"accept-ch state","type":"dfn","url":"#accept-ch-state"},
+"#add-a-new-accept-ch-cache-entry": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"clienthintsinfra","spec":"clienthintsinfra-1","status":"local","text":"add a new accept-ch cache entry","type":"dfn","url":"#add-a-new-accept-ch-cache-entry"},
+"#client-hints-set": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"clienthintsinfra","spec":"clienthintsinfra-1","status":"local","text":"client hints set","type":"dfn","url":"#client-hints-set"},
+"#client-hints-token": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"clienthintsinfra","spec":"clienthintsinfra-1","status":"local","text":"client hints token","type":"dfn","url":"#client-hints-token"},
+"#environment-settings-object-client-hints-set": {"export":true,"for_":["environment settings object"],"level":"1","normative":true,"shortname":"clienthintsinfra","spec":"clienthintsinfra-1","status":"local","text":"client hints set","type":"dfn","url":"#environment-settings-object-client-hints-set"},
+"#field-name": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"clienthintsinfra","spec":"clienthintsinfra-1","status":"local","text":"field-name","type":"dfn","url":"#field-name"},
+"#find-client-hint-value": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"clienthintsinfra","spec":"clienthintsinfra-1","status":"local","text":"find client hint value","type":"dfn","url":"#find-client-hint-value"},
+"#low-entropy-hint-table": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"clienthintsinfra","spec":"clienthintsinfra-1","status":"local","text":"low entropy hint table","type":"dfn","url":"#low-entropy-hint-table"},
+"#retrieve-the-client-hints-set": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"clienthintsinfra","spec":"clienthintsinfra-1","status":"local","text":"retrieve the client hints set","type":"dfn","url":"#retrieve-the-client-hints-set"},
+"https://fetch.spec.whatwg.org/#concept-fetch": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"fetch","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-fetch"},
+"https://fetch.spec.whatwg.org/#concept-header": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"header","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-header"},
+"https://fetch.spec.whatwg.org/#concept-header-list-append": {"export":true,"for_":["header list"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"append","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-header-list-append"},
+"https://fetch.spec.whatwg.org/#concept-header-name": {"export":true,"for_":["header"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"name","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-header-name"},
+"https://fetch.spec.whatwg.org/#concept-header-value": {"export":true,"for_":["header"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"value","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-header-value"},
+"https://fetch.spec.whatwg.org/#concept-http-redirect-fetch": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"http-redirect fetch","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-http-redirect-fetch"},
+"https://fetch.spec.whatwg.org/#concept-request-client": {"export":true,"for_":["request"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"client","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-request-client"},
+"https://fetch.spec.whatwg.org/#concept-request-header-list": {"export":true,"for_":["request"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"header list","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-request-header-list"},
+"https://fetch.spec.whatwg.org/#concept-request-request": {"export":true,"for_":["Request"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"request","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-request-request"},
+"https://fetch.spec.whatwg.org/#header-list-contains": {"export":true,"for_":["header list"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"does not contain","type":"dfn","url":"https://fetch.spec.whatwg.org/#header-list-contains"},
+"https://fetch.spec.whatwg.org/#subresource-request": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"subresource request","type":"dfn","url":"https://fetch.spec.whatwg.org/#subresource-request"},
+"https://html.spec.whatwg.org/multipage/browsers.html#concept-origin": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"origin","type":"dfn","url":"https://html.spec.whatwg.org/multipage/browsers.html#concept-origin"},
+"https://html.spec.whatwg.org/multipage/browsers.html#same-origin": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"same origin","type":"dfn","url":"https://html.spec.whatwg.org/multipage/browsers.html#same-origin"},
+"https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"top-level browsing context","type":"dfn","url":"https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context"},
+"https://html.spec.whatwg.org/multipage/nav-history-apis.html#window-bc": {"export":true,"for_":["Window"],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"browsing context","type":"dfn","url":"https://html.spec.whatwg.org/multipage/nav-history-apis.html#window-bc"},
+"https://html.spec.whatwg.org/multipage/semantics.html#attr-meta-content": {"export":true,"for_":["meta"],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"content","type":"element-attr","url":"https://html.spec.whatwg.org/multipage/semantics.html#attr-meta-content"},
+"https://html.spec.whatwg.org/multipage/semantics.html#meta": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"meta","type":"element","url":"https://html.spec.whatwg.org/multipage/semantics.html#meta"},
+"https://html.spec.whatwg.org/multipage/semantics.html#the-head-element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"head","type":"element","url":"https://html.spec.whatwg.org/multipage/semantics.html#the-head-element"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-global": {"export":true,"for_":["environment settings object"],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"global object","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-global"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-origin": {"export":true,"for_":["environment settings object"],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"origin","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-origin"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"environment settings object","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"relevant settings object","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object"},
+"https://infra.spec.whatwg.org/#byte-lowercase": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"byte-lowercase","type":"dfn","url":"https://infra.spec.whatwg.org/#byte-lowercase"},
+"https://infra.spec.whatwg.org/#list-clone": {"export":true,"for_":["list","stack","queue","set"],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"clone","type":"dfn","url":"https://infra.spec.whatwg.org/#list-clone"},
+"https://infra.spec.whatwg.org/#list-iterate": {"export":true,"for_":["list","set"],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"for each","type":"dfn","url":"https://infra.spec.whatwg.org/#list-iterate"},
+"https://infra.spec.whatwg.org/#map-key": {"export":true,"for_":["map"],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"key","type":"dfn","url":"https://infra.spec.whatwg.org/#map-key"},
+"https://infra.spec.whatwg.org/#map-set": {"export":true,"for_":["map"],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"set","type":"dfn","url":"https://infra.spec.whatwg.org/#map-set"},
+"https://infra.spec.whatwg.org/#ordered-map": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"ordered map","type":"dfn","url":"https://infra.spec.whatwg.org/#ordered-map"},
+"https://infra.spec.whatwg.org/#ordered-set": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"set","type":"dfn","url":"https://infra.spec.whatwg.org/#ordered-set"},
+"https://infra.spec.whatwg.org/#set-append": {"export":true,"for_":["set"],"level":"1","normative":true,"shortname":"infra","spec":"infra","status":"current","text":"append","type":"dfn","url":"https://infra.spec.whatwg.org/#set-append"},
+"https://w3c.github.io/webappsec-permissions-policy/#policy-controlled-feature": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"current","text":"policy-controlled feature","type":"dfn","url":"https://w3c.github.io/webappsec-permissions-policy/#policy-controlled-feature"},
+"https://w3c.github.io/webappsec-permissions-policy/#policy-controlled-feature-default-allowlist": {"export":true,"for_":["policy-controlled feature"],"level":"1","normative":true,"shortname":"permissions-policy","spec":"permissions-policy-1","status":"current","text":"default allowlist","type":"dfn","url":"https://w3c.github.io/webappsec-permissions-policy/#policy-controlled-feature-default-allowlist"},
+};
+
+function mkRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "Term: "),
+                mk.span({}, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    let forListElements;
+    if(forList.length == 0) {
+        forListElements = [];
+    } else if(forList.length == 1) {
+        forListElements = mk.li({},
+            mk.b({}, "For: "),
+            mk.span({}, forList[0]),
+        );
+    } else {
+        forListElements = mk.li({},
             mk.b({}, "For: "),
             mk.ul({},
                 ...forList.map(forItem =>
                     mk.li({},
-                        mk.span({}, `${forItem}`)
+                        mk.span({}, forItem)
                     ),
                 ),
             ),
         );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+    }
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    setupRefHintEventListeners(link, hintPanel);
+    return hintPanel;
+}
+
+function hideAllRefHints() {
+    queryAll(".ref-hint").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    if(refHint.teardownEventListeners) {
+        refHint.teardownEventListeners();
     }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+    refHint.remove();
+}
+
+function showRefHint(link) {
+    if(link.classList.contains("dfn-link")) return;
+    const url = link.getAttribute("href");
+    const ref = refsData[url];
+    if(!ref) return;
+
+    hideAllRefHints(); // Only display one at this time.
+
+    const refHint = mkRefHint(link, ref);
+    append(document.body, refHint);
+    link.setAttribute("aria-expanded", "true");
+    positionRefHint(refHint);
+}
+
+function setupRefHintEventListeners(link, refHint) {
+    if (refHint.teardownEventListeners) return;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
+
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
-
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
-    }
-
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
-        }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
-
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
-    }
-
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+document.addEventListener("DOMContentLoaded", () => {
+    document.body.addEventListener("mouseover", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
+    });
+    document.body.addEventListener("focus", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
     });
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['https://infra.spec.whatwg.org/#ordered-set'] = {"text": "set", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ordered-set", "export": true, "normative": true, "for_": []};
-window.refsData['#client-hints-token'] = {"text": "client hints token", "type": "dfn", "spec": "clienthintsinfra-1", "shortname": "clienthintsinfra", "level": "1", "status": "local", "url": "#client-hints-token", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#ordered-map'] = {"text": "ordered map", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ordered-map", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#map-key'] = {"text": "key", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-key", "export": true, "normative": true, "for_": ["map"]};
-window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#concept-origin'] = {"text": "origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-origin", "export": true, "normative": true, "for_": []};
-window.refsData['#client-hints-set'] = {"text": "client hints set", "type": "dfn", "spec": "clienthintsinfra-1", "shortname": "clienthintsinfra", "level": "1", "status": "local", "url": "#client-hints-set", "export": true, "normative": true, "for_": []};
-window.refsData['#accept-ch-cache'] = {"text": "accept-ch cache", "type": "dfn", "spec": "clienthintsinfra-1", "shortname": "clienthintsinfra", "level": "1", "status": "local", "url": "#accept-ch-cache", "export": true, "normative": true, "for_": []};
-window.refsData['#accept-ch-cache-origin'] = {"text": "origin", "type": "dfn", "spec": "clienthintsinfra-1", "shortname": "clienthintsinfra", "level": "1", "status": "local", "url": "#accept-ch-cache-origin", "export": true, "normative": true, "for_": ["accept-ch-cache"]};
-window.refsData['https://infra.spec.whatwg.org/#map-set'] = {"text": "set", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-set", "export": true, "normative": true, "for_": ["map"]};
-window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#same-origin'] = {"text": "same origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#same-origin", "export": true, "normative": true, "for_": []};
-window.refsData['#accept-ch-cache-client-hints-set'] = {"text": "client hints set", "type": "dfn", "spec": "clienthintsinfra-1", "shortname": "clienthintsinfra", "level": "1", "status": "local", "url": "#accept-ch-cache-client-hints-set", "export": true, "normative": true, "for_": ["accept-ch-cache"]};
-window.refsData['https://infra.spec.whatwg.org/#set-append'] = {"text": "append", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#set-append", "export": true, "normative": true, "for_": ["set"]};
-window.refsData['#retrieve-the-client-hints-set'] = {"text": "retrieve the client hints set", "type": "dfn", "spec": "clienthintsinfra-1", "shortname": "clienthintsinfra", "level": "1", "status": "local", "url": "#retrieve-the-client-hints-set", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-origin'] = {"text": "origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-origin", "export": true, "normative": true, "for_": ["environment settings object"]};
-window.refsData['#environment-settings-object-client-hints-set'] = {"text": "client hints set", "type": "dfn", "spec": "clienthintsinfra-1", "shortname": "clienthintsinfra", "level": "1", "status": "local", "url": "#environment-settings-object-client-hints-set", "export": true, "normative": true, "for_": ["environment settings object"]};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-global'] = {"text": "global object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-global", "export": true, "normative": true, "for_": ["environment settings object"]};
-window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#window-bc'] = {"text": "browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window-bc", "export": true, "normative": true, "for_": ["Window"]};
-window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context'] = {"text": "top-level browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context", "export": true, "normative": true, "for_": []};
-window.refsData['#field-name'] = {"text": "field-name", "type": "dfn", "spec": "clienthintsinfra-1", "shortname": "clienthintsinfra", "level": "1", "status": "local", "url": "#field-name", "export": true, "normative": true, "for_": []};
-window.refsData['#add-a-new-accept-ch-cache-entry'] = {"text": "add a new accept-ch cache entry", "type": "dfn", "spec": "clienthintsinfra-1", "shortname": "clienthintsinfra", "level": "1", "status": "local", "url": "#add-a-new-accept-ch-cache-entry", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object'] = {"text": "environment settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/semantics.html#meta'] = {"text": "meta", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/semantics.html#meta", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/semantics.html#the-head-element'] = {"text": "head", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/semantics.html#the-head-element", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/semantics.html#attr-meta-content'] = {"text": "content", "type": "element-attr", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/semantics.html#attr-meta-content", "export": true, "normative": true, "for_": ["meta"]};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object'] = {"text": "relevant settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object", "export": true, "normative": true, "for_": []};
-window.refsData['#accept-ch'] = {"text": "accept-ch", "type": "dfn", "spec": "clienthintsinfra-1", "shortname": "clienthintsinfra", "level": "1", "status": "local", "url": "#accept-ch", "export": true, "normative": true, "for_": []};
-window.refsData['#abstract-opdef-initialize-the-client-hints-set'] = {"text": "initialize the Client Hints set", "type": "abstract-op", "spec": "clienthintsinfra-1", "shortname": "clienthintsinfra", "level": "1", "status": "local", "url": "#abstract-opdef-initialize-the-client-hints-set", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#list-clone'] = {"text": "clone", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-clone", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
-window.refsData['#accept-ch-state'] = {"text": "accept-ch state", "type": "dfn", "spec": "clienthintsinfra-1", "shortname": "clienthintsinfra", "level": "1", "status": "local", "url": "#accept-ch-state", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#concept-fetch'] = {"text": "fetch", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-fetch", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#concept-request-request'] = {"text": "request", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-request", "export": true, "normative": true, "for_": ["Request"]};
-window.refsData['https://fetch.spec.whatwg.org/#concept-request-client'] = {"text": "client", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-client", "export": true, "normative": true, "for_": ["request"]};
-window.refsData['https://fetch.spec.whatwg.org/#concept-header'] = {"text": "header", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-header", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#concept-header-name'] = {"text": "name", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-header-name", "export": true, "normative": true, "for_": ["header"]};
-window.refsData['#low-entropy-hint-table'] = {"text": "low entropy hint table", "type": "dfn", "spec": "clienthintsinfra-1", "shortname": "clienthintsinfra", "level": "1", "status": "local", "url": "#low-entropy-hint-table", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#concept-request-header-list'] = {"text": "header list", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-header-list", "export": true, "normative": true, "for_": ["request"]};
-window.refsData['https://fetch.spec.whatwg.org/#header-list-contains'] = {"text": "does not contain", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#header-list-contains", "export": true, "normative": true, "for_": ["header list"]};
-window.refsData['https://fetch.spec.whatwg.org/#concept-header-list-append'] = {"text": "append", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-header-list-append", "export": true, "normative": true, "for_": ["header list"]};
-window.refsData['https://infra.spec.whatwg.org/#list-iterate'] = {"text": "for each", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-iterate", "export": true, "normative": true, "for_": ["list", "set"]};
-window.refsData['#find-client-hint-value'] = {"text": "find client hint value", "type": "dfn", "spec": "clienthintsinfra-1", "shortname": "clienthintsinfra", "level": "1", "status": "local", "url": "#find-client-hint-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#subresource-request'] = {"text": "subresource request", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#subresource-request", "export": true, "normative": true, "for_": []};
-window.refsData['#abstract-opdef-append-client-hints-to-request'] = {"text": "append client hints to request", "type": "abstract-op", "spec": "clienthintsinfra-1", "shortname": "clienthintsinfra", "level": "1", "status": "local", "url": "#abstract-opdef-append-client-hints-to-request", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#concept-http-redirect-fetch'] = {"text": "http-redirect fetch", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-http-redirect-fetch", "export": true, "normative": true, "for_": []};
-window.refsData['#abstract-opdef-remove-client-hints-from-redirect-if-needed'] = {"text": "remove client hints from redirect if needed", "type": "abstract-op", "spec": "clienthintsinfra-1", "shortname": "clienthintsinfra", "level": "1", "status": "local", "url": "#abstract-opdef-remove-client-hints-from-redirect-if-needed", "export": true, "normative": true, "for_": []};
-window.refsData['https://infra.spec.whatwg.org/#byte-lowercase'] = {"text": "byte-lowercase", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#byte-lowercase", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/webappsec-permissions-policy/#policy-controlled-feature'] = {"text": "policy-controlled feature", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "current", "url": "https://w3c.github.io/webappsec-permissions-policy/#policy-controlled-feature", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/webappsec-permissions-policy/#policy-controlled-feature-default-allowlist'] = {"text": "default allowlist", "type": "dfn", "spec": "permissions-policy-1", "shortname": "permissions-policy", "level": "1", "status": "current", "url": "https://w3c.github.io/webappsec-permissions-policy/#policy-controlled-feature-default-allowlist", "export": true, "normative": true, "for_": ["policy-controlled feature"]};
-window.refsData['https://fetch.spec.whatwg.org/#concept-header-value'] = {"text": "value", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-header-value", "export": true, "normative": true, "for_": ["header"]};
 </script>

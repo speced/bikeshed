@@ -76,7 +76,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -482,7 +481,7 @@ a[href].issue-return {
 }
 
 .ref-hint {
-    display: none;
+    display: inline-block;
     position: absolute;
     z-index: 35;
     width: 20em;
@@ -498,16 +497,11 @@ a[href].issue-return {
     white-space: normal; /* in case it's moved into a pre */
 }
 
-.ref-hint.on {
-    display: inline-block;
-}
-
 .ref-hint * { margin: 0; padding: 0; text-indent: 0; }
 
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -578,14 +572,14 @@ D50 2deg illuminant, L in [0,100], a and b in [-128, 128]
 5 = lab(85,-10,-50)
 6 = lab(85,35,-15)
 */
-var { cursor: pointer; }
-var.selected0 { background-color: #F4D200; box-shadow: 0 0 0 2px #F4D200; }
-var.selected1 { background-color: #FF87A2; box-shadow: 0 0 0 2px #FF87A2; }
-var.selected2 { background-color: #96E885; box-shadow: 0 0 0 2px #96E885; }
-var.selected3 { background-color: #3EEED2; box-shadow: 0 0 0 2px #3EEED2; }
-var.selected4 { background-color: #EACFB6; box-shadow: 0 0 0 2px #EACFB6; }
-var.selected5 { background-color: #82DDFF; box-shadow: 0 0 0 2px #82DDFF; }
-var.selected6 { background-color: #FFBCF2; box-shadow: 0 0 0 2px #FFBCF2; }
+[data-algorithm] var { cursor: pointer; }
+var[data-var-color="0"] { background-color: #F4D200; box-shadow: 0 0 0 2px #F4D200; }
+var[data-var-color="1"] { background-color: #FF87A2; box-shadow: 0 0 0 2px #FF87A2; }
+var[data-var-color="2"] { background-color: #96E885; box-shadow: 0 0 0 2px #96E885; }
+var[data-var-color="3"] { background-color: #3EEED2; box-shadow: 0 0 0 2px #3EEED2; }
+var[data-var-color="4"] { background-color: #EACFB6; box-shadow: 0 0 0 2px #EACFB6; }
+var[data-var-color="5"] { background-color: #82DDFF; box-shadow: 0 0 0 2px #82DDFF; }
+var[data-var-color="6"] { background-color: #FFBCF2; box-shadow: 0 0 0 2px #FFBCF2; }
 </style>
  <body class="h-entry">
   <div class="head">
@@ -1788,453 +1782,8 @@ calling <a data-link-type="dfn" href="#determine-compatibility" id="ref-for-dete
     parameters? Perhaps parameters should be defined separately, with names,
     types, and ranges. <a class="issue-return" href="#issue-91264ad1" title="Jump to section">↵</a></div>
   </div>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['85394472'] = {"dfnID": "85394472", "url": "https://dom.spec.whatwg.org/#document", "dfnText": "Document", "refSections": [{"refs": [{"id": "ref-for-document"}], "title": "9.8. Get policy value for feature in document"}, {"refs": [{"id": "ref-for-document\u2460"}], "title": "9.9. Determine compatibility of value with policy for feature"}, {"refs": [{"id": "ref-for-document\u2461"}], "title": "9.10. Determine if value is compatible with policy for feature or report"}, {"refs": [{"id": "ref-for-document\u2462"}], "title": "9.11. Determine if value is compatible with policy for feature"}], "external": true};
-window.dfnpanelData['3f23ec71'] = {"dfnID": "3f23ec71", "url": "https://dom.spec.whatwg.org/#concept-document-content-type", "dfnText": "content type", "refSections": [{"refs": [{"id": "ref-for-concept-document-content-type"}], "title": "8.1. Integration with HTML"}], "external": true};
-window.dfnpanelData['a973e0fe'] = {"dfnID": "a973e0fe", "url": "https://dom.spec.whatwg.org/#concept-document", "dfnText": "document", "refSections": [{"refs": [{"id": "ref-for-concept-document"}, {"id": "ref-for-concept-document\u2460"}], "title": "4.2. Policies"}, {"refs": [{"id": "ref-for-concept-document\u2461"}, {"id": "ref-for-concept-document\u2462"}], "title": "8.1. Integration with HTML"}], "external": true};
-window.dfnpanelData['2d7f82f5'] = {"dfnID": "2d7f82f5", "url": "https://dom.spec.whatwg.org/#html-document", "dfnText": "html document", "refSections": [{"refs": [{"id": "ref-for-html-document"}], "title": "8.1. Integration with HTML"}], "external": true};
-window.dfnpanelData['fd11cdcd'] = {"dfnID": "fd11cdcd", "url": "https://dom.spec.whatwg.org/#concept-document-quirks", "dfnText": "quirks mode", "refSections": [{"refs": [{"id": "ref-for-concept-document-quirks"}], "title": "8.1. Integration with HTML"}], "external": true};
-window.dfnpanelData['c9e7c11a'] = {"dfnID": "c9e7c11a", "url": "https://fetch.spec.whatwg.org/#concept-header", "dfnText": "header", "refSections": [{"refs": [{"id": "ref-for-concept-header"}, {"id": "ref-for-concept-header\u2460"}], "title": "9.2. Process response policy"}], "external": true};
-window.dfnpanelData['0298c08c'] = {"dfnID": "0298c08c", "url": "https://fetch.spec.whatwg.org/#concept-headers-header-list", "dfnText": "header list (for Headers)", "refSections": [{"refs": [{"id": "ref-for-concept-headers-header-list"}], "title": "8.2. Integration with Fetch"}], "external": true};
-window.dfnpanelData['6ee0eab1'] = {"dfnID": "6ee0eab1", "url": "https://fetch.spec.whatwg.org/#concept-request-header-list", "dfnText": "header list (for request)", "refSections": [{"refs": [{"id": "ref-for-concept-request-header-list"}], "title": "8.2. Integration with Fetch"}], "external": true};
-window.dfnpanelData['f7b00a8b'] = {"dfnID": "f7b00a8b", "url": "https://fetch.spec.whatwg.org/#concept-response-header-list", "dfnText": "header list (for response)", "refSections": [{"refs": [{"id": "ref-for-concept-response-header-list"}, {"id": "ref-for-concept-response-header-list\u2460"}], "title": "9.2. Process response policy"}, {"refs": [{"id": "ref-for-concept-response-header-list\u2461"}], "title": "9.7. Should response to request be blocked due to document policy?"}], "external": true};
-window.dfnpanelData['162d2b51'] = {"dfnID": "162d2b51", "url": "https://fetch.spec.whatwg.org/#concept-request-request", "dfnText": "request", "refSections": [{"refs": [{"id": "ref-for-concept-request-request"}], "title": "8.2. Integration with Fetch"}, {"refs": [{"id": "ref-for-concept-request-request\u2460"}], "title": "9.7. Should response to request be blocked due to document policy?"}], "external": true};
-window.dfnpanelData['e3201629'] = {"dfnID": "e3201629", "url": "https://fetch.spec.whatwg.org/#concept-response-response", "dfnText": "response", "refSections": [{"refs": [{"id": "ref-for-concept-response-response"}], "title": "7.2.1. Document-Policy"}, {"refs": [{"id": "ref-for-concept-response-response\u2460"}], "title": "7.2.2. Document-Policy-Report-Only"}, {"refs": [{"id": "ref-for-concept-response-response\u2461"}], "title": "9.2. Process response policy"}, {"refs": [{"id": "ref-for-concept-response-response\u2462"}], "title": "9.6. Create a document Policy for a browsing context from response"}, {"refs": [{"id": "ref-for-concept-response-response\u2463"}], "title": "9.7. Should response to request be blocked due to document policy?"}], "external": true};
-window.dfnpanelData['27e10eaf'] = {"dfnID": "27e10eaf", "url": "https://html.spec.whatwg.org/multipage/browsers.html#active-sandboxing-flag-set", "dfnText": "active sandboxing flag set", "refSections": [{"refs": [{"id": "ref-for-active-sandboxing-flag-set"}], "title": "8.1. Integration with HTML"}], "external": true};
-window.dfnpanelData['0d0390b4'] = {"dfnID": "0d0390b4", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#browsing-context", "dfnText": "browsing context", "refSections": [{"refs": [{"id": "ref-for-browsing-context"}, {"id": "ref-for-browsing-context\u2460"}, {"id": "ref-for-browsing-context\u2461"}], "title": "4.2. Policies"}, {"refs": [{"id": "ref-for-browsing-context\u2462"}], "title": "9.5. Create a required policy for a browsing context"}, {"refs": [{"id": "ref-for-browsing-context\u2463"}], "title": "9.6. Create a document Policy for a browsing context from response"}], "external": true};
-window.dfnpanelData['aa0ee8c8'] = {"dfnID": "aa0ee8c8", "url": "https://html.spec.whatwg.org/multipage/browsers.html#creating-a-new-browsing-context", "dfnText": "creating a new browsing context", "refSections": [{"refs": [{"id": "ref-for-creating-a-new-browsing-context"}], "title": "8.1. Integration with HTML"}], "external": true};
-window.dfnpanelData['3e12e042'] = {"dfnID": "3e12e042", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object", "dfnText": "environment settings object", "refSections": [{"refs": [{"id": "ref-for-environment-settings-object"}], "title": "9.10. Determine if value is compatible with policy for feature or report"}], "external": true};
-window.dfnpanelData['87fcd40c'] = {"dfnID": "87fcd40c", "url": "https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element", "dfnText": "iframe", "refSections": [{"refs": [{"id": "ref-for-the-iframe-element"}], "title": "7.3. The policy attribute of the iframe element"}, {"refs": [{"id": "ref-for-the-iframe-element\u2460"}], "title": "8.1. Integration with HTML"}], "external": true};
-window.dfnpanelData['241984e3'] = {"dfnID": "241984e3", "url": "https://html.spec.whatwg.org/multipage/browsers.html#initialise-the-document-object", "dfnText": "initialise the document object", "refSections": [{"refs": [{"id": "ref-for-initialise-the-document-object"}], "title": "8.1. Integration with HTML"}], "external": true};
-window.dfnpanelData['78787bc5'] = {"dfnID": "78787bc5", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#opener-browsing-context", "dfnText": "opener browsing context", "refSections": [{"refs": [{"id": "ref-for-opener-browsing-context"}], "title": "4.2. Policies"}], "external": true};
-window.dfnpanelData['086e3aff'] = {"dfnID": "086e3aff", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-origin", "dfnText": "origin", "refSections": [{"refs": [{"id": "ref-for-concept-origin"}], "title": "8.1. Integration with HTML"}], "external": true};
-window.dfnpanelData['5c35dd47'] = {"dfnID": "5c35dd47", "url": "https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-sandbox", "dfnText": "sandbox", "refSections": [{"refs": [{"id": "ref-for-attr-iframe-sandbox"}], "title": "11. Privacy and Security"}], "external": true};
-window.dfnpanelData['9239678f'] = {"dfnID": "9239678f", "url": "https://w3c.github.io/reporting/#endpoint", "dfnText": "endpoint", "refSections": [{"refs": [{"id": "ref-for-endpoint"}], "title": "6.1.1. The \"report-to\" parameter"}, {"refs": [{"id": "ref-for-endpoint\u2460"}, {"id": "ref-for-endpoint\u2461"}], "title": "6.1.2. Setting the default reporting endpoint"}, {"refs": [{"id": "ref-for-endpoint\u2462"}], "title": "9.9. Determine compatibility of value with policy for feature"}], "external": true};
-window.dfnpanelData['configuration-point'] = {"dfnID": "configuration-point", "url": "#configuration-point", "dfnText": "configuration point", "refSections": [{"refs": [{"id": "ref-for-configuration-point"}, {"id": "ref-for-configuration-point\u2460"}, {"id": "ref-for-configuration-point\u2461"}, {"id": "ref-for-configuration-point\u2462"}], "title": "4.1. Configuration Points"}, {"refs": [{"id": "ref-for-configuration-point\u2463"}, {"id": "ref-for-configuration-point\u2464"}], "title": "4.2. Policies"}, {"refs": [{"id": "ref-for-configuration-point\u2465"}, {"id": "ref-for-configuration-point\u2466"}], "title": "7.1. Policies as Structured Headers"}, {"refs": [{"id": "ref-for-configuration-point\u2467"}, {"id": "ref-for-configuration-point\u2468"}, {"id": "ref-for-configuration-point\u2460\u24ea"}, {"id": "ref-for-configuration-point\u2460\u2460"}, {"id": "ref-for-configuration-point\u2460\u2461"}, {"id": "ref-for-configuration-point\u2460\u2462"}, {"id": "ref-for-configuration-point\u2460\u2463"}], "title": "7.1.1. Parameters"}], "external": false};
-window.dfnpanelData['configuration-point-name'] = {"dfnID": "configuration-point-name", "url": "#configuration-point-name", "dfnText": "name", "refSections": [{"refs": [{"id": "ref-for-configuration-point-name"}], "title": "7.1. Policies as Structured Headers"}, {"refs": [{"id": "ref-for-configuration-point-name\u2460"}], "title": "9.2. Process response policy"}], "external": false};
-window.dfnpanelData['configuration-point-type'] = {"dfnID": "configuration-point-type", "url": "#configuration-point-type", "dfnText": "type", "refSections": [{"refs": [{"id": "ref-for-configuration-point-type"}], "title": "4.1. Configuration Points"}], "external": false};
-window.dfnpanelData['configuration-point-range'] = {"dfnID": "configuration-point-range", "url": "#configuration-point-range", "dfnText": "range", "refSections": [{"refs": [{"id": "ref-for-configuration-point-range"}], "title": "4.1. Configuration Points"}, {"refs": [{"id": "ref-for-configuration-point-range\u2460"}], "title": "4.2. Policies"}, {"refs": [{"id": "ref-for-configuration-point-range\u2461"}], "title": "7.1. Policies as Structured Headers"}], "external": false};
-window.dfnpanelData['configuration-point-default-value'] = {"dfnID": "configuration-point-default-value", "url": "#configuration-point-default-value", "dfnText": "default value", "refSections": [{"refs": [{"id": "ref-for-configuration-point-default-value"}], "title": "4.1. Configuration Points"}, {"refs": [{"id": "ref-for-configuration-point-default-value\u2460"}], "title": "9.8. Get policy value for feature in document"}, {"refs": [{"id": "ref-for-configuration-point-default-value\u2461"}, {"id": "ref-for-configuration-point-default-value\u2462"}], "title": "9.9. Determine compatibility of value with policy for feature"}], "external": false};
-window.dfnpanelData['document-policy'] = {"dfnID": "document-policy", "url": "#document-policy", "dfnText": "document policy", "refSections": [{"refs": [{"id": "ref-for-document-policy"}, {"id": "ref-for-document-policy\u2460"}, {"id": "ref-for-document-policy\u2461"}, {"id": "ref-for-document-policy\u2462"}], "title": "4.2. Policies"}, {"refs": [{"id": "ref-for-document-policy\u2463"}], "title": "7.2.1. Document-Policy"}, {"refs": [{"id": "ref-for-document-policy\u2464"}], "title": "7.2.4. Sec-Required-Document-Policy"}, {"refs": [{"id": "ref-for-document-policy\u2465"}], "title": "8.1. Integration with HTML"}, {"refs": [{"id": "ref-for-document-policy\u2466"}], "title": "8.2. Integration with Fetch"}, {"refs": [{"id": "ref-for-document-policy\u2467"}], "title": "9.3. Parse document policy"}, {"refs": [{"id": "ref-for-document-policy\u2468"}], "title": "9.4. Serialize required policy"}, {"refs": [{"id": "ref-for-document-policy\u2460\u24ea"}], "title": "9.5. Create a required policy for a browsing context"}, {"refs": [{"id": "ref-for-document-policy\u2460\u2460"}], "title": "9.6. Create a document Policy for a browsing context from response"}, {"refs": [{"id": "ref-for-document-policy\u2460\u2461"}, {"id": "ref-for-document-policy\u2460\u2462"}], "title": "9.8. Get policy value for feature in document"}, {"refs": [{"id": "ref-for-document-policy\u2460\u2463"}, {"id": "ref-for-document-policy\u2460\u2464"}, {"id": "ref-for-document-policy\u2460\u2465"}], "title": "9.9. Determine compatibility of value with policy for feature"}, {"refs": [{"id": "ref-for-document-policy\u2460\u2466"}], "title": "9.10. Determine if value is compatible with policy for feature or report"}, {"refs": [{"id": "ref-for-document-policy\u2460\u2467"}], "title": "9.11. Determine if value is compatible with policy for feature"}], "external": false};
-window.dfnpanelData['policy-configuration'] = {"dfnID": "policy-configuration", "url": "#policy-configuration", "dfnText": "policy configuration", "refSections": [{"refs": [{"id": "ref-for-policy-configuration"}], "title": "4.2. Policies"}, {"refs": [{"id": "ref-for-policy-configuration\u2460"}, {"id": "ref-for-policy-configuration\u2461"}, {"id": "ref-for-policy-configuration\u2462"}, {"id": "ref-for-policy-configuration\u2463"}], "title": "9.3. Parse document policy"}], "external": false};
-window.dfnpanelData['policy-configuration-value'] = {"dfnID": "policy-configuration-value", "url": "#policy-configuration-value", "dfnText": "value", "refSections": [{"refs": [{"id": "ref-for-policy-configuration-value"}], "title": "9.2. Process response policy"}, {"refs": [{"id": "ref-for-policy-configuration-value\u2460"}, {"id": "ref-for-policy-configuration-value\u2461"}, {"id": "ref-for-policy-configuration-value\u2462"}, {"id": "ref-for-policy-configuration-value\u2463"}], "title": "9.3. Parse document policy"}, {"refs": [{"id": "ref-for-policy-configuration-value\u2464"}], "title": "9.8. Get policy value for feature in document"}], "external": false};
-window.dfnpanelData['policy-configuration-reporting-endpoint'] = {"dfnID": "policy-configuration-reporting-endpoint", "url": "#policy-configuration-reporting-endpoint", "dfnText": "reporting endpoint", "refSections": [{"refs": [{"id": "ref-for-policy-configuration-reporting-endpoint"}, {"id": "ref-for-policy-configuration-reporting-endpoint\u2460"}, {"id": "ref-for-policy-configuration-reporting-endpoint\u2461"}, {"id": "ref-for-policy-configuration-reporting-endpoint\u2462"}, {"id": "ref-for-policy-configuration-reporting-endpoint\u2463"}, {"id": "ref-for-policy-configuration-reporting-endpoint\u2464"}], "title": "9.3. Parse document policy"}], "external": false};
-window.dfnpanelData['required-document-policy'] = {"dfnID": "required-document-policy", "url": "#required-document-policy", "dfnText": "required document policy", "refSections": [{"refs": [{"id": "ref-for-required-document-policy"}], "title": "4.2. Policies"}, {"refs": [{"id": "ref-for-required-document-policy\u2460"}], "title": "7.2.3. Require-Document-Policy"}, {"refs": [{"id": "ref-for-required-document-policy\u2461"}, {"id": "ref-for-required-document-policy\u2462"}, {"id": "ref-for-required-document-policy\u2463"}, {"id": "ref-for-required-document-policy\u2464"}, {"id": "ref-for-required-document-policy\u2465"}], "title": "8.1. Integration with HTML"}, {"refs": [{"id": "ref-for-required-document-policy\u2466"}], "title": "9.1. Is policy compatible?"}], "external": false};
-window.dfnpanelData['nested-context-required-document-policy'] = {"dfnID": "nested-context-required-document-policy", "url": "#nested-context-required-document-policy", "dfnText": "nested context required document\n    policy", "refSections": [{"refs": [{"id": "ref-for-nested-context-required-document-policy"}], "title": "9.5. Create a required policy for a browsing context"}], "external": false};
-window.dfnpanelData['declared-document-policy'] = {"dfnID": "declared-document-policy", "url": "#declared-document-policy", "dfnText": "declared document policy", "refSections": [{"refs": [{"id": "ref-for-declared-document-policy"}], "title": "9.1. Is policy compatible?"}, {"refs": [{"id": "ref-for-declared-document-policy\u2460"}], "title": "9.2. Process response policy"}], "external": false};
-window.dfnpanelData['report-only-document-policy'] = {"dfnID": "report-only-document-policy", "url": "#report-only-document-policy", "dfnText": "report-only document policy", "refSections": [{"refs": [{"id": "ref-for-report-only-document-policy"}], "title": "7.2.2. Document-Policy-Report-Only"}, {"refs": [{"id": "ref-for-report-only-document-policy\u2460"}, {"id": "ref-for-report-only-document-policy\u2461"}], "title": "9.9. Determine compatibility of value with policy for feature"}], "external": false};
-window.dfnpanelData['serialized-document-policy'] = {"dfnID": "serialized-document-policy", "url": "#serialized-document-policy", "dfnText": "serialized", "refSections": [{"refs": [{"id": "ref-for-serialized-document-policy"}], "title": "7.1. Policies as Structured Headers"}, {"refs": [{"id": "ref-for-serialized-document-policy\u2460"}], "title": "8.1. Integration with HTML"}], "external": false};
-window.dfnpanelData['document-policy-directive'] = {"dfnID": "document-policy-directive", "url": "#document-policy-directive", "dfnText": "document policy directive", "refSections": [{"refs": [{"id": "ref-for-document-policy-directive"}], "title": "7.1. Policies as Structured Headers"}, {"refs": [{"id": "ref-for-document-policy-directive\u2460"}, {"id": "ref-for-document-policy-directive\u2461"}, {"id": "ref-for-document-policy-directive\u2462"}, {"id": "ref-for-document-policy-directive\u2463"}, {"id": "ref-for-document-policy-directive\u2464"}], "title": "7.1.1. Parameters"}], "external": false};
-window.dfnpanelData['directive-name'] = {"dfnID": "directive-name", "url": "#directive-name", "dfnText": "directive name", "refSections": [{"refs": [{"id": "ref-for-directive-name"}], "title": "7.1. Policies as Structured Headers"}, {"refs": [{"id": "ref-for-directive-name\u2460"}, {"id": "ref-for-directive-name\u2461"}, {"id": "ref-for-directive-name\u2462"}, {"id": "ref-for-directive-name\u2463"}], "title": "7.1.1. Parameters"}], "external": false};
-window.dfnpanelData['request-required-document-policy'] = {"dfnID": "request-required-document-policy", "url": "#request-required-document-policy", "dfnText": "required document\npolicy", "refSections": [{"refs": [{"id": "ref-for-request-required-document-policy"}, {"id": "ref-for-request-required-document-policy\u2460"}], "title": "8.2. Integration with Fetch"}, {"refs": [{"id": "ref-for-request-required-document-policy\u2461"}, {"id": "ref-for-request-required-document-policy\u2462"}], "title": "9.7. Should response to request be blocked due to document policy?"}], "external": false};
-window.dfnpanelData['is-policy-compatible'] = {"dfnID": "is-policy-compatible", "url": "#is-policy-compatible", "dfnText": "Is policy compatible", "refSections": [{"refs": [{"id": "ref-for-is-policy-compatible"}], "title": "9.6. Create a document Policy for a browsing context from response"}, {"refs": [{"id": "ref-for-is-policy-compatible"}], "title": "9.7. Should response to request be blocked due to document policy?"}], "external": false};
-window.dfnpanelData['process-response-policy'] = {"dfnID": "process-response-policy", "url": "#process-response-policy", "dfnText": "Process response policy", "refSections": [{"refs": [{"id": "ref-for-process-response-policy"}], "title": "9.6. Create a document Policy for a browsing context from response"}], "external": false};
-window.dfnpanelData['parse-document-policy'] = {"dfnID": "parse-document-policy", "url": "#parse-document-policy", "dfnText": "Parse document policy", "refSections": [{"refs": [{"id": "ref-for-parse-document-policy"}], "title": "9.2. Process response policy"}], "external": false};
-window.dfnpanelData['serialize-required-policy'] = {"dfnID": "serialize-required-policy", "url": "#serialize-required-policy", "dfnText": "Serialize required policy", "refSections": [{"refs": [{"id": "ref-for-serialize-required-policy"}], "title": "8.2. Integration with Fetch"}], "external": false};
-window.dfnpanelData['create-for-browsingcontext'] = {"dfnID": "create-for-browsingcontext", "url": "#create-for-browsingcontext", "dfnText": "Create a required policy for a browsing context", "refSections": [{"refs": [{"id": "ref-for-create-for-browsingcontext"}], "title": "8.1. Integration with HTML"}, {"refs": [{"id": "ref-for-create-for-browsingcontext\u2460"}], "title": "9.6. Create a document Policy for a browsing context from response"}], "external": false};
-window.dfnpanelData['create-document-policy'] = {"dfnID": "create-document-policy", "url": "#create-document-policy", "dfnText": "Create a document Policy for a browsing context from response", "refSections": [{"refs": [{"id": "ref-for-create-document-policy"}], "title": "8.1. Integration with HTML"}], "external": false};
-window.dfnpanelData['should-response-to-request-be-blocked-due-to-document-policy'] = {"dfnID": "should-response-to-request-be-blocked-due-to-document-policy", "url": "#should-response-to-request-be-blocked-due-to-document-policy", "dfnText": "Should response to request be blocked due to document policy", "refSections": [{"refs": [{"id": "ref-for-should-response-to-request-be-blocked-due-to-document-policy"}], "title": "8.2. Integration with Fetch"}], "external": false};
-window.dfnpanelData['determine-compatibility'] = {"dfnID": "determine-compatibility", "url": "#determine-compatibility", "dfnText": "Determine compatibility of value with policy for feature", "refSections": [{"refs": [{"id": "ref-for-determine-compatibility"}], "title": "9.10. Determine if value is compatible with policy for feature or report"}, {"refs": [{"id": "ref-for-determine-compatibility\u2460"}], "title": "9.11. Determine if value is compatible with policy for feature"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -2428,361 +1977,796 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"0298c08c": {"dfnID":"0298c08c","dfnText":"header list (for Headers)","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-headers-header-list"}],"title":"8.2. Integration with Fetch"}],"url":"https://fetch.spec.whatwg.org/#concept-headers-header-list"},
+"086e3aff": {"dfnID":"086e3aff","dfnText":"origin","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-origin"}],"title":"8.1. Integration with HTML"}],"url":"https://html.spec.whatwg.org/multipage/browsers.html#concept-origin"},
+"0d0390b4": {"dfnID":"0d0390b4","dfnText":"browsing context","external":true,"refSections":[{"refs":[{"id":"ref-for-browsing-context"},{"id":"ref-for-browsing-context\u2460"},{"id":"ref-for-browsing-context\u2461"}],"title":"4.2. Policies"},{"refs":[{"id":"ref-for-browsing-context\u2462"}],"title":"9.5. Create a required policy for a browsing context"},{"refs":[{"id":"ref-for-browsing-context\u2463"}],"title":"9.6. Create a document Policy for a browsing context from response"}],"url":"https://html.spec.whatwg.org/multipage/document-sequences.html#browsing-context"},
+"162d2b51": {"dfnID":"162d2b51","dfnText":"request","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-request-request"}],"title":"8.2. Integration with Fetch"},{"refs":[{"id":"ref-for-concept-request-request\u2460"}],"title":"9.7. Should response to request be blocked due to document policy?"}],"url":"https://fetch.spec.whatwg.org/#concept-request-request"},
+"241984e3": {"dfnID":"241984e3","dfnText":"initialise the document object","external":true,"refSections":[{"refs":[{"id":"ref-for-initialise-the-document-object"}],"title":"8.1. Integration with HTML"}],"url":"https://html.spec.whatwg.org/multipage/browsers.html#initialise-the-document-object"},
+"27e10eaf": {"dfnID":"27e10eaf","dfnText":"active sandboxing flag set","external":true,"refSections":[{"refs":[{"id":"ref-for-active-sandboxing-flag-set"}],"title":"8.1. Integration with HTML"}],"url":"https://html.spec.whatwg.org/multipage/browsers.html#active-sandboxing-flag-set"},
+"2d7f82f5": {"dfnID":"2d7f82f5","dfnText":"html document","external":true,"refSections":[{"refs":[{"id":"ref-for-html-document"}],"title":"8.1. Integration with HTML"}],"url":"https://dom.spec.whatwg.org/#html-document"},
+"3e12e042": {"dfnID":"3e12e042","dfnText":"environment settings object","external":true,"refSections":[{"refs":[{"id":"ref-for-environment-settings-object"}],"title":"9.10. Determine if value is compatible with policy for feature or report"}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object"},
+"3f23ec71": {"dfnID":"3f23ec71","dfnText":"content type","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-document-content-type"}],"title":"8.1. Integration with HTML"}],"url":"https://dom.spec.whatwg.org/#concept-document-content-type"},
+"5c35dd47": {"dfnID":"5c35dd47","dfnText":"sandbox","external":true,"refSections":[{"refs":[{"id":"ref-for-attr-iframe-sandbox"}],"title":"11. Privacy and Security"}],"url":"https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-sandbox"},
+"6ee0eab1": {"dfnID":"6ee0eab1","dfnText":"header list (for request)","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-request-header-list"}],"title":"8.2. Integration with Fetch"}],"url":"https://fetch.spec.whatwg.org/#concept-request-header-list"},
+"78787bc5": {"dfnID":"78787bc5","dfnText":"opener browsing context","external":true,"refSections":[{"refs":[{"id":"ref-for-opener-browsing-context"}],"title":"4.2. Policies"}],"url":"https://html.spec.whatwg.org/multipage/document-sequences.html#opener-browsing-context"},
+"85394472": {"dfnID":"85394472","dfnText":"Document","external":true,"refSections":[{"refs":[{"id":"ref-for-document"}],"title":"9.8. Get policy value for feature in document"},{"refs":[{"id":"ref-for-document\u2460"}],"title":"9.9. Determine compatibility of value with policy for feature"},{"refs":[{"id":"ref-for-document\u2461"}],"title":"9.10. Determine if value is compatible with policy for feature or report"},{"refs":[{"id":"ref-for-document\u2462"}],"title":"9.11. Determine if value is compatible with policy for feature"}],"url":"https://dom.spec.whatwg.org/#document"},
+"87fcd40c": {"dfnID":"87fcd40c","dfnText":"iframe","external":true,"refSections":[{"refs":[{"id":"ref-for-the-iframe-element"}],"title":"7.3. The policy attribute of the iframe element"},{"refs":[{"id":"ref-for-the-iframe-element\u2460"}],"title":"8.1. Integration with HTML"}],"url":"https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element"},
+"9239678f": {"dfnID":"9239678f","dfnText":"endpoint","external":true,"refSections":[{"refs":[{"id":"ref-for-endpoint"}],"title":"6.1.1. The \"report-to\" parameter"},{"refs":[{"id":"ref-for-endpoint\u2460"},{"id":"ref-for-endpoint\u2461"}],"title":"6.1.2. Setting the default reporting endpoint"},{"refs":[{"id":"ref-for-endpoint\u2462"}],"title":"9.9. Determine compatibility of value with policy for feature"}],"url":"https://w3c.github.io/reporting/#endpoint"},
+"a973e0fe": {"dfnID":"a973e0fe","dfnText":"document","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-document"},{"id":"ref-for-concept-document\u2460"}],"title":"4.2. Policies"},{"refs":[{"id":"ref-for-concept-document\u2461"},{"id":"ref-for-concept-document\u2462"}],"title":"8.1. Integration with HTML"}],"url":"https://dom.spec.whatwg.org/#concept-document"},
+"aa0ee8c8": {"dfnID":"aa0ee8c8","dfnText":"creating a new browsing context","external":true,"refSections":[{"refs":[{"id":"ref-for-creating-a-new-browsing-context"}],"title":"8.1. Integration with HTML"}],"url":"https://html.spec.whatwg.org/multipage/browsers.html#creating-a-new-browsing-context"},
+"c9e7c11a": {"dfnID":"c9e7c11a","dfnText":"header","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-header"},{"id":"ref-for-concept-header\u2460"}],"title":"9.2. Process response policy"}],"url":"https://fetch.spec.whatwg.org/#concept-header"},
+"configuration-point": {"dfnID":"configuration-point","dfnText":"configuration point","external":false,"refSections":[{"refs":[{"id":"ref-for-configuration-point"},{"id":"ref-for-configuration-point\u2460"},{"id":"ref-for-configuration-point\u2461"},{"id":"ref-for-configuration-point\u2462"}],"title":"4.1. Configuration Points"},{"refs":[{"id":"ref-for-configuration-point\u2463"},{"id":"ref-for-configuration-point\u2464"}],"title":"4.2. Policies"},{"refs":[{"id":"ref-for-configuration-point\u2465"},{"id":"ref-for-configuration-point\u2466"}],"title":"7.1. Policies as Structured Headers"},{"refs":[{"id":"ref-for-configuration-point\u2467"},{"id":"ref-for-configuration-point\u2468"},{"id":"ref-for-configuration-point\u2460\u24ea"},{"id":"ref-for-configuration-point\u2460\u2460"},{"id":"ref-for-configuration-point\u2460\u2461"},{"id":"ref-for-configuration-point\u2460\u2462"},{"id":"ref-for-configuration-point\u2460\u2463"}],"title":"7.1.1. Parameters"}],"url":"#configuration-point"},
+"configuration-point-default-value": {"dfnID":"configuration-point-default-value","dfnText":"default value","external":false,"refSections":[{"refs":[{"id":"ref-for-configuration-point-default-value"}],"title":"4.1. Configuration Points"},{"refs":[{"id":"ref-for-configuration-point-default-value\u2460"}],"title":"9.8. Get policy value for feature in document"},{"refs":[{"id":"ref-for-configuration-point-default-value\u2461"},{"id":"ref-for-configuration-point-default-value\u2462"}],"title":"9.9. Determine compatibility of value with policy for feature"}],"url":"#configuration-point-default-value"},
+"configuration-point-name": {"dfnID":"configuration-point-name","dfnText":"name","external":false,"refSections":[{"refs":[{"id":"ref-for-configuration-point-name"}],"title":"7.1. Policies as Structured Headers"},{"refs":[{"id":"ref-for-configuration-point-name\u2460"}],"title":"9.2. Process response policy"}],"url":"#configuration-point-name"},
+"configuration-point-range": {"dfnID":"configuration-point-range","dfnText":"range","external":false,"refSections":[{"refs":[{"id":"ref-for-configuration-point-range"}],"title":"4.1. Configuration Points"},{"refs":[{"id":"ref-for-configuration-point-range\u2460"}],"title":"4.2. Policies"},{"refs":[{"id":"ref-for-configuration-point-range\u2461"}],"title":"7.1. Policies as Structured Headers"}],"url":"#configuration-point-range"},
+"configuration-point-type": {"dfnID":"configuration-point-type","dfnText":"type","external":false,"refSections":[{"refs":[{"id":"ref-for-configuration-point-type"}],"title":"4.1. Configuration Points"}],"url":"#configuration-point-type"},
+"create-document-policy": {"dfnID":"create-document-policy","dfnText":"Create a document Policy for a browsing context from response","external":false,"refSections":[{"refs":[{"id":"ref-for-create-document-policy"}],"title":"8.1. Integration with HTML"}],"url":"#create-document-policy"},
+"create-for-browsingcontext": {"dfnID":"create-for-browsingcontext","dfnText":"Create a required policy for a browsing context","external":false,"refSections":[{"refs":[{"id":"ref-for-create-for-browsingcontext"}],"title":"8.1. Integration with HTML"},{"refs":[{"id":"ref-for-create-for-browsingcontext\u2460"}],"title":"9.6. Create a document Policy for a browsing context from response"}],"url":"#create-for-browsingcontext"},
+"declared-document-policy": {"dfnID":"declared-document-policy","dfnText":"declared document policy","external":false,"refSections":[{"refs":[{"id":"ref-for-declared-document-policy"}],"title":"9.1. Is policy compatible?"},{"refs":[{"id":"ref-for-declared-document-policy\u2460"}],"title":"9.2. Process response policy"}],"url":"#declared-document-policy"},
+"determine-compatibility": {"dfnID":"determine-compatibility","dfnText":"Determine compatibility of value with policy for feature","external":false,"refSections":[{"refs":[{"id":"ref-for-determine-compatibility"}],"title":"9.10. Determine if value is compatible with policy for feature or report"},{"refs":[{"id":"ref-for-determine-compatibility\u2460"}],"title":"9.11. Determine if value is compatible with policy for feature"}],"url":"#determine-compatibility"},
+"directive-name": {"dfnID":"directive-name","dfnText":"directive name","external":false,"refSections":[{"refs":[{"id":"ref-for-directive-name"}],"title":"7.1. Policies as Structured Headers"},{"refs":[{"id":"ref-for-directive-name\u2460"},{"id":"ref-for-directive-name\u2461"},{"id":"ref-for-directive-name\u2462"},{"id":"ref-for-directive-name\u2463"}],"title":"7.1.1. Parameters"}],"url":"#directive-name"},
+"document-policy": {"dfnID":"document-policy","dfnText":"document policy","external":false,"refSections":[{"refs":[{"id":"ref-for-document-policy"},{"id":"ref-for-document-policy\u2460"},{"id":"ref-for-document-policy\u2461"},{"id":"ref-for-document-policy\u2462"}],"title":"4.2. Policies"},{"refs":[{"id":"ref-for-document-policy\u2463"}],"title":"7.2.1. Document-Policy"},{"refs":[{"id":"ref-for-document-policy\u2464"}],"title":"7.2.4. Sec-Required-Document-Policy"},{"refs":[{"id":"ref-for-document-policy\u2465"}],"title":"8.1. Integration with HTML"},{"refs":[{"id":"ref-for-document-policy\u2466"}],"title":"8.2. Integration with Fetch"},{"refs":[{"id":"ref-for-document-policy\u2467"}],"title":"9.3. Parse document policy"},{"refs":[{"id":"ref-for-document-policy\u2468"}],"title":"9.4. Serialize required policy"},{"refs":[{"id":"ref-for-document-policy\u2460\u24ea"}],"title":"9.5. Create a required policy for a browsing context"},{"refs":[{"id":"ref-for-document-policy\u2460\u2460"}],"title":"9.6. Create a document Policy for a browsing context from response"},{"refs":[{"id":"ref-for-document-policy\u2460\u2461"},{"id":"ref-for-document-policy\u2460\u2462"}],"title":"9.8. Get policy value for feature in document"},{"refs":[{"id":"ref-for-document-policy\u2460\u2463"},{"id":"ref-for-document-policy\u2460\u2464"},{"id":"ref-for-document-policy\u2460\u2465"}],"title":"9.9. Determine compatibility of value with policy for feature"},{"refs":[{"id":"ref-for-document-policy\u2460\u2466"}],"title":"9.10. Determine if value is compatible with policy for feature or report"},{"refs":[{"id":"ref-for-document-policy\u2460\u2467"}],"title":"9.11. Determine if value is compatible with policy for feature"}],"url":"#document-policy"},
+"document-policy-directive": {"dfnID":"document-policy-directive","dfnText":"document policy directive","external":false,"refSections":[{"refs":[{"id":"ref-for-document-policy-directive"}],"title":"7.1. Policies as Structured Headers"},{"refs":[{"id":"ref-for-document-policy-directive\u2460"},{"id":"ref-for-document-policy-directive\u2461"},{"id":"ref-for-document-policy-directive\u2462"},{"id":"ref-for-document-policy-directive\u2463"},{"id":"ref-for-document-policy-directive\u2464"}],"title":"7.1.1. Parameters"}],"url":"#document-policy-directive"},
+"e3201629": {"dfnID":"e3201629","dfnText":"response","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-response-response"}],"title":"7.2.1. Document-Policy"},{"refs":[{"id":"ref-for-concept-response-response\u2460"}],"title":"7.2.2. Document-Policy-Report-Only"},{"refs":[{"id":"ref-for-concept-response-response\u2461"}],"title":"9.2. Process response policy"},{"refs":[{"id":"ref-for-concept-response-response\u2462"}],"title":"9.6. Create a document Policy for a browsing context from response"},{"refs":[{"id":"ref-for-concept-response-response\u2463"}],"title":"9.7. Should response to request be blocked due to document policy?"}],"url":"https://fetch.spec.whatwg.org/#concept-response-response"},
+"f7b00a8b": {"dfnID":"f7b00a8b","dfnText":"header list (for response)","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-response-header-list"},{"id":"ref-for-concept-response-header-list\u2460"}],"title":"9.2. Process response policy"},{"refs":[{"id":"ref-for-concept-response-header-list\u2461"}],"title":"9.7. Should response to request be blocked due to document policy?"}],"url":"https://fetch.spec.whatwg.org/#concept-response-header-list"},
+"fd11cdcd": {"dfnID":"fd11cdcd","dfnText":"quirks mode","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-document-quirks"}],"title":"8.1. Integration with HTML"}],"url":"https://dom.spec.whatwg.org/#concept-document-quirks"},
+"is-policy-compatible": {"dfnID":"is-policy-compatible","dfnText":"Is policy compatible","external":false,"refSections":[{"refs":[{"id":"ref-for-is-policy-compatible"}],"title":"9.6. Create a document Policy for a browsing context from response"},{"refs":[{"id":"ref-for-is-policy-compatible"}],"title":"9.7. Should response to request be blocked due to document policy?"}],"url":"#is-policy-compatible"},
+"nested-context-required-document-policy": {"dfnID":"nested-context-required-document-policy","dfnText":"nested context required document\n    policy","external":false,"refSections":[{"refs":[{"id":"ref-for-nested-context-required-document-policy"}],"title":"9.5. Create a required policy for a browsing context"}],"url":"#nested-context-required-document-policy"},
+"parse-document-policy": {"dfnID":"parse-document-policy","dfnText":"Parse document policy","external":false,"refSections":[{"refs":[{"id":"ref-for-parse-document-policy"}],"title":"9.2. Process response policy"}],"url":"#parse-document-policy"},
+"policy-configuration": {"dfnID":"policy-configuration","dfnText":"policy configuration","external":false,"refSections":[{"refs":[{"id":"ref-for-policy-configuration"}],"title":"4.2. Policies"},{"refs":[{"id":"ref-for-policy-configuration\u2460"},{"id":"ref-for-policy-configuration\u2461"},{"id":"ref-for-policy-configuration\u2462"},{"id":"ref-for-policy-configuration\u2463"}],"title":"9.3. Parse document policy"}],"url":"#policy-configuration"},
+"policy-configuration-reporting-endpoint": {"dfnID":"policy-configuration-reporting-endpoint","dfnText":"reporting endpoint","external":false,"refSections":[{"refs":[{"id":"ref-for-policy-configuration-reporting-endpoint"},{"id":"ref-for-policy-configuration-reporting-endpoint\u2460"},{"id":"ref-for-policy-configuration-reporting-endpoint\u2461"},{"id":"ref-for-policy-configuration-reporting-endpoint\u2462"},{"id":"ref-for-policy-configuration-reporting-endpoint\u2463"},{"id":"ref-for-policy-configuration-reporting-endpoint\u2464"}],"title":"9.3. Parse document policy"}],"url":"#policy-configuration-reporting-endpoint"},
+"policy-configuration-value": {"dfnID":"policy-configuration-value","dfnText":"value","external":false,"refSections":[{"refs":[{"id":"ref-for-policy-configuration-value"}],"title":"9.2. Process response policy"},{"refs":[{"id":"ref-for-policy-configuration-value\u2460"},{"id":"ref-for-policy-configuration-value\u2461"},{"id":"ref-for-policy-configuration-value\u2462"},{"id":"ref-for-policy-configuration-value\u2463"}],"title":"9.3. Parse document policy"},{"refs":[{"id":"ref-for-policy-configuration-value\u2464"}],"title":"9.8. Get policy value for feature in document"}],"url":"#policy-configuration-value"},
+"process-response-policy": {"dfnID":"process-response-policy","dfnText":"Process response policy","external":false,"refSections":[{"refs":[{"id":"ref-for-process-response-policy"}],"title":"9.6. Create a document Policy for a browsing context from response"}],"url":"#process-response-policy"},
+"report-only-document-policy": {"dfnID":"report-only-document-policy","dfnText":"report-only document policy","external":false,"refSections":[{"refs":[{"id":"ref-for-report-only-document-policy"}],"title":"7.2.2. Document-Policy-Report-Only"},{"refs":[{"id":"ref-for-report-only-document-policy\u2460"},{"id":"ref-for-report-only-document-policy\u2461"}],"title":"9.9. Determine compatibility of value with policy for feature"}],"url":"#report-only-document-policy"},
+"request-required-document-policy": {"dfnID":"request-required-document-policy","dfnText":"required document\npolicy","external":false,"refSections":[{"refs":[{"id":"ref-for-request-required-document-policy"},{"id":"ref-for-request-required-document-policy\u2460"}],"title":"8.2. Integration with Fetch"},{"refs":[{"id":"ref-for-request-required-document-policy\u2461"},{"id":"ref-for-request-required-document-policy\u2462"}],"title":"9.7. Should response to request be blocked due to document policy?"}],"url":"#request-required-document-policy"},
+"required-document-policy": {"dfnID":"required-document-policy","dfnText":"required document policy","external":false,"refSections":[{"refs":[{"id":"ref-for-required-document-policy"}],"title":"4.2. Policies"},{"refs":[{"id":"ref-for-required-document-policy\u2460"}],"title":"7.2.3. Require-Document-Policy"},{"refs":[{"id":"ref-for-required-document-policy\u2461"},{"id":"ref-for-required-document-policy\u2462"},{"id":"ref-for-required-document-policy\u2463"},{"id":"ref-for-required-document-policy\u2464"},{"id":"ref-for-required-document-policy\u2465"}],"title":"8.1. Integration with HTML"},{"refs":[{"id":"ref-for-required-document-policy\u2466"}],"title":"9.1. Is policy compatible?"}],"url":"#required-document-policy"},
+"serialize-required-policy": {"dfnID":"serialize-required-policy","dfnText":"Serialize required policy","external":false,"refSections":[{"refs":[{"id":"ref-for-serialize-required-policy"}],"title":"8.2. Integration with Fetch"}],"url":"#serialize-required-policy"},
+"serialized-document-policy": {"dfnID":"serialized-document-policy","dfnText":"serialized","external":false,"refSections":[{"refs":[{"id":"ref-for-serialized-document-policy"}],"title":"7.1. Policies as Structured Headers"},{"refs":[{"id":"ref-for-serialized-document-policy\u2460"}],"title":"8.1. Integration with HTML"}],"url":"#serialized-document-policy"},
+"should-response-to-request-be-blocked-due-to-document-policy": {"dfnID":"should-response-to-request-be-blocked-due-to-document-policy","dfnText":"Should response to request be blocked due to document policy","external":false,"refSections":[{"refs":[{"id":"ref-for-should-response-to-request-be-blocked-due-to-document-policy"}],"title":"8.2. Integration with Fetch"}],"url":"#should-response-to-request-be-blocked-due-to-document-policy"},
+};
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+});
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        dfn.panelData = panelData;
+        insertDfnPopupAction(dfn);
+    }
+}
+
+function genDfnPanel(dfn, { dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel on",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel({dfnPanel});
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.dfn = dfn;
+    dfn.dfnPanel = dfnPanel;
+    return dfnPanel;
+}
+
+
+
+function hideAllDfnPanels() {
+    // Delete the currently-active dfn panel.
+    queryAll(".dfn-panel").forEach(dfnPanel=>hideDfnPanel({dfnPanel}));
+}
+
+function showDfnPanel(dfn) {
+    hideAllDfnPanels(); // Only display one at a time.
+
+    dfn.setAttribute("aria-expanded", "true");
+
+    const dfnPanel = genDfnPanel(dfn, dfn.panelData);
+
+    // Give the dfn a unique tabindex, and then
+    // give all the tabbable panel bits successive indexes.
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+
+    append(document.body, dfnPanel);
+    positionDfnPanel(dfnPanel);
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.dfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }
+}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel({dfn, dfnPanel}) {
+    if(!dfnPanel) dfnPanel = dfn.dfnPanel;
+    if(!dfn) dfn = dfnPanel.dfn;
+    dfn.dfnPanel = undefined;
+    dfnPanel.dfn = undefined;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.remove()
+}
+
+function toggleDfnPanel(dfn) {
+    if(dfn.dfnPanel) {
+        hideDfnPanel(dfn);
+    } else {
+        showDfnPanel(dfn);
+    }
+}
+
+function insertDfnPopupAction(dfn) {
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        toggleDfnPanel(dfn);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+function needsFor(type) {
+    switch(type) {
+        case "descriptor":
+        case "value":
+        case "element-attr":
+        case "attr-value":
+        case "element-state":
+        case "method":
+        case "constructor":
+        case "argument":
+        case "attribute":
+        case "const":
+        case "dict-member":
+        case "event":
+        case "enum-value":
+        case "stringifier":
+        case "serializer":
+        case "iterator":
+        case "maplike":
+        case "setlike":
+        case "state":
+        case "mode":
+        case "context":
+        case "facet": return true;
+
+        default: return false;
+    }
+}
+function refusesFor(type) {
+    switch(type) {
+        case "property":
+        case "element":
+        case "interface":
+        case "namespace":
+        case "callback":
+        case "dictionary":
+        case "enum":
+        case "exception":
+        case "typedef":
+        case "http-header":
+        case "permission": return true;
+
+        default: return false;
+    }
+}
+function linkFormatterFromType(type) {
+    switch(type) {
+        case 'scheme':
+        case 'permission':
+        case 'dfn': return (text) => `[=${text}=]`;
+
+        case 'abstract-op': return (text) => `[\$${text}\$]`;
+
+        case 'function':
+        case 'at-rule':
+        case 'selector':
+        case 'value': return (text) => `''${text}''`;
+
+        case 'http-header': return (text) => `[:${text}:]`;
+
+        case 'interface':
+        case 'constructor':
+        case 'method':
+        case 'argument':
+        case 'attribute':
+        case 'callback':
+        case 'dictionary':
+        case 'dict-member':
+        case 'enum':
+        case 'enum-value':
+        case 'exception':
+        case 'const':
+        case 'typedef':
+        case 'stringifier':
+        case 'serializer':
+        case 'iterator':
+        case 'maplike':
+        case 'setlike':
+        case 'extended-attribute':
+        case 'event':
+        case 'idl': return (text) => `{{${text}}}`;
+
+        case 'element-state':
+        case 'element-attr':
+        case 'attr-value':
+        case 'element': return (element) => `<{${element}}>`;
+
+        case 'grammar': return (text) => `${text} (within a <pre class=prod>)`;
+
+        case 'type': return (text)=> `<<${text}>>`;
+
+        case 'descriptor':
+        case 'property': return (text) => `'${text}'`;
+
+        default: return;
+    };
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!needsFor(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!refusesFor(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
 }
 </script>
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
-                mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
+let refsData = {
+"#configuration-point": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"document-policy","spec":"document-policy-1","status":"local","text":"configuration point","type":"dfn","url":"#configuration-point"},
+"#configuration-point-default-value": {"export":true,"for_":["configuration point"],"level":"1","normative":true,"shortname":"document-policy","spec":"document-policy-1","status":"local","text":"default value","type":"dfn","url":"#configuration-point-default-value"},
+"#configuration-point-name": {"export":true,"for_":["configuration point"],"level":"1","normative":true,"shortname":"document-policy","spec":"document-policy-1","status":"local","text":"name","type":"dfn","url":"#configuration-point-name"},
+"#configuration-point-range": {"export":true,"for_":["configuration point"],"level":"1","normative":true,"shortname":"document-policy","spec":"document-policy-1","status":"local","text":"range","type":"dfn","url":"#configuration-point-range"},
+"#configuration-point-type": {"export":true,"for_":["configuration point"],"level":"1","normative":true,"shortname":"document-policy","spec":"document-policy-1","status":"local","text":"type","type":"dfn","url":"#configuration-point-type"},
+"#create-document-policy": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"document-policy","spec":"document-policy-1","status":"local","text":"create-document-policy","type":"dfn","url":"#create-document-policy"},
+"#create-for-browsingcontext": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"document-policy","spec":"document-policy-1","status":"local","text":"create-for-browsingcontext","type":"dfn","url":"#create-for-browsingcontext"},
+"#declared-document-policy": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"document-policy","spec":"document-policy-1","status":"local","text":"declared document policy","type":"dfn","url":"#declared-document-policy"},
+"#determine-compatibility": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"document-policy","spec":"document-policy-1","status":"local","text":"determine-compatibility","type":"dfn","url":"#determine-compatibility"},
+"#directive-name": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"document-policy","spec":"document-policy-1","status":"local","text":"directive name","type":"dfn","url":"#directive-name"},
+"#document-policy": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"document-policy","spec":"document-policy-1","status":"local","text":"document policy","type":"dfn","url":"#document-policy"},
+"#document-policy-directive": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"document-policy","spec":"document-policy-1","status":"local","text":"document policy directive","type":"dfn","url":"#document-policy-directive"},
+"#is-policy-compatible": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"document-policy","spec":"document-policy-1","status":"local","text":"is policy compatible","type":"dfn","url":"#is-policy-compatible"},
+"#nested-context-required-document-policy": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"document-policy","spec":"document-policy-1","status":"local","text":"nested context required document policy","type":"dfn","url":"#nested-context-required-document-policy"},
+"#parse-document-policy": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"document-policy","spec":"document-policy-1","status":"local","text":"parse document policy","type":"dfn","url":"#parse-document-policy"},
+"#policy-configuration": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"document-policy","spec":"document-policy-1","status":"local","text":"policy configuration","type":"dfn","url":"#policy-configuration"},
+"#policy-configuration-reporting-endpoint": {"export":true,"for_":["policy configuration"],"level":"1","normative":true,"shortname":"document-policy","spec":"document-policy-1","status":"local","text":"reporting endpoint","type":"dfn","url":"#policy-configuration-reporting-endpoint"},
+"#policy-configuration-value": {"export":true,"for_":["policy configuration"],"level":"1","normative":true,"shortname":"document-policy","spec":"document-policy-1","status":"local","text":"value","type":"dfn","url":"#policy-configuration-value"},
+"#process-response-policy": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"document-policy","spec":"document-policy-1","status":"local","text":"process response policy","type":"dfn","url":"#process-response-policy"},
+"#report-only-document-policy": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"document-policy","spec":"document-policy-1","status":"local","text":"report-only document policy","type":"dfn","url":"#report-only-document-policy"},
+"#request-required-document-policy": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"document-policy","spec":"document-policy-1","status":"local","text":"request-required-document-policy","type":"dfn","url":"#request-required-document-policy"},
+"#required-document-policy": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"document-policy","spec":"document-policy-1","status":"local","text":"required document policy","type":"dfn","url":"#required-document-policy"},
+"#serialize-required-policy": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"document-policy","spec":"document-policy-1","status":"local","text":"serialize required policy","type":"dfn","url":"#serialize-required-policy"},
+"#serialized-document-policy": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"document-policy","spec":"document-policy-1","status":"local","text":"serialized document policy","type":"dfn","url":"#serialized-document-policy"},
+"#should-response-to-request-be-blocked-due-to-document-policy": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"document-policy","spec":"document-policy-1","status":"local","text":"should response to request be blocked due to document policy","type":"dfn","url":"#should-response-to-request-be-blocked-due-to-document-policy"},
+"https://dom.spec.whatwg.org/#concept-document": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"document","type":"dfn","url":"https://dom.spec.whatwg.org/#concept-document"},
+"https://dom.spec.whatwg.org/#concept-document-content-type": {"export":true,"for_":["Document"],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"content type","type":"dfn","url":"https://dom.spec.whatwg.org/#concept-document-content-type"},
+"https://dom.spec.whatwg.org/#concept-document-quirks": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"quirks mode","type":"dfn","url":"https://dom.spec.whatwg.org/#concept-document-quirks"},
+"https://dom.spec.whatwg.org/#document": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"Document","type":"interface","url":"https://dom.spec.whatwg.org/#document"},
+"https://dom.spec.whatwg.org/#html-document": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"html document","type":"dfn","url":"https://dom.spec.whatwg.org/#html-document"},
+"https://fetch.spec.whatwg.org/#concept-header": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"header","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-header"},
+"https://fetch.spec.whatwg.org/#concept-headers-header-list": {"export":true,"for_":["Headers"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"header list","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-headers-header-list"},
+"https://fetch.spec.whatwg.org/#concept-request-header-list": {"export":true,"for_":["request"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"header list","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-request-header-list"},
+"https://fetch.spec.whatwg.org/#concept-request-request": {"export":true,"for_":["Request"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"request","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-request-request"},
+"https://fetch.spec.whatwg.org/#concept-response-header-list": {"export":true,"for_":["response"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"header list","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-response-header-list"},
+"https://fetch.spec.whatwg.org/#concept-response-response": {"export":true,"for_":["Response"],"level":"1","normative":true,"shortname":"fetch","spec":"fetch","status":"current","text":"response","type":"dfn","url":"https://fetch.spec.whatwg.org/#concept-response-response"},
+"https://html.spec.whatwg.org/multipage/browsers.html#active-sandboxing-flag-set": {"export":true,"for_":["Document"],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"active sandboxing flag set","type":"dfn","url":"https://html.spec.whatwg.org/multipage/browsers.html#active-sandboxing-flag-set"},
+"https://html.spec.whatwg.org/multipage/browsers.html#concept-origin": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"origin","type":"dfn","url":"https://html.spec.whatwg.org/multipage/browsers.html#concept-origin"},
+"https://html.spec.whatwg.org/multipage/browsers.html#creating-a-new-browsing-context": {"export":true,"for_":[],"level":"","normative":true,"shortname":"html","spec":"html","status":"anchor-block","text":"creating a new browsing context","type":"dfn","url":"https://html.spec.whatwg.org/multipage/browsers.html#creating-a-new-browsing-context"},
+"https://html.spec.whatwg.org/multipage/browsers.html#initialise-the-document-object": {"export":true,"for_":[],"level":"","normative":true,"shortname":"html","spec":"html","status":"anchor-block","text":"initialise the document object","type":"dfn","url":"https://html.spec.whatwg.org/multipage/browsers.html#initialise-the-document-object"},
+"https://html.spec.whatwg.org/multipage/document-sequences.html#browsing-context": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"browsing context","type":"dfn","url":"https://html.spec.whatwg.org/multipage/document-sequences.html#browsing-context"},
+"https://html.spec.whatwg.org/multipage/document-sequences.html#opener-browsing-context": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"opener browsing context","type":"dfn","url":"https://html.spec.whatwg.org/multipage/document-sequences.html#opener-browsing-context"},
+"https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-sandbox": {"export":true,"for_":["iframe"],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"sandbox","type":"element-attr","url":"https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-sandbox"},
+"https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"iframe","type":"element","url":"https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"environment settings object","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object"},
+"https://w3c.github.io/reporting/#endpoint": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"reporting","spec":"reporting-1","status":"current","text":"endpoint","type":"dfn","url":"https://w3c.github.io/reporting/#endpoint"},
+};
+
+function mkRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "Term: "),
+                mk.span({}, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    let forListElements;
+    if(forList.length == 0) {
+        forListElements = [];
+    } else if(forList.length == 1) {
+        forListElements = mk.li({},
+            mk.b({}, "For: "),
+            mk.span({}, forList[0]),
+        );
+    } else {
+        forListElements = mk.li({},
             mk.b({}, "For: "),
             mk.ul({},
                 ...forList.map(forItem =>
                     mk.li({},
-                        mk.span({}, `${forItem}`)
+                        mk.span({}, forItem)
                     ),
                 ),
             ),
         );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+    }
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    setupRefHintEventListeners(link, hintPanel);
+    return hintPanel;
+}
+
+function hideAllRefHints() {
+    queryAll(".ref-hint").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    if(refHint.teardownEventListeners) {
+        refHint.teardownEventListeners();
     }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+    refHint.remove();
+}
+
+function showRefHint(link) {
+    if(link.classList.contains("dfn-link")) return;
+    const url = link.getAttribute("href");
+    const ref = refsData[url];
+    if(!ref) return;
+
+    hideAllRefHints(); // Only display one at this time.
+
+    const refHint = mkRefHint(link, ref);
+    append(document.body, refHint);
+    link.setAttribute("aria-expanded", "true");
+    positionRefHint(refHint);
+}
+
+function setupRefHintEventListeners(link, refHint) {
+    if (refHint.teardownEventListeners) return;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
+
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
-
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
-    }
-
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
-        }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
-
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
-    }
-
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+document.addEventListener("DOMContentLoaded", () => {
+    document.body.addEventListener("mouseover", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
+    });
+    document.body.addEventListener("focus", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
     });
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
 </script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['#configuration-point'] = {"text": "configuration point", "type": "dfn", "spec": "document-policy-1", "shortname": "document-policy", "level": "1", "status": "local", "url": "#configuration-point", "export": true, "normative": true, "for_": []};
-window.refsData['#configuration-point-type'] = {"text": "type", "type": "dfn", "spec": "document-policy-1", "shortname": "document-policy", "level": "1", "status": "local", "url": "#configuration-point-type", "export": true, "normative": true, "for_": ["configuration point"]};
-window.refsData['#configuration-point-range'] = {"text": "range", "type": "dfn", "spec": "document-policy-1", "shortname": "document-policy", "level": "1", "status": "local", "url": "#configuration-point-range", "export": true, "normative": true, "for_": ["configuration point"]};
-window.refsData['#configuration-point-default-value'] = {"text": "default value", "type": "dfn", "spec": "document-policy-1", "shortname": "document-policy", "level": "1", "status": "local", "url": "#configuration-point-default-value", "export": true, "normative": true, "for_": ["configuration point"]};
-window.refsData['#policy-configuration'] = {"text": "policy configuration", "type": "dfn", "spec": "document-policy-1", "shortname": "document-policy", "level": "1", "status": "local", "url": "#policy-configuration", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#browsing-context'] = {"text": "browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#browsing-context", "export": true, "normative": true, "for_": []};
-window.refsData['#document-policy'] = {"text": "document policy", "type": "dfn", "spec": "document-policy-1", "shortname": "document-policy", "level": "1", "status": "local", "url": "#document-policy", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#opener-browsing-context'] = {"text": "opener browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#opener-browsing-context", "export": true, "normative": true, "for_": []};
-window.refsData['#required-document-policy'] = {"text": "required document policy", "type": "dfn", "spec": "document-policy-1", "shortname": "document-policy", "level": "1", "status": "local", "url": "#required-document-policy", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#concept-document'] = {"text": "document", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-document", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/reporting/#endpoint'] = {"text": "endpoint", "type": "dfn", "spec": "reporting-1", "shortname": "reporting", "level": "1", "status": "current", "url": "https://w3c.github.io/reporting/#endpoint", "export": true, "normative": true, "for_": []};
-window.refsData['#document-policy-directive'] = {"text": "document policy directive", "type": "dfn", "spec": "document-policy-1", "shortname": "document-policy", "level": "1", "status": "local", "url": "#document-policy-directive", "export": true, "normative": true, "for_": []};
-window.refsData['#serialized-document-policy'] = {"text": "serialized document policy", "type": "dfn", "spec": "document-policy-1", "shortname": "document-policy", "level": "1", "status": "local", "url": "#serialized-document-policy", "export": true, "normative": true, "for_": []};
-window.refsData['#directive-name'] = {"text": "directive name", "type": "dfn", "spec": "document-policy-1", "shortname": "document-policy", "level": "1", "status": "local", "url": "#directive-name", "export": true, "normative": true, "for_": []};
-window.refsData['#configuration-point-name'] = {"text": "name", "type": "dfn", "spec": "document-policy-1", "shortname": "document-policy", "level": "1", "status": "local", "url": "#configuration-point-name", "export": true, "normative": true, "for_": ["configuration point"]};
-window.refsData['https://fetch.spec.whatwg.org/#concept-response-response'] = {"text": "response", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response-response", "export": true, "normative": true, "for_": ["Response"]};
-window.refsData['#report-only-document-policy'] = {"text": "report-only document policy", "type": "dfn", "spec": "document-policy-1", "shortname": "document-policy", "level": "1", "status": "local", "url": "#report-only-document-policy", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element'] = {"text": "iframe", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#creating-a-new-browsing-context'] = {"text": "creating a new browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#creating-a-new-browsing-context", "export": true, "normative": true, "for_": []};
-window.refsData['#create-for-browsingcontext'] = {"text": "create-for-browsingcontext", "type": "dfn", "spec": "document-policy-1", "shortname": "document-policy", "level": "1", "status": "local", "url": "#create-for-browsingcontext", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#html-document'] = {"text": "html document", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#html-document", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#concept-document-quirks'] = {"text": "quirks mode", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-document-quirks", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#concept-document-content-type'] = {"text": "content type", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-document-content-type", "export": true, "normative": true, "for_": ["Document"]};
-window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#concept-origin'] = {"text": "origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-origin", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#active-sandboxing-flag-set'] = {"text": "active sandboxing flag set", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#active-sandboxing-flag-set", "export": true, "normative": true, "for_": ["Document"]};
-window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#initialise-the-document-object'] = {"text": "initialise the document object", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#initialise-the-document-object", "export": true, "normative": true, "for_": []};
-window.refsData['#create-document-policy'] = {"text": "create-document-policy", "type": "dfn", "spec": "document-policy-1", "shortname": "document-policy", "level": "1", "status": "local", "url": "#create-document-policy", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#concept-request-request'] = {"text": "request", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-request", "export": true, "normative": true, "for_": ["Request"]};
-window.refsData['#request-required-document-policy'] = {"text": "request-required-document-policy", "type": "dfn", "spec": "document-policy-1", "shortname": "document-policy", "level": "1", "status": "local", "url": "#request-required-document-policy", "export": true, "normative": true, "for_": []};
-window.refsData['#serialize-required-policy'] = {"text": "serialize required policy", "type": "dfn", "spec": "document-policy-1", "shortname": "document-policy", "level": "1", "status": "local", "url": "#serialize-required-policy", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#concept-request-header-list'] = {"text": "header list", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-header-list", "export": true, "normative": true, "for_": ["request"]};
-window.refsData['#should-response-to-request-be-blocked-due-to-document-policy'] = {"text": "should response to request be blocked due to document policy", "type": "dfn", "spec": "document-policy-1", "shortname": "document-policy", "level": "1", "status": "local", "url": "#should-response-to-request-be-blocked-due-to-document-policy", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#concept-headers-header-list'] = {"text": "header list", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-headers-header-list", "export": true, "normative": true, "for_": ["Headers"]};
-window.refsData['#declared-document-policy'] = {"text": "declared document policy", "type": "dfn", "spec": "document-policy-1", "shortname": "document-policy", "level": "1", "status": "local", "url": "#declared-document-policy", "export": true, "normative": true, "for_": []};
-window.refsData['https://fetch.spec.whatwg.org/#concept-response-header-list'] = {"text": "header list", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response-header-list", "export": true, "normative": true, "for_": ["response"]};
-window.refsData['https://fetch.spec.whatwg.org/#concept-header'] = {"text": "header", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-header", "export": true, "normative": true, "for_": []};
-window.refsData['#policy-configuration-value'] = {"text": "value", "type": "dfn", "spec": "document-policy-1", "shortname": "document-policy", "level": "1", "status": "local", "url": "#policy-configuration-value", "export": true, "normative": true, "for_": ["policy configuration"]};
-window.refsData['#parse-document-policy'] = {"text": "parse document policy", "type": "dfn", "spec": "document-policy-1", "shortname": "document-policy", "level": "1", "status": "local", "url": "#parse-document-policy", "export": true, "normative": true, "for_": []};
-window.refsData['#policy-configuration-reporting-endpoint'] = {"text": "reporting endpoint", "type": "dfn", "spec": "document-policy-1", "shortname": "document-policy", "level": "1", "status": "local", "url": "#policy-configuration-reporting-endpoint", "export": true, "normative": true, "for_": ["policy configuration"]};
-window.refsData['#nested-context-required-document-policy'] = {"text": "nested context required document policy", "type": "dfn", "spec": "document-policy-1", "shortname": "document-policy", "level": "1", "status": "local", "url": "#nested-context-required-document-policy", "export": true, "normative": true, "for_": []};
-window.refsData['#process-response-policy'] = {"text": "process response policy", "type": "dfn", "spec": "document-policy-1", "shortname": "document-policy", "level": "1", "status": "local", "url": "#process-response-policy", "export": true, "normative": true, "for_": []};
-window.refsData['#is-policy-compatible'] = {"text": "is policy compatible", "type": "dfn", "spec": "document-policy-1", "shortname": "document-policy", "level": "1", "status": "local", "url": "#is-policy-compatible", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
-window.refsData['#determine-compatibility'] = {"text": "determine-compatibility", "type": "dfn", "spec": "document-policy-1", "shortname": "document-policy", "level": "1", "status": "local", "url": "#determine-compatibility", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object'] = {"text": "environment settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-sandbox'] = {"text": "sandbox", "type": "element-attr", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-sandbox", "export": true, "normative": true, "for_": ["iframe"]};
-</script>
 <script>/* Boilerplate: script-var-click-highlighting */
+"use strict";
+{
 /*
 Color-choosing design:
 
-Colors are ordered by goodness.
-Each color has a usage count (initially zero).
-Each variable has a last-used color.
-
-* If the var has a last-used color, and that color's usage is 0,
-    return that color.
-* Otherwise, return the lowest-indexed color with the lowest usage.
-    Increment the color's usage and set it as the last-used color
-    for that var.
-* On unclicking, decrement usage of the color.
+* Colors are ordered by goodness.
+* On clicking a var, give it the earliest color
+    with the lowest usage in the algorithm.
+* On re-clicking, re-use the var's most recent color
+    if that's not currently being used elsewhere.
 */
-"use strict";
-{
-    document.addEventListener("click", e=>{
-        if(e.target.nodeName == "VAR") {
-            highlightSameAlgoVars(e.target);
-        }
-    });
-    const indexCounts = new Map();
-    const indexNames = new Map();
-    function highlightSameAlgoVars(v) {
-        // Find the algorithm container.
-        let algoContainer = null;
-        let searchEl = v;
-        while(algoContainer == null && searchEl != document.body) {
-            searchEl = searchEl.parentNode;
-            if(searchEl.hasAttribute("data-algorithm")) {
-                algoContainer = searchEl;
-            }
-        }
 
-        // Not highlighting document-global vars,
-        // too likely to be unrelated.
-        if(algoContainer == null) return;
+const COLOR_COUNT = 7;
 
-        const algoName = algoContainer.getAttribute("data-algorithm");
-        const varName = getVarName(v);
-        const addClass = !v.classList.contains("selected");
-        let highlightClass = null;
-        if(addClass) {
-            const index = chooseHighlightIndex(algoName, varName);
-            indexCounts.get(algoName)[index] += 1;
-            indexNames.set(algoName+"///"+varName, index);
-            highlightClass = nameFromIndex(index);
-        } else {
-            const index = previousHighlightIndex(algoName, varName);
-            indexCounts.get(algoName)[index] -= 1;
-            highlightClass = nameFromIndex(index);
-        }
+document.addEventListener("click", e=>{
+    if(e.target.nodeName == "VAR") {
+        highlightSameAlgoVars(e.target);
+    }
+});
 
-        // Find all same-name vars, and toggle their class appropriately.
+function highlightSameAlgoVars(v) {
+    // Find the algorithm container.
+    let algoContainer = findAlgoContainer(v);
+
+    // Not highlighting document-global vars,
+    // too likely to be unrelated.
+    if(algoContainer == null) return;
+
+    const varName = nameFromVar(v);
+    if(!v.hasAttribute("data-var-color")) {
+        const newColor = chooseHighlightColor(algoContainer, v);
         for(const el of algoContainer.querySelectorAll("var")) {
-            if(getVarName(el) == varName) {
-                el.classList.toggle("selected", addClass);
-                el.classList.toggle(highlightClass, addClass);
+            if(nameFromVar(el) == varName) {
+                el.setAttribute("data-var-color", newColor);
+                el.setAttribute("data-var-last-color", newColor);
+            }
+        }
+    } else {
+        for(const el of algoContainer.querySelectorAll("var")) {
+            if(nameFromVar(el) == varName) {
+                el.removeAttribute("data-var-color");
             }
         }
     }
-    function getVarName(el) {
-        return el.textContent.replace(/(\s|\xa0)+/, " ").trim();
+}
+function findAlgoContainer(el) {
+    while(el != document.body) {
+        if(el.hasAttribute("data-algorithm")) return el;
+        el = el.parentNode;
     }
-    function chooseHighlightIndex(algoName, varName) {
-        let indexes = null;
-        if(indexCounts.has(algoName)) {
-            indexes = indexCounts.get(algoName);
-        } else {
-            // 7 classes right now
-            indexes = [0,0,0,0,0,0,0];
-            indexCounts.set(algoName, indexes);
-        }
+    return null;
+}
+function nameFromVar(el) {
+    return el.textContent.replace(/(\s|\xa0)+/, " ").trim();
+}
+function colorCountsFromContainer(container) {
+    const namesFromColor = Array.from({length:COLOR_COUNT}, x=>new Set());
+    for(let v of container.querySelectorAll("var[data-var-color]")) {
+        let color = +v.getAttribute("data-var-color");
+        namesFromColor[color].add(nameFromVar(v));
+    }
 
-        // If the element was recently unclicked,
-        // *and* that color is still unclaimed,
-        // give it back the same color.
-        const lastIndex = previousHighlightIndex(algoName, varName);
-        if(indexes[lastIndex] === 0) return lastIndex;
-
-        // Find the earliest index with the lowest count.
-        const minCount = Math.min.apply(null, indexes);
-        let index = null;
-        for(var i = 0; i < indexes.length; i++) {
-            if(indexes[i] == minCount) {
-                return i;
-            }
+    return namesFromColor.map(x=>x.size);
+}
+function leastUsedColor(colors) {
+    // Find the earliest color with the lowest count.
+    let minCount = Infinity;
+    let minColor = null;
+    for(var i = 0; i < colors.length; i++) {
+        if(colors[i] < minCount) {
+            minColor = i;
+            minCount = colors[i];
         }
     }
-    function previousHighlightIndex(algoName, varName) {
-        return indexNames.get(algoName+"///"+varName);
+    return minColor;
+}
+function chooseHighlightColor(container, v) {
+    const colorCounts = colorCountsFromContainer(container);
+    if(v.hasAttribute("data-var-last-color")) {
+        let color = +v.getAttribute("data-var-last-color");
+        if(colorCounts[color] == 0) return color;
     }
-    function nameFromIndex(index) {
-        return "selected" + index;
-    }
+    return leastUsedColor(colorCounts);
+}
 }
 </script>

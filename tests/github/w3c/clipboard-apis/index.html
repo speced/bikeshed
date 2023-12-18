@@ -78,7 +78,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -452,6 +451,11 @@ figcaption:not(.no-marker)::before {
     }
 }
 </style>
+<style>/* Boilerplate: style-idl-highlighting */
+pre.idl.highlight {
+    background: var(--borderedblock-bg, var(--def-bg));
+}
+</style>
 <style>/* Boilerplate: style-issues */
 a[href].issue-return {
     float: right;
@@ -704,7 +708,7 @@ a[href].issue-return {
 }
 
 .ref-hint {
-    display: none;
+    display: inline-block;
     position: absolute;
     z-index: 35;
     width: 20em;
@@ -720,16 +724,11 @@ a[href].issue-return {
     white-space: normal; /* in case it's moved into a pre */
 }
 
-.ref-hint.on {
-    display: inline-block;
-}
-
 .ref-hint * { margin: 0; padding: 0; text-indent: 0; }
 
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -789,7 +788,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -846,7 +844,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -923,14 +920,14 @@ D50 2deg illuminant, L in [0,100], a and b in [-128, 128]
 5 = lab(85,-10,-50)
 6 = lab(85,35,-15)
 */
-var { cursor: pointer; }
-var.selected0 { background-color: #F4D200; box-shadow: 0 0 0 2px #F4D200; }
-var.selected1 { background-color: #FF87A2; box-shadow: 0 0 0 2px #FF87A2; }
-var.selected2 { background-color: #96E885; box-shadow: 0 0 0 2px #96E885; }
-var.selected3 { background-color: #3EEED2; box-shadow: 0 0 0 2px #3EEED2; }
-var.selected4 { background-color: #EACFB6; box-shadow: 0 0 0 2px #EACFB6; }
-var.selected5 { background-color: #82DDFF; box-shadow: 0 0 0 2px #82DDFF; }
-var.selected6 { background-color: #FFBCF2; box-shadow: 0 0 0 2px #FFBCF2; }
+[data-algorithm] var { cursor: pointer; }
+var[data-var-color="0"] { background-color: #F4D200; box-shadow: 0 0 0 2px #F4D200; }
+var[data-var-color="1"] { background-color: #FF87A2; box-shadow: 0 0 0 2px #FF87A2; }
+var[data-var-color="2"] { background-color: #96E885; box-shadow: 0 0 0 2px #96E885; }
+var[data-var-color="3"] { background-color: #3EEED2; box-shadow: 0 0 0 2px #3EEED2; }
+var[data-var-color="4"] { background-color: #EACFB6; box-shadow: 0 0 0 2px #EACFB6; }
+var[data-var-color="5"] { background-color: #82DDFF; box-shadow: 0 0 0 2px #82DDFF; }
+var[data-var-color="6"] { background-color: #FFBCF2; box-shadow: 0 0 0 2px #FFBCF2; }
 </style>
  <body class="h-entry">
   <div class="head">
@@ -3070,499 +3067,8 @@ required, and because it’s hard to test in a cross-platform way. <a class="iss
     </div>
    </div>
   </details>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['c176812b'] = {"dfnID": "c176812b", "url": "http://www.w3.org/TR/html5/browsers.html#allowed-to-show-a-popup", "dfnText": "allowed to show a popup", "refSections": [{"refs": [{"id": "ref-for-allowed-to-show-a-popup"}], "title": "5.3.1. Event handlers that are allowed to modify the clipboard"}], "external": true};
-window.dfnpanelData['b3578d7c'] = {"dfnID": "b3578d7c", "url": "https://w3c.github.io/FileAPI/#dfn-blobparts", "dfnText": "blobparts", "refSections": [{"refs": [{"id": "ref-for-dfn-blobparts"}], "title": "7.2.4. writeText(data)"}], "external": true};
-window.dfnpanelData['dc8f85df'] = {"dfnID": "dc8f85df", "url": "https://html.spec.whatwg.org/multipage/interaction.html#concept-dnd-p", "dfnText": "concept dnd p", "refSections": [{"refs": [{"id": "ref-for-concept-dnd-p"}], "title": "fire a clipboard event"}], "external": true};
-window.dfnpanelData['2ea8cccb'] = {"dfnID": "2ea8cccb", "url": "https://html.spec.whatwg.org/multipage/interaction.html#concept-dnd-ro", "dfnText": "concept dnd ro", "refSections": [{"refs": [{"id": "ref-for-concept-dnd-ro"}], "title": "6.3. Overriding the paste event"}, {"refs": [{"id": "ref-for-concept-dnd-ro\u2460"}], "title": "fire a clipboard event"}], "external": true};
-window.dfnpanelData['2551a9c6'] = {"dfnID": "2551a9c6", "url": "https://html.spec.whatwg.org/multipage/interaction.html#concept-dnd-rw", "dfnText": "concept dnd rw", "refSections": [{"refs": [{"id": "ref-for-concept-dnd-rw"}, {"id": "ref-for-concept-dnd-rw\u2460"}], "title": "fire a clipboard event"}], "external": true};
-window.dfnpanelData['a1ac87bf'] = {"dfnID": "a1ac87bf", "url": "https://dom.spec.whatwg.org/#constructing-events", "dfnText": "constructing events", "refSections": [{"refs": [{"id": "ref-for-constructing-events"}], "title": "5.1. Clipboard event interfaces"}], "external": true};
-window.dfnpanelData['2cb28cb0'] = {"dfnID": "2cb28cb0", "url": "https://w3c.github.io/permissions/#dom-permissionstate-denied", "dfnText": "denied", "refSections": [{"refs": [{"id": "ref-for-dom-permissionstate-denied"}], "title": "9. Permissions API Integration"}], "external": true};
-window.dfnpanelData['c1f77abc'] = {"dfnID": "c1f77abc", "url": "https://html.spec.whatwg.org/multipage/interaction.html#drag-data-item-kind", "dfnText": "drag data item kind", "refSections": [{"refs": [{"id": "ref-for-drag-data-item-kind"}, {"id": "ref-for-drag-data-item-kind\u2460"}, {"id": "ref-for-drag-data-item-kind\u2461"}], "title": "fire a clipboard event"}, {"refs": [{"id": "ref-for-drag-data-item-kind\u2462"}, {"id": "ref-for-drag-data-item-kind\u2463"}], "title": "process an HTML paste event"}], "external": true};
-window.dfnpanelData['a70adace'] = {"dfnID": "a70adace", "url": "https://html.spec.whatwg.org/multipage/interaction.html#drag-data-item-type-string", "dfnText": "drag data item type string", "refSections": [{"refs": [{"id": "ref-for-drag-data-item-type-string"}, {"id": "ref-for-drag-data-item-type-string\u2460"}, {"id": "ref-for-drag-data-item-type-string\u2461"}, {"id": "ref-for-drag-data-item-type-string\u2462"}], "title": "fire a clipboard event"}, {"refs": [{"id": "ref-for-drag-data-item-type-string\u2463"}, {"id": "ref-for-drag-data-item-type-string\u2464"}], "title": "process an HTML paste event"}], "external": true};
-window.dfnpanelData['b8912f12'] = {"dfnID": "b8912f12", "url": "https://html.spec.whatwg.org/multipage/interaction.html#drag-data-store-mode", "dfnText": "drag data store mode", "refSections": [{"refs": [{"id": "ref-for-drag-data-store-mode"}], "title": "6.3. Overriding the paste event"}, {"refs": [{"id": "ref-for-drag-data-store-mode\u2460"}, {"id": "ref-for-drag-data-store-mode\u2461"}, {"id": "ref-for-drag-data-store-mode\u2462"}, {"id": "ref-for-drag-data-store-mode\u2463"}], "title": "fire a clipboard event"}], "external": true};
-window.dfnpanelData['c4619dd3'] = {"dfnID": "c4619dd3", "url": "http://w3c.github.io/editing/contentEditable.html#dfn-editing-host", "dfnText": "editing host", "refSections": [{"refs": [{"id": "ref-for-dfn-editing-host"}], "title": "3. Terminology"}], "external": true};
-window.dfnpanelData['fad8924f'] = {"dfnID": "fad8924f", "url": "https://html.spec.whatwg.org/multipage/interaction.html#focusable-area", "dfnText": "focusable area", "refSections": [{"refs": [{"id": "ref-for-focusable-area"}], "title": "5.3.5. Event listeners that modify selection or focus"}], "external": true};
-window.dfnpanelData['c6ce3c60'] = {"dfnID": "c6ce3c60", "url": "https://w3c.github.io/permissions/#dom-permissionstate-granted", "dfnText": "granted", "refSections": [{"refs": [{"id": "ref-for-dom-permissionstate-granted"}], "title": "9.2.1. check clipboard write permission"}], "external": true};
-window.dfnpanelData['c51ad875'] = {"dfnID": "c51ad875", "url": "https://html.spec.whatwg.org/multipage/dom.html#the-body-element-2", "dfnText": "the body element", "refSections": [{"refs": [{"id": "ref-for-the-body-element-2"}, {"id": "ref-for-the-body-element-2\u2460"}], "title": "fire a clipboard event"}], "external": true};
-window.dfnpanelData['e303c02d'] = {"dfnID": "e303c02d", "url": "https://w3c.github.io/FileAPI/#dfn-type", "dfnText": "type", "refSections": [{"refs": [{"id": "ref-for-dfn-type"}, {"id": "ref-for-dfn-type\u2460"}], "title": "7.2.4. writeText(data)"}], "external": true};
-window.dfnpanelData['129bdae8'] = {"dfnID": "129bdae8", "url": "https://dom.spec.whatwg.org/#event", "dfnText": "Event", "refSections": [{"refs": [{"id": "ref-for-event"}, {"id": "ref-for-event\u2460"}], "title": "5.1. Clipboard event interfaces"}], "external": true};
-window.dfnpanelData['44a7708c'] = {"dfnID": "44a7708c", "url": "https://dom.spec.whatwg.org/#dictdef-eventinit", "dfnText": "EventInit", "refSections": [{"refs": [{"id": "ref-for-dictdef-eventinit"}], "title": "5.1. Clipboard event interfaces"}], "external": true};
-window.dfnpanelData['2bc0cdf4'] = {"dfnID": "2bc0cdf4", "url": "https://dom.spec.whatwg.org/#eventtarget", "dfnText": "EventTarget", "refSections": [{"refs": [{"id": "ref-for-eventtarget"}], "title": "7.2. Clipboard Interface"}], "external": true};
-window.dfnpanelData['8b547cc7'] = {"dfnID": "8b547cc7", "url": "https://dom.spec.whatwg.org/#dom-event-composed", "dfnText": "composed", "refSections": [{"refs": [{"id": "ref-for-dom-event-composed"}], "title": "fire a clipboard event"}], "external": true};
-window.dfnpanelData['212ee1f7'] = {"dfnID": "212ee1f7", "url": "https://dom.spec.whatwg.org/#concept-cd-data", "dfnText": "data", "refSections": [{"refs": [{"id": "ref-for-concept-cd-data"}], "title": "7.2.4. writeText(data)"}], "external": true};
-window.dfnpanelData['838900a7'] = {"dfnID": "838900a7", "url": "https://dom.spec.whatwg.org/#dom-event-istrusted", "dfnText": "isTrusted", "refSections": [{"refs": [{"id": "ref-for-dom-event-istrusted"}], "title": "fire a clipboard event"}], "external": true};
-window.dfnpanelData['fefe0433'] = {"dfnID": "fefe0433", "url": "https://dom.spec.whatwg.org/#dom-event-preventdefault", "dfnText": "preventDefault()", "refSections": [{"refs": [{"id": "ref-for-dom-event-preventdefault"}], "title": "6.1. Overriding the copy event"}, {"refs": [{"id": "ref-for-dom-event-preventdefault\u2460"}], "title": "6.2. Overriding the cut event"}, {"refs": [{"id": "ref-for-dom-event-preventdefault\u2461"}], "title": "6.3. Overriding the paste event"}], "external": true};
-window.dfnpanelData['7c9ab308'] = {"dfnID": "7c9ab308", "url": "http://tc39.github.io/ecma262/#sec-promise-objects", "dfnText": "promise", "refSections": [{"refs": [{"id": "ref-for-sec-promise-objects"}], "title": "7.2.1. read()"}, {"refs": [{"id": "ref-for-sec-promise-objects\u2460"}], "title": "7.2.2. readText()"}, {"refs": [{"id": "ref-for-sec-promise-objects\u2461"}], "title": "7.2.3. write(data)"}, {"refs": [{"id": "ref-for-sec-promise-objects\u2462"}], "title": "7.2.4. writeText(data)"}], "external": true};
-window.dfnpanelData['b7d73f5b'] = {"dfnID": "b7d73f5b", "url": "https://w3c.github.io/FileAPI/#dfn-Blob", "dfnText": "Blob", "refSections": [{"refs": [{"id": "ref-for-dfn-Blob"}, {"id": "ref-for-dfn-Blob\u2460"}], "title": "7.2. Clipboard Interface"}, {"refs": [{"id": "ref-for-dfn-Blob\u2461"}, {"id": "ref-for-dfn-Blob\u2462"}], "title": "7.2.3. write(data)"}, {"refs": [{"id": "ref-for-dfn-Blob\u2463"}], "title": "7.2.4. writeText(data)"}], "external": true};
-window.dfnpanelData['cd028611'] = {"dfnID": "cd028611", "url": "https://w3c.github.io/FileAPI/#dfn-file", "dfnText": "File", "refSections": [{"refs": [{"id": "ref-for-dfn-file"}, {"id": "ref-for-dfn-file\u2460"}], "title": "process an HTML paste event"}], "external": true};
-window.dfnpanelData['f9970195'] = {"dfnID": "f9970195", "url": "https://w3c.github.io/FileAPI/#dfn-lastModified", "dfnText": "lastModified", "refSections": [{"refs": [{"id": "ref-for-dfn-lastModified"}], "title": "process an HTML paste event"}], "external": true};
-window.dfnpanelData['1441e3bf'] = {"dfnID": "1441e3bf", "url": "https://w3c.github.io/FileAPI/#dfn-name", "dfnText": "name", "refSections": [{"refs": [{"id": "ref-for-dfn-name"}], "title": "process an HTML paste event"}], "external": true};
-window.dfnpanelData['2b83ae0c'] = {"dfnID": "2b83ae0c", "url": "https://html.spec.whatwg.org/multipage/dnd.html#datatransfer", "dfnText": "DataTransfer", "refSections": [{"refs": [{"id": "ref-for-datatransfer"}], "title": "4. Model"}, {"refs": [{"id": "ref-for-datatransfer\u2460"}, {"id": "ref-for-datatransfer\u2461"}, {"id": "ref-for-datatransfer\u2462"}, {"id": "ref-for-datatransfer\u2463"}], "title": "5.1. Clipboard event interfaces"}, {"refs": [{"id": "ref-for-datatransfer\u2464"}], "title": "6. Clipboard Event API"}, {"refs": [{"id": "ref-for-datatransfer\u2465"}], "title": "6.4.2. Writing to the clipboard"}, {"refs": [{"id": "ref-for-datatransfer\u2466"}], "title": "10.4. Nuisance considerations"}, {"refs": [{"id": "ref-for-datatransfer\u2467"}, {"id": "ref-for-datatransfer\u2468"}], "title": "11.1. Privacy and the Clipboard Event API"}, {"refs": [{"id": "ref-for-datatransfer\u2460\u24ea"}, {"id": "ref-for-datatransfer\u2460\u2460"}, {"id": "ref-for-datatransfer\u2460\u2461"}], "title": "fire a clipboard event"}, {"refs": [{"id": "ref-for-datatransfer\u2460\u2462"}], "title": "process an HTML paste event"}], "external": true};
-window.dfnpanelData['4ff66d05'] = {"dfnID": "4ff66d05", "url": "https://html.spec.whatwg.org/multipage/dnd.html#datatransferitem", "dfnText": "DataTransferItem", "refSections": [{"refs": [{"id": "ref-for-datatransferitem"}, {"id": "ref-for-datatransferitem\u2460"}, {"id": "ref-for-datatransferitem\u2461"}], "title": "fire a clipboard event"}, {"refs": [{"id": "ref-for-datatransferitem\u2462"}, {"id": "ref-for-datatransferitem\u2463"}], "title": "process an HTML paste event"}], "external": true};
-window.dfnpanelData['707c843f'] = {"dfnID": "707c843f", "url": "https://html.spec.whatwg.org/multipage/dnd.html#datatransferitemlist", "dfnText": "DataTransferItemList", "refSections": [{"refs": [{"id": "ref-for-datatransferitemlist"}], "title": "6.4. Mandatory data types"}, {"refs": [{"id": "ref-for-datatransferitemlist\u2460"}], "title": "8.1. The copy action"}, {"refs": [{"id": "ref-for-datatransferitemlist\u2461"}], "title": "8.2. The cut action"}, {"refs": [{"id": "ref-for-datatransferitemlist\u2462"}], "title": "10.2. General security policies"}, {"refs": [{"id": "ref-for-datatransferitemlist\u2463"}], "title": "write content to the clipboard"}, {"refs": [{"id": "ref-for-datatransferitemlist\u2464"}, {"id": "ref-for-datatransferitemlist\u2465"}], "title": "fire a clipboard event"}, {"refs": [{"id": "ref-for-datatransferitemlist\u2466"}], "title": "process an HTML paste event"}], "external": true};
-window.dfnpanelData['be0c27b2'] = {"dfnID": "be0c27b2", "url": "https://html.spec.whatwg.org/multipage/system-state.html#navigator", "dfnText": "Navigator", "refSections": [{"refs": [{"id": "ref-for-navigator"}], "title": "7.1. Navigator Interface"}, {"refs": [{"id": "ref-for-navigator\u2460"}], "title": "7.1.1. clipboard"}], "external": true};
-window.dfnpanelData['5f5b7a0c'] = {"dfnID": "5f5b7a0c", "url": "https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransferitemlist-clear", "dfnText": "clear()", "refSections": [{"refs": [{"id": "ref-for-dom-datatransferitemlist-clear"}], "title": "fire a clipboard event"}], "external": true};
-window.dfnpanelData['f62ad1e6'] = {"dfnID": "f62ad1e6", "url": "https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-cleardata", "dfnText": "clearData(format)", "refSections": [{"refs": [{"id": "ref-for-dom-datatransfer-cleardata"}], "title": "fire a clipboard event"}], "external": true};
-window.dfnpanelData['1e280de0'] = {"dfnID": "1e280de0", "url": "https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-files", "dfnText": "files", "refSections": [{"refs": [{"id": "ref-for-dom-datatransfer-files"}], "title": "5.1. Clipboard event interfaces"}, {"refs": [{"id": "ref-for-dom-datatransfer-files\u2460"}], "title": "10.2. General security policies"}, {"refs": [{"id": "ref-for-dom-datatransfer-files\u2461"}], "title": "fire a clipboard event"}], "external": true};
-window.dfnpanelData['d82f90d1'] = {"dfnID": "d82f90d1", "url": "https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-getdata", "dfnText": "getData(format)", "refSections": [{"refs": [{"id": "ref-for-dom-datatransfer-getdata"}], "title": "fire a clipboard event"}], "external": true};
-window.dfnpanelData['a72449dd'] = {"dfnID": "a72449dd", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel", "dfnText": "in parallel", "refSections": [{"refs": [{"id": "ref-for-in-parallel"}, {"id": "ref-for-in-parallel\u2460"}], "title": "7.2.1. read()"}, {"refs": [{"id": "ref-for-in-parallel\u2461"}, {"id": "ref-for-in-parallel\u2462"}], "title": "7.2.2. readText()"}, {"refs": [{"id": "ref-for-in-parallel\u2463"}, {"id": "ref-for-in-parallel\u2464"}], "title": "7.2.3. write(data)"}, {"refs": [{"id": "ref-for-in-parallel\u2465"}, {"id": "ref-for-in-parallel\u2466"}], "title": "7.2.4. writeText(data)"}], "external": true};
-window.dfnpanelData['50eecf1d'] = {"dfnID": "50eecf1d", "url": "https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-items", "dfnText": "items", "refSections": [{"refs": [{"id": "ref-for-dom-datatransfer-items"}], "title": "5.1. Clipboard event interfaces"}, {"refs": [{"id": "ref-for-dom-datatransfer-items\u2460"}], "title": "6. Clipboard Event API"}, {"refs": [{"id": "ref-for-dom-datatransfer-items\u2461"}, {"id": "ref-for-dom-datatransfer-items\u2462"}, {"id": "ref-for-dom-datatransfer-items\u2463"}, {"id": "ref-for-dom-datatransfer-items\u2464"}, {"id": "ref-for-dom-datatransfer-items\u2465"}, {"id": "ref-for-dom-datatransfer-items\u2466"}], "title": "fire a clipboard event"}, {"refs": [{"id": "ref-for-dom-datatransfer-items\u2467"}, {"id": "ref-for-dom-datatransfer-items\u2468"}, {"id": "ref-for-dom-datatransfer-items\u2460\u24ea"}], "title": "process an HTML paste event"}], "external": true};
-window.dfnpanelData['e99bd18e'] = {"dfnID": "e99bd18e", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-global", "dfnText": "relevant global object", "refSections": [{"refs": [{"id": "ref-for-concept-relevant-global"}], "title": "9.1.1. check clipboard read permission"}, {"refs": [{"id": "ref-for-concept-relevant-global\u2460"}], "title": "9.2.1. check clipboard write permission"}], "external": true};
-window.dfnpanelData['beda2316'] = {"dfnID": "beda2316", "url": "https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-setdata", "dfnText": "setData(format, data)", "refSections": [{"refs": [{"id": "ref-for-dom-datatransfer-setdata"}], "title": "6.3. Overriding the paste event"}, {"refs": [{"id": "ref-for-dom-datatransfer-setdata\u2460"}], "title": "write content to the clipboard"}, {"refs": [{"id": "ref-for-dom-datatransfer-setdata\u2461"}, {"id": "ref-for-dom-datatransfer-setdata\u2462"}], "title": "fire a clipboard event"}], "external": true};
-window.dfnpanelData['47fe679e'] = {"dfnID": "47fe679e", "url": "https://html.spec.whatwg.org/multipage/interaction.html#transient-activation", "dfnText": "transient activation", "refSections": [{"refs": [{"id": "ref-for-transient-activation"}], "title": "9.1.1. check clipboard read permission"}, {"refs": [{"id": "ref-for-transient-activation\u2460"}], "title": "9.2.1. check clipboard write permission"}], "external": true};
-window.dfnpanelData['f3fc35d3'] = {"dfnID": "f3fc35d3", "url": "https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-types", "dfnText": "types", "refSections": [{"refs": [{"id": "ref-for-dom-datatransfer-types"}], "title": "fire a clipboard event"}], "external": true};
-window.dfnpanelData['ebb01253'] = {"dfnID": "ebb01253", "url": "https://w3c.github.io/permissions/#dom-permissiondescriptor", "dfnText": "PermissionDescriptor", "refSections": [{"refs": [{"id": "ref-for-dom-permissiondescriptor"}], "title": "9. Permissions API Integration"}], "external": true};
-window.dfnpanelData['4b7ca52a'] = {"dfnID": "4b7ca52a", "url": "https://w3c.github.io/permissions/#dfn-permission-descriptor-type", "dfnText": "permission descriptor type", "refSections": [{"refs": [{"id": "ref-for-dfn-permission-descriptor-type"}], "title": "9. Permissions API Integration"}], "external": true};
-window.dfnpanelData['d124397f'] = {"dfnID": "d124397f", "url": "https://w3c.github.io/permissions/#dfn-permission-state", "dfnText": "permission state", "refSections": [{"refs": [{"id": "ref-for-dfn-permission-state"}], "title": "9.2.1. check clipboard write permission"}], "external": true};
-window.dfnpanelData['6c2d7879'] = {"dfnID": "6c2d7879", "url": "https://w3c.github.io/permissions/#dfn-powerful-feature", "dfnText": "powerful feature", "refSections": [{"refs": [{"id": "ref-for-dfn-powerful-feature"}], "title": "1. Introduction"}, {"refs": [{"id": "ref-for-dfn-powerful-feature\u2460"}, {"id": "ref-for-dfn-powerful-feature\u2461"}], "title": "9. Permissions API Integration"}], "external": true};
-window.dfnpanelData['bcc085e3'] = {"dfnID": "bcc085e3", "url": "https://w3c.github.io/permissions/#dfn-request-permission-to-use", "dfnText": "request permission to use", "refSections": [{"refs": [{"id": "ref-for-dfn-request-permission-to-use"}, {"id": "ref-for-dfn-request-permission-to-use\u2460"}], "title": "9.2.1. check clipboard write permission"}], "external": true};
-window.dfnpanelData['8855a9aa'] = {"dfnID": "8855a9aa", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "dfnText": "DOMString", "refSections": [{"refs": [{"id": "ref-for-idl-DOMString"}], "title": "5.1. Clipboard event interfaces"}, {"refs": [{"id": "ref-for-idl-DOMString\u2460"}, {"id": "ref-for-idl-DOMString\u2461"}, {"id": "ref-for-idl-DOMString\u2462"}, {"id": "ref-for-idl-DOMString\u2463"}, {"id": "ref-for-idl-DOMString\u2464"}, {"id": "ref-for-idl-DOMString\u2465"}, {"id": "ref-for-idl-DOMString\u2466"}], "title": "7.2. Clipboard Interface"}], "external": true};
-window.dfnpanelData['889e932f'] = {"dfnID": "889e932f", "url": "https://webidl.spec.whatwg.org/#Exposed", "dfnText": "Exposed", "refSections": [{"refs": [{"id": "ref-for-Exposed"}], "title": "5.1. Clipboard event interfaces"}, {"refs": [{"id": "ref-for-Exposed\u2460"}, {"id": "ref-for-Exposed\u2461"}], "title": "7.2. Clipboard Interface"}], "external": true};
-window.dfnpanelData['dcf5fafa'] = {"dfnID": "dcf5fafa", "url": "https://webidl.spec.whatwg.org/#idl-frozen-array", "dfnText": "FrozenArray", "refSections": [{"refs": [{"id": "ref-for-idl-frozen-array"}], "title": "7.2. Clipboard Interface"}], "external": true};
-window.dfnpanelData['bdbd19d1'] = {"dfnID": "bdbd19d1", "url": "https://webidl.spec.whatwg.org/#idl-promise", "dfnText": "Promise", "refSections": [{"refs": [{"id": "ref-for-idl-promise"}, {"id": "ref-for-idl-promise\u2460"}, {"id": "ref-for-idl-promise\u2461"}, {"id": "ref-for-idl-promise\u2462"}, {"id": "ref-for-idl-promise\u2463"}, {"id": "ref-for-idl-promise\u2464"}], "title": "7.2. Clipboard Interface"}], "external": true};
-window.dfnpanelData['a5c91173'] = {"dfnID": "a5c91173", "url": "https://webidl.spec.whatwg.org/#SameObject", "dfnText": "SameObject", "refSections": [{"refs": [{"id": "ref-for-SameObject"}], "title": "7.1. Navigator Interface"}], "external": true};
-window.dfnpanelData['b75bb3bd'] = {"dfnID": "b75bb3bd", "url": "https://webidl.spec.whatwg.org/#SecureContext", "dfnText": "SecureContext", "refSections": [{"refs": [{"id": "ref-for-SecureContext"}], "title": "7.1. Navigator Interface"}, {"refs": [{"id": "ref-for-SecureContext\u2460"}], "title": "7.2. Clipboard Interface"}], "external": true};
-window.dfnpanelData['5372cca8'] = {"dfnID": "5372cca8", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "dfnText": "boolean", "refSections": [{"refs": [{"id": "ref-for-idl-boolean"}], "title": "7.2. Clipboard Interface"}, {"refs": [{"id": "ref-for-idl-boolean\u2460"}], "title": "9. Permissions API Integration"}], "external": true};
-window.dfnpanelData['9aeb0a82'] = {"dfnID": "9aeb0a82", "url": "https://webidl.spec.whatwg.org/#idl-long-long", "dfnText": "long long", "refSections": [{"refs": [{"id": "ref-for-idl-long-long"}], "title": "7.2. Clipboard Interface"}], "external": true};
-window.dfnpanelData['7787d359'] = {"dfnID": "7787d359", "url": "https://webidl.spec.whatwg.org/#idl-record", "dfnText": "record", "refSections": [{"refs": [{"id": "ref-for-idl-record"}, {"id": "ref-for-idl-record\u2460"}], "title": "7.2. Clipboard Interface"}], "external": true};
-window.dfnpanelData['9cce47fd'] = {"dfnID": "9cce47fd", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "dfnText": "sequence", "refSections": [{"refs": [{"id": "ref-for-idl-sequence"}], "title": "7.2. Clipboard Interface"}], "external": true};
-window.dfnpanelData['4013a022'] = {"dfnID": "4013a022", "url": "https://webidl.spec.whatwg.org/#this", "dfnText": "this", "refSections": [{"refs": [{"id": "ref-for-this"}], "title": "9.1.1. check clipboard read permission"}, {"refs": [{"id": "ref-for-this\u2460"}], "title": "9.2.1. check clipboard write permission"}], "external": true};
-window.dfnpanelData['5f90bbfb'] = {"dfnID": "5f90bbfb", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "dfnText": "undefined", "refSections": [{"refs": [{"id": "ref-for-idl-undefined"}, {"id": "ref-for-idl-undefined\u2460"}], "title": "7.2. Clipboard Interface"}], "external": true};
-window.dfnpanelData['editable-context'] = {"dfnID": "editable-context", "url": "#editable-context", "dfnText": "editable context", "refSections": [{"refs": [{"id": "ref-for-editable-context"}, {"id": "ref-for-editable-context\u2460"}], "title": "5.2.3. The cut event"}, {"refs": [{"id": "ref-for-editable-context\u2461"}, {"id": "ref-for-editable-context\u2462"}], "title": "5.2.4. The paste event"}, {"refs": [{"id": "ref-for-editable-context\u2463"}], "title": "8.2. The cut action"}, {"refs": [{"id": "ref-for-editable-context\u2464"}], "title": "8.3. The paste action"}], "external": false};
-window.dfnpanelData['system-clipboard'] = {"dfnID": "system-clipboard", "url": "#system-clipboard", "dfnText": "system clipboard", "refSections": [{"refs": [{"id": "ref-for-system-clipboard"}], "title": "4. Model"}, {"refs": [{"id": "ref-for-system-clipboard\u2460"}, {"id": "ref-for-system-clipboard\u2461"}], "title": "5.2.1. The clipboardchange event"}, {"refs": [{"id": "ref-for-system-clipboard\u2462"}, {"id": "ref-for-system-clipboard\u2463"}], "title": "5.2.2. The copy event"}, {"refs": [{"id": "ref-for-system-clipboard\u2464"}, {"id": "ref-for-system-clipboard\u2465"}], "title": "5.2.3. The cut event"}, {"refs": [{"id": "ref-for-system-clipboard\u2466"}], "title": "6.1. Overriding the copy event"}, {"refs": [{"id": "ref-for-system-clipboard\u2467"}], "title": "6.2. Overriding the cut event"}, {"refs": [{"id": "ref-for-system-clipboard\u2468"}], "title": "6.3. Overriding the paste event"}], "external": false};
-window.dfnpanelData['system-clipboard-data'] = {"dfnID": "system-clipboard-data", "url": "#system-clipboard-data", "dfnText": "system clipboard data", "refSections": [{"refs": [{"id": "ref-for-system-clipboard-data"}, {"id": "ref-for-system-clipboard-data\u2460"}], "title": "4. Model"}, {"refs": [{"id": "ref-for-system-clipboard-data\u2461"}], "title": "7.2.1. read()"}, {"refs": [{"id": "ref-for-system-clipboard-data\u2462"}], "title": "7.2.2. readText()"}, {"refs": [{"id": "ref-for-system-clipboard-data\u2463"}], "title": "7.2.3. write(data)"}, {"refs": [{"id": "ref-for-system-clipboard-data\u2464"}], "title": "7.2.4. writeText(data)"}], "external": false};
-window.dfnpanelData['dictdef-clipboardeventinit'] = {"dfnID": "dictdef-clipboardeventinit", "url": "#dictdef-clipboardeventinit", "dfnText": "ClipboardEventInit", "refSections": [{"refs": [{"id": "ref-for-dictdef-clipboardeventinit"}], "title": "5.1. Clipboard event interfaces"}], "external": false};
-window.dfnpanelData['clipboardevent'] = {"dfnID": "clipboardevent", "url": "#clipboardevent", "dfnText": "ClipboardEvent", "refSections": [{"refs": [{"id": "ref-for-clipboardevent"}, {"id": "ref-for-clipboardevent\u2460"}], "title": "6. Clipboard Event API"}, {"refs": [{"id": "ref-for-clipboardevent\u2461"}], "title": "6.1. Overriding the copy event"}, {"refs": [{"id": "ref-for-clipboardevent\u2462"}], "title": "6.2. Overriding the cut event"}, {"refs": [{"id": "ref-for-clipboardevent\u2463"}, {"id": "ref-for-clipboardevent\u2464"}], "title": "fire a clipboard event"}], "external": false};
-window.dfnpanelData['dom-clipboardevent-clipboarddata'] = {"dfnID": "dom-clipboardevent-clipboarddata", "url": "#dom-clipboardevent-clipboarddata", "dfnText": "clipboardData", "refSections": [{"refs": [{"id": "ref-for-dom-clipboardevent-clipboarddata"}], "title": "5.2.3. The cut event"}, {"refs": [{"id": "ref-for-dom-clipboardevent-clipboarddata\u2460"}], "title": "6. Clipboard Event API"}, {"refs": [{"id": "ref-for-dom-clipboardevent-clipboarddata\u2461"}], "title": "6.1. Overriding the copy event"}, {"refs": [{"id": "ref-for-dom-clipboardevent-clipboarddata\u2462"}], "title": "6.2. Overriding the cut event"}, {"refs": [{"id": "ref-for-dom-clipboardevent-clipboarddata\u2463"}], "title": "fire a clipboard event"}], "external": false};
-window.dfnpanelData['clipboardchange'] = {"dfnID": "clipboardchange", "url": "#clipboardchange", "dfnText": "clipboardchange", "refSections": [{"refs": [{"id": "ref-for-clipboardchange"}], "title": "2.2. Remote Clipboard Synchronization"}, {"refs": [{"id": "ref-for-clipboardchange\u2460"}, {"id": "ref-for-clipboardchange\u2461"}], "title": "5.2.1. The clipboardchange event"}, {"refs": [{"id": "ref-for-clipboardchange\u2462"}], "title": "8.1. The copy action"}, {"refs": [{"id": "ref-for-clipboardchange\u2463"}, {"id": "ref-for-clipboardchange\u2464"}], "title": "8.2. The cut action"}], "external": false};
-window.dfnpanelData['copy'] = {"dfnID": "copy", "url": "#copy", "dfnText": "copy", "refSections": [{"refs": [{"id": "ref-for-copy"}], "title": "5.2.1. The clipboardchange event"}, {"refs": [{"id": "ref-for-copy\u2460"}, {"id": "ref-for-copy\u2461"}, {"id": "ref-for-copy\u2462"}], "title": "5.2.2. The copy event"}, {"refs": [{"id": "ref-for-copy\u2463"}], "title": "5.3.1. Event handlers that are allowed to modify the clipboard"}, {"refs": [{"id": "ref-for-copy\u2464"}, {"id": "ref-for-copy\u2465"}], "title": "6.1. Overriding the copy event"}, {"refs": [{"id": "ref-for-copy\u2466"}], "title": "8.1. The copy action"}], "external": false};
-window.dfnpanelData['cut'] = {"dfnID": "cut", "url": "#cut", "dfnText": "cut", "refSections": [{"refs": [{"id": "ref-for-cut"}], "title": "5.2.1. The clipboardchange event"}, {"refs": [{"id": "ref-for-cut\u2460"}, {"id": "ref-for-cut\u2461"}, {"id": "ref-for-cut\u2462"}, {"id": "ref-for-cut\u2463"}, {"id": "ref-for-cut\u2464"}], "title": "5.2.3. The cut event"}, {"refs": [{"id": "ref-for-cut\u2465"}], "title": "5.3.1. Event handlers that are allowed to modify the clipboard"}, {"refs": [{"id": "ref-for-cut\u2466"}, {"id": "ref-for-cut\u2467"}, {"id": "ref-for-cut\u2468"}], "title": "6.2. Overriding the cut event"}, {"refs": [{"id": "ref-for-cut\u2460\u24ea"}], "title": "8.2. The cut action"}], "external": false};
-window.dfnpanelData['paste'] = {"dfnID": "paste", "url": "#paste", "dfnText": "paste", "refSections": [{"refs": [{"id": "ref-for-paste"}, {"id": "ref-for-paste\u2460"}, {"id": "ref-for-paste\u2461"}, {"id": "ref-for-paste\u2462"}], "title": "5.2.4. The paste event"}, {"refs": [{"id": "ref-for-paste\u2463"}], "title": "5.3.2. Event handlers that are allowed to read from clipboard"}, {"refs": [{"id": "ref-for-paste\u2464"}, {"id": "ref-for-paste\u2465"}, {"id": "ref-for-paste\u2466"}, {"id": "ref-for-paste\u2467"}], "title": "6.3. Overriding the paste event"}, {"refs": [{"id": "ref-for-paste\u2468"}], "title": "8.3. The paste action"}], "external": false};
-window.dfnpanelData['allowed-to-modify-the-clipboard'] = {"dfnID": "allowed-to-modify-the-clipboard", "url": "#allowed-to-modify-the-clipboard", "dfnText": "allowed to modify the clipboard", "refSections": [{"refs": [{"id": "ref-for-allowed-to-modify-the-clipboard"}], "title": "8. Clipboard Actions"}], "external": false};
-window.dfnpanelData['allowed-to-read-from-clipboard'] = {"dfnID": "allowed-to-read-from-clipboard", "url": "#allowed-to-read-from-clipboard", "dfnText": "allowed to read from clipboard", "refSections": [{"refs": [{"id": "ref-for-allowed-to-read-from-clipboard"}], "title": "8. Clipboard Actions"}], "external": false};
-window.dfnpanelData['mandatory-data-types'] = {"dfnID": "mandatory-data-types", "url": "#mandatory-data-types", "dfnText": "Mandatory data types", "refSections": [{"refs": [{"id": "ref-for-mandatory-data-types"}], "title": "5.1. Clipboard event interfaces"}, {"refs": [{"id": "ref-for-mandatory-data-types\u2460"}, {"id": "ref-for-mandatory-data-types\u2461"}], "title": "write content to the clipboard"}, {"refs": [{"id": "ref-for-mandatory-data-types\u2462"}], "title": "fire a clipboard event"}], "external": false};
-window.dfnpanelData['navigator-clipboard'] = {"dfnID": "navigator-clipboard", "url": "#navigator-clipboard", "dfnText": "clipboard", "refSections": [{"refs": [{"id": "ref-for-navigator-clipboard"}, {"id": "ref-for-navigator-clipboard\u2460"}], "title": "7.1.1. clipboard"}], "external": false};
-window.dfnpanelData['typedefdef-clipboarditems'] = {"dfnID": "typedefdef-clipboarditems", "url": "#typedefdef-clipboarditems", "dfnText": "ClipboardItems", "refSections": [{"refs": [{"id": "ref-for-typedefdef-clipboarditems"}, {"id": "ref-for-typedefdef-clipboarditems\u2460"}], "title": "7.2. Clipboard Interface"}], "external": false};
-window.dfnpanelData['clipboard'] = {"dfnID": "clipboard", "url": "#clipboard", "dfnText": "Clipboard", "refSections": [{"refs": [{"id": "ref-for-clipboard"}], "title": "7.1. Navigator Interface"}], "external": false};
-window.dfnpanelData['typedefdef-clipboarditemdatatype'] = {"dfnID": "typedefdef-clipboarditemdatatype", "url": "#typedefdef-clipboarditemdatatype", "dfnText": "ClipboardItemDataType", "refSections": [{"refs": [{"id": "ref-for-typedefdef-clipboarditemdatatype"}], "title": "7.2. Clipboard Interface"}], "external": false};
-window.dfnpanelData['typedefdef-clipboarditemdata'] = {"dfnID": "typedefdef-clipboarditemdata", "url": "#typedefdef-clipboarditemdata", "dfnText": "ClipboardItemData", "refSections": [{"refs": [{"id": "ref-for-typedefdef-clipboarditemdata"}, {"id": "ref-for-typedefdef-clipboarditemdata\u2460"}], "title": "7.2. Clipboard Interface"}], "external": false};
-window.dfnpanelData['callbackdef-clipboarditemdelayedcallback'] = {"dfnID": "callbackdef-clipboarditemdelayedcallback", "url": "#callbackdef-clipboarditemdelayedcallback", "dfnText": "ClipboardItemDelayedCallback", "refSections": [{"refs": [{"id": "ref-for-callbackdef-clipboarditemdelayedcallback"}], "title": "7.2. Clipboard Interface"}], "external": false};
-window.dfnpanelData['clipboarditem'] = {"dfnID": "clipboarditem", "url": "#clipboarditem", "dfnText": "ClipboardItem", "refSections": [{"refs": [{"id": "ref-for-clipboarditem"}], "title": "4. Model"}, {"refs": [{"id": "ref-for-clipboarditem\u2460"}, {"id": "ref-for-clipboarditem\u2461"}], "title": "7.2. Clipboard Interface"}, {"refs": [{"id": "ref-for-clipboarditem\u2462"}], "title": "7.2.1. read()"}, {"refs": [{"id": "ref-for-clipboarditem\u2463"}, {"id": "ref-for-clipboarditem\u2464"}], "title": "7.2.4. writeText(data)"}], "external": false};
-window.dfnpanelData['enumdef-presentationstyle'] = {"dfnID": "enumdef-presentationstyle", "url": "#enumdef-presentationstyle", "dfnText": "PresentationStyle", "refSections": [{"refs": [{"id": "ref-for-enumdef-presentationstyle"}, {"id": "ref-for-enumdef-presentationstyle\u2460"}], "title": "7.2. Clipboard Interface"}], "external": false};
-window.dfnpanelData['dictdef-clipboarditemoptions'] = {"dfnID": "dictdef-clipboarditemoptions", "url": "#dictdef-clipboarditemoptions", "dfnText": "ClipboardItemOptions", "refSections": [{"refs": [{"id": "ref-for-dictdef-clipboarditemoptions"}, {"id": "ref-for-dictdef-clipboarditemoptions\u2460"}], "title": "7.2. Clipboard Interface"}], "external": false};
-window.dfnpanelData['dom-clipboard-read'] = {"dfnID": "dom-clipboard-read", "url": "#dom-clipboard-read", "dfnText": "7.2.1. read()", "refSections": [{"refs": [{"id": "ref-for-dom-clipboard-read"}], "title": "2.2. Remote Clipboard Synchronization"}, {"refs": [{"id": "ref-for-dom-clipboard-read\u2460"}], "title": "7.2. Clipboard Interface"}, {"refs": [{"id": "ref-for-dom-clipboard-read"}, {"id": "ref-for-dom-clipboard-read\u2461"}], "title": "7.2.1. read()"}], "external": false};
-window.dfnpanelData['dom-clipboard-readtext'] = {"dfnID": "dom-clipboard-readtext", "url": "#dom-clipboard-readtext", "dfnText": "7.2.2. readText()", "refSections": [{"refs": [{"id": "ref-for-dom-clipboard-readtext"}], "title": "7.2. Clipboard Interface"}, {"refs": [{"id": "ref-for-dom-clipboard-readtext"}, {"id": "ref-for-dom-clipboard-readtext\u2460"}], "title": "7.2.2. readText()"}], "external": false};
-window.dfnpanelData['dom-clipboard-write'] = {"dfnID": "dom-clipboard-write", "url": "#dom-clipboard-write", "dfnText": "7.2.3. write(data)", "refSections": [{"refs": [{"id": "ref-for-dom-clipboard-write"}], "title": "2.2. Remote Clipboard Synchronization"}, {"refs": [{"id": "ref-for-dom-clipboard-write\u2460"}], "title": "7.2. Clipboard Interface"}, {"refs": [{"id": "ref-for-dom-clipboard-write"}, {"id": "ref-for-dom-clipboard-write\u2461"}], "title": "7.2.3. write(data)"}], "external": false};
-window.dfnpanelData['dom-clipboard-writetext'] = {"dfnID": "dom-clipboard-writetext", "url": "#dom-clipboard-writetext", "dfnText": "7.2.4. writeText(data)", "refSections": [{"refs": [{"id": "ref-for-dom-clipboard-writetext"}], "title": "7.2. Clipboard Interface"}, {"refs": [{"id": "ref-for-dom-clipboard-writetext"}, {"id": "ref-for-dom-clipboard-writetext\u2460"}], "title": "7.2.4. writeText(data)"}], "external": false};
-window.dfnpanelData['script-triggered'] = {"dfnID": "script-triggered", "url": "#script-triggered", "dfnText": "script-triggered", "refSections": [{"refs": [{"id": "ref-for-script-triggered"}, {"id": "ref-for-script-triggered\u2460"}], "title": "8. Clipboard Actions"}, {"refs": [{"id": "ref-for-script-triggered\u2461"}], "title": "8.1. The copy action"}, {"refs": [{"id": "ref-for-script-triggered\u2462"}], "title": "8.2. The cut action"}, {"refs": [{"id": "ref-for-script-triggered\u2463"}], "title": "8.3. The paste action"}], "external": false};
-window.dfnpanelData['script-may-access-clipboard'] = {"dfnID": "script-may-access-clipboard", "url": "#script-may-access-clipboard", "dfnText": "script-may-access-clipboard", "refSections": [{"refs": [{"id": "ref-for-script-may-access-clipboard"}, {"id": "ref-for-script-may-access-clipboard\u2460"}, {"id": "ref-for-script-may-access-clipboard\u2461"}], "title": "8. Clipboard Actions"}, {"refs": [{"id": "ref-for-script-may-access-clipboard\u2462"}], "title": "8.1. The copy action"}, {"refs": [{"id": "ref-for-script-may-access-clipboard\u2463"}], "title": "8.2. The cut action"}, {"refs": [{"id": "ref-for-script-may-access-clipboard\u2464"}, {"id": "ref-for-script-may-access-clipboard\u2465"}], "title": "8.3. The paste action"}], "external": false};
-window.dfnpanelData['dictdef-clipboardpermissiondescriptor'] = {"dfnID": "dictdef-clipboardpermissiondescriptor", "url": "#dictdef-clipboardpermissiondescriptor", "dfnText": "ClipboardPermissionDescriptor", "refSections": [{"refs": [{"id": "ref-for-dictdef-clipboardpermissiondescriptor"}], "title": "9. Permissions API Integration"}], "external": false};
-window.dfnpanelData['check-clipboard-read-permission'] = {"dfnID": "check-clipboard-read-permission", "url": "#check-clipboard-read-permission", "dfnText": "check clipboard read permission", "refSections": [{"refs": [{"id": "ref-for-check-clipboard-read-permission"}], "title": "7.2.1. read()"}, {"refs": [{"id": "ref-for-check-clipboard-read-permission\u2460"}], "title": "7.2.2. readText()"}], "external": false};
-window.dfnpanelData['check-clipboard-write-permission'] = {"dfnID": "check-clipboard-write-permission", "url": "#check-clipboard-write-permission", "dfnText": "check clipboard write permission", "refSections": [{"refs": [{"id": "ref-for-check-clipboard-write-permission"}], "title": "7.2.3. write(data)"}, {"refs": [{"id": "ref-for-check-clipboard-write-permission\u2460"}], "title": "7.2.4. writeText(data)"}], "external": false};
-window.dfnpanelData['write-content-to-the-clipboard'] = {"dfnID": "write-content-to-the-clipboard", "url": "#write-content-to-the-clipboard", "dfnText": "write content to the clipboard", "refSections": [{"refs": [{"id": "ref-for-write-content-to-the-clipboard"}], "title": "8.1. The copy action"}, {"refs": [{"id": "ref-for-write-content-to-the-clipboard\u2460"}], "title": "8.2. The cut action"}], "external": false};
-window.dfnpanelData['fire-a-clipboard-event'] = {"dfnID": "fire-a-clipboard-event", "url": "#fire-a-clipboard-event", "dfnText": "fire a clipboard event", "refSections": [{"refs": [{"id": "ref-for-fire-a-clipboard-event"}], "title": "5.2.2. The copy event"}, {"refs": [{"id": "ref-for-fire-a-clipboard-event\u2460"}], "title": "5.2.3. The cut event"}, {"refs": [{"id": "ref-for-fire-a-clipboard-event\u2461"}], "title": "5.2.4. The paste event"}, {"refs": [{"id": "ref-for-fire-a-clipboard-event\u2462"}, {"id": "ref-for-fire-a-clipboard-event\u2463"}], "title": "8.1. The copy action"}, {"refs": [{"id": "ref-for-fire-a-clipboard-event\u2464"}, {"id": "ref-for-fire-a-clipboard-event\u2465"}, {"id": "ref-for-fire-a-clipboard-event\u2466"}], "title": "8.2. The cut action"}, {"refs": [{"id": "ref-for-fire-a-clipboard-event"}], "title": "8.3. The paste action"}], "external": false};
-window.dfnpanelData['process-an-html-paste-event'] = {"dfnID": "process-an-html-paste-event", "url": "#process-an-html-paste-event", "dfnText": "process an HTML paste event", "refSections": [{"refs": [{"id": "ref-for-process-an-html-paste-event"}], "title": "fire a clipboard event"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -3756,34 +3262,517 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"129bdae8": {"dfnID":"129bdae8","dfnText":"Event","external":true,"refSections":[{"refs":[{"id":"ref-for-event"},{"id":"ref-for-event\u2460"}],"title":"5.1. Clipboard event interfaces"}],"url":"https://dom.spec.whatwg.org/#event"},
+"1441e3bf": {"dfnID":"1441e3bf","dfnText":"name","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-name"}],"title":"process an HTML paste event"}],"url":"https://w3c.github.io/FileAPI/#dfn-name"},
+"1e280de0": {"dfnID":"1e280de0","dfnText":"files","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-datatransfer-files"}],"title":"5.1. Clipboard event interfaces"},{"refs":[{"id":"ref-for-dom-datatransfer-files\u2460"}],"title":"10.2. General security policies"},{"refs":[{"id":"ref-for-dom-datatransfer-files\u2461"}],"title":"fire a clipboard event"}],"url":"https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-files"},
+"212ee1f7": {"dfnID":"212ee1f7","dfnText":"data","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-cd-data"}],"title":"7.2.4. writeText(data)"}],"url":"https://dom.spec.whatwg.org/#concept-cd-data"},
+"2551a9c6": {"dfnID":"2551a9c6","dfnText":"concept dnd rw","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-dnd-rw"},{"id":"ref-for-concept-dnd-rw\u2460"}],"title":"fire a clipboard event"}],"url":"https://html.spec.whatwg.org/multipage/interaction.html#concept-dnd-rw"},
+"2b83ae0c": {"dfnID":"2b83ae0c","dfnText":"DataTransfer","external":true,"refSections":[{"refs":[{"id":"ref-for-datatransfer"}],"title":"4. Model"},{"refs":[{"id":"ref-for-datatransfer\u2460"},{"id":"ref-for-datatransfer\u2461"},{"id":"ref-for-datatransfer\u2462"},{"id":"ref-for-datatransfer\u2463"}],"title":"5.1. Clipboard event interfaces"},{"refs":[{"id":"ref-for-datatransfer\u2464"}],"title":"6. Clipboard Event API"},{"refs":[{"id":"ref-for-datatransfer\u2465"}],"title":"6.4.2. Writing to the clipboard"},{"refs":[{"id":"ref-for-datatransfer\u2466"}],"title":"10.4. Nuisance considerations"},{"refs":[{"id":"ref-for-datatransfer\u2467"},{"id":"ref-for-datatransfer\u2468"}],"title":"11.1. Privacy and the Clipboard Event API"},{"refs":[{"id":"ref-for-datatransfer\u2460\u24ea"},{"id":"ref-for-datatransfer\u2460\u2460"},{"id":"ref-for-datatransfer\u2460\u2461"}],"title":"fire a clipboard event"},{"refs":[{"id":"ref-for-datatransfer\u2460\u2462"}],"title":"process an HTML paste event"}],"url":"https://html.spec.whatwg.org/multipage/dnd.html#datatransfer"},
+"2bc0cdf4": {"dfnID":"2bc0cdf4","dfnText":"EventTarget","external":true,"refSections":[{"refs":[{"id":"ref-for-eventtarget"}],"title":"7.2. Clipboard Interface"}],"url":"https://dom.spec.whatwg.org/#eventtarget"},
+"2cb28cb0": {"dfnID":"2cb28cb0","dfnText":"denied","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-permissionstate-denied"}],"title":"9. Permissions API Integration"}],"url":"https://w3c.github.io/permissions/#dom-permissionstate-denied"},
+"2ea8cccb": {"dfnID":"2ea8cccb","dfnText":"concept dnd ro","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-dnd-ro"}],"title":"6.3. Overriding the paste event"},{"refs":[{"id":"ref-for-concept-dnd-ro\u2460"}],"title":"fire a clipboard event"}],"url":"https://html.spec.whatwg.org/multipage/interaction.html#concept-dnd-ro"},
+"4013a022": {"dfnID":"4013a022","dfnText":"this","external":true,"refSections":[{"refs":[{"id":"ref-for-this"}],"title":"9.1.1. check clipboard read permission"},{"refs":[{"id":"ref-for-this\u2460"}],"title":"9.2.1. check clipboard write permission"}],"url":"https://webidl.spec.whatwg.org/#this"},
+"44a7708c": {"dfnID":"44a7708c","dfnText":"EventInit","external":true,"refSections":[{"refs":[{"id":"ref-for-dictdef-eventinit"}],"title":"5.1. Clipboard event interfaces"}],"url":"https://dom.spec.whatwg.org/#dictdef-eventinit"},
+"47fe679e": {"dfnID":"47fe679e","dfnText":"transient activation","external":true,"refSections":[{"refs":[{"id":"ref-for-transient-activation"}],"title":"9.1.1. check clipboard read permission"},{"refs":[{"id":"ref-for-transient-activation\u2460"}],"title":"9.2.1. check clipboard write permission"}],"url":"https://html.spec.whatwg.org/multipage/interaction.html#transient-activation"},
+"4b7ca52a": {"dfnID":"4b7ca52a","dfnText":"permission descriptor type","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-permission-descriptor-type"}],"title":"9. Permissions API Integration"}],"url":"https://w3c.github.io/permissions/#dfn-permission-descriptor-type"},
+"4ff66d05": {"dfnID":"4ff66d05","dfnText":"DataTransferItem","external":true,"refSections":[{"refs":[{"id":"ref-for-datatransferitem"},{"id":"ref-for-datatransferitem\u2460"},{"id":"ref-for-datatransferitem\u2461"}],"title":"fire a clipboard event"},{"refs":[{"id":"ref-for-datatransferitem\u2462"},{"id":"ref-for-datatransferitem\u2463"}],"title":"process an HTML paste event"}],"url":"https://html.spec.whatwg.org/multipage/dnd.html#datatransferitem"},
+"50eecf1d": {"dfnID":"50eecf1d","dfnText":"items","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-datatransfer-items"}],"title":"5.1. Clipboard event interfaces"},{"refs":[{"id":"ref-for-dom-datatransfer-items\u2460"}],"title":"6. Clipboard Event API"},{"refs":[{"id":"ref-for-dom-datatransfer-items\u2461"},{"id":"ref-for-dom-datatransfer-items\u2462"},{"id":"ref-for-dom-datatransfer-items\u2463"},{"id":"ref-for-dom-datatransfer-items\u2464"},{"id":"ref-for-dom-datatransfer-items\u2465"},{"id":"ref-for-dom-datatransfer-items\u2466"}],"title":"fire a clipboard event"},{"refs":[{"id":"ref-for-dom-datatransfer-items\u2467"},{"id":"ref-for-dom-datatransfer-items\u2468"},{"id":"ref-for-dom-datatransfer-items\u2460\u24ea"}],"title":"process an HTML paste event"}],"url":"https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-items"},
+"5372cca8": {"dfnID":"5372cca8","dfnText":"boolean","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-boolean"}],"title":"7.2. Clipboard Interface"},{"refs":[{"id":"ref-for-idl-boolean\u2460"}],"title":"9. Permissions API Integration"}],"url":"https://webidl.spec.whatwg.org/#idl-boolean"},
+"5f5b7a0c": {"dfnID":"5f5b7a0c","dfnText":"clear()","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-datatransferitemlist-clear"}],"title":"fire a clipboard event"}],"url":"https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransferitemlist-clear"},
+"5f90bbfb": {"dfnID":"5f90bbfb","dfnText":"undefined","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-undefined"},{"id":"ref-for-idl-undefined\u2460"}],"title":"7.2. Clipboard Interface"}],"url":"https://webidl.spec.whatwg.org/#idl-undefined"},
+"6c2d7879": {"dfnID":"6c2d7879","dfnText":"powerful feature","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-powerful-feature"}],"title":"1. Introduction"},{"refs":[{"id":"ref-for-dfn-powerful-feature\u2460"},{"id":"ref-for-dfn-powerful-feature\u2461"}],"title":"9. Permissions API Integration"}],"url":"https://w3c.github.io/permissions/#dfn-powerful-feature"},
+"707c843f": {"dfnID":"707c843f","dfnText":"DataTransferItemList","external":true,"refSections":[{"refs":[{"id":"ref-for-datatransferitemlist"}],"title":"6.4. Mandatory data types"},{"refs":[{"id":"ref-for-datatransferitemlist\u2460"}],"title":"8.1. The copy action"},{"refs":[{"id":"ref-for-datatransferitemlist\u2461"}],"title":"8.2. The cut action"},{"refs":[{"id":"ref-for-datatransferitemlist\u2462"}],"title":"10.2. General security policies"},{"refs":[{"id":"ref-for-datatransferitemlist\u2463"}],"title":"write content to the clipboard"},{"refs":[{"id":"ref-for-datatransferitemlist\u2464"},{"id":"ref-for-datatransferitemlist\u2465"}],"title":"fire a clipboard event"},{"refs":[{"id":"ref-for-datatransferitemlist\u2466"}],"title":"process an HTML paste event"}],"url":"https://html.spec.whatwg.org/multipage/dnd.html#datatransferitemlist"},
+"7787d359": {"dfnID":"7787d359","dfnText":"record","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-record"},{"id":"ref-for-idl-record\u2460"}],"title":"7.2. Clipboard Interface"}],"url":"https://webidl.spec.whatwg.org/#idl-record"},
+"7c9ab308": {"dfnID":"7c9ab308","dfnText":"promise","external":true,"refSections":[{"refs":[{"id":"ref-for-sec-promise-objects"}],"title":"7.2.1. read()"},{"refs":[{"id":"ref-for-sec-promise-objects\u2460"}],"title":"7.2.2. readText()"},{"refs":[{"id":"ref-for-sec-promise-objects\u2461"}],"title":"7.2.3. write(data)"},{"refs":[{"id":"ref-for-sec-promise-objects\u2462"}],"title":"7.2.4. writeText(data)"}],"url":"http://tc39.github.io/ecma262/#sec-promise-objects"},
+"838900a7": {"dfnID":"838900a7","dfnText":"isTrusted","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-event-istrusted"}],"title":"fire a clipboard event"}],"url":"https://dom.spec.whatwg.org/#dom-event-istrusted"},
+"8855a9aa": {"dfnID":"8855a9aa","dfnText":"DOMString","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-DOMString"}],"title":"5.1. Clipboard event interfaces"},{"refs":[{"id":"ref-for-idl-DOMString\u2460"},{"id":"ref-for-idl-DOMString\u2461"},{"id":"ref-for-idl-DOMString\u2462"},{"id":"ref-for-idl-DOMString\u2463"},{"id":"ref-for-idl-DOMString\u2464"},{"id":"ref-for-idl-DOMString\u2465"},{"id":"ref-for-idl-DOMString\u2466"}],"title":"7.2. Clipboard Interface"}],"url":"https://webidl.spec.whatwg.org/#idl-DOMString"},
+"889e932f": {"dfnID":"889e932f","dfnText":"Exposed","external":true,"refSections":[{"refs":[{"id":"ref-for-Exposed"}],"title":"5.1. Clipboard event interfaces"},{"refs":[{"id":"ref-for-Exposed\u2460"},{"id":"ref-for-Exposed\u2461"}],"title":"7.2. Clipboard Interface"}],"url":"https://webidl.spec.whatwg.org/#Exposed"},
+"8b547cc7": {"dfnID":"8b547cc7","dfnText":"composed","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-event-composed"}],"title":"fire a clipboard event"}],"url":"https://dom.spec.whatwg.org/#dom-event-composed"},
+"9aeb0a82": {"dfnID":"9aeb0a82","dfnText":"long long","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-long-long"}],"title":"7.2. Clipboard Interface"}],"url":"https://webidl.spec.whatwg.org/#idl-long-long"},
+"9cce47fd": {"dfnID":"9cce47fd","dfnText":"sequence","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-sequence"}],"title":"7.2. Clipboard Interface"}],"url":"https://webidl.spec.whatwg.org/#idl-sequence"},
+"a1ac87bf": {"dfnID":"a1ac87bf","dfnText":"constructing events","external":true,"refSections":[{"refs":[{"id":"ref-for-constructing-events"}],"title":"5.1. Clipboard event interfaces"}],"url":"https://dom.spec.whatwg.org/#constructing-events"},
+"a5c91173": {"dfnID":"a5c91173","dfnText":"SameObject","external":true,"refSections":[{"refs":[{"id":"ref-for-SameObject"}],"title":"7.1. Navigator Interface"}],"url":"https://webidl.spec.whatwg.org/#SameObject"},
+"a70adace": {"dfnID":"a70adace","dfnText":"drag data item type string","external":true,"refSections":[{"refs":[{"id":"ref-for-drag-data-item-type-string"},{"id":"ref-for-drag-data-item-type-string\u2460"},{"id":"ref-for-drag-data-item-type-string\u2461"},{"id":"ref-for-drag-data-item-type-string\u2462"}],"title":"fire a clipboard event"},{"refs":[{"id":"ref-for-drag-data-item-type-string\u2463"},{"id":"ref-for-drag-data-item-type-string\u2464"}],"title":"process an HTML paste event"}],"url":"https://html.spec.whatwg.org/multipage/interaction.html#drag-data-item-type-string"},
+"a72449dd": {"dfnID":"a72449dd","dfnText":"in parallel","external":true,"refSections":[{"refs":[{"id":"ref-for-in-parallel"},{"id":"ref-for-in-parallel\u2460"}],"title":"7.2.1. read()"},{"refs":[{"id":"ref-for-in-parallel\u2461"},{"id":"ref-for-in-parallel\u2462"}],"title":"7.2.2. readText()"},{"refs":[{"id":"ref-for-in-parallel\u2463"},{"id":"ref-for-in-parallel\u2464"}],"title":"7.2.3. write(data)"},{"refs":[{"id":"ref-for-in-parallel\u2465"},{"id":"ref-for-in-parallel\u2466"}],"title":"7.2.4. writeText(data)"}],"url":"https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel"},
+"allowed-to-modify-the-clipboard": {"dfnID":"allowed-to-modify-the-clipboard","dfnText":"allowed to modify the clipboard","external":false,"refSections":[{"refs":[{"id":"ref-for-allowed-to-modify-the-clipboard"}],"title":"8. Clipboard Actions"}],"url":"#allowed-to-modify-the-clipboard"},
+"allowed-to-read-from-clipboard": {"dfnID":"allowed-to-read-from-clipboard","dfnText":"allowed to read from clipboard","external":false,"refSections":[{"refs":[{"id":"ref-for-allowed-to-read-from-clipboard"}],"title":"8. Clipboard Actions"}],"url":"#allowed-to-read-from-clipboard"},
+"b3578d7c": {"dfnID":"b3578d7c","dfnText":"blobparts","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-blobparts"}],"title":"7.2.4. writeText(data)"}],"url":"https://w3c.github.io/FileAPI/#dfn-blobparts"},
+"b75bb3bd": {"dfnID":"b75bb3bd","dfnText":"SecureContext","external":true,"refSections":[{"refs":[{"id":"ref-for-SecureContext"}],"title":"7.1. Navigator Interface"},{"refs":[{"id":"ref-for-SecureContext\u2460"}],"title":"7.2. Clipboard Interface"}],"url":"https://webidl.spec.whatwg.org/#SecureContext"},
+"b7d73f5b": {"dfnID":"b7d73f5b","dfnText":"Blob","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-Blob"},{"id":"ref-for-dfn-Blob\u2460"}],"title":"7.2. Clipboard Interface"},{"refs":[{"id":"ref-for-dfn-Blob\u2461"},{"id":"ref-for-dfn-Blob\u2462"}],"title":"7.2.3. write(data)"},{"refs":[{"id":"ref-for-dfn-Blob\u2463"}],"title":"7.2.4. writeText(data)"}],"url":"https://w3c.github.io/FileAPI/#dfn-Blob"},
+"b8912f12": {"dfnID":"b8912f12","dfnText":"drag data store mode","external":true,"refSections":[{"refs":[{"id":"ref-for-drag-data-store-mode"}],"title":"6.3. Overriding the paste event"},{"refs":[{"id":"ref-for-drag-data-store-mode\u2460"},{"id":"ref-for-drag-data-store-mode\u2461"},{"id":"ref-for-drag-data-store-mode\u2462"},{"id":"ref-for-drag-data-store-mode\u2463"}],"title":"fire a clipboard event"}],"url":"https://html.spec.whatwg.org/multipage/interaction.html#drag-data-store-mode"},
+"bcc085e3": {"dfnID":"bcc085e3","dfnText":"request permission to use","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-request-permission-to-use"},{"id":"ref-for-dfn-request-permission-to-use\u2460"}],"title":"9.2.1. check clipboard write permission"}],"url":"https://w3c.github.io/permissions/#dfn-request-permission-to-use"},
+"bdbd19d1": {"dfnID":"bdbd19d1","dfnText":"Promise","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-promise"},{"id":"ref-for-idl-promise\u2460"},{"id":"ref-for-idl-promise\u2461"},{"id":"ref-for-idl-promise\u2462"},{"id":"ref-for-idl-promise\u2463"},{"id":"ref-for-idl-promise\u2464"}],"title":"7.2. Clipboard Interface"}],"url":"https://webidl.spec.whatwg.org/#idl-promise"},
+"be0c27b2": {"dfnID":"be0c27b2","dfnText":"Navigator","external":true,"refSections":[{"refs":[{"id":"ref-for-navigator"}],"title":"7.1. Navigator Interface"},{"refs":[{"id":"ref-for-navigator\u2460"}],"title":"7.1.1. clipboard"}],"url":"https://html.spec.whatwg.org/multipage/system-state.html#navigator"},
+"beda2316": {"dfnID":"beda2316","dfnText":"setData(format, data)","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-datatransfer-setdata"}],"title":"6.3. Overriding the paste event"},{"refs":[{"id":"ref-for-dom-datatransfer-setdata\u2460"}],"title":"write content to the clipboard"},{"refs":[{"id":"ref-for-dom-datatransfer-setdata\u2461"},{"id":"ref-for-dom-datatransfer-setdata\u2462"}],"title":"fire a clipboard event"}],"url":"https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-setdata"},
+"c176812b": {"dfnID":"c176812b","dfnText":"allowed to show a popup","external":true,"refSections":[{"refs":[{"id":"ref-for-allowed-to-show-a-popup"}],"title":"5.3.1. Event handlers that are allowed to modify the clipboard"}],"url":"http://www.w3.org/TR/html5/browsers.html#allowed-to-show-a-popup"},
+"c1f77abc": {"dfnID":"c1f77abc","dfnText":"drag data item kind","external":true,"refSections":[{"refs":[{"id":"ref-for-drag-data-item-kind"},{"id":"ref-for-drag-data-item-kind\u2460"},{"id":"ref-for-drag-data-item-kind\u2461"}],"title":"fire a clipboard event"},{"refs":[{"id":"ref-for-drag-data-item-kind\u2462"},{"id":"ref-for-drag-data-item-kind\u2463"}],"title":"process an HTML paste event"}],"url":"https://html.spec.whatwg.org/multipage/interaction.html#drag-data-item-kind"},
+"c4619dd3": {"dfnID":"c4619dd3","dfnText":"editing host","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-editing-host"}],"title":"3. Terminology"}],"url":"http://w3c.github.io/editing/contentEditable.html#dfn-editing-host"},
+"c51ad875": {"dfnID":"c51ad875","dfnText":"the body element","external":true,"refSections":[{"refs":[{"id":"ref-for-the-body-element-2"},{"id":"ref-for-the-body-element-2\u2460"}],"title":"fire a clipboard event"}],"url":"https://html.spec.whatwg.org/multipage/dom.html#the-body-element-2"},
+"c6ce3c60": {"dfnID":"c6ce3c60","dfnText":"granted","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-permissionstate-granted"}],"title":"9.2.1. check clipboard write permission"}],"url":"https://w3c.github.io/permissions/#dom-permissionstate-granted"},
+"callbackdef-clipboarditemdelayedcallback": {"dfnID":"callbackdef-clipboarditemdelayedcallback","dfnText":"ClipboardItemDelayedCallback","external":false,"refSections":[{"refs":[{"id":"ref-for-callbackdef-clipboarditemdelayedcallback"}],"title":"7.2. Clipboard Interface"}],"url":"#callbackdef-clipboarditemdelayedcallback"},
+"cd028611": {"dfnID":"cd028611","dfnText":"File","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-file"},{"id":"ref-for-dfn-file\u2460"}],"title":"process an HTML paste event"}],"url":"https://w3c.github.io/FileAPI/#dfn-file"},
+"check-clipboard-read-permission": {"dfnID":"check-clipboard-read-permission","dfnText":"check clipboard read permission","external":false,"refSections":[{"refs":[{"id":"ref-for-check-clipboard-read-permission"}],"title":"7.2.1. read()"},{"refs":[{"id":"ref-for-check-clipboard-read-permission\u2460"}],"title":"7.2.2. readText()"}],"url":"#check-clipboard-read-permission"},
+"check-clipboard-write-permission": {"dfnID":"check-clipboard-write-permission","dfnText":"check clipboard write permission","external":false,"refSections":[{"refs":[{"id":"ref-for-check-clipboard-write-permission"}],"title":"7.2.3. write(data)"},{"refs":[{"id":"ref-for-check-clipboard-write-permission\u2460"}],"title":"7.2.4. writeText(data)"}],"url":"#check-clipboard-write-permission"},
+"clipboard": {"dfnID":"clipboard","dfnText":"Clipboard","external":false,"refSections":[{"refs":[{"id":"ref-for-clipboard"}],"title":"7.1. Navigator Interface"}],"url":"#clipboard"},
+"clipboardchange": {"dfnID":"clipboardchange","dfnText":"clipboardchange","external":false,"refSections":[{"refs":[{"id":"ref-for-clipboardchange"}],"title":"2.2. Remote Clipboard Synchronization"},{"refs":[{"id":"ref-for-clipboardchange\u2460"},{"id":"ref-for-clipboardchange\u2461"}],"title":"5.2.1. The clipboardchange event"},{"refs":[{"id":"ref-for-clipboardchange\u2462"}],"title":"8.1. The copy action"},{"refs":[{"id":"ref-for-clipboardchange\u2463"},{"id":"ref-for-clipboardchange\u2464"}],"title":"8.2. The cut action"}],"url":"#clipboardchange"},
+"clipboardevent": {"dfnID":"clipboardevent","dfnText":"ClipboardEvent","external":false,"refSections":[{"refs":[{"id":"ref-for-clipboardevent"},{"id":"ref-for-clipboardevent\u2460"}],"title":"6. Clipboard Event API"},{"refs":[{"id":"ref-for-clipboardevent\u2461"}],"title":"6.1. Overriding the copy event"},{"refs":[{"id":"ref-for-clipboardevent\u2462"}],"title":"6.2. Overriding the cut event"},{"refs":[{"id":"ref-for-clipboardevent\u2463"},{"id":"ref-for-clipboardevent\u2464"}],"title":"fire a clipboard event"}],"url":"#clipboardevent"},
+"clipboarditem": {"dfnID":"clipboarditem","dfnText":"ClipboardItem","external":false,"refSections":[{"refs":[{"id":"ref-for-clipboarditem"}],"title":"4. Model"},{"refs":[{"id":"ref-for-clipboarditem\u2460"},{"id":"ref-for-clipboarditem\u2461"}],"title":"7.2. Clipboard Interface"},{"refs":[{"id":"ref-for-clipboarditem\u2462"}],"title":"7.2.1. read()"},{"refs":[{"id":"ref-for-clipboarditem\u2463"},{"id":"ref-for-clipboarditem\u2464"}],"title":"7.2.4. writeText(data)"}],"url":"#clipboarditem"},
+"copy": {"dfnID":"copy","dfnText":"copy","external":false,"refSections":[{"refs":[{"id":"ref-for-copy"}],"title":"5.2.1. The clipboardchange event"},{"refs":[{"id":"ref-for-copy\u2460"},{"id":"ref-for-copy\u2461"},{"id":"ref-for-copy\u2462"}],"title":"5.2.2. The copy event"},{"refs":[{"id":"ref-for-copy\u2463"}],"title":"5.3.1. Event handlers that are allowed to modify the clipboard"},{"refs":[{"id":"ref-for-copy\u2464"},{"id":"ref-for-copy\u2465"}],"title":"6.1. Overriding the copy event"},{"refs":[{"id":"ref-for-copy\u2466"}],"title":"8.1. The copy action"}],"url":"#copy"},
+"cut": {"dfnID":"cut","dfnText":"cut","external":false,"refSections":[{"refs":[{"id":"ref-for-cut"}],"title":"5.2.1. The clipboardchange event"},{"refs":[{"id":"ref-for-cut\u2460"},{"id":"ref-for-cut\u2461"},{"id":"ref-for-cut\u2462"},{"id":"ref-for-cut\u2463"},{"id":"ref-for-cut\u2464"}],"title":"5.2.3. The cut event"},{"refs":[{"id":"ref-for-cut\u2465"}],"title":"5.3.1. Event handlers that are allowed to modify the clipboard"},{"refs":[{"id":"ref-for-cut\u2466"},{"id":"ref-for-cut\u2467"},{"id":"ref-for-cut\u2468"}],"title":"6.2. Overriding the cut event"},{"refs":[{"id":"ref-for-cut\u2460\u24ea"}],"title":"8.2. The cut action"}],"url":"#cut"},
+"d124397f": {"dfnID":"d124397f","dfnText":"permission state","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-permission-state"}],"title":"9.2.1. check clipboard write permission"}],"url":"https://w3c.github.io/permissions/#dfn-permission-state"},
+"d82f90d1": {"dfnID":"d82f90d1","dfnText":"getData(format)","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-datatransfer-getdata"}],"title":"fire a clipboard event"}],"url":"https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-getdata"},
+"dc8f85df": {"dfnID":"dc8f85df","dfnText":"concept dnd p","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-dnd-p"}],"title":"fire a clipboard event"}],"url":"https://html.spec.whatwg.org/multipage/interaction.html#concept-dnd-p"},
+"dcf5fafa": {"dfnID":"dcf5fafa","dfnText":"FrozenArray","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-frozen-array"}],"title":"7.2. Clipboard Interface"}],"url":"https://webidl.spec.whatwg.org/#idl-frozen-array"},
+"dictdef-clipboardeventinit": {"dfnID":"dictdef-clipboardeventinit","dfnText":"ClipboardEventInit","external":false,"refSections":[{"refs":[{"id":"ref-for-dictdef-clipboardeventinit"}],"title":"5.1. Clipboard event interfaces"}],"url":"#dictdef-clipboardeventinit"},
+"dictdef-clipboarditemoptions": {"dfnID":"dictdef-clipboarditemoptions","dfnText":"ClipboardItemOptions","external":false,"refSections":[{"refs":[{"id":"ref-for-dictdef-clipboarditemoptions"},{"id":"ref-for-dictdef-clipboarditemoptions\u2460"}],"title":"7.2. Clipboard Interface"}],"url":"#dictdef-clipboarditemoptions"},
+"dictdef-clipboardpermissiondescriptor": {"dfnID":"dictdef-clipboardpermissiondescriptor","dfnText":"ClipboardPermissionDescriptor","external":false,"refSections":[{"refs":[{"id":"ref-for-dictdef-clipboardpermissiondescriptor"}],"title":"9. Permissions API Integration"}],"url":"#dictdef-clipboardpermissiondescriptor"},
+"dom-clipboard-read": {"dfnID":"dom-clipboard-read","dfnText":"7.2.1. read()","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-clipboard-read"}],"title":"2.2. Remote Clipboard Synchronization"},{"refs":[{"id":"ref-for-dom-clipboard-read\u2460"}],"title":"7.2. Clipboard Interface"},{"refs":[{"id":"ref-for-dom-clipboard-read"},{"id":"ref-for-dom-clipboard-read\u2461"}],"title":"7.2.1. read()"}],"url":"#dom-clipboard-read"},
+"dom-clipboard-readtext": {"dfnID":"dom-clipboard-readtext","dfnText":"7.2.2. readText()","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-clipboard-readtext"}],"title":"7.2. Clipboard Interface"},{"refs":[{"id":"ref-for-dom-clipboard-readtext"},{"id":"ref-for-dom-clipboard-readtext\u2460"}],"title":"7.2.2. readText()"}],"url":"#dom-clipboard-readtext"},
+"dom-clipboard-write": {"dfnID":"dom-clipboard-write","dfnText":"7.2.3. write(data)","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-clipboard-write"}],"title":"2.2. Remote Clipboard Synchronization"},{"refs":[{"id":"ref-for-dom-clipboard-write\u2460"}],"title":"7.2. Clipboard Interface"},{"refs":[{"id":"ref-for-dom-clipboard-write"},{"id":"ref-for-dom-clipboard-write\u2461"}],"title":"7.2.3. write(data)"}],"url":"#dom-clipboard-write"},
+"dom-clipboard-writetext": {"dfnID":"dom-clipboard-writetext","dfnText":"7.2.4. writeText(data)","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-clipboard-writetext"}],"title":"7.2. Clipboard Interface"},{"refs":[{"id":"ref-for-dom-clipboard-writetext"},{"id":"ref-for-dom-clipboard-writetext\u2460"}],"title":"7.2.4. writeText(data)"}],"url":"#dom-clipboard-writetext"},
+"dom-clipboardevent-clipboarddata": {"dfnID":"dom-clipboardevent-clipboarddata","dfnText":"clipboardData","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-clipboardevent-clipboarddata"}],"title":"5.2.3. The cut event"},{"refs":[{"id":"ref-for-dom-clipboardevent-clipboarddata\u2460"}],"title":"6. Clipboard Event API"},{"refs":[{"id":"ref-for-dom-clipboardevent-clipboarddata\u2461"}],"title":"6.1. Overriding the copy event"},{"refs":[{"id":"ref-for-dom-clipboardevent-clipboarddata\u2462"}],"title":"6.2. Overriding the cut event"},{"refs":[{"id":"ref-for-dom-clipboardevent-clipboarddata\u2463"}],"title":"fire a clipboard event"}],"url":"#dom-clipboardevent-clipboarddata"},
+"e303c02d": {"dfnID":"e303c02d","dfnText":"type","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-type"},{"id":"ref-for-dfn-type\u2460"}],"title":"7.2.4. writeText(data)"}],"url":"https://w3c.github.io/FileAPI/#dfn-type"},
+"e99bd18e": {"dfnID":"e99bd18e","dfnText":"relevant global object","external":true,"refSections":[{"refs":[{"id":"ref-for-concept-relevant-global"}],"title":"9.1.1. check clipboard read permission"},{"refs":[{"id":"ref-for-concept-relevant-global\u2460"}],"title":"9.2.1. check clipboard write permission"}],"url":"https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-global"},
+"ebb01253": {"dfnID":"ebb01253","dfnText":"PermissionDescriptor","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-permissiondescriptor"}],"title":"9. Permissions API Integration"}],"url":"https://w3c.github.io/permissions/#dom-permissiondescriptor"},
+"editable-context": {"dfnID":"editable-context","dfnText":"editable context","external":false,"refSections":[{"refs":[{"id":"ref-for-editable-context"},{"id":"ref-for-editable-context\u2460"}],"title":"5.2.3. The cut event"},{"refs":[{"id":"ref-for-editable-context\u2461"},{"id":"ref-for-editable-context\u2462"}],"title":"5.2.4. The paste event"},{"refs":[{"id":"ref-for-editable-context\u2463"}],"title":"8.2. The cut action"},{"refs":[{"id":"ref-for-editable-context\u2464"}],"title":"8.3. The paste action"}],"url":"#editable-context"},
+"enumdef-presentationstyle": {"dfnID":"enumdef-presentationstyle","dfnText":"PresentationStyle","external":false,"refSections":[{"refs":[{"id":"ref-for-enumdef-presentationstyle"},{"id":"ref-for-enumdef-presentationstyle\u2460"}],"title":"7.2. Clipboard Interface"}],"url":"#enumdef-presentationstyle"},
+"f3fc35d3": {"dfnID":"f3fc35d3","dfnText":"types","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-datatransfer-types"}],"title":"fire a clipboard event"}],"url":"https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-types"},
+"f62ad1e6": {"dfnID":"f62ad1e6","dfnText":"clearData(format)","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-datatransfer-cleardata"}],"title":"fire a clipboard event"}],"url":"https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-cleardata"},
+"f9970195": {"dfnID":"f9970195","dfnText":"lastModified","external":true,"refSections":[{"refs":[{"id":"ref-for-dfn-lastModified"}],"title":"process an HTML paste event"}],"url":"https://w3c.github.io/FileAPI/#dfn-lastModified"},
+"fad8924f": {"dfnID":"fad8924f","dfnText":"focusable area","external":true,"refSections":[{"refs":[{"id":"ref-for-focusable-area"}],"title":"5.3.5. Event listeners that modify selection or focus"}],"url":"https://html.spec.whatwg.org/multipage/interaction.html#focusable-area"},
+"fefe0433": {"dfnID":"fefe0433","dfnText":"preventDefault()","external":true,"refSections":[{"refs":[{"id":"ref-for-dom-event-preventdefault"}],"title":"6.1. Overriding the copy event"},{"refs":[{"id":"ref-for-dom-event-preventdefault\u2460"}],"title":"6.2. Overriding the cut event"},{"refs":[{"id":"ref-for-dom-event-preventdefault\u2461"}],"title":"6.3. Overriding the paste event"}],"url":"https://dom.spec.whatwg.org/#dom-event-preventdefault"},
+"fire-a-clipboard-event": {"dfnID":"fire-a-clipboard-event","dfnText":"fire a clipboard event","external":false,"refSections":[{"refs":[{"id":"ref-for-fire-a-clipboard-event"}],"title":"5.2.2. The copy event"},{"refs":[{"id":"ref-for-fire-a-clipboard-event\u2460"}],"title":"5.2.3. The cut event"},{"refs":[{"id":"ref-for-fire-a-clipboard-event\u2461"}],"title":"5.2.4. The paste event"},{"refs":[{"id":"ref-for-fire-a-clipboard-event\u2462"},{"id":"ref-for-fire-a-clipboard-event\u2463"}],"title":"8.1. The copy action"},{"refs":[{"id":"ref-for-fire-a-clipboard-event\u2464"},{"id":"ref-for-fire-a-clipboard-event\u2465"},{"id":"ref-for-fire-a-clipboard-event\u2466"}],"title":"8.2. The cut action"},{"refs":[{"id":"ref-for-fire-a-clipboard-event"}],"title":"8.3. The paste action"}],"url":"#fire-a-clipboard-event"},
+"mandatory-data-types": {"dfnID":"mandatory-data-types","dfnText":"Mandatory data types","external":false,"refSections":[{"refs":[{"id":"ref-for-mandatory-data-types"}],"title":"5.1. Clipboard event interfaces"},{"refs":[{"id":"ref-for-mandatory-data-types\u2460"},{"id":"ref-for-mandatory-data-types\u2461"}],"title":"write content to the clipboard"},{"refs":[{"id":"ref-for-mandatory-data-types\u2462"}],"title":"fire a clipboard event"}],"url":"#mandatory-data-types"},
+"navigator-clipboard": {"dfnID":"navigator-clipboard","dfnText":"clipboard","external":false,"refSections":[{"refs":[{"id":"ref-for-navigator-clipboard"},{"id":"ref-for-navigator-clipboard\u2460"}],"title":"7.1.1. clipboard"}],"url":"#navigator-clipboard"},
+"paste": {"dfnID":"paste","dfnText":"paste","external":false,"refSections":[{"refs":[{"id":"ref-for-paste"},{"id":"ref-for-paste\u2460"},{"id":"ref-for-paste\u2461"},{"id":"ref-for-paste\u2462"}],"title":"5.2.4. The paste event"},{"refs":[{"id":"ref-for-paste\u2463"}],"title":"5.3.2. Event handlers that are allowed to read from clipboard"},{"refs":[{"id":"ref-for-paste\u2464"},{"id":"ref-for-paste\u2465"},{"id":"ref-for-paste\u2466"},{"id":"ref-for-paste\u2467"}],"title":"6.3. Overriding the paste event"},{"refs":[{"id":"ref-for-paste\u2468"}],"title":"8.3. The paste action"}],"url":"#paste"},
+"process-an-html-paste-event": {"dfnID":"process-an-html-paste-event","dfnText":"process an HTML paste event","external":false,"refSections":[{"refs":[{"id":"ref-for-process-an-html-paste-event"}],"title":"fire a clipboard event"}],"url":"#process-an-html-paste-event"},
+"script-may-access-clipboard": {"dfnID":"script-may-access-clipboard","dfnText":"script-may-access-clipboard","external":false,"refSections":[{"refs":[{"id":"ref-for-script-may-access-clipboard"},{"id":"ref-for-script-may-access-clipboard\u2460"},{"id":"ref-for-script-may-access-clipboard\u2461"}],"title":"8. Clipboard Actions"},{"refs":[{"id":"ref-for-script-may-access-clipboard\u2462"}],"title":"8.1. The copy action"},{"refs":[{"id":"ref-for-script-may-access-clipboard\u2463"}],"title":"8.2. The cut action"},{"refs":[{"id":"ref-for-script-may-access-clipboard\u2464"},{"id":"ref-for-script-may-access-clipboard\u2465"}],"title":"8.3. The paste action"}],"url":"#script-may-access-clipboard"},
+"script-triggered": {"dfnID":"script-triggered","dfnText":"script-triggered","external":false,"refSections":[{"refs":[{"id":"ref-for-script-triggered"},{"id":"ref-for-script-triggered\u2460"}],"title":"8. Clipboard Actions"},{"refs":[{"id":"ref-for-script-triggered\u2461"}],"title":"8.1. The copy action"},{"refs":[{"id":"ref-for-script-triggered\u2462"}],"title":"8.2. The cut action"},{"refs":[{"id":"ref-for-script-triggered\u2463"}],"title":"8.3. The paste action"}],"url":"#script-triggered"},
+"system-clipboard": {"dfnID":"system-clipboard","dfnText":"system clipboard","external":false,"refSections":[{"refs":[{"id":"ref-for-system-clipboard"}],"title":"4. Model"},{"refs":[{"id":"ref-for-system-clipboard\u2460"},{"id":"ref-for-system-clipboard\u2461"}],"title":"5.2.1. The clipboardchange event"},{"refs":[{"id":"ref-for-system-clipboard\u2462"},{"id":"ref-for-system-clipboard\u2463"}],"title":"5.2.2. The copy event"},{"refs":[{"id":"ref-for-system-clipboard\u2464"},{"id":"ref-for-system-clipboard\u2465"}],"title":"5.2.3. The cut event"},{"refs":[{"id":"ref-for-system-clipboard\u2466"}],"title":"6.1. Overriding the copy event"},{"refs":[{"id":"ref-for-system-clipboard\u2467"}],"title":"6.2. Overriding the cut event"},{"refs":[{"id":"ref-for-system-clipboard\u2468"}],"title":"6.3. Overriding the paste event"}],"url":"#system-clipboard"},
+"system-clipboard-data": {"dfnID":"system-clipboard-data","dfnText":"system clipboard data","external":false,"refSections":[{"refs":[{"id":"ref-for-system-clipboard-data"},{"id":"ref-for-system-clipboard-data\u2460"}],"title":"4. Model"},{"refs":[{"id":"ref-for-system-clipboard-data\u2461"}],"title":"7.2.1. read()"},{"refs":[{"id":"ref-for-system-clipboard-data\u2462"}],"title":"7.2.2. readText()"},{"refs":[{"id":"ref-for-system-clipboard-data\u2463"}],"title":"7.2.3. write(data)"},{"refs":[{"id":"ref-for-system-clipboard-data\u2464"}],"title":"7.2.4. writeText(data)"}],"url":"#system-clipboard-data"},
+"typedefdef-clipboarditemdata": {"dfnID":"typedefdef-clipboarditemdata","dfnText":"ClipboardItemData","external":false,"refSections":[{"refs":[{"id":"ref-for-typedefdef-clipboarditemdata"},{"id":"ref-for-typedefdef-clipboarditemdata\u2460"}],"title":"7.2. Clipboard Interface"}],"url":"#typedefdef-clipboarditemdata"},
+"typedefdef-clipboarditemdatatype": {"dfnID":"typedefdef-clipboarditemdatatype","dfnText":"ClipboardItemDataType","external":false,"refSections":[{"refs":[{"id":"ref-for-typedefdef-clipboarditemdatatype"}],"title":"7.2. Clipboard Interface"}],"url":"#typedefdef-clipboarditemdatatype"},
+"typedefdef-clipboarditems": {"dfnID":"typedefdef-clipboarditems","dfnText":"ClipboardItems","external":false,"refSections":[{"refs":[{"id":"ref-for-typedefdef-clipboarditems"},{"id":"ref-for-typedefdef-clipboarditems\u2460"}],"title":"7.2. Clipboard Interface"}],"url":"#typedefdef-clipboarditems"},
+"write-content-to-the-clipboard": {"dfnID":"write-content-to-the-clipboard","dfnText":"write content to the clipboard","external":false,"refSections":[{"refs":[{"id":"ref-for-write-content-to-the-clipboard"}],"title":"8.1. The copy action"},{"refs":[{"id":"ref-for-write-content-to-the-clipboard\u2460"}],"title":"8.2. The cut action"}],"url":"#write-content-to-the-clipboard"},
+};
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+});
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        dfn.panelData = panelData;
+        insertDfnPopupAction(dfn);
+    }
+}
+
+function genDfnPanel(dfn, { dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel on",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel({dfnPanel});
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.dfn = dfn;
+    dfn.dfnPanel = dfnPanel;
+    return dfnPanel;
+}
+
+
+
+function hideAllDfnPanels() {
+    // Delete the currently-active dfn panel.
+    queryAll(".dfn-panel").forEach(dfnPanel=>hideDfnPanel({dfnPanel}));
+}
+
+function showDfnPanel(dfn) {
+    hideAllDfnPanels(); // Only display one at a time.
+
+    dfn.setAttribute("aria-expanded", "true");
+
+    const dfnPanel = genDfnPanel(dfn, dfn.panelData);
+
+    // Give the dfn a unique tabindex, and then
+    // give all the tabbable panel bits successive indexes.
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+
+    append(document.body, dfnPanel);
+    positionDfnPanel(dfnPanel);
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.dfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }
+}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel({dfn, dfnPanel}) {
+    if(!dfnPanel) dfnPanel = dfn.dfnPanel;
+    if(!dfn) dfn = dfnPanel.dfn;
+    dfn.dfnPanel = undefined;
+    dfnPanel.dfn = undefined;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.remove()
+}
+
+function toggleDfnPanel(dfn) {
+    if(dfn.dfnPanel) {
+        hideDfnPanel(dfn);
+    } else {
+        showDfnPanel(dfn);
+    }
+}
+
+function insertDfnPopupAction(dfn) {
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        toggleDfnPanel(dfn);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+function needsFor(type) {
+    switch(type) {
+        case "descriptor":
+        case "value":
+        case "element-attr":
+        case "attr-value":
+        case "element-state":
+        case "method":
+        case "constructor":
+        case "argument":
+        case "attribute":
+        case "const":
+        case "dict-member":
+        case "event":
+        case "enum-value":
+        case "stringifier":
+        case "serializer":
+        case "iterator":
+        case "maplike":
+        case "setlike":
+        case "state":
+        case "mode":
+        case "context":
+        case "facet": return true;
+
+        default: return false;
+    }
+}
+function refusesFor(type) {
+    switch(type) {
+        case "property":
+        case "element":
+        case "interface":
+        case "namespace":
+        case "callback":
+        case "dictionary":
+        case "enum":
+        case "exception":
+        case "typedef":
+        case "http-header":
+        case "permission": return true;
+
+        default: return false;
+    }
+}
+function linkFormatterFromType(type) {
+    switch(type) {
+        case 'scheme':
+        case 'permission':
+        case 'dfn': return (text) => `[=${text}=]`;
+
+        case 'abstract-op': return (text) => `[\$${text}\$]`;
+
+        case 'function':
+        case 'at-rule':
+        case 'selector':
+        case 'value': return (text) => `''${text}''`;
+
+        case 'http-header': return (text) => `[:${text}:]`;
+
+        case 'interface':
+        case 'constructor':
+        case 'method':
+        case 'argument':
+        case 'attribute':
+        case 'callback':
+        case 'dictionary':
+        case 'dict-member':
+        case 'enum':
+        case 'enum-value':
+        case 'exception':
+        case 'const':
+        case 'typedef':
+        case 'stringifier':
+        case 'serializer':
+        case 'iterator':
+        case 'maplike':
+        case 'setlike':
+        case 'extended-attribute':
+        case 'event':
+        case 'idl': return (text) => `{{${text}}}`;
+
+        case 'element-state':
+        case 'element-attr':
+        case 'attr-value':
+        case 'element': return (element) => `<{${element}}>`;
+
+        case 'grammar': return (text) => `${text} (within a <pre class=prod>)`;
+
+        case 'type': return (text)=> `<<${text}>>`;
+
+        case 'descriptor':
+        case 'property': return (text) => `'${text}'`;
+
+        default: return;
+    };
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!needsFor(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!refusesFor(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
 }
 </script>
 <script>/* Boilerplate: script-position-annos */
 "use strict";
 {
-
 function repositionAnnoPanels(){
     const panels = [...document.querySelectorAll("[data-anno-for]")];
-    const main = document.querySelector("main");
-    let mainRect;
-    if(main) mainRect = main.getBoundingClientRect();
-    for(const panel of panels) {
-        const dfn = document.getElementById(panel.getAttribute("data-anno-for"));
-        if(!dfn) {
-            console.log("Can't find the annotation panel target:", panel);
-            continue;
-        }
-        const rect = dfn.getBoundingClientRect();
-        const top = window.scrollY + rect.top
-        panel.style.top = top + "px";
-        panel.top = top;
-        panel.height = rect.height;
-        panel.classList.remove("unpositioned");
-        const panelRect = panel.getBoundingClientRect()
-        if(main) {
-            panel.classList.toggle("overlapping-main", panelRect.left < mainRect.right)
-        }
-    }
+    hydratePanels(panels);
     let vSoFar = 0;
     for(const panel of panels.sort(cmpTops)) {
         if(panel.top < vSoFar) {
@@ -3791,6 +3780,39 @@ function repositionAnnoPanels(){
             panel.style.top = vSoFar + "px";
         }
         vSoFar = panel.top + panel.height + 15;
+    }
+}
+function hydratePanels(panels) {
+    const main = document.querySelector("main");
+    let mainRect;
+    if(main) mainRect = main.getBoundingClientRect();
+    // First display them all, if they're not already visible.
+    for(const panel of panels) {
+        panel.classList.remove("unpositioned");
+    }
+    // Measure them all
+    for(const panel of panels) {
+        const dfn = document.getElementById(panel.getAttribute("data-anno-for"));
+        if(!dfn) {
+            console.log("Can't find the annotation panel target:", panel);
+            continue;
+        }
+        panel.dfn = dfn;
+        panel.top = window.scrollY + dfn.getBoundingClientRect().top;
+        let panelRect = panel.getBoundingClientRect();
+        panel.height = panelRect.height;
+        if(main) {
+            panel.overlappingMain = panelRect.left < mainRect.right;
+        } else {
+            panel.overlappingMain = false;
+        }
+    }
+    // And finally position them
+    for(const panel of panels) {
+        const dfn = panel.dfn;
+        if(!dfn) continue;
+        panel.style.top = panel.top + "px";
+        panel.classList.toggle("overlapping-main", panel.overlappingMain);
     }
 }
 
@@ -3805,402 +3827,380 @@ window.addEventListener("resize", repositionAnnoPanels);
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
-                mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
+let refsData = {
+"#allowed-to-modify-the-clipboard": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"allowed to modify the clipboard","type":"dfn","url":"#allowed-to-modify-the-clipboard"},
+"#allowed-to-read-from-clipboard": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"allowed to read from clipboard","type":"dfn","url":"#allowed-to-read-from-clipboard"},
+"#callbackdef-clipboarditemdelayedcallback": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"ClipboardItemDelayedCallback","type":"callback","url":"#callbackdef-clipboarditemdelayedcallback"},
+"#check-clipboard-read-permission": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"check clipboard read permission","type":"dfn","url":"#check-clipboard-read-permission"},
+"#check-clipboard-write-permission": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"check clipboard write permission","type":"dfn","url":"#check-clipboard-write-permission"},
+"#clipboard": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"Clipboard","type":"interface","url":"#clipboard"},
+"#clipboardchange": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"clipboardchange","type":"dfn","url":"#clipboardchange"},
+"#clipboardevent": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"ClipboardEvent","type":"interface","url":"#clipboardevent"},
+"#clipboarditem": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"ClipboardItem","type":"interface","url":"#clipboarditem"},
+"#copy": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"copy","type":"dfn","url":"#copy"},
+"#cut": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"cut","type":"dfn","url":"#cut"},
+"#dictdef-clipboardeventinit": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"ClipboardEventInit","type":"dictionary","url":"#dictdef-clipboardeventinit"},
+"#dictdef-clipboarditemoptions": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"ClipboardItemOptions","type":"dictionary","url":"#dictdef-clipboarditemoptions"},
+"#dictdef-clipboardpermissiondescriptor": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"ClipboardPermissionDescriptor","type":"dictionary","url":"#dictdef-clipboardpermissiondescriptor"},
+"#dom-clipboard-read": {"export":true,"for_":["Clipboard"],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"read()","type":"method","url":"#dom-clipboard-read"},
+"#dom-clipboard-readtext": {"export":true,"for_":["Clipboard"],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"readText()","type":"method","url":"#dom-clipboard-readtext"},
+"#dom-clipboard-write": {"export":true,"for_":["Clipboard"],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"write(data)","type":"method","url":"#dom-clipboard-write"},
+"#dom-clipboard-writetext": {"export":true,"for_":["Clipboard"],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"writeText(data)","type":"method","url":"#dom-clipboard-writetext"},
+"#dom-clipboardevent-clipboarddata": {"export":true,"for_":["ClipboardEvent"],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"clipboardData","type":"attribute","url":"#dom-clipboardevent-clipboarddata"},
+"#editable-context": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"editable context","type":"dfn","url":"#editable-context"},
+"#enumdef-presentationstyle": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"PresentationStyle","type":"enum","url":"#enumdef-presentationstyle"},
+"#fire-a-clipboard-event": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"fire a clipboard event","type":"dfn","url":"#fire-a-clipboard-event"},
+"#mandatory-data-types": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"mandatory data types","type":"dfn","url":"#mandatory-data-types"},
+"#navigator-clipboard": {"export":true,"for_":["Navigator"],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"clipboard","type":"dfn","url":"#navigator-clipboard"},
+"#paste": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"paste","type":"dfn","url":"#paste"},
+"#process-an-html-paste-event": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"process an html paste event","type":"dfn","url":"#process-an-html-paste-event"},
+"#script-may-access-clipboard": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"script-may-access-clipboard","type":"dfn","url":"#script-may-access-clipboard"},
+"#script-triggered": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"script-triggered","type":"dfn","url":"#script-triggered"},
+"#system-clipboard": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"system clipboard","type":"dfn","url":"#system-clipboard"},
+"#system-clipboard-data": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"system clipboard data","type":"dfn","url":"#system-clipboard-data"},
+"#typedefdef-clipboarditemdata": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"ClipboardItemData","type":"typedef","url":"#typedefdef-clipboarditemdata"},
+"#typedefdef-clipboarditemdatatype": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"ClipboardItemDataType","type":"typedef","url":"#typedefdef-clipboarditemdatatype"},
+"#typedefdef-clipboarditems": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"ClipboardItems","type":"typedef","url":"#typedefdef-clipboarditems"},
+"#write-content-to-the-clipboard": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"clipboard-apis","status":"local","text":"write content to the clipboard","type":"dfn","url":"#write-content-to-the-clipboard"},
+"http://tc39.github.io/ecma262/#sec-promise-objects": {"export":true,"for_":[],"level":"262","normative":true,"shortname":"ecma","spec":"ecma-262","status":"anchor-block","text":"promise","type":"dfn","url":"http://tc39.github.io/ecma262/#sec-promise-objects"},
+"http://w3c.github.io/editing/contentEditable.html#dfn-editing-host": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"","status":"anchor-block","text":"editing host","type":"dfn","url":"http://w3c.github.io/editing/contentEditable.html#dfn-editing-host"},
+"http://www.w3.org/TR/html5/browsers.html#allowed-to-show-a-popup": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"","status":"anchor-block","text":"allowed to show a popup","type":"dfn","url":"http://www.w3.org/TR/html5/browsers.html#allowed-to-show-a-popup"},
+"https://dom.spec.whatwg.org/#concept-cd-data": {"export":true,"for_":["CharacterData"],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"data","type":"dfn","url":"https://dom.spec.whatwg.org/#concept-cd-data"},
+"https://dom.spec.whatwg.org/#constructing-events": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"","status":"anchor-block","text":"constructing events","type":"dfn","url":"https://dom.spec.whatwg.org/#constructing-events"},
+"https://dom.spec.whatwg.org/#dictdef-eventinit": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"EventInit","type":"dictionary","url":"https://dom.spec.whatwg.org/#dictdef-eventinit"},
+"https://dom.spec.whatwg.org/#dom-event-composed": {"export":true,"for_":["Event"],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"composed","type":"attribute","url":"https://dom.spec.whatwg.org/#dom-event-composed"},
+"https://dom.spec.whatwg.org/#dom-event-istrusted": {"export":true,"for_":["Event"],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"isTrusted","type":"attribute","url":"https://dom.spec.whatwg.org/#dom-event-istrusted"},
+"https://dom.spec.whatwg.org/#dom-event-preventdefault": {"export":true,"for_":["Event"],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"preventDefault()","type":"method","url":"https://dom.spec.whatwg.org/#dom-event-preventdefault"},
+"https://dom.spec.whatwg.org/#event": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"Event","type":"interface","url":"https://dom.spec.whatwg.org/#event"},
+"https://dom.spec.whatwg.org/#eventtarget": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"dom","spec":"dom","status":"current","text":"EventTarget","type":"interface","url":"https://dom.spec.whatwg.org/#eventtarget"},
+"https://html.spec.whatwg.org/multipage/dnd.html#datatransfer": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"DataTransfer","type":"interface","url":"https://html.spec.whatwg.org/multipage/dnd.html#datatransfer"},
+"https://html.spec.whatwg.org/multipage/dnd.html#datatransferitem": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"DataTransferItem","type":"interface","url":"https://html.spec.whatwg.org/multipage/dnd.html#datatransferitem"},
+"https://html.spec.whatwg.org/multipage/dnd.html#datatransferitemlist": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"DataTransferItemList","type":"interface","url":"https://html.spec.whatwg.org/multipage/dnd.html#datatransferitemlist"},
+"https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-cleardata": {"export":true,"for_":["DataTransfer"],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"clearData(format)","type":"method","url":"https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-cleardata"},
+"https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-files": {"export":true,"for_":["DataTransfer"],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"files","type":"attribute","url":"https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-files"},
+"https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-getdata": {"export":true,"for_":["DataTransfer"],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"getData(format)","type":"method","url":"https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-getdata"},
+"https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-items": {"export":true,"for_":["DataTransfer"],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"items","type":"attribute","url":"https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-items"},
+"https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-setdata": {"export":true,"for_":["DataTransfer"],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"setData(format, data)","type":"method","url":"https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-setdata"},
+"https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-types": {"export":true,"for_":["DataTransfer"],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"types","type":"attribute","url":"https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-types"},
+"https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransferitemlist-clear": {"export":true,"for_":["DataTransferItemList"],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"clear()","type":"method","url":"https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransferitemlist-clear"},
+"https://html.spec.whatwg.org/multipage/dom.html#the-body-element-2": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"","status":"anchor-block","text":"the body element","type":"dfn","url":"https://html.spec.whatwg.org/multipage/dom.html#the-body-element-2"},
+"https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"in parallel","type":"dfn","url":"https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel"},
+"https://html.spec.whatwg.org/multipage/interaction.html#concept-dnd-p": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"","status":"anchor-block","text":"concept dnd p","type":"dfn","url":"https://html.spec.whatwg.org/multipage/interaction.html#concept-dnd-p"},
+"https://html.spec.whatwg.org/multipage/interaction.html#concept-dnd-ro": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"","status":"anchor-block","text":"concept dnd ro","type":"dfn","url":"https://html.spec.whatwg.org/multipage/interaction.html#concept-dnd-ro"},
+"https://html.spec.whatwg.org/multipage/interaction.html#concept-dnd-rw": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"","status":"anchor-block","text":"concept dnd rw","type":"dfn","url":"https://html.spec.whatwg.org/multipage/interaction.html#concept-dnd-rw"},
+"https://html.spec.whatwg.org/multipage/interaction.html#drag-data-item-kind": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"","status":"anchor-block","text":"drag data item kind","type":"dfn","url":"https://html.spec.whatwg.org/multipage/interaction.html#drag-data-item-kind"},
+"https://html.spec.whatwg.org/multipage/interaction.html#drag-data-item-type-string": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"","status":"anchor-block","text":"drag data item type string","type":"dfn","url":"https://html.spec.whatwg.org/multipage/interaction.html#drag-data-item-type-string"},
+"https://html.spec.whatwg.org/multipage/interaction.html#drag-data-store-mode": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"","status":"anchor-block","text":"drag data store mode","type":"dfn","url":"https://html.spec.whatwg.org/multipage/interaction.html#drag-data-store-mode"},
+"https://html.spec.whatwg.org/multipage/interaction.html#focusable-area": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"","status":"anchor-block","text":"focusable area","type":"dfn","url":"https://html.spec.whatwg.org/multipage/interaction.html#focusable-area"},
+"https://html.spec.whatwg.org/multipage/interaction.html#transient-activation": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"transient activation","type":"dfn","url":"https://html.spec.whatwg.org/multipage/interaction.html#transient-activation"},
+"https://html.spec.whatwg.org/multipage/system-state.html#navigator": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"Navigator","type":"interface","url":"https://html.spec.whatwg.org/multipage/system-state.html#navigator"},
+"https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-global": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"html","spec":"html","status":"current","text":"relevant global object","type":"dfn","url":"https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-global"},
+"https://w3c.github.io/FileAPI/#dfn-Blob": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"fileapi","spec":"fileapi","status":"current","text":"Blob","type":"interface","url":"https://w3c.github.io/FileAPI/#dfn-Blob"},
+"https://w3c.github.io/FileAPI/#dfn-blobparts": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"","status":"anchor-block","text":"blobparts","type":"dfn","url":"https://w3c.github.io/FileAPI/#dfn-blobparts"},
+"https://w3c.github.io/FileAPI/#dfn-file": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"fileapi","spec":"fileapi","status":"current","text":"File","type":"interface","url":"https://w3c.github.io/FileAPI/#dfn-file"},
+"https://w3c.github.io/FileAPI/#dfn-lastModified": {"export":true,"for_":["File"],"level":"1","normative":true,"shortname":"fileapi","spec":"fileapi","status":"current","text":"lastModified","type":"attribute","url":"https://w3c.github.io/FileAPI/#dfn-lastModified"},
+"https://w3c.github.io/FileAPI/#dfn-name": {"export":true,"for_":["File"],"level":"1","normative":true,"shortname":"fileapi","spec":"fileapi","status":"current","text":"name","type":"attribute","url":"https://w3c.github.io/FileAPI/#dfn-name"},
+"https://w3c.github.io/FileAPI/#dfn-type": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"","status":"anchor-block","text":"type","type":"dfn","url":"https://w3c.github.io/FileAPI/#dfn-type"},
+"https://w3c.github.io/permissions/#dfn-permission-descriptor-type": {"export":true,"for_":["powerful feature"],"level":"1","normative":true,"shortname":"permissions","spec":"permissions","status":"current","text":"permission descriptor type","type":"dfn","url":"https://w3c.github.io/permissions/#dfn-permission-descriptor-type"},
+"https://w3c.github.io/permissions/#dfn-permission-state": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions","spec":"permissions","status":"current","text":"permission state","type":"dfn","url":"https://w3c.github.io/permissions/#dfn-permission-state"},
+"https://w3c.github.io/permissions/#dfn-powerful-feature": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions","spec":"permissions","status":"current","text":"powerful feature","type":"dfn","url":"https://w3c.github.io/permissions/#dfn-powerful-feature"},
+"https://w3c.github.io/permissions/#dfn-request-permission-to-use": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions","spec":"permissions","status":"current","text":"request permission to use","type":"dfn","url":"https://w3c.github.io/permissions/#dfn-request-permission-to-use"},
+"https://w3c.github.io/permissions/#dom-permissiondescriptor": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"permissions","spec":"permissions","status":"current","text":"PermissionDescriptor","type":"dictionary","url":"https://w3c.github.io/permissions/#dom-permissiondescriptor"},
+"https://w3c.github.io/permissions/#dom-permissionstate-denied": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"","status":"anchor-block","text":"denied","type":"dfn","url":"https://w3c.github.io/permissions/#dom-permissionstate-denied"},
+"https://w3c.github.io/permissions/#dom-permissionstate-granted": {"export":true,"for_":[],"level":"","normative":true,"shortname":"clipboard-apis","spec":"","status":"anchor-block","text":"granted","type":"dfn","url":"https://w3c.github.io/permissions/#dom-permissionstate-granted"},
+"https://webidl.spec.whatwg.org/#Exposed": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"Exposed","type":"extended-attribute","url":"https://webidl.spec.whatwg.org/#Exposed"},
+"https://webidl.spec.whatwg.org/#SameObject": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"SameObject","type":"extended-attribute","url":"https://webidl.spec.whatwg.org/#SameObject"},
+"https://webidl.spec.whatwg.org/#SecureContext": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"SecureContext","type":"extended-attribute","url":"https://webidl.spec.whatwg.org/#SecureContext"},
+"https://webidl.spec.whatwg.org/#idl-DOMString": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"DOMString","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-DOMString"},
+"https://webidl.spec.whatwg.org/#idl-boolean": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"boolean","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-boolean"},
+"https://webidl.spec.whatwg.org/#idl-frozen-array": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"FrozenArray","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-frozen-array"},
+"https://webidl.spec.whatwg.org/#idl-long-long": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"long long","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-long-long"},
+"https://webidl.spec.whatwg.org/#idl-promise": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"Promise","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-promise"},
+"https://webidl.spec.whatwg.org/#idl-record": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"record","type":"dfn","url":"https://webidl.spec.whatwg.org/#idl-record"},
+"https://webidl.spec.whatwg.org/#idl-sequence": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"sequence","type":"dfn","url":"https://webidl.spec.whatwg.org/#idl-sequence"},
+"https://webidl.spec.whatwg.org/#idl-undefined": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"undefined","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-undefined"},
+"https://webidl.spec.whatwg.org/#this": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"this","type":"dfn","url":"https://webidl.spec.whatwg.org/#this"},
+};
+
+function mkRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "Term: "),
+                mk.span({}, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    let forListElements;
+    if(forList.length == 0) {
+        forListElements = [];
+    } else if(forList.length == 1) {
+        forListElements = mk.li({},
+            mk.b({}, "For: "),
+            mk.span({}, forList[0]),
+        );
+    } else {
+        forListElements = mk.li({},
             mk.b({}, "For: "),
             mk.ul({},
                 ...forList.map(forItem =>
                     mk.li({},
-                        mk.span({}, `${forItem}`)
+                        mk.span({}, forItem)
                     ),
                 ),
             ),
         );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+    }
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    setupRefHintEventListeners(link, hintPanel);
+    return hintPanel;
+}
+
+function hideAllRefHints() {
+    queryAll(".ref-hint").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    if(refHint.teardownEventListeners) {
+        refHint.teardownEventListeners();
     }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+    refHint.remove();
+}
+
+function showRefHint(link) {
+    if(link.classList.contains("dfn-link")) return;
+    const url = link.getAttribute("href");
+    const ref = refsData[url];
+    if(!ref) return;
+
+    hideAllRefHints(); // Only display one at this time.
+
+    const refHint = mkRefHint(link, ref);
+    append(document.body, refHint);
+    link.setAttribute("aria-expanded", "true");
+    positionRefHint(refHint);
+}
+
+function setupRefHintEventListeners(link, refHint) {
+    if (refHint.teardownEventListeners) return;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
+
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
-
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
-    }
-
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
-        }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
-
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
-    }
-
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+document.addEventListener("DOMContentLoaded", () => {
+    document.body.addEventListener("mouseover", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
+    });
+    document.body.addEventListener("focus", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
     });
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
 </script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['https://w3c.github.io/permissions/#dfn-powerful-feature'] = {"text": "powerful feature", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-powerful-feature", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-clipboard-write'] = {"text": "write(data)", "type": "method", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#dom-clipboard-write", "export": true, "normative": true, "for_": ["Clipboard"]};
-window.refsData['#clipboardchange'] = {"text": "clipboardchange", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#clipboardchange", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-clipboard-read'] = {"text": "read()", "type": "method", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#dom-clipboard-read", "export": true, "normative": true, "for_": ["Clipboard"]};
-window.refsData['http://w3c.github.io/editing/contentEditable.html#dfn-editing-host'] = {"text": "editing host", "type": "dfn", "spec": "", "shortname": "clipboard-apis", "level": "", "status": "anchor-block", "url": "http://w3c.github.io/editing/contentEditable.html#dfn-editing-host", "export": true, "normative": true, "for_": []};
-window.refsData['#system-clipboard'] = {"text": "system clipboard", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#system-clipboard", "export": true, "normative": true, "for_": []};
-window.refsData['#system-clipboard-data'] = {"text": "system clipboard data", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#system-clipboard-data", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/dnd.html#datatransfer'] = {"text": "DataTransfer", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dnd.html#datatransfer", "export": true, "normative": true, "for_": []};
-window.refsData['#clipboarditem'] = {"text": "ClipboardItem", "type": "interface", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#clipboarditem", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#event'] = {"text": "Event", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#event", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#dictdef-eventinit'] = {"text": "EventInit", "type": "dictionary", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dictdef-eventinit", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
-window.refsData['#dictdef-clipboardeventinit'] = {"text": "ClipboardEventInit", "type": "dictionary", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#dictdef-clipboardeventinit", "export": true, "normative": true, "for_": []};
-window.refsData['#mandatory-data-types'] = {"text": "mandatory data types", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#mandatory-data-types", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-items'] = {"text": "items", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-items", "export": true, "normative": true, "for_": ["DataTransfer"]};
-window.refsData['https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-files'] = {"text": "files", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-files", "export": true, "normative": true, "for_": ["DataTransfer"]};
-window.refsData['https://dom.spec.whatwg.org/#constructing-events'] = {"text": "constructing events", "type": "dfn", "spec": "", "shortname": "clipboard-apis", "level": "", "status": "anchor-block", "url": "https://dom.spec.whatwg.org/#constructing-events", "export": true, "normative": true, "for_": []};
-window.refsData['#cut'] = {"text": "cut", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#cut", "export": true, "normative": true, "for_": []};
-window.refsData['#copy'] = {"text": "copy", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#copy", "export": true, "normative": true, "for_": []};
-window.refsData['#fire-a-clipboard-event'] = {"text": "fire a clipboard event", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#fire-a-clipboard-event", "export": true, "normative": true, "for_": []};
-window.refsData['#editable-context'] = {"text": "editable context", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#editable-context", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-clipboardevent-clipboarddata'] = {"text": "clipboardData", "type": "attribute", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#dom-clipboardevent-clipboarddata", "export": true, "normative": true, "for_": ["ClipboardEvent"]};
-window.refsData['#paste'] = {"text": "paste", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#paste", "export": true, "normative": true, "for_": []};
-window.refsData['http://www.w3.org/TR/html5/browsers.html#allowed-to-show-a-popup'] = {"text": "allowed to show a popup", "type": "dfn", "spec": "", "shortname": "clipboard-apis", "level": "", "status": "anchor-block", "url": "http://www.w3.org/TR/html5/browsers.html#allowed-to-show-a-popup", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#focusable-area'] = {"text": "focusable area", "type": "dfn", "spec": "", "shortname": "clipboard-apis", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/interaction.html#focusable-area", "export": true, "normative": true, "for_": []};
-window.refsData['#clipboardevent'] = {"text": "ClipboardEvent", "type": "interface", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#clipboardevent", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#dom-event-preventdefault'] = {"text": "preventDefault()", "type": "method", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-event-preventdefault", "export": true, "normative": true, "for_": ["Event"]};
-window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#drag-data-store-mode'] = {"text": "drag data store mode", "type": "dfn", "spec": "", "shortname": "clipboard-apis", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/interaction.html#drag-data-store-mode", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#concept-dnd-ro'] = {"text": "concept dnd ro", "type": "dfn", "spec": "", "shortname": "clipboard-apis", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/interaction.html#concept-dnd-ro", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-setdata'] = {"text": "setData(format, data)", "type": "method", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-setdata", "export": true, "normative": true, "for_": ["DataTransfer"]};
-window.refsData['https://html.spec.whatwg.org/multipage/dnd.html#datatransferitemlist'] = {"text": "DataTransferItemList", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dnd.html#datatransferitemlist", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/system-state.html#navigator'] = {"text": "Navigator", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/system-state.html#navigator", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#SecureContext'] = {"text": "SecureContext", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SecureContext", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#SameObject'] = {"text": "SameObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SameObject", "export": true, "normative": true, "for_": []};
-window.refsData['#clipboard'] = {"text": "Clipboard", "type": "interface", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#clipboard", "export": true, "normative": true, "for_": []};
-window.refsData['#navigator-clipboard'] = {"text": "clipboard", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#navigator-clipboard", "export": true, "normative": true, "for_": ["Navigator"]};
-window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#eventtarget'] = {"text": "EventTarget", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#eventtarget", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-promise'] = {"text": "Promise", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-promise", "export": true, "normative": true, "for_": []};
-window.refsData['#typedefdef-clipboarditems'] = {"text": "ClipboardItems", "type": "typedef", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#typedefdef-clipboarditems", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-clipboard-readtext'] = {"text": "readText()", "type": "method", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#dom-clipboard-readtext", "export": true, "normative": true, "for_": ["Clipboard"]};
-window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
-window.refsData['#dom-clipboard-writetext'] = {"text": "writeText(data)", "type": "method", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#dom-clipboard-writetext", "export": true, "normative": true, "for_": ["Clipboard"]};
-window.refsData['https://w3c.github.io/FileAPI/#dfn-Blob'] = {"text": "Blob", "type": "interface", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#dfn-Blob", "export": true, "normative": true, "for_": []};
-window.refsData['#typedefdef-clipboarditemdatatype'] = {"text": "ClipboardItemDataType", "type": "typedef", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#typedefdef-clipboarditemdatatype", "export": true, "normative": true, "for_": []};
-window.refsData['#typedefdef-clipboarditemdata'] = {"text": "ClipboardItemData", "type": "typedef", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#typedefdef-clipboarditemdata", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-record'] = {"text": "record", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-record", "export": true, "normative": true, "for_": []};
-window.refsData['#dictdef-clipboarditemoptions'] = {"text": "ClipboardItemOptions", "type": "dictionary", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#dictdef-clipboarditemoptions", "export": true, "normative": true, "for_": []};
-window.refsData['#callbackdef-clipboarditemdelayedcallback'] = {"text": "ClipboardItemDelayedCallback", "type": "callback", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#callbackdef-clipboarditemdelayedcallback", "export": true, "normative": true, "for_": []};
-window.refsData['#enumdef-presentationstyle'] = {"text": "PresentationStyle", "type": "enum", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#enumdef-presentationstyle", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-long-long'] = {"text": "long long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-long-long", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#idl-frozen-array'] = {"text": "FrozenArray", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-frozen-array", "export": true, "normative": true, "for_": []};
-window.refsData['http://tc39.github.io/ecma262/#sec-promise-objects'] = {"text": "promise", "type": "dfn", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "http://tc39.github.io/ecma262/#sec-promise-objects", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel'] = {"text": "in parallel", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel", "export": true, "normative": true, "for_": []};
-window.refsData['#check-clipboard-read-permission'] = {"text": "check clipboard read permission", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#check-clipboard-read-permission", "export": true, "normative": true, "for_": []};
-window.refsData['#check-clipboard-write-permission'] = {"text": "check clipboard write permission", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#check-clipboard-write-permission", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/FileAPI/#dfn-type'] = {"text": "type", "type": "dfn", "spec": "", "shortname": "clipboard-apis", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/FileAPI/#dfn-type", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/FileAPI/#dfn-blobparts'] = {"text": "blobparts", "type": "dfn", "spec": "", "shortname": "clipboard-apis", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/FileAPI/#dfn-blobparts", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#concept-cd-data'] = {"text": "data", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-cd-data", "export": true, "normative": true, "for_": ["CharacterData"]};
-window.refsData['#script-triggered'] = {"text": "script-triggered", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#script-triggered", "export": true, "normative": true, "for_": []};
-window.refsData['#script-may-access-clipboard'] = {"text": "script-may-access-clipboard", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#script-may-access-clipboard", "export": true, "normative": true, "for_": []};
-window.refsData['#allowed-to-modify-the-clipboard'] = {"text": "allowed to modify the clipboard", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#allowed-to-modify-the-clipboard", "export": true, "normative": true, "for_": []};
-window.refsData['#allowed-to-read-from-clipboard'] = {"text": "allowed to read from clipboard", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#allowed-to-read-from-clipboard", "export": true, "normative": true, "for_": []};
-window.refsData['#write-content-to-the-clipboard'] = {"text": "write content to the clipboard", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#write-content-to-the-clipboard", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/permissions/#dfn-permission-descriptor-type'] = {"text": "permission descriptor type", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-permission-descriptor-type", "export": true, "normative": true, "for_": ["powerful feature"]};
-window.refsData['https://w3c.github.io/permissions/#dom-permissiondescriptor'] = {"text": "PermissionDescriptor", "type": "dictionary", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dom-permissiondescriptor", "export": true, "normative": true, "for_": []};
-window.refsData['#dictdef-clipboardpermissiondescriptor'] = {"text": "ClipboardPermissionDescriptor", "type": "dictionary", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#dictdef-clipboardpermissiondescriptor", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/permissions/#dom-permissionstate-denied'] = {"text": "denied", "type": "dfn", "spec": "", "shortname": "clipboard-apis", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/permissions/#dom-permissionstate-denied", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-global'] = {"text": "relevant global object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-global", "export": true, "normative": true, "for_": []};
-window.refsData['https://webidl.spec.whatwg.org/#this'] = {"text": "this", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#this", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#transient-activation'] = {"text": "transient activation", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/interaction.html#transient-activation", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/permissions/#dfn-permission-state'] = {"text": "permission state", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-permission-state", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/permissions/#dom-permissionstate-granted'] = {"text": "granted", "type": "dfn", "spec": "", "shortname": "clipboard-apis", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/permissions/#dom-permissionstate-granted", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/permissions/#dfn-request-permission-to-use'] = {"text": "request permission to use", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-request-permission-to-use", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/dom.html#the-body-element-2'] = {"text": "the body element", "type": "dfn", "spec": "", "shortname": "clipboard-apis", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/dom.html#the-body-element-2", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/dnd.html#datatransferitem'] = {"text": "DataTransferItem", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dnd.html#datatransferitem", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#drag-data-item-kind'] = {"text": "drag data item kind", "type": "dfn", "spec": "", "shortname": "clipboard-apis", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/interaction.html#drag-data-item-kind", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#drag-data-item-type-string'] = {"text": "drag data item type string", "type": "dfn", "spec": "", "shortname": "clipboard-apis", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/interaction.html#drag-data-item-type-string", "export": true, "normative": true, "for_": []};
-window.refsData['#process-an-html-paste-event'] = {"text": "process an html paste event", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#process-an-html-paste-event", "export": true, "normative": true, "for_": []};
-window.refsData['https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-types'] = {"text": "types", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-types", "export": true, "normative": true, "for_": ["DataTransfer"]};
-window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#concept-dnd-rw'] = {"text": "concept dnd rw", "type": "dfn", "spec": "", "shortname": "clipboard-apis", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/interaction.html#concept-dnd-rw", "export": true, "normative": true, "for_": []};
-window.refsData['https://dom.spec.whatwg.org/#dom-event-istrusted'] = {"text": "isTrusted", "type": "attribute", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-event-istrusted", "export": true, "normative": true, "for_": ["Event"]};
-window.refsData['https://dom.spec.whatwg.org/#dom-event-composed'] = {"text": "composed", "type": "attribute", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-event-composed", "export": true, "normative": true, "for_": ["Event"]};
-window.refsData['https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-cleardata'] = {"text": "clearData(format)", "type": "method", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-cleardata", "export": true, "normative": true, "for_": ["DataTransfer"]};
-window.refsData['https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransferitemlist-clear'] = {"text": "clear()", "type": "method", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransferitemlist-clear", "export": true, "normative": true, "for_": ["DataTransferItemList"]};
-window.refsData['https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-getdata'] = {"text": "getData(format)", "type": "method", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-getdata", "export": true, "normative": true, "for_": ["DataTransfer"]};
-window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#concept-dnd-p'] = {"text": "concept dnd p", "type": "dfn", "spec": "", "shortname": "clipboard-apis", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/interaction.html#concept-dnd-p", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/FileAPI/#dfn-file'] = {"text": "File", "type": "interface", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#dfn-file", "export": true, "normative": true, "for_": []};
-window.refsData['https://w3c.github.io/FileAPI/#dfn-name'] = {"text": "name", "type": "attribute", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#dfn-name", "export": true, "normative": true, "for_": ["File"]};
-window.refsData['https://w3c.github.io/FileAPI/#dfn-lastModified'] = {"text": "lastModified", "type": "attribute", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#dfn-lastModified", "export": true, "normative": true, "for_": ["File"]};
-</script>
 <script>/* Boilerplate: script-var-click-highlighting */
+"use strict";
+{
 /*
 Color-choosing design:
 
-Colors are ordered by goodness.
-Each color has a usage count (initially zero).
-Each variable has a last-used color.
-
-* If the var has a last-used color, and that color's usage is 0,
-    return that color.
-* Otherwise, return the lowest-indexed color with the lowest usage.
-    Increment the color's usage and set it as the last-used color
-    for that var.
-* On unclicking, decrement usage of the color.
+* Colors are ordered by goodness.
+* On clicking a var, give it the earliest color
+    with the lowest usage in the algorithm.
+* On re-clicking, re-use the var's most recent color
+    if that's not currently being used elsewhere.
 */
-"use strict";
-{
-    document.addEventListener("click", e=>{
-        if(e.target.nodeName == "VAR") {
-            highlightSameAlgoVars(e.target);
-        }
-    });
-    const indexCounts = new Map();
-    const indexNames = new Map();
-    function highlightSameAlgoVars(v) {
-        // Find the algorithm container.
-        let algoContainer = null;
-        let searchEl = v;
-        while(algoContainer == null && searchEl != document.body) {
-            searchEl = searchEl.parentNode;
-            if(searchEl.hasAttribute("data-algorithm")) {
-                algoContainer = searchEl;
-            }
-        }
 
-        // Not highlighting document-global vars,
-        // too likely to be unrelated.
-        if(algoContainer == null) return;
+const COLOR_COUNT = 7;
 
-        const algoName = algoContainer.getAttribute("data-algorithm");
-        const varName = getVarName(v);
-        const addClass = !v.classList.contains("selected");
-        let highlightClass = null;
-        if(addClass) {
-            const index = chooseHighlightIndex(algoName, varName);
-            indexCounts.get(algoName)[index] += 1;
-            indexNames.set(algoName+"///"+varName, index);
-            highlightClass = nameFromIndex(index);
-        } else {
-            const index = previousHighlightIndex(algoName, varName);
-            indexCounts.get(algoName)[index] -= 1;
-            highlightClass = nameFromIndex(index);
-        }
+document.addEventListener("click", e=>{
+    if(e.target.nodeName == "VAR") {
+        highlightSameAlgoVars(e.target);
+    }
+});
 
-        // Find all same-name vars, and toggle their class appropriately.
+function highlightSameAlgoVars(v) {
+    // Find the algorithm container.
+    let algoContainer = findAlgoContainer(v);
+
+    // Not highlighting document-global vars,
+    // too likely to be unrelated.
+    if(algoContainer == null) return;
+
+    const varName = nameFromVar(v);
+    if(!v.hasAttribute("data-var-color")) {
+        const newColor = chooseHighlightColor(algoContainer, v);
         for(const el of algoContainer.querySelectorAll("var")) {
-            if(getVarName(el) == varName) {
-                el.classList.toggle("selected", addClass);
-                el.classList.toggle(highlightClass, addClass);
+            if(nameFromVar(el) == varName) {
+                el.setAttribute("data-var-color", newColor);
+                el.setAttribute("data-var-last-color", newColor);
+            }
+        }
+    } else {
+        for(const el of algoContainer.querySelectorAll("var")) {
+            if(nameFromVar(el) == varName) {
+                el.removeAttribute("data-var-color");
             }
         }
     }
-    function getVarName(el) {
-        return el.textContent.replace(/(\s|\xa0)+/, " ").trim();
+}
+function findAlgoContainer(el) {
+    while(el != document.body) {
+        if(el.hasAttribute("data-algorithm")) return el;
+        el = el.parentNode;
     }
-    function chooseHighlightIndex(algoName, varName) {
-        let indexes = null;
-        if(indexCounts.has(algoName)) {
-            indexes = indexCounts.get(algoName);
-        } else {
-            // 7 classes right now
-            indexes = [0,0,0,0,0,0,0];
-            indexCounts.set(algoName, indexes);
-        }
+    return null;
+}
+function nameFromVar(el) {
+    return el.textContent.replace(/(\s|\xa0)+/, " ").trim();
+}
+function colorCountsFromContainer(container) {
+    const namesFromColor = Array.from({length:COLOR_COUNT}, x=>new Set());
+    for(let v of container.querySelectorAll("var[data-var-color]")) {
+        let color = +v.getAttribute("data-var-color");
+        namesFromColor[color].add(nameFromVar(v));
+    }
 
-        // If the element was recently unclicked,
-        // *and* that color is still unclaimed,
-        // give it back the same color.
-        const lastIndex = previousHighlightIndex(algoName, varName);
-        if(indexes[lastIndex] === 0) return lastIndex;
-
-        // Find the earliest index with the lowest count.
-        const minCount = Math.min.apply(null, indexes);
-        let index = null;
-        for(var i = 0; i < indexes.length; i++) {
-            if(indexes[i] == minCount) {
-                return i;
-            }
+    return namesFromColor.map(x=>x.size);
+}
+function leastUsedColor(colors) {
+    // Find the earliest color with the lowest count.
+    let minCount = Infinity;
+    let minColor = null;
+    for(var i = 0; i < colors.length; i++) {
+        if(colors[i] < minCount) {
+            minColor = i;
+            minCount = colors[i];
         }
     }
-    function previousHighlightIndex(algoName, varName) {
-        return indexNames.get(algoName+"///"+varName);
+    return minColor;
+}
+function chooseHighlightColor(container, v) {
+    const colorCounts = colorCountsFromContainer(container);
+    if(v.hasAttribute("data-var-last-color")) {
+        let color = +v.getAttribute("data-var-last-color");
+        if(colorCounts[color] == 0) return color;
     }
-    function nameFromIndex(index) {
-        return "selected" + index;
-    }
+    return leastUsedColor(colorCounts);
+}
 }
 </script>

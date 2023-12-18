@@ -79,7 +79,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -485,7 +484,7 @@ a[href].issue-return {
 }
 
 .ref-hint {
-    display: none;
+    display: inline-block;
     position: absolute;
     z-index: 35;
     width: 20em;
@@ -501,16 +500,11 @@ a[href].issue-return {
     white-space: normal; /* in case it's moved into a pre */
 }
 
-.ref-hint.on {
-    display: inline-block;
-}
-
 .ref-hint * { margin: 0; padding: 0; text-indent: 0; }
 
 .ref-hint ul { padding: 0 0 0 1em; list-style: none; }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -2105,437 +2099,8 @@ And some more text&lt;/p>
   inline-end/block-end. We should augment this with the option to have a secondary
   float direction to allow basic 2D floating. <a class="issue-return" href="#issue-329c073e" title="Jump to section">↵</a></div>
   </div>
-<script>/* Boilerplate: script-dfn-panel */
-"use strict";
-{
-    // Functions, divided by link type, that wrap an autolink's
-    // contents with the appropriate outer syntax.
-    // Alternately, a string naming another type they format
-    // the same as.
-    const typeFormatters = {
-        'dfn': (text) => `[=${text}=]`,
-        'abstract-op': (text) => `[\$${text}\$]`,
-        'value': (text) => `''${text}''`,
-        'http-header': (text) => `[:${text}:]`,
-        'idl': (text) => `{{${text}}}`,
-        'interface': 'idl',
-        'constructor': 'idl',
-        'method': 'idl',
-        'argument': 'idl',
-        'attribute': 'idl',
-        'callback': 'idl',
-        'dictionary': 'idl',
-        'dict-member': 'idl',
-        'enum': 'idl',
-        'enum-value': 'idl',
-        'exception': 'idl',
-        'const': 'idl',
-        'typedef': 'idl',
-        'stringifier': 'idl',
-        'serializer': 'idl',
-        'iterator': 'idl',
-        'maplike': 'idl',
-        'setlike': 'idl',
-        'extended-attribute': 'idl',
-        'event': 'idl',
-        'element': (element) => `<{${element}}>`,
-        'element-state': 'element',
-        'element-attr': 'element',
-        'attr-value': 'element',
-        'scheme': 'dfn',
-        'permission': 'dfn',
-        'grammar': (text) => `${text} (within a <pre class=prod>)`,
-        'type': (text)=> `<<${text}>>`,
-        'property': (text) => `'${text}'`,
-        'descriptor': 'property',
-        'function': 'value',
-        'at-rule': 'value',
-        'selector': 'value',
-    };
-    const typesUsingFor = new Set(
-        [
-            "descriptor",
-            "value",
-            "element-attr",
-            "attr-value",
-            "element-state",
-            "method",
-            "constructor",
-            "argument",
-            "attribute",
-            "const",
-            "dict-member",
-            "event",
-            "enum-value",
-            "stringifier",
-            "serializer",
-            "iterator",
-            "maplike",
-            "setlike",
-            "state",
-            "mode",
-            "context",
-            "facet",
-        ],
-    )
-    const typesNotUsingFor = new Set(
-        [
-            "property",
-            "element",
-            "interface",
-            "namespace",
-            "callback",
-            "dictionary",
-            "enum",
-            "exception",
-            "typedef",
-            "http-header",
-            "permission",
-        ],
-    )
-    function linkFormatterFromType(type) {
-        const fnOrType = typeFormatters[type];
-        if(typeof fnOrType === 'string') {
-            // follow the alias
-            return linkFormatterFromType(fnOrType);
-        }
-        return fnOrType;
-    };
-
-    function genLinkingSyntaxes(dfn) {
-        if(dfn.tagName != "DFN") return;
-
-        const type = dfn.getAttribute('data-dfn-type');
-        if(!type) {
-            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
-            return [];
-        }
-
-        // Return a function that wraps link text based on the type
-        const linkFormatter = linkFormatterFromType(type);
-        if(!linkFormatter) {
-            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
-            return [];
-        }
-
-        let ltAlts;
-        if(dfn.hasAttribute('data-lt')) {
-            ltAlts = dfn.getAttribute('data-lt')
-                .split("|")
-                .map(x=>x.trim());
-        } else {
-            ltAlts = [dfn.textContent.trim()];
-        }
-        if(type == "type") {
-            // lt of "<foo>", but "foo" is the interior;
-            // <<foo/bar>> is how you write it with a for,
-            // not <foo/<bar>> or whatever.
-            for(var i = 0; i < ltAlts.length; i++) {
-                const lt = ltAlts[i];
-                const match = /<(.*)>/.exec(lt);
-                if(match) { ltAlts[i] = match[1]; }
-            }
-        }
-
-        let forAlts;
-        if(dfn.hasAttribute('data-dfn-for')) {
-            forAlts = dfn.getAttribute('data-dfn-for')
-                .split(",")
-                .map(x=>x.trim());
-        } else {
-            forAlts = [''];
-        }
-
-        let linkingSyntaxes = [];
-        if(!typesUsingFor.has(type)) {
-            for(const lt of ltAlts) {
-                linkingSyntaxes.push(linkFormatter(lt));
-            }
-        }
-        if(!typesNotUsingFor.has(type)) {
-            for(const f of forAlts) {
-                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
-            }
-        }
-        return [
-            mk.b({}, 'Possible linking syntaxes:'),
-            mk.ul({},
-                ...linkingSyntaxes.map(link => {
-                    const copyLink = async () =>
-                        await navigator.clipboard.writeText(link);
-                    return mk.li({},
-                        mk.div({ class: 'link-item' },
-                            mk.button({
-                                class: 'copy-icon', title: 'Copy',
-                                type: 'button',
-                                _onclick: copyLink,
-                                tabindex: 0,
-                            }, mk.span({ class: 'icon' }) ),
-                            mk.span({}, link)
-                        )
-                    );
-                })
-            )
-        ];
-    }
-
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const dfnPanel = mk.aside({
-            class: "dfn-panel",
-            id: `infopanel-for-${dfnID}`,
-            "data-for": dfnID,
-            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
-            },
-            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
-                `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
-            mk.b({}, "Referenced in:"),
-            mk.ul({},
-                ...refSections.map(section=>
-                    mk.li({},
-                        ...section.refs.map((ref, refI)=>
-                            [
-                                mk.a({ href: `#${ref.id}` },
-                                    (refI == 0) ? section.title : `(${refI + 1})`
-                                ),
-                                " ",
-                            ]
-                        ),
-                    ),
-                ),
-            ),
-            genLinkingSyntaxes(dfn),
-        );
-        dfnPanel.forDfn = dfn;
-        if(!dfn) { console.log(dfnPanel); }
-        return dfnPanel;
-    }
-
-    function genAllDfnPanels() {
-        for(const panelData of Object.values(window.dfnpanelData)) {
-            const dfnID = panelData.dfnID;
-            const dfn = document.getElementById(dfnID);
-            if(!dfn) {
-                console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
-            }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(panel)
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllDfnPanels();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all dfn panels.
-            hideAllDfnPanels();
-        });
-    })
-
-    function hideAllDfnPanels() {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
-    }
-
-    function showDfnPanel(dfnPanel) {
-        hideAllDfnPanels(); // Only display one at this time.
-
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "true");
-
-        dfnPanel.classList.add("on");
-        positionDfnPanel(dfnPanel);
-
-        let tabIndex = 100;
-        dfn.tabIndex = tabIndex++;
-        // Increment tabindex for each anchor and button tags in panel
-        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
-        for (const el of tabbable) {
-            el.tabIndex = tabIndex++;
-        }
-    }
-
-    function positionDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        const dfnPos = getRootLevelAbsolutePosition(dfn);
-        dfnPanel.style.top = dfnPos.bottom + "px";
-        dfnPanel.style.left = dfnPos.left + "px";
-
-        const panelPos = dfnPanel.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
-            dfnPanel.style.left = newLeft + "px";
-        }}
-
-    function pinDfnPanel(dfnPanel) {
-        // Switch it to "activated" state, which pins it.
-        dfnPanel.classList.add("activated");
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.left = null;
-        dfnPanel.style.top = null;
-    }
-
-    function hideDfnPanel(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute("aria-expanded", "false");
-        dfn.tabIndex = undefined;
-        dfnPanel.style.position = "absolute"; // unfix it
-        dfnPanel.classList.remove("on");
-        dfnPanel.classList.remove("activated");
-    }
-
-    function toggleDfnPanel(dfnPanel) {
-        if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel);
-        } else {
-            showDfnPanel(dfnPanel);
-        }
-    }
-
-    function insertDfnPopupAction(dfnPanel) {
-        const dfn = dfnPanel.forDfn;
-        dfn.setAttribute('role', 'button');
-        dfn.setAttribute('aria-expanded', 'false')
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            const kc = event.keyCode;
-            // 32->Space, 13->Enter
-            if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-
-        dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                scrollToTargetAndHighlight(event);
-                pinDfnPanel(dfnPanel);
-            }
-            event.stopPropagation();
-            refocusOnTarget(event);
-        });
-
-        dfnPanel.addEventListener('keydown', (event) => {
-            if(event.keyCode == 27) { // Escape key
-                hideDfnPanel(dfnPanel, dfn);
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        })
-    }
-
-    function refocusOnTarget(event) {
-        const target = event.target;
-        setTimeout(() => {
-            // Refocus on the event.target element.
-            // This is needed after browser scrolls to the destination.
-            target.focus();
-        });
-    }
-
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function scrolledIntoView(element) {
-        const rect = element.getBoundingClientRect();
-        return (
-            rect.top > 0 &&
-            rect.bottom < window.innerHeight
-        );
-    }
-
-    function scrollToTargetAndHighlight(event) {
-        let hash = event.target.hash;
-        if (hash) {
-            hash = decodeURIComponent(hash.substring(1));
-            const dest = document.getElementById(hash);
-            if (dest) {
-                // Maybe prevent default scroll.
-                if (scrolledIntoView(dest)) {
-                    event.preventDefault();
-                }
-                dest.classList.add('highlighted');
-                setTimeout(() => dest.classList.remove('highlighted'), 1000);
-            }
-        }
-    }
-
-    window.addEventListener("resize", () => {
-        // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
-    });
-}
-</script>
-<script>/* Boilerplate: script-dfn-panel-json */
-window.dfnpanelData = {};
-window.dfnpanelData['40060954'] = {"dfnID": "40060954", "url": "https://drafts.csswg.org/css-break-4/#fragmentation-container", "dfnText": "fragmentation container", "refSections": [{"refs": [{"id": "ref-for-fragmentation-container"}, {"id": "ref-for-fragmentation-container\u2460"}], "title": "1. Overview"}, {"refs": [{"id": "ref-for-fragmentation-container\u2461"}, {"id": "ref-for-fragmentation-container\u2462"}], "title": "5. Deferring page floats"}, {"refs": [{"id": "ref-for-fragmentation-container\u2463"}, {"id": "ref-for-fragmentation-container\u2464"}, {"id": "ref-for-fragmentation-container\u2465"}, {"id": "ref-for-fragmentation-container\u2466"}, {"id": "ref-for-fragmentation-container\u2467"}, {"id": "ref-for-fragmentation-container\u2468"}, {"id": "ref-for-fragmentation-container\u2460\u24ea"}, {"id": "ref-for-fragmentation-container\u2460\u2460"}, {"id": "ref-for-fragmentation-container\u2460\u2461"}, {"id": "ref-for-fragmentation-container\u2460\u2462"}, {"id": "ref-for-fragmentation-container\u2460\u2463"}, {"id": "ref-for-fragmentation-container\u2460\u2464"}], "title": "5.1. The float-defer property"}, {"refs": [{"id": "ref-for-fragmentation-container\u2460\u2465"}, {"id": "ref-for-fragmentation-container\u2460\u2466"}, {"id": "ref-for-fragmentation-container\u2460\u2467"}, {"id": "ref-for-fragmentation-container\u2460\u2468"}, {"id": "ref-for-fragmentation-container\u2461\u24ea"}, {"id": "ref-for-fragmentation-container\u2461\u2460"}, {"id": "ref-for-fragmentation-container\u2461\u2461"}, {"id": "ref-for-fragmentation-container\u2461\u2462"}, {"id": "ref-for-fragmentation-container\u2461\u2463"}, {"id": "ref-for-fragmentation-container\u2461\u2464"}, {"id": "ref-for-fragmentation-container\u2461\u2465"}], "title": "8. Page float placement"}], "external": true};
-window.dfnpanelData['a270c80d'] = {"dfnID": "a270c80d", "url": "https://drafts.csswg.org/css-break-4/#fragmentation-context", "dfnText": "fragmentation context", "refSections": [{"refs": [{"id": "ref-for-fragmentation-context"}, {"id": "ref-for-fragmentation-context\u2460"}, {"id": "ref-for-fragmentation-context\u2461"}, {"id": "ref-for-fragmentation-context\u2462"}, {"id": "ref-for-fragmentation-context\u2463"}, {"id": "ref-for-fragmentation-context\u2464"}, {"id": "ref-for-fragmentation-context\u2465"}], "title": "5.1. The float-defer property"}, {"refs": [{"id": "ref-for-fragmentation-context\u2466"}, {"id": "ref-for-fragmentation-context\u2467"}, {"id": "ref-for-fragmentation-context\u2468"}, {"id": "ref-for-fragmentation-context\u2460\u24ea"}, {"id": "ref-for-fragmentation-context\u2460\u2460"}, {"id": "ref-for-fragmentation-context\u2460\u2461"}], "title": "8. Page float placement"}, {"refs": [{"id": "ref-for-fragmentation-context\u2460\u2462"}], "title": "8.2. Rules for page float stacking"}], "external": true};
-window.dfnpanelData['9f9120ff'] = {"dfnID": "9f9120ff", "url": "https://drafts.csswg.org/css-values-4/#comb-comma", "dfnText": ",", "refSections": [{"refs": [{"id": "ref-for-comb-comma"}, {"id": "ref-for-comb-comma\u2460"}], "title": "3.2. The float property"}], "external": true};
-window.dfnpanelData['18222566'] = {"dfnID": "18222566", "url": "https://drafts.csswg.org/css-values-4/#typedef-length-percentage", "dfnText": "<length-percentage>", "refSections": [{"refs": [{"id": "ref-for-typedef-length-percentage"}], "title": "7. The float-offset property"}], "external": true};
-window.dfnpanelData['fb030e6c'] = {"dfnID": "fb030e6c", "url": "https://drafts.csswg.org/css-values-4/#length-value", "dfnText": "<length>", "refSections": [{"refs": [{"id": "ref-for-length-value"}, {"id": "ref-for-length-value\u2460"}], "title": "3.2. The float property"}, {"refs": [{"id": "ref-for-length-value\u2461"}], "title": "7. The float-offset property"}], "external": true};
-window.dfnpanelData['15f5b381'] = {"dfnID": "15f5b381", "url": "https://drafts.csswg.org/css-values-4/#percentage-value", "dfnText": "<percentage>", "refSections": [{"refs": [{"id": "ref-for-percentage-value"}, {"id": "ref-for-percentage-value\u2460"}], "title": "7. The float-offset property"}], "external": true};
-window.dfnpanelData['537cf076'] = {"dfnID": "537cf076", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "dfnText": "?", "refSections": [{"refs": [{"id": "ref-for-mult-opt"}, {"id": "ref-for-mult-opt\u2460"}], "title": "3.2. The float property"}], "external": true};
-window.dfnpanelData['358fd6ff'] = {"dfnID": "358fd6ff", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "dfnText": "css-wide keywords", "refSections": [{"refs": [{"id": "ref-for-css-wide-keywords"}], "title": "1.1. Value Definitions"}], "external": true};
-window.dfnpanelData['6ec67710'] = {"dfnID": "6ec67710", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "dfnText": "|", "refSections": [{"refs": [{"id": "ref-for-comb-one"}, {"id": "ref-for-comb-one\u2460"}, {"id": "ref-for-comb-one\u2461"}], "title": "3.1. The float-reference property"}, {"refs": [{"id": "ref-for-comb-one\u2462"}, {"id": "ref-for-comb-one\u2463"}, {"id": "ref-for-comb-one\u2464"}, {"id": "ref-for-comb-one\u2465"}, {"id": "ref-for-comb-one\u2466"}, {"id": "ref-for-comb-one\u2467"}, {"id": "ref-for-comb-one\u2468"}, {"id": "ref-for-comb-one\u2460\u24ea"}, {"id": "ref-for-comb-one\u2460\u2460"}, {"id": "ref-for-comb-one\u2460\u2461"}, {"id": "ref-for-comb-one\u2460\u2462"}, {"id": "ref-for-comb-one\u2460\u2463"}, {"id": "ref-for-comb-one\u2460\u2464"}, {"id": "ref-for-comb-one\u2460\u2465"}, {"id": "ref-for-comb-one\u2460\u2466"}, {"id": "ref-for-comb-one\u2460\u2467"}], "title": "3.2. The float property"}, {"refs": [{"id": "ref-for-comb-one\u2460\u2468"}, {"id": "ref-for-comb-one\u2461\u24ea"}, {"id": "ref-for-comb-one\u2461\u2460"}, {"id": "ref-for-comb-one\u2461\u2461"}, {"id": "ref-for-comb-one\u2461\u2462"}, {"id": "ref-for-comb-one\u2461\u2463"}, {"id": "ref-for-comb-one\u2461\u2464"}, {"id": "ref-for-comb-one\u2461\u2465"}], "title": "4. \nThe clear property"}, {"refs": [{"id": "ref-for-comb-one\u2461\u2466"}, {"id": "ref-for-comb-one\u2461\u2467"}], "title": "5.1. The float-defer property"}, {"refs": [{"id": "ref-for-comb-one\u2461\u2468"}], "title": "7. The float-offset property"}], "external": true};
-window.dfnpanelData['5bc8bd12'] = {"dfnID": "5bc8bd12", "url": "https://drafts.csswg.org/css-writing-modes-3/#propdef-direction", "dfnText": "direction", "refSections": [{"refs": [{"id": "ref-for-propdef-direction"}, {"id": "ref-for-propdef-direction\u2460"}, {"id": "ref-for-propdef-direction\u2461"}, {"id": "ref-for-propdef-direction\u2462"}], "title": "3.2. The float property"}, {"refs": [{"id": "ref-for-propdef-direction\u2463"}, {"id": "ref-for-propdef-direction\u2464"}, {"id": "ref-for-propdef-direction\u2465"}, {"id": "ref-for-propdef-direction\u2466"}], "title": "4. \nThe clear property"}], "external": true};
-window.dfnpanelData['37f0daea'] = {"dfnID": "37f0daea", "url": "https://drafts.csswg.org/css-writing-modes-4/#inline-size", "dfnText": "inline size", "refSections": [{"refs": [{"id": "ref-for-inline-size"}, {"id": "ref-for-inline-size\u2460"}, {"id": "ref-for-inline-size\u2461"}], "title": "3.2. The float property"}], "external": true};
-window.dfnpanelData['385326d7'] = {"dfnID": "385326d7", "url": "https://drafts.csswg.org/css-writing-modes-4/#propdef-writing-mode", "dfnText": "writing-mode", "refSections": [{"refs": [{"id": "ref-for-propdef-writing-mode"}, {"id": "ref-for-propdef-writing-mode\u2460"}, {"id": "ref-for-propdef-writing-mode\u2461"}, {"id": "ref-for-propdef-writing-mode\u2462"}], "title": "3.2. The float property"}, {"refs": [{"id": "ref-for-propdef-writing-mode\u2463"}, {"id": "ref-for-propdef-writing-mode\u2464"}, {"id": "ref-for-propdef-writing-mode\u2465"}, {"id": "ref-for-propdef-writing-mode\u2466"}], "title": "4. \nThe clear property"}], "external": true};
-window.dfnpanelData['1c876efa'] = {"dfnID": "1c876efa", "url": "https://www.w3.org/TR/CSS22/visudet.html#propdef-max-height", "dfnText": "max-height", "refSections": [{"refs": [{"id": "ref-for-propdef-max-height"}, {"id": "ref-for-propdef-max-height\u2460"}], "title": "3.2. The float property"}], "external": true};
-window.dfnpanelData['db7285a8'] = {"dfnID": "db7285a8", "url": "https://www.w3.org/TR/CSS22/visudet.html#propdef-max-width", "dfnText": "max-width", "refSections": [{"refs": [{"id": "ref-for-propdef-max-width"}, {"id": "ref-for-propdef-max-width\u2460"}], "title": "3.2. The float property"}], "external": true};
-window.dfnpanelData['0d754b3e'] = {"dfnID": "0d754b3e", "url": "https://drafts.csswg.org/css-exclusions-1/#propdef-wrap-flow", "dfnText": "wrap-flow", "refSections": [{"refs": [{"id": "ref-for-propdef-wrap-flow"}], "title": "1. Overview"}, {"refs": [{"id": "ref-for-propdef-wrap-flow\u2460"}, {"id": "ref-for-propdef-wrap-flow\u2461"}], "title": "6. Wrapping around page floats"}], "external": true};
-window.dfnpanelData['float'] = {"dfnID": "float", "url": "#float", "dfnText": "Float", "refSections": [{"refs": [{"id": "ref-for-float"}], "title": "1. Overview"}], "external": false};
-window.dfnpanelData['inline-float'] = {"dfnID": "inline-float", "url": "#inline-float", "dfnText": "Inline float", "refSections": [{"refs": [{"id": "ref-for-inline-float"}], "title": "3.1. The float-reference property"}, {"refs": [{"id": "ref-for-inline-float\u2460"}, {"id": "ref-for-inline-float\u2461"}], "title": "3.2. The float property"}, {"refs": [{"id": "ref-for-inline-float\u2462"}, {"id": "ref-for-inline-float\u2463"}, {"id": "ref-for-inline-float\u2464"}], "title": "4. \nThe clear property"}, {"refs": [{"id": "ref-for-inline-float\u2465"}], "title": "5. Deferring page floats"}, {"refs": [{"id": "ref-for-inline-float\u2466"}], "title": "5.1. The float-defer property"}, {"refs": [{"id": "ref-for-inline-float\u2467"}], "title": "7. The float-offset property"}], "external": false};
-window.dfnpanelData['page-float'] = {"dfnID": "page-float", "url": "#page-float", "dfnText": "Page float", "refSections": [{"refs": [{"id": "ref-for-page-float"}, {"id": "ref-for-page-float\u2460"}, {"id": "ref-for-page-float\u2461"}], "title": "3.1. The float-reference property"}, {"refs": [{"id": "ref-for-page-float\u2462"}, {"id": "ref-for-page-float\u2463"}], "title": "3.2. The float property"}, {"refs": [{"id": "ref-for-page-float\u2464"}, {"id": "ref-for-page-float\u2465"}], "title": "4. \nThe clear property"}, {"refs": [{"id": "ref-for-page-float\u2466"}], "title": "5. Deferring page floats"}, {"refs": [{"id": "ref-for-page-float\u2467"}], "title": "5.1. The float-defer property"}, {"refs": [{"id": "ref-for-page-float\u2468"}, {"id": "ref-for-page-float\u2460\u24ea"}], "title": "7. The float-offset property"}], "external": false};
-window.dfnpanelData['float-anchor'] = {"dfnID": "float-anchor", "url": "#float-anchor", "dfnText": "Float anchor", "refSections": [{"refs": [{"id": "ref-for-float-anchor"}, {"id": "ref-for-float-anchor\u2460"}], "title": "3. \nFloating to the inline-start/inline-end and block-start/block-end"}, {"refs": [{"id": "ref-for-float-anchor\u2461"}, {"id": "ref-for-float-anchor\u2462"}, {"id": "ref-for-float-anchor\u2463"}, {"id": "ref-for-float-anchor\u2464"}, {"id": "ref-for-float-anchor\u2465"}, {"id": "ref-for-float-anchor\u2466"}, {"id": "ref-for-float-anchor\u2467"}, {"id": "ref-for-float-anchor\u2468"}, {"id": "ref-for-float-anchor\u2460\u24ea"}, {"id": "ref-for-float-anchor\u2460\u2460"}, {"id": "ref-for-float-anchor\u2460\u2461"}], "title": "3.1. The float-reference property"}, {"refs": [{"id": "ref-for-float-anchor\u2460\u2462"}], "title": "5. Deferring page floats"}, {"refs": [{"id": "ref-for-float-anchor\u2460\u2463"}, {"id": "ref-for-float-anchor\u2460\u2464"}, {"id": "ref-for-float-anchor\u2460\u2465"}, {"id": "ref-for-float-anchor\u2460\u2466"}], "title": "5.1. The float-defer property"}, {"refs": [{"id": "ref-for-float-anchor\u2460\u2467"}], "title": "8. Page float placement"}], "external": false};
-window.dfnpanelData['float-containing-block-formatting-context'] = {"dfnID": "float-containing-block-formatting-context", "url": "#float-containing-block-formatting-context", "dfnText": "Float containing block formatting context", "refSections": [{"refs": [{"id": "ref-for-float-containing-block-formatting-context"}, {"id": "ref-for-float-containing-block-formatting-context\u2460"}, {"id": "ref-for-float-containing-block-formatting-context\u2461"}, {"id": "ref-for-float-containing-block-formatting-context\u2462"}, {"id": "ref-for-float-containing-block-formatting-context\u2463"}], "title": "3.1. The float-reference property"}, {"refs": [{"id": "ref-for-float-containing-block-formatting-context\u2464"}, {"id": "ref-for-float-containing-block-formatting-context\u2465"}, {"id": "ref-for-float-containing-block-formatting-context\u2466"}], "title": "9.1. \nDifferences between inline floats and absolutely positioned elements"}], "external": false};
-window.dfnpanelData['initial-float-reference'] = {"dfnID": "initial-float-reference", "url": "#initial-float-reference", "dfnText": "Initial float reference", "refSections": [{"refs": [{"id": "ref-for-initial-float-reference"}, {"id": "ref-for-initial-float-reference\u2460"}], "title": "5. Deferring page floats"}, {"refs": [{"id": "ref-for-initial-float-reference\u2461"}, {"id": "ref-for-initial-float-reference\u2462"}, {"id": "ref-for-initial-float-reference\u2463"}, {"id": "ref-for-initial-float-reference\u2464"}, {"id": "ref-for-initial-float-reference\u2465"}, {"id": "ref-for-initial-float-reference\u2466"}, {"id": "ref-for-initial-float-reference\u2467"}], "title": "5.1. The float-defer property"}, {"refs": [{"id": "ref-for-initial-float-reference\u2468"}, {"id": "ref-for-initial-float-reference\u2460\u24ea"}], "title": "8. Page float placement"}], "external": false};
-window.dfnpanelData['float-reference'] = {"dfnID": "float-reference", "url": "#float-reference", "dfnText": "Float reference", "refSections": [{"refs": [{"id": "ref-for-float-reference"}], "title": "1. Overview"}, {"refs": [{"id": "ref-for-float-reference\u2460"}, {"id": "ref-for-float-reference\u2461"}], "title": "3. \nFloating to the inline-start/inline-end and block-start/block-end"}, {"refs": [{"id": "ref-for-float-reference\u2462"}, {"id": "ref-for-float-reference\u2463"}, {"id": "ref-for-float-reference\u2464"}, {"id": "ref-for-float-reference\u2465"}, {"id": "ref-for-float-reference\u2466"}, {"id": "ref-for-float-reference\u2467"}, {"id": "ref-for-float-reference\u2468"}, {"id": "ref-for-float-reference\u2460\u24ea"}, {"id": "ref-for-float-reference\u2460\u2460"}, {"id": "ref-for-float-reference\u2460\u2461"}, {"id": "ref-for-float-reference\u2460\u2462"}], "title": "3.1. The float-reference property"}, {"refs": [{"id": "ref-for-float-reference\u2460\u2463"}, {"id": "ref-for-float-reference\u2460\u2464"}, {"id": "ref-for-float-reference\u2460\u2465"}, {"id": "ref-for-float-reference\u2460\u2466"}, {"id": "ref-for-float-reference\u2460\u2467"}, {"id": "ref-for-float-reference\u2460\u2468"}, {"id": "ref-for-float-reference\u2461\u24ea"}, {"id": "ref-for-float-reference\u2461\u2460"}, {"id": "ref-for-float-reference\u2461\u2461"}, {"id": "ref-for-float-reference\u2461\u2462"}, {"id": "ref-for-float-reference\u2461\u2463"}, {"id": "ref-for-float-reference\u2461\u2464"}, {"id": "ref-for-float-reference\u2461\u2465"}, {"id": "ref-for-float-reference\u2461\u2466"}, {"id": "ref-for-float-reference\u2461\u2467"}, {"id": "ref-for-float-reference\u2461\u2468"}, {"id": "ref-for-float-reference\u2462\u24ea"}], "title": "3.2. The float property"}, {"refs": [{"id": "ref-for-float-reference\u2462\u2460"}, {"id": "ref-for-float-reference\u2462\u2461"}, {"id": "ref-for-float-reference\u2462\u2462"}, {"id": "ref-for-float-reference\u2462\u2463"}], "title": "4. \nThe clear property"}, {"refs": [{"id": "ref-for-float-reference\u2462\u2464"}, {"id": "ref-for-float-reference\u2462\u2465"}, {"id": "ref-for-float-reference\u2462\u2466"}, {"id": "ref-for-float-reference\u2462\u2467"}, {"id": "ref-for-float-reference\u2462\u2468"}, {"id": "ref-for-float-reference\u2463\u24ea"}, {"id": "ref-for-float-reference\u2463\u2460"}, {"id": "ref-for-float-reference\u2463\u2461"}], "title": "8. Page float placement"}, {"refs": [{"id": "ref-for-float-reference\u2463\u2462"}, {"id": "ref-for-float-reference\u2463\u2463"}, {"id": "ref-for-float-reference\u2463\u2464"}, {"id": "ref-for-float-reference\u2463\u2465"}, {"id": "ref-for-float-reference\u2463\u2466"}, {"id": "ref-for-float-reference\u2463\u2467"}, {"id": "ref-for-float-reference\u2463\u2468"}, {"id": "ref-for-float-reference\u2464\u24ea"}], "title": "8.2. Rules for page float stacking"}], "external": false};
-window.dfnpanelData['not-overlapping'] = {"dfnID": "not-overlapping", "url": "#not-overlapping", "dfnText": "Not overlapping", "refSections": [{"refs": [{"id": "ref-for-not-overlapping"}], "title": "8.2. Rules for page float stacking"}], "external": false};
-window.dfnpanelData['propdef-float-reference'] = {"dfnID": "propdef-float-reference", "url": "#propdef-float-reference", "dfnText": "float-reference", "refSections": [{"refs": [{"id": "ref-for-propdef-float-reference"}], "title": "3. \nFloating to the inline-start/inline-end and block-start/block-end"}, {"refs": [{"id": "ref-for-propdef-float-reference\u2460"}], "title": "3.1. The float-reference property"}, {"refs": [{"id": "ref-for-propdef-float-reference\u2461"}, {"id": "ref-for-propdef-float-reference\u2462"}, {"id": "ref-for-propdef-float-reference\u2463"}], "title": "8. Page float placement"}], "external": false};
-window.dfnpanelData['propdef-float'] = {"dfnID": "propdef-float", "url": "#propdef-float", "dfnText": "float", "refSections": [{"refs": [{"id": "ref-for-propdef-float"}], "title": "1. Overview"}, {"refs": [{"id": "ref-for-propdef-float\u2460"}], "title": "3. \nFloating to the inline-start/inline-end and block-start/block-end"}, {"refs": [{"id": "ref-for-propdef-float\u2461"}], "title": "3.2. The float property"}, {"refs": [{"id": "ref-for-propdef-float\u2462"}], "title": "7. The float-offset property"}, {"refs": [{"id": "ref-for-propdef-float\u2463"}], "title": "8.2. Rules for page float stacking"}], "external": false};
-window.dfnpanelData['funcdef-float-snap-block'] = {"dfnID": "funcdef-float-snap-block", "url": "#funcdef-float-snap-block", "dfnText": "snap-block()", "refSections": [{"refs": [{"id": "ref-for-funcdef-float-snap-block"}, {"id": "ref-for-funcdef-float-snap-block\u2460"}], "title": "3.2. The float property"}], "external": false};
-window.dfnpanelData['funcdef-float-snap-inline'] = {"dfnID": "funcdef-float-snap-inline", "url": "#funcdef-float-snap-inline", "dfnText": "snap-inline()", "refSections": [{"refs": [{"id": "ref-for-funcdef-float-snap-inline"}, {"id": "ref-for-funcdef-float-snap-inline\u2460"}], "title": "3.2. The float property"}], "external": false};
-window.dfnpanelData['propdef-clear'] = {"dfnID": "propdef-clear", "url": "#propdef-clear", "dfnText": "clear", "refSections": [{"refs": [{"id": "ref-for-propdef-clear"}], "title": "1. Overview"}, {"refs": [{"id": "ref-for-propdef-clear\u2460"}, {"id": "ref-for-propdef-clear\u2461"}], "title": "4. \nThe clear property"}, {"refs": [{"id": "ref-for-propdef-clear\u2462"}, {"id": "ref-for-propdef-clear\u2463"}], "title": "8.2. Rules for page float stacking"}], "external": false};
-window.dfnpanelData['propdef-float-defer'] = {"dfnID": "propdef-float-defer", "url": "#propdef-float-defer", "dfnText": "float-defer", "refSections": [{"refs": [{"id": "ref-for-propdef-float-defer"}], "title": "5. Deferring page floats"}, {"refs": [{"id": "ref-for-propdef-float-defer\u2460"}], "title": "5.1. The float-defer property"}, {"refs": [{"id": "ref-for-propdef-float-defer\u2461"}], "title": "10. Overconstrained floats"}], "external": false};
-window.dfnpanelData['propdef-float-offset'] = {"dfnID": "propdef-float-offset", "url": "#propdef-float-offset", "dfnText": "float-offset", "refSections": [{"refs": [{"id": "ref-for-propdef-float-offset"}, {"id": "ref-for-propdef-float-offset\u2460"}], "title": "7. The float-offset property"}, {"refs": [{"id": "ref-for-propdef-float-offset\u2461"}], "title": "8.2. Rules for page float stacking"}], "external": false};
-</script>
 <script>/* Boilerplate: script-dom-helper */
+"use strict";
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -2729,11 +2294,454 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"0d754b3e": {"dfnID":"0d754b3e","dfnText":"wrap-flow","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-wrap-flow"}],"title":"1. Overview"},{"refs":[{"id":"ref-for-propdef-wrap-flow\u2460"},{"id":"ref-for-propdef-wrap-flow\u2461"}],"title":"6. Wrapping around page floats"}],"url":"https://drafts.csswg.org/css-exclusions-1/#propdef-wrap-flow"},
+"15f5b381": {"dfnID":"15f5b381","dfnText":"<percentage>","external":true,"refSections":[{"refs":[{"id":"ref-for-percentage-value"},{"id":"ref-for-percentage-value\u2460"}],"title":"7. The float-offset property"}],"url":"https://drafts.csswg.org/css-values-4/#percentage-value"},
+"18222566": {"dfnID":"18222566","dfnText":"<length-percentage>","external":true,"refSections":[{"refs":[{"id":"ref-for-typedef-length-percentage"}],"title":"7. The float-offset property"}],"url":"https://drafts.csswg.org/css-values-4/#typedef-length-percentage"},
+"1c876efa": {"dfnID":"1c876efa","dfnText":"max-height","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-max-height"},{"id":"ref-for-propdef-max-height\u2460"}],"title":"3.2. The float property"}],"url":"https://www.w3.org/TR/CSS22/visudet.html#propdef-max-height"},
+"358fd6ff": {"dfnID":"358fd6ff","dfnText":"css-wide keywords","external":true,"refSections":[{"refs":[{"id":"ref-for-css-wide-keywords"}],"title":"1.1. Value Definitions"}],"url":"https://drafts.csswg.org/css-values-4/#css-wide-keywords"},
+"37f0daea": {"dfnID":"37f0daea","dfnText":"inline size","external":true,"refSections":[{"refs":[{"id":"ref-for-inline-size"},{"id":"ref-for-inline-size\u2460"},{"id":"ref-for-inline-size\u2461"}],"title":"3.2. The float property"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#inline-size"},
+"385326d7": {"dfnID":"385326d7","dfnText":"writing-mode","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-writing-mode"},{"id":"ref-for-propdef-writing-mode\u2460"},{"id":"ref-for-propdef-writing-mode\u2461"},{"id":"ref-for-propdef-writing-mode\u2462"}],"title":"3.2. The float property"},{"refs":[{"id":"ref-for-propdef-writing-mode\u2463"},{"id":"ref-for-propdef-writing-mode\u2464"},{"id":"ref-for-propdef-writing-mode\u2465"},{"id":"ref-for-propdef-writing-mode\u2466"}],"title":"4. \nThe clear property"}],"url":"https://drafts.csswg.org/css-writing-modes-4/#propdef-writing-mode"},
+"40060954": {"dfnID":"40060954","dfnText":"fragmentation container","external":true,"refSections":[{"refs":[{"id":"ref-for-fragmentation-container"},{"id":"ref-for-fragmentation-container\u2460"}],"title":"1. Overview"},{"refs":[{"id":"ref-for-fragmentation-container\u2461"},{"id":"ref-for-fragmentation-container\u2462"}],"title":"5. Deferring page floats"},{"refs":[{"id":"ref-for-fragmentation-container\u2463"},{"id":"ref-for-fragmentation-container\u2464"},{"id":"ref-for-fragmentation-container\u2465"},{"id":"ref-for-fragmentation-container\u2466"},{"id":"ref-for-fragmentation-container\u2467"},{"id":"ref-for-fragmentation-container\u2468"},{"id":"ref-for-fragmentation-container\u2460\u24ea"},{"id":"ref-for-fragmentation-container\u2460\u2460"},{"id":"ref-for-fragmentation-container\u2460\u2461"},{"id":"ref-for-fragmentation-container\u2460\u2462"},{"id":"ref-for-fragmentation-container\u2460\u2463"},{"id":"ref-for-fragmentation-container\u2460\u2464"}],"title":"5.1. The float-defer property"},{"refs":[{"id":"ref-for-fragmentation-container\u2460\u2465"},{"id":"ref-for-fragmentation-container\u2460\u2466"},{"id":"ref-for-fragmentation-container\u2460\u2467"},{"id":"ref-for-fragmentation-container\u2460\u2468"},{"id":"ref-for-fragmentation-container\u2461\u24ea"},{"id":"ref-for-fragmentation-container\u2461\u2460"},{"id":"ref-for-fragmentation-container\u2461\u2461"},{"id":"ref-for-fragmentation-container\u2461\u2462"},{"id":"ref-for-fragmentation-container\u2461\u2463"},{"id":"ref-for-fragmentation-container\u2461\u2464"},{"id":"ref-for-fragmentation-container\u2461\u2465"}],"title":"8. Page float placement"}],"url":"https://drafts.csswg.org/css-break-4/#fragmentation-container"},
+"537cf076": {"dfnID":"537cf076","dfnText":"?","external":true,"refSections":[{"refs":[{"id":"ref-for-mult-opt"},{"id":"ref-for-mult-opt\u2460"}],"title":"3.2. The float property"}],"url":"https://drafts.csswg.org/css-values-4/#mult-opt"},
+"5bc8bd12": {"dfnID":"5bc8bd12","dfnText":"direction","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-direction"},{"id":"ref-for-propdef-direction\u2460"},{"id":"ref-for-propdef-direction\u2461"},{"id":"ref-for-propdef-direction\u2462"}],"title":"3.2. The float property"},{"refs":[{"id":"ref-for-propdef-direction\u2463"},{"id":"ref-for-propdef-direction\u2464"},{"id":"ref-for-propdef-direction\u2465"},{"id":"ref-for-propdef-direction\u2466"}],"title":"4. \nThe clear property"}],"url":"https://drafts.csswg.org/css-writing-modes-3/#propdef-direction"},
+"6ec67710": {"dfnID":"6ec67710","dfnText":"|","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-one"},{"id":"ref-for-comb-one\u2460"},{"id":"ref-for-comb-one\u2461"}],"title":"3.1. The float-reference property"},{"refs":[{"id":"ref-for-comb-one\u2462"},{"id":"ref-for-comb-one\u2463"},{"id":"ref-for-comb-one\u2464"},{"id":"ref-for-comb-one\u2465"},{"id":"ref-for-comb-one\u2466"},{"id":"ref-for-comb-one\u2467"},{"id":"ref-for-comb-one\u2468"},{"id":"ref-for-comb-one\u2460\u24ea"},{"id":"ref-for-comb-one\u2460\u2460"},{"id":"ref-for-comb-one\u2460\u2461"},{"id":"ref-for-comb-one\u2460\u2462"},{"id":"ref-for-comb-one\u2460\u2463"},{"id":"ref-for-comb-one\u2460\u2464"},{"id":"ref-for-comb-one\u2460\u2465"},{"id":"ref-for-comb-one\u2460\u2466"},{"id":"ref-for-comb-one\u2460\u2467"}],"title":"3.2. The float property"},{"refs":[{"id":"ref-for-comb-one\u2460\u2468"},{"id":"ref-for-comb-one\u2461\u24ea"},{"id":"ref-for-comb-one\u2461\u2460"},{"id":"ref-for-comb-one\u2461\u2461"},{"id":"ref-for-comb-one\u2461\u2462"},{"id":"ref-for-comb-one\u2461\u2463"},{"id":"ref-for-comb-one\u2461\u2464"},{"id":"ref-for-comb-one\u2461\u2465"}],"title":"4. \nThe clear property"},{"refs":[{"id":"ref-for-comb-one\u2461\u2466"},{"id":"ref-for-comb-one\u2461\u2467"}],"title":"5.1. The float-defer property"},{"refs":[{"id":"ref-for-comb-one\u2461\u2468"}],"title":"7. The float-offset property"}],"url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"9f9120ff": {"dfnID":"9f9120ff","dfnText":",","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-comma"},{"id":"ref-for-comb-comma\u2460"}],"title":"3.2. The float property"}],"url":"https://drafts.csswg.org/css-values-4/#comb-comma"},
+"a270c80d": {"dfnID":"a270c80d","dfnText":"fragmentation context","external":true,"refSections":[{"refs":[{"id":"ref-for-fragmentation-context"},{"id":"ref-for-fragmentation-context\u2460"},{"id":"ref-for-fragmentation-context\u2461"},{"id":"ref-for-fragmentation-context\u2462"},{"id":"ref-for-fragmentation-context\u2463"},{"id":"ref-for-fragmentation-context\u2464"},{"id":"ref-for-fragmentation-context\u2465"}],"title":"5.1. The float-defer property"},{"refs":[{"id":"ref-for-fragmentation-context\u2466"},{"id":"ref-for-fragmentation-context\u2467"},{"id":"ref-for-fragmentation-context\u2468"},{"id":"ref-for-fragmentation-context\u2460\u24ea"},{"id":"ref-for-fragmentation-context\u2460\u2460"},{"id":"ref-for-fragmentation-context\u2460\u2461"}],"title":"8. Page float placement"},{"refs":[{"id":"ref-for-fragmentation-context\u2460\u2462"}],"title":"8.2. Rules for page float stacking"}],"url":"https://drafts.csswg.org/css-break-4/#fragmentation-context"},
+"db7285a8": {"dfnID":"db7285a8","dfnText":"max-width","external":true,"refSections":[{"refs":[{"id":"ref-for-propdef-max-width"},{"id":"ref-for-propdef-max-width\u2460"}],"title":"3.2. The float property"}],"url":"https://www.w3.org/TR/CSS22/visudet.html#propdef-max-width"},
+"fb030e6c": {"dfnID":"fb030e6c","dfnText":"<length>","external":true,"refSections":[{"refs":[{"id":"ref-for-length-value"},{"id":"ref-for-length-value\u2460"}],"title":"3.2. The float property"},{"refs":[{"id":"ref-for-length-value\u2461"}],"title":"7. The float-offset property"}],"url":"https://drafts.csswg.org/css-values-4/#length-value"},
+"float": {"dfnID":"float","dfnText":"Float","external":false,"refSections":[{"refs":[{"id":"ref-for-float"}],"title":"1. Overview"}],"url":"#float"},
+"float-anchor": {"dfnID":"float-anchor","dfnText":"Float anchor","external":false,"refSections":[{"refs":[{"id":"ref-for-float-anchor"},{"id":"ref-for-float-anchor\u2460"}],"title":"3. \nFloating to the inline-start/inline-end and block-start/block-end"},{"refs":[{"id":"ref-for-float-anchor\u2461"},{"id":"ref-for-float-anchor\u2462"},{"id":"ref-for-float-anchor\u2463"},{"id":"ref-for-float-anchor\u2464"},{"id":"ref-for-float-anchor\u2465"},{"id":"ref-for-float-anchor\u2466"},{"id":"ref-for-float-anchor\u2467"},{"id":"ref-for-float-anchor\u2468"},{"id":"ref-for-float-anchor\u2460\u24ea"},{"id":"ref-for-float-anchor\u2460\u2460"},{"id":"ref-for-float-anchor\u2460\u2461"}],"title":"3.1. The float-reference property"},{"refs":[{"id":"ref-for-float-anchor\u2460\u2462"}],"title":"5. Deferring page floats"},{"refs":[{"id":"ref-for-float-anchor\u2460\u2463"},{"id":"ref-for-float-anchor\u2460\u2464"},{"id":"ref-for-float-anchor\u2460\u2465"},{"id":"ref-for-float-anchor\u2460\u2466"}],"title":"5.1. The float-defer property"},{"refs":[{"id":"ref-for-float-anchor\u2460\u2467"}],"title":"8. Page float placement"}],"url":"#float-anchor"},
+"float-containing-block-formatting-context": {"dfnID":"float-containing-block-formatting-context","dfnText":"Float containing block formatting context","external":false,"refSections":[{"refs":[{"id":"ref-for-float-containing-block-formatting-context"},{"id":"ref-for-float-containing-block-formatting-context\u2460"},{"id":"ref-for-float-containing-block-formatting-context\u2461"},{"id":"ref-for-float-containing-block-formatting-context\u2462"},{"id":"ref-for-float-containing-block-formatting-context\u2463"}],"title":"3.1. The float-reference property"},{"refs":[{"id":"ref-for-float-containing-block-formatting-context\u2464"},{"id":"ref-for-float-containing-block-formatting-context\u2465"},{"id":"ref-for-float-containing-block-formatting-context\u2466"}],"title":"9.1. \nDifferences between inline floats and absolutely positioned elements"}],"url":"#float-containing-block-formatting-context"},
+"float-reference": {"dfnID":"float-reference","dfnText":"Float reference","external":false,"refSections":[{"refs":[{"id":"ref-for-float-reference"}],"title":"1. Overview"},{"refs":[{"id":"ref-for-float-reference\u2460"},{"id":"ref-for-float-reference\u2461"}],"title":"3. \nFloating to the inline-start/inline-end and block-start/block-end"},{"refs":[{"id":"ref-for-float-reference\u2462"},{"id":"ref-for-float-reference\u2463"},{"id":"ref-for-float-reference\u2464"},{"id":"ref-for-float-reference\u2465"},{"id":"ref-for-float-reference\u2466"},{"id":"ref-for-float-reference\u2467"},{"id":"ref-for-float-reference\u2468"},{"id":"ref-for-float-reference\u2460\u24ea"},{"id":"ref-for-float-reference\u2460\u2460"},{"id":"ref-for-float-reference\u2460\u2461"},{"id":"ref-for-float-reference\u2460\u2462"}],"title":"3.1. The float-reference property"},{"refs":[{"id":"ref-for-float-reference\u2460\u2463"},{"id":"ref-for-float-reference\u2460\u2464"},{"id":"ref-for-float-reference\u2460\u2465"},{"id":"ref-for-float-reference\u2460\u2466"},{"id":"ref-for-float-reference\u2460\u2467"},{"id":"ref-for-float-reference\u2460\u2468"},{"id":"ref-for-float-reference\u2461\u24ea"},{"id":"ref-for-float-reference\u2461\u2460"},{"id":"ref-for-float-reference\u2461\u2461"},{"id":"ref-for-float-reference\u2461\u2462"},{"id":"ref-for-float-reference\u2461\u2463"},{"id":"ref-for-float-reference\u2461\u2464"},{"id":"ref-for-float-reference\u2461\u2465"},{"id":"ref-for-float-reference\u2461\u2466"},{"id":"ref-for-float-reference\u2461\u2467"},{"id":"ref-for-float-reference\u2461\u2468"},{"id":"ref-for-float-reference\u2462\u24ea"}],"title":"3.2. The float property"},{"refs":[{"id":"ref-for-float-reference\u2462\u2460"},{"id":"ref-for-float-reference\u2462\u2461"},{"id":"ref-for-float-reference\u2462\u2462"},{"id":"ref-for-float-reference\u2462\u2463"}],"title":"4. \nThe clear property"},{"refs":[{"id":"ref-for-float-reference\u2462\u2464"},{"id":"ref-for-float-reference\u2462\u2465"},{"id":"ref-for-float-reference\u2462\u2466"},{"id":"ref-for-float-reference\u2462\u2467"},{"id":"ref-for-float-reference\u2462\u2468"},{"id":"ref-for-float-reference\u2463\u24ea"},{"id":"ref-for-float-reference\u2463\u2460"},{"id":"ref-for-float-reference\u2463\u2461"}],"title":"8. Page float placement"},{"refs":[{"id":"ref-for-float-reference\u2463\u2462"},{"id":"ref-for-float-reference\u2463\u2463"},{"id":"ref-for-float-reference\u2463\u2464"},{"id":"ref-for-float-reference\u2463\u2465"},{"id":"ref-for-float-reference\u2463\u2466"},{"id":"ref-for-float-reference\u2463\u2467"},{"id":"ref-for-float-reference\u2463\u2468"},{"id":"ref-for-float-reference\u2464\u24ea"}],"title":"8.2. Rules for page float stacking"}],"url":"#float-reference"},
+"funcdef-float-snap-block": {"dfnID":"funcdef-float-snap-block","dfnText":"snap-block()","external":false,"refSections":[{"refs":[{"id":"ref-for-funcdef-float-snap-block"},{"id":"ref-for-funcdef-float-snap-block\u2460"}],"title":"3.2. The float property"}],"url":"#funcdef-float-snap-block"},
+"funcdef-float-snap-inline": {"dfnID":"funcdef-float-snap-inline","dfnText":"snap-inline()","external":false,"refSections":[{"refs":[{"id":"ref-for-funcdef-float-snap-inline"},{"id":"ref-for-funcdef-float-snap-inline\u2460"}],"title":"3.2. The float property"}],"url":"#funcdef-float-snap-inline"},
+"initial-float-reference": {"dfnID":"initial-float-reference","dfnText":"Initial float reference","external":false,"refSections":[{"refs":[{"id":"ref-for-initial-float-reference"},{"id":"ref-for-initial-float-reference\u2460"}],"title":"5. Deferring page floats"},{"refs":[{"id":"ref-for-initial-float-reference\u2461"},{"id":"ref-for-initial-float-reference\u2462"},{"id":"ref-for-initial-float-reference\u2463"},{"id":"ref-for-initial-float-reference\u2464"},{"id":"ref-for-initial-float-reference\u2465"},{"id":"ref-for-initial-float-reference\u2466"},{"id":"ref-for-initial-float-reference\u2467"}],"title":"5.1. The float-defer property"},{"refs":[{"id":"ref-for-initial-float-reference\u2468"},{"id":"ref-for-initial-float-reference\u2460\u24ea"}],"title":"8. Page float placement"}],"url":"#initial-float-reference"},
+"inline-float": {"dfnID":"inline-float","dfnText":"Inline float","external":false,"refSections":[{"refs":[{"id":"ref-for-inline-float"}],"title":"3.1. The float-reference property"},{"refs":[{"id":"ref-for-inline-float\u2460"},{"id":"ref-for-inline-float\u2461"}],"title":"3.2. The float property"},{"refs":[{"id":"ref-for-inline-float\u2462"},{"id":"ref-for-inline-float\u2463"},{"id":"ref-for-inline-float\u2464"}],"title":"4. \nThe clear property"},{"refs":[{"id":"ref-for-inline-float\u2465"}],"title":"5. Deferring page floats"},{"refs":[{"id":"ref-for-inline-float\u2466"}],"title":"5.1. The float-defer property"},{"refs":[{"id":"ref-for-inline-float\u2467"}],"title":"7. The float-offset property"}],"url":"#inline-float"},
+"not-overlapping": {"dfnID":"not-overlapping","dfnText":"Not overlapping","external":false,"refSections":[{"refs":[{"id":"ref-for-not-overlapping"}],"title":"8.2. Rules for page float stacking"}],"url":"#not-overlapping"},
+"page-float": {"dfnID":"page-float","dfnText":"Page float","external":false,"refSections":[{"refs":[{"id":"ref-for-page-float"},{"id":"ref-for-page-float\u2460"},{"id":"ref-for-page-float\u2461"}],"title":"3.1. The float-reference property"},{"refs":[{"id":"ref-for-page-float\u2462"},{"id":"ref-for-page-float\u2463"}],"title":"3.2. The float property"},{"refs":[{"id":"ref-for-page-float\u2464"},{"id":"ref-for-page-float\u2465"}],"title":"4. \nThe clear property"},{"refs":[{"id":"ref-for-page-float\u2466"}],"title":"5. Deferring page floats"},{"refs":[{"id":"ref-for-page-float\u2467"}],"title":"5.1. The float-defer property"},{"refs":[{"id":"ref-for-page-float\u2468"},{"id":"ref-for-page-float\u2460\u24ea"}],"title":"7. The float-offset property"}],"url":"#page-float"},
+"propdef-clear": {"dfnID":"propdef-clear","dfnText":"clear","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-clear"}],"title":"1. Overview"},{"refs":[{"id":"ref-for-propdef-clear\u2460"},{"id":"ref-for-propdef-clear\u2461"}],"title":"4. \nThe clear property"},{"refs":[{"id":"ref-for-propdef-clear\u2462"},{"id":"ref-for-propdef-clear\u2463"}],"title":"8.2. Rules for page float stacking"}],"url":"#propdef-clear"},
+"propdef-float": {"dfnID":"propdef-float","dfnText":"float","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-float"}],"title":"1. Overview"},{"refs":[{"id":"ref-for-propdef-float\u2460"}],"title":"3. \nFloating to the inline-start/inline-end and block-start/block-end"},{"refs":[{"id":"ref-for-propdef-float\u2461"}],"title":"3.2. The float property"},{"refs":[{"id":"ref-for-propdef-float\u2462"}],"title":"7. The float-offset property"},{"refs":[{"id":"ref-for-propdef-float\u2463"}],"title":"8.2. Rules for page float stacking"}],"url":"#propdef-float"},
+"propdef-float-defer": {"dfnID":"propdef-float-defer","dfnText":"float-defer","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-float-defer"}],"title":"5. Deferring page floats"},{"refs":[{"id":"ref-for-propdef-float-defer\u2460"}],"title":"5.1. The float-defer property"},{"refs":[{"id":"ref-for-propdef-float-defer\u2461"}],"title":"10. Overconstrained floats"}],"url":"#propdef-float-defer"},
+"propdef-float-offset": {"dfnID":"propdef-float-offset","dfnText":"float-offset","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-float-offset"},{"id":"ref-for-propdef-float-offset\u2460"}],"title":"7. The float-offset property"},{"refs":[{"id":"ref-for-propdef-float-offset\u2461"}],"title":"8.2. Rules for page float stacking"}],"url":"#propdef-float-offset"},
+"propdef-float-reference": {"dfnID":"propdef-float-reference","dfnText":"float-reference","external":false,"refSections":[{"refs":[{"id":"ref-for-propdef-float-reference"}],"title":"3. \nFloating to the inline-start/inline-end and block-start/block-end"},{"refs":[{"id":"ref-for-propdef-float-reference\u2460"}],"title":"3.1. The float-reference property"},{"refs":[{"id":"ref-for-propdef-float-reference\u2461"},{"id":"ref-for-propdef-float-reference\u2462"},{"id":"ref-for-propdef-float-reference\u2463"}],"title":"8. Page float placement"}],"url":"#propdef-float-reference"},
+};
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
+});
+
+window.addEventListener("resize", () => {
+    // Pin any visible dfn panel
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+});
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        dfn.panelData = panelData;
+        insertDfnPopupAction(dfn);
+    }
+}
+
+function genDfnPanel(dfn, { dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.aside({
+        class: "dfn-panel on",
+        id: `infopanel-for-${dfnID}`,
+        "data-for": dfnID,
+        "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        mk.b({}, "Referenced in:"),
+        mk.ul({},
+            ...refSections.map(section=>
+                mk.li({},
+                    ...section.refs.map((ref, refI)=>
+                        [
+                            mk.a({ href: `#${ref.id}` },
+                                (refI == 0) ? section.title : `(${refI + 1})`
+                            ),
+                            " ",
+                        ]
+                    ),
+                ),
+            ),
+        ),
+        genLinkingSyntaxes(dfn),
+    );
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+    dfnPanel.addEventListener('keydown', (event) => {
+        if(event.keyCode == 27) { // Escape key
+            hideDfnPanel({dfnPanel});
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+
+    dfnPanel.dfn = dfn;
+    dfn.dfnPanel = dfnPanel;
+    return dfnPanel;
+}
+
+
+
+function hideAllDfnPanels() {
+    // Delete the currently-active dfn panel.
+    queryAll(".dfn-panel").forEach(dfnPanel=>hideDfnPanel({dfnPanel}));
+}
+
+function showDfnPanel(dfn) {
+    hideAllDfnPanels(); // Only display one at a time.
+
+    dfn.setAttribute("aria-expanded", "true");
+
+    const dfnPanel = genDfnPanel(dfn, dfn.panelData);
+
+    // Give the dfn a unique tabindex, and then
+    // give all the tabbable panel bits successive indexes.
+    let tabIndex = 100;
+    dfn.tabIndex = tabIndex++;
+    const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+    for (const el of tabbable) {
+        el.tabIndex = tabIndex++;
+    }
+
+    append(document.body, dfnPanel);
+    positionDfnPanel(dfnPanel);
+}
+
+function positionDfnPanel(dfnPanel) {
+    const dfn = dfnPanel.dfn;
+    const dfnPos = getRootLevelAbsolutePosition(dfn);
+    dfnPanel.style.top = dfnPos.bottom + "px";
+    dfnPanel.style.left = dfnPos.left + "px";
+
+    const panelPos = dfnPanel.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+        dfnPanel.style.left = newLeft + "px";
+    }
+}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.position = "fixed";
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function hideDfnPanel({dfn, dfnPanel}) {
+    if(!dfnPanel) dfnPanel = dfn.dfnPanel;
+    if(!dfn) dfn = dfnPanel.dfn;
+    dfn.dfnPanel = undefined;
+    dfnPanel.dfn = undefined;
+    dfn.setAttribute("aria-expanded", "false");
+    dfn.tabIndex = undefined;
+    dfnPanel.remove()
+}
+
+function toggleDfnPanel(dfn) {
+    if(dfn.dfnPanel) {
+        hideDfnPanel(dfn);
+    } else {
+        showDfnPanel(dfn);
+    }
+}
+
+function insertDfnPopupAction(dfn) {
+    dfn.setAttribute('role', 'button');
+    dfn.setAttribute('aria-expanded', 'false')
+    dfn.tabIndex = 0;
+    dfn.classList.add('has-dfn-panel');
+    dfn.addEventListener('click', (event) => {
+        toggleDfnPanel(dfn);
+        event.stopPropagation();
+    });
+    dfn.addEventListener('keypress', (event) => {
+        const kc = event.keyCode;
+        // 32->Space, 13->Enter
+        if(kc == 32 || kc == 13) {
+            toggleDfnPanel(dfn);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    });
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
+        }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
+    }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
+
+function scrolledIntoView(element) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top > 0 &&
+        rect.bottom < window.innerHeight
+    );
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            // Maybe prevent default scroll.
+            if (scrolledIntoView(dest)) {
+                event.preventDefault();
+            }
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+function needsFor(type) {
+    switch(type) {
+        case "descriptor":
+        case "value":
+        case "element-attr":
+        case "attr-value":
+        case "element-state":
+        case "method":
+        case "constructor":
+        case "argument":
+        case "attribute":
+        case "const":
+        case "dict-member":
+        case "event":
+        case "enum-value":
+        case "stringifier":
+        case "serializer":
+        case "iterator":
+        case "maplike":
+        case "setlike":
+        case "state":
+        case "mode":
+        case "context":
+        case "facet": return true;
+
+        default: return false;
+    }
+}
+function refusesFor(type) {
+    switch(type) {
+        case "property":
+        case "element":
+        case "interface":
+        case "namespace":
+        case "callback":
+        case "dictionary":
+        case "enum":
+        case "exception":
+        case "typedef":
+        case "http-header":
+        case "permission": return true;
+
+        default: return false;
+    }
+}
+function linkFormatterFromType(type) {
+    switch(type) {
+        case 'scheme':
+        case 'permission':
+        case 'dfn': return (text) => `[=${text}=]`;
+
+        case 'abstract-op': return (text) => `[\$${text}\$]`;
+
+        case 'function':
+        case 'at-rule':
+        case 'selector':
+        case 'value': return (text) => `''${text}''`;
+
+        case 'http-header': return (text) => `[:${text}:]`;
+
+        case 'interface':
+        case 'constructor':
+        case 'method':
+        case 'argument':
+        case 'attribute':
+        case 'callback':
+        case 'dictionary':
+        case 'dict-member':
+        case 'enum':
+        case 'enum-value':
+        case 'exception':
+        case 'const':
+        case 'typedef':
+        case 'stringifier':
+        case 'serializer':
+        case 'iterator':
+        case 'maplike':
+        case 'setlike':
+        case 'extended-attribute':
+        case 'event':
+        case 'idl': return (text) => `{{${text}}}`;
+
+        case 'element-state':
+        case 'element-attr':
+        case 'attr-value':
+        case 'element': return (element) => `<{${element}}>`;
+
+        case 'grammar': return (text) => `${text} (within a <pre class=prod>)`;
+
+        case 'type': return (text)=> `<<${text}>>`;
+
+        case 'descriptor':
+        case 'property': return (text) => `'${text}'`;
+
+        default: return;
+    };
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!needsFor(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!refusesFor(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
 }
 </script>
 <script>/* Boilerplate: script-link-titles */
+"use strict";
+{
 let linkTitleData = {
- "https://drafts.csswg.org/css-values-4/#length-value": "Expands to: advance measure | cap | ch | cm | dvb | dvh | dvi | dvmax | dvmin | dvw | em | ex | ic | in | lh | lvb | lvh | lvi | lvmax | lvmin | lvw | mm | pc | pt | px | q | rcap | rch | rem | rex | ric | rlh | svb | svh | svi | svmax | svmin | svw | vb | vh | vi | vmax | vmin | vw"
+"https://drafts.csswg.org/css-values-4/#length-value": "Expands to: advance measure | cap | ch | cm | dvb | dvh | dvi | dvmax | dvmin | dvw | em | ex | ic | in | lh | lvb | lvh | lvi | lvmax | lvmin | lvw | mm | pc | pt | px | q | rcap | rch | rem | rex | ric | rlh | svb | svh | svi | svmax | svmin | svw | vb | vh | vi | vmax | vmin | vw",
 };
 
 function setTypeTitles() {
@@ -2745,250 +2753,236 @@ function setTypeTitles() {
 }
 
 document.addEventListener("DOMContentLoaded", setTypeTitles);
+}
 </script>
 <script>/* Boilerplate: script-ref-hints */
 "use strict";
 {
-    function genRefHint(link, ref) {
-        const linkText = link.textContent;
-        let dfnTextElements = '';
-        if (ref.text != linkText) {
-            dfnTextElements =
-                mk.li({},
-                    mk.b({}, "DFN: "),
-                    mk.code({ class: "dfn-text" }, ref.text)
-                );
-        }
-        const forList = ref.for_;
-        const forListElements = forList.length === 0 ? '' : mk.li({},
+let refsData = {
+"#float": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-page-floats","spec":"css-page-floats-3","status":"local","text":"float","type":"dfn","url":"#float"},
+"#float-anchor": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-page-floats","spec":"css-page-floats-3","status":"local","text":"float anchor","type":"dfn","url":"#float-anchor"},
+"#float-containing-block-formatting-context": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-page-floats","spec":"css-page-floats-3","status":"local","text":"float containing block formatting context","type":"dfn","url":"#float-containing-block-formatting-context"},
+"#float-reference": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-page-floats","spec":"css-page-floats-3","status":"local","text":"float reference","type":"dfn","url":"#float-reference"},
+"#funcdef-float-snap-block": {"export":true,"for_":["float"],"level":"3","normative":true,"shortname":"css-page-floats","spec":"css-page-floats-3","status":"local","text":"snap-block()","type":"function","url":"#funcdef-float-snap-block"},
+"#funcdef-float-snap-inline": {"export":true,"for_":["float"],"level":"3","normative":true,"shortname":"css-page-floats","spec":"css-page-floats-3","status":"local","text":"snap-inline()","type":"function","url":"#funcdef-float-snap-inline"},
+"#initial-float-reference": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-page-floats","spec":"css-page-floats-3","status":"local","text":"initial float reference","type":"dfn","url":"#initial-float-reference"},
+"#inline-float": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-page-floats","spec":"css-page-floats-3","status":"local","text":"inline float","type":"dfn","url":"#inline-float"},
+"#not-overlapping": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-page-floats","spec":"css-page-floats-3","status":"local","text":"not overlapping","type":"dfn","url":"#not-overlapping"},
+"#page-float": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-page-floats","spec":"css-page-floats-3","status":"local","text":"page float","type":"dfn","url":"#page-float"},
+"#propdef-clear": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-page-floats","spec":"css-page-floats-3","status":"local","text":"clear","type":"property","url":"#propdef-clear"},
+"#propdef-float": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-page-floats","spec":"css-page-floats-3","status":"local","text":"float","type":"property","url":"#propdef-float"},
+"#propdef-float-defer": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-page-floats","spec":"css-page-floats-3","status":"local","text":"float-defer","type":"property","url":"#propdef-float-defer"},
+"#propdef-float-offset": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-page-floats","spec":"css-page-floats-3","status":"local","text":"float-offset","type":"property","url":"#propdef-float-offset"},
+"#propdef-float-reference": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-page-floats","spec":"css-page-floats-3","status":"local","text":"float-reference","type":"property","url":"#propdef-float-reference"},
+"https://drafts.csswg.org/css-break-4/#fragmentation-container": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"current","text":"fragmentation container","type":"dfn","url":"https://drafts.csswg.org/css-break-4/#fragmentation-container"},
+"https://drafts.csswg.org/css-break-4/#fragmentation-context": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-break","spec":"css-break-4","status":"current","text":"fragmentation context","type":"dfn","url":"https://drafts.csswg.org/css-break-4/#fragmentation-context"},
+"https://drafts.csswg.org/css-exclusions-1/#propdef-wrap-flow": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css-exclusions","spec":"css3-exclusions","status":"current","text":"wrap-flow","type":"property","url":"https://drafts.csswg.org/css-exclusions-1/#propdef-wrap-flow"},
+"https://drafts.csswg.org/css-values-4/#comb-comma": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":",","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-comma"},
+"https://drafts.csswg.org/css-values-4/#comb-one": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"|","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"https://drafts.csswg.org/css-values-4/#css-wide-keywords": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"css-wide keywords","type":"dfn","url":"https://drafts.csswg.org/css-values-4/#css-wide-keywords"},
+"https://drafts.csswg.org/css-values-4/#length-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<length>","type":"type","url":"https://drafts.csswg.org/css-values-4/#length-value"},
+"https://drafts.csswg.org/css-values-4/#mult-opt": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"?","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#mult-opt"},
+"https://drafts.csswg.org/css-values-4/#percentage-value": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<percentage>","type":"type","url":"https://drafts.csswg.org/css-values-4/#percentage-value"},
+"https://drafts.csswg.org/css-values-4/#typedef-length-percentage": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<length-percentage>","type":"type","url":"https://drafts.csswg.org/css-values-4/#typedef-length-percentage"},
+"https://drafts.csswg.org/css-writing-modes-3/#propdef-direction": {"export":true,"for_":[],"level":"3","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-3","status":"current","text":"direction","type":"property","url":"https://drafts.csswg.org/css-writing-modes-3/#propdef-direction"},
+"https://drafts.csswg.org/css-writing-modes-4/#inline-size": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"inline size","type":"dfn","url":"https://drafts.csswg.org/css-writing-modes-4/#inline-size"},
+"https://drafts.csswg.org/css-writing-modes-4/#propdef-writing-mode": {"export":true,"for_":[],"level":"4","normative":true,"shortname":"css-writing-modes","spec":"css-writing-modes-4","status":"current","text":"writing-mode","type":"property","url":"https://drafts.csswg.org/css-writing-modes-4/#propdef-writing-mode"},
+"https://www.w3.org/TR/CSS22/visudet.html#propdef-max-height": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css","spec":"css22","status":"snapshot","text":"max-height","type":"dfn","url":"https://www.w3.org/TR/CSS22/visudet.html#propdef-max-height"},
+"https://www.w3.org/TR/CSS22/visudet.html#propdef-max-width": {"export":true,"for_":[],"level":"1","normative":true,"shortname":"css","spec":"css22","status":"snapshot","text":"max-width","type":"dfn","url":"https://www.w3.org/TR/CSS22/visudet.html#propdef-max-width"},
+};
+
+function mkRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.text != linkText) {
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "Term: "),
+                mk.span({}, ref.text)
+            );
+    }
+    const forList = ref.for_;
+    let forListElements;
+    if(forList.length == 0) {
+        forListElements = [];
+    } else if(forList.length == 1) {
+        forListElements = mk.li({},
+            mk.b({}, "For: "),
+            mk.span({}, forList[0]),
+        );
+    } else {
+        forListElements = mk.li({},
             mk.b({}, "For: "),
             mk.ul({},
                 ...forList.map(forItem =>
                     mk.li({},
-                        mk.span({}, `${forItem}`)
+                        mk.span({}, forItem)
                     ),
                 ),
             ),
         );
-        const url = ref.url;
-        const safeUrl = encodeURIComponent(url);
-        const hintPanel = mk.aside({
-            class: "ref-hint",
-            id: `ref-hint-for-${safeUrl}`,
-            "data-for": url,
-            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
-        },
-            mk.ul({},
-                dfnTextElements,
-                mk.li({},
-                    mk.b({}, "URL: "),
-                    mk.a({ href: url, class: "ref" }, url),
-                ),
-                mk.li({},
-                    mk.b({}, "Type: "),
-                    mk.span({}, `${ref.type}`),
-                ),
-                mk.li({},
-                    mk.b({}, "Spec: "),
-                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
-                ),
-                forListElements
+    }
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
             ),
-        );
-        hintPanel.forLink = link;
-        return hintPanel;
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    setupRefHintEventListeners(link, hintPanel);
+    return hintPanel;
+}
+
+function hideAllRefHints() {
+    queryAll(".ref-hint").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    if(refHint.teardownEventListeners) {
+        refHint.teardownEventListeners();
     }
-    function genAllRefHints() {
-        for(const refData of Object.values(window.refsData)) {
-            const refUrl = refData.url;
-            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
-            if (links.length == 0) {
-                console.log(`Can't find link href="${refUrl}".`, refData);
-                continue;
-            }
-            for (let i = 0; i < links.length; i++) {
-                const link = links[i];
-                const hint = genRefHint(link, refData);
-                append(document.body, hint);
-                insertLinkPopupAction(hint)
-            }
+    refHint.remove();
+}
+
+function showRefHint(link) {
+    if(link.classList.contains("dfn-link")) return;
+    const url = link.getAttribute("href");
+    const ref = refsData[url];
+    if(!ref) return;
+
+    hideAllRefHints(); // Only display one at this time.
+
+    const refHint = mkRefHint(link, ref);
+    append(document.body, refHint);
+    link.setAttribute("aria-expanded", "true");
+    positionRefHint(refHint);
+}
+
+function setupRefHintEventListeners(link, refHint) {
+    if (refHint.teardownEventListeners) return;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
         }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
     }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
 
-    function hideAllRefHints() {
-        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
+
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getRootLevelAbsolutePosition(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
     }
+}
 
-    function hideRefHint(refHint) {
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "false");
-        refHint.style.position = "absolute"; // unfix it
-        refHint.classList.remove("on");
-        const teardown = refHint.teardownEventListeners;
-        if (teardown) {
-            refHint.teardownEventListeners = undefined;
-            teardown();
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getRootLevelAbsolutePosition(el) {
+    const boundsRect = el.getBoundingClientRect();
+    let xPos = 0;
+    let yPos = 0;
+
+    while (el) {
+        let xScroll = el.scrollLeft;
+        let yScroll = el.scrollTop;
+
+        // Ignore scrolling of body.
+        if (el.tagName === "BODY") {
+            xScroll = 0;
+            yScroll = 0;
         }
+        xPos += (el.offsetLeft - xScroll + el.clientLeft);
+        yPos += (el.offsetTop - yScroll + el.clientTop);
+
+        el = el.offsetParent;
     }
+    return {
+        left: xPos,
+        top: yPos,
+        right: xPos + boundsRect.width,
+        bottom: yPos + boundsRect.height,
+    };
+}
 
-    function showRefHint(refHint) {
-        hideAllRefHints(); // Only display one at this time.
-
-        const link = refHint.forLink;
-        link.setAttribute("aria-expanded", "true");
-        refHint.classList.add("on");
-        positionRefHint(refHint);
-        setupRefHintEventListeners(refHint);
-    }
-
-    function setupRefHintEventListeners(refHint) {
-        if (refHint.teardownEventListeners) return;
-        const link = refHint.forLink;
-        // Add event handlers to hide the refHint after the user moves away
-        // from both the link and refHint, if not hovering either within one second.
-        let timeout = null;
-        const startHidingRefHint = (event) => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-            timeout = setTimeout(() => {
-                hideRefHint(refHint);
-            }, 1000);
-        }
-        const resetHidingRefHint = (event) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = null;
-        };
-        link.addEventListener("mouseleave", startHidingRefHint);
-        link.addEventListener("mouseenter", resetHidingRefHint);
-        link.addEventListener("blur", startHidingRefHint);
-        link.addEventListener("focus", resetHidingRefHint);
-        refHint.addEventListener("mouseleave", startHidingRefHint);
-        refHint.addEventListener("mouseenter", resetHidingRefHint);
-        refHint.addEventListener("blur", startHidingRefHint);
-        refHint.addEventListener("focus", resetHidingRefHint);
-
-        refHint.teardownEventListeners = () => {
-            // remove event listeners
-            resetHidingRefHint();
-            link.removeEventListener("mouseleave", startHidingRefHint);
-            link.removeEventListener("mouseenter", resetHidingRefHint);
-            link.removeEventListener("blur", startHidingRefHint);
-            link.removeEventListener("focus", resetHidingRefHint);
-            refHint.removeEventListener("mouseleave", startHidingRefHint);
-            refHint.removeEventListener("mouseenter", resetHidingRefHint);
-            refHint.removeEventListener("blur", startHidingRefHint);
-            refHint.removeEventListener("focus", resetHidingRefHint);
-        };
-    }
-
-    function positionRefHint(refHint) {
-        const link = refHint.forLink;
-        const linkPos = getRootLevelAbsolutePosition(link);
-        refHint.style.top = linkPos.bottom + "px";
-        refHint.style.left = linkPos.left + "px";
-
-        const panelPos = refHint.getBoundingClientRect();
-        const panelMargin = 8;
-        const maxRight = document.body.parentNode.clientWidth - panelMargin;
-        if (panelPos.right > maxRight) {
-            const overflowAmount = panelPos.right - maxRight;
-            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
-            refHint.style.left = newLeft + "px";
-        }
-    }
-
-    // TODO: shared util
-    // Returns the root-level absolute position {left and top} of element.
-    function getRootLevelAbsolutePosition(el) {
-        const boundsRect = el.getBoundingClientRect();
-        let xPos = 0;
-        let yPos = 0;
-
-        while (el) {
-            let xScroll = el.scrollLeft;
-            let yScroll = el.scrollTop;
-
-            // Ignore scrolling of body.
-            if (el.tagName === "BODY") {
-                xScroll = 0;
-                yScroll = 0;
-            }
-            xPos += (el.offsetLeft - xScroll + el.clientLeft);
-            yPos += (el.offsetTop - yScroll + el.clientTop);
-
-            el = el.offsetParent;
-        }
-        return {
-            left: xPos,
-            top: yPos,
-            right: xPos + boundsRect.width,
-            bottom: yPos + boundsRect.height,
-        };
-    }
-
-    function insertLinkPopupAction(refHint) {
-        const link = refHint.forLink;
-        // link.setAttribute('role', 'button');
-        link.setAttribute('aria-expanded', 'false')
-        link.classList.add('has-ref-hint');
-        link.addEventListener('mouseover', (event) => {
-            showRefHint(refHint);
-        });
-        link.addEventListener('focus', (event) => {
-            showRefHint(refHint);
-        })
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
+document.addEventListener("DOMContentLoaded", () => {
+    document.body.addEventListener("mouseover", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
+    });
+    document.body.addEventListener("focus", e=>{
+        let link = e.target.closest("a");
+        if(link) showRefHint(link);
     });
 
-    window.addEventListener("resize", () => {
-        // Hide any open ref hint.
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all link panels.
         hideAllRefHints();
     });
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
 }
-</script>
-<script>/* Boilerplate: script-ref-hints-json */
-window.refsData = {};
-window.refsData['#propdef-float'] = {"text": "float", "type": "property", "spec": "css-page-floats-3", "shortname": "css-page-floats", "level": "3", "status": "local", "url": "#propdef-float", "export": true, "normative": true, "for_": []};
-window.refsData['#float'] = {"text": "float", "type": "dfn", "spec": "css-page-floats-3", "shortname": "css-page-floats", "level": "3", "status": "local", "url": "#float", "export": true, "normative": true, "for_": []};
-window.refsData['#float-reference'] = {"text": "float reference", "type": "dfn", "spec": "css-page-floats-3", "shortname": "css-page-floats", "level": "3", "status": "local", "url": "#float-reference", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-break-4/#fragmentation-container'] = {"text": "fragmentation container", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-break-4/#fragmentation-container", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-clear'] = {"text": "clear", "type": "property", "spec": "css-page-floats-3", "shortname": "css-page-floats", "level": "3", "status": "local", "url": "#propdef-clear", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-exclusions-1/#propdef-wrap-flow'] = {"text": "wrap-flow", "type": "property", "spec": "css3-exclusions", "shortname": "css-exclusions", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-exclusions-1/#propdef-wrap-flow", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#css-wide-keywords'] = {"text": "css-wide keywords", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "export": true, "normative": true, "for_": []};
-window.refsData['#float-anchor'] = {"text": "float anchor", "type": "dfn", "spec": "css-page-floats-3", "shortname": "css-page-floats", "level": "3", "status": "local", "url": "#float-anchor", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-float-reference'] = {"text": "float-reference", "type": "property", "spec": "css-page-floats-3", "shortname": "css-page-floats", "level": "3", "status": "local", "url": "#propdef-float-reference", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
-window.refsData['#float-containing-block-formatting-context'] = {"text": "float containing block formatting context", "type": "dfn", "spec": "css-page-floats-3", "shortname": "css-page-floats", "level": "3", "status": "local", "url": "#float-containing-block-formatting-context", "export": true, "normative": true, "for_": []};
-window.refsData['#inline-float'] = {"text": "inline float", "type": "dfn", "spec": "css-page-floats-3", "shortname": "css-page-floats", "level": "3", "status": "local", "url": "#inline-float", "export": true, "normative": true, "for_": []};
-window.refsData['#page-float'] = {"text": "page float", "type": "dfn", "spec": "css-page-floats-3", "shortname": "css-page-floats", "level": "3", "status": "local", "url": "#page-float", "export": true, "normative": true, "for_": []};
-window.refsData['#funcdef-float-snap-block'] = {"text": "snap-block()", "type": "function", "spec": "css-page-floats-3", "shortname": "css-page-floats", "level": "3", "status": "local", "url": "#funcdef-float-snap-block", "export": true, "normative": true, "for_": ["float"]};
-window.refsData['#funcdef-float-snap-inline'] = {"text": "snap-inline()", "type": "function", "spec": "css-page-floats-3", "shortname": "css-page-floats", "level": "3", "status": "local", "url": "#funcdef-float-snap-inline", "export": true, "normative": true, "for_": ["float"]};
-window.refsData['https://www.w3.org/TR/CSS22/visudet.html#propdef-max-width'] = {"text": "max-width", "type": "dfn", "spec": "css22", "shortname": "css", "level": "1", "status": "snapshot", "url": "https://www.w3.org/TR/CSS22/visudet.html#propdef-max-width", "export": true, "normative": true, "for_": []};
-window.refsData['https://www.w3.org/TR/CSS22/visudet.html#propdef-max-height'] = {"text": "max-height", "type": "dfn", "spec": "css22", "shortname": "css", "level": "1", "status": "snapshot", "url": "https://www.w3.org/TR/CSS22/visudet.html#propdef-max-height", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#inline-size'] = {"text": "inline size", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#inline-size", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-3/#propdef-direction'] = {"text": "direction", "type": "property", "spec": "css-writing-modes-3", "shortname": "css-writing-modes", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-3/#propdef-direction", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-writing-modes-4/#propdef-writing-mode'] = {"text": "writing-mode", "type": "property", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#propdef-writing-mode", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#length-value'] = {"text": "<length>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#length-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#comb-comma'] = {"text": ",", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-comma", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#mult-opt'] = {"text": "?", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "export": true, "normative": true, "for_": []};
-window.refsData['#initial-float-reference'] = {"text": "initial float reference", "type": "dfn", "spec": "css-page-floats-3", "shortname": "css-page-floats", "level": "3", "status": "local", "url": "#initial-float-reference", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-float-defer'] = {"text": "float-defer", "type": "property", "spec": "css-page-floats-3", "shortname": "css-page-floats", "level": "3", "status": "local", "url": "#propdef-float-defer", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-break-4/#fragmentation-context'] = {"text": "fragmentation context", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-break-4/#fragmentation-context", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-float-offset'] = {"text": "float-offset", "type": "property", "spec": "css-page-floats-3", "shortname": "css-page-floats", "level": "3", "status": "local", "url": "#propdef-float-offset", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#percentage-value'] = {"text": "<percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#percentage-value", "export": true, "normative": true, "for_": []};
-window.refsData['https://drafts.csswg.org/css-values-4/#typedef-length-percentage'] = {"text": "<length-percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#typedef-length-percentage", "export": true, "normative": true, "for_": []};
-window.refsData['#not-overlapping'] = {"text": "not overlapping", "type": "dfn", "spec": "css-page-floats-3", "shortname": "css-page-floats", "level": "3", "status": "local", "url": "#not-overlapping", "export": true, "normative": true, "for_": []};window.refsData['#propdef-clear'] = {"text": "clear", "type": "property", "spec": "css-page-floats-3", "shortname": "css-page-floats", "level": "3", "status": "local", "url": "#propdef-clear", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-float'] = {"text": "float", "type": "property", "spec": "css-page-floats-3", "shortname": "css-page-floats", "level": "3", "status": "local", "url": "#propdef-float", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-float-defer'] = {"text": "float-defer", "type": "property", "spec": "css-page-floats-3", "shortname": "css-page-floats", "level": "3", "status": "local", "url": "#propdef-float-defer", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-float-offset'] = {"text": "float-offset", "type": "property", "spec": "css-page-floats-3", "shortname": "css-page-floats", "level": "3", "status": "local", "url": "#propdef-float-offset", "export": true, "normative": true, "for_": []};
-window.refsData['#propdef-float-reference'] = {"text": "float-reference", "type": "property", "spec": "css-page-floats-3", "shortname": "css-page-floats", "level": "3", "status": "local", "url": "#propdef-float-reference", "export": true, "normative": true, "for_": []};
 </script>
