@@ -354,7 +354,7 @@ def determineDfnType(doc: t.SpecT, dfn: t.ElementT, inferCSS: bool = False) -> s
         ):
             return "value"
         if text[0:1] == "<" and text[-1:] == ">":
-            if "[" in text:
+            if "[" in text and "]" in text:
                 # has a range, *must* be a value
                 return "value"
             else:
