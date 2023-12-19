@@ -30,12 +30,6 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
             section = h.sectionName(doc, link)
             if section is not None:
                 refsFromSection.setdefault(section, []).append(link)
-        if not refsFromSection:
-            # Just insert a self-link instead
-            # unless it already has a self-link, of course
-            if h.find(".self-link", dfn) is None:
-                h.appendChild(dfn, h.E.a({"href": "#" + h.escapeUrlFrag(id), "class": "self-link"}))
-            continue
         h.addClass(doc, dfn, "dfn-paneled")
         sectionsJson = []
         for text, els in refsFromSection.items():
