@@ -354,7 +354,11 @@ def determineDfnType(doc: t.SpecT, dfn: t.ElementT, inferCSS: bool = False) -> s
         ):
             return "value"
         if text[0:1] == "<" and text[-1:] == ">":
-            return "type"
+            if "[" in text:
+                # has a range, *must* be a value
+                return "value"
+            else:
+                return "type"
         if text[0:1] == ":":
             return "selector"
         if re.match(r"^[\w-]+\(.*\)$", text) and not (dfn.get("id") or "").startswith("dom-"):
