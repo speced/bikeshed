@@ -15,29 +15,29 @@ class JCManager:
     styles: dict[str, Style] = dataclasses.field(default_factory=dict)
     scripts: dict[str, Script] = dataclasses.field(default_factory=dict)
 
-    def getStyles(self) -> list[Style]:
+    def getStyles(self, allowList: t.BoolSet) -> list[Style]:
         styles = {}
         for style in self.styles.values():
-            if not style.insertable():
+            if not style.insertable(allowList):
                 continue
             styles[style.name] = style
         for script in self.scripts.values():
-            if not script.insertable():
+            if not script.insertable(allowList):
                 continue
             if script.style:
                 styles[script.style.name] = script.style
         return sorted(styles.values(), key=lambda x: x.name)
 
-    def getScripts(self) -> list[Library | Script]:
+    def getScripts(self, allowList: t.BoolSet) -> list[Library | Script]:
         libs = {}
         scripts = {}
         for style in self.styles.values():
-            if not style.insertable():
+            if not style.insertable(allowList):
                 continue
             if style.script:
                 scripts[style.script.name] = style.script
         for script in self.scripts.values():
-            if not script.insertable():
+            if not script.insertable(allowList):
                 continue
             if script.libraries:
                 libs.update(script.libraries)
@@ -164,7 +164,7 @@ class JCResource(metaclass=ABCMeta):
     name: str
 
     @abstractmethod
-    def insertable(self) -> bool:
+    def insertable(self, allowList: t.BoolSet) -> bool:
         pass
 
     @abstractmethod
@@ -179,7 +179,9 @@ class Script(JCResource):
     style: Style | None = None
     data: tuple[str, t.JSONT] | None = None
 
-    def insertable(self) -> bool:
+    def insertable(self, allowList: t.BoolSet) -> bool:
+        if f"script-{self.name}" not in allowList:
+            return False
         if self.data is None:
             return True
         if self.data[1]:
@@ -205,7 +207,7 @@ class Script(JCResource):
 class Library(JCResource):
     path: Path
 
-    def insertable(self) -> bool:
+    def insertable(self, allowList: t.BoolSet) -> bool:
         return True
 
     def toElement(self) -> t.ElementT:
@@ -219,7 +221,9 @@ class Style(JCResource):
     textPath: Path
     script: Script | None = None
 
-    def insertable(self) -> bool:
+    def insertable(self, allowList: t.BoolSet) -> bool:
+        if f"style-{self.name}" not in allowList:
+            return False
         return True
 
     def toElement(self, darkMode: bool = True) -> t.ElementT:

@@ -63,6 +63,7 @@ if TYPE_CHECKING:
     SpecT = Spec
 
     from .biblio import BiblioEntry
+    from .config.BoolSet import BoolSet
     from .metadata import MetadataManager
     from .refs import MethodVariant, MethodVariants, ReferenceManager, RefSource, RefWrapper
     from .retrieve import DataFileRequester

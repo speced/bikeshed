@@ -244,17 +244,13 @@ def w3cStylesheetInUse(doc: t.SpecT) -> bool:
 
 
 def addBikeshedBoilerplate(doc: t.SpecT) -> None:
-    for style in doc.extraJC.getStyles():
-        if "style-" + style.name not in doc.md.boilerplate:
-            continue
+    for style in doc.extraJC.getStyles(doc.md.boilerplate):
         container = getFillContainer("style-" + style.name, doc)
         if container is None:
             container = getFillContainer("bs-styles", doc, default=True)
         if container is not None:
             h.appendChild(container, style.toElement(darkMode=doc.md.darkMode))
-    for script in doc.extraJC.getScripts():
-        if "script-" + script.name not in doc.md.boilerplate:
-            continue
+    for script in doc.extraJC.getScripts(doc.md.boilerplate):
         container = getFillContainer("script-" + script.name, doc)
         if container is None:
             container = getFillContainer("bs-scripts", doc, default=True)
