@@ -159,16 +159,20 @@ class MetadataManager:
 
         if key not in ("ED", "TR", "URL"):
             key = key.title()
-        self.allData[key].append(val)
 
         if key not in knownKeys:
             m.die(f'Unknown metadata key "{key}". Prefix custom keys with "!".', lineNum=lineNum)
             return self
+
         md = knownKeys[key]
+        try:
+            parsedVal = md.parse(key, val, lineNum=lineNum)
+        except Exception as e:
+            m.die(f"Error while parsing '{key}' metadata value:\n  {val}\n{e}")
+            return self
 
-        val = md.parse(key, val, lineNum=lineNum)
-
-        self.addParsedData(key, val)
+        self.allData[key].append(val)
+        self.addParsedData(key, parsedVal)
         return self
 
     def addParsedData(self, key: str, val: t.Any) -> MetadataManager:
