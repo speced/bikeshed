@@ -16,7 +16,7 @@ class JCManager:
     scripts: dict[str, Script] = dataclasses.field(default_factory=dict)
 
     def getStyles(self, allowList: t.BoolSet) -> list[Style]:
-        styles = {}
+        styles: dict[str, Style] = {}
         for style in self.styles.values():
             if not style.insertable(allowList):
                 continue
@@ -24,23 +24,25 @@ class JCManager:
         for script in self.scripts.values():
             if not script.insertable(allowList):
                 continue
-            if script.style:
+            if script.style and script.style.insertable(allowList):
                 styles[script.style.name] = script.style
         return sorted(styles.values(), key=lambda x: x.name)
 
     def getScripts(self, allowList: t.BoolSet) -> list[Library | Script]:
-        libs = {}
-        scripts = {}
+        libs: dict[str, Library] = {}
+        scripts: dict[str, Script] = {}
         for style in self.styles.values():
             if not style.insertable(allowList):
                 continue
-            if style.script:
+            if style.script and style.script.insertable(allowList):
                 scripts[style.script.name] = style.script
         for script in self.scripts.values():
             if not script.insertable(allowList):
                 continue
             if script.libraries:
-                libs.update(script.libraries)
+                for lib in script.libraries.values():
+                    if lib.insertable(allowList):
+                        libs[lib.name] = lib
             scripts[script.name] = script
         return sorted(libs.values(), key=lambda x: x.name) + sorted(scripts.values(), key=lambda x: x.name)
 
