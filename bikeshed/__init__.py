@@ -43,22 +43,22 @@ def verify_requirements() -> None:
     )
     if os.path.exists(requirements_file_path):
         requirements_met = True
-        with open(requirements_file_path, encoding="utf-8") as requirements_file:
-            requirements = [line for line in requirements_file.read().split("\n") if (not line.strip().startswith("-"))]
-            for requirement in pkg_resources.parse_requirements(requirements):
-                try:
-                    distribution = pkg_resources.get_distribution(requirement.project_name)
-                    if distribution not in requirement:
-                        print(
-                            "Package {} version {} is not supported.".format(
-                                requirement.project_name,
-                                distribution.version,
-                            ),
-                        )
-                        requirements_met = False
-                except Exception:
-                    print(f"Package {requirement.project_name} is not installed.")
+        with open(requirements_file_path, encoding="utf-8") as fh:
+            requirements = [line for line in fh.read().split("\n") if (not line.strip().startswith("-"))]
+        for requirement in pkg_resources.parse_requirements(requirements):
+            try:
+                distribution = pkg_resources.get_distribution(requirement.project_name)
+                if distribution not in requirement:
+                    print(
+                        "Package {} version {} is not supported.".format(
+                            requirement.project_name,
+                            distribution.version,
+                        ),
+                    )
                     requirements_met = False
+            except Exception:
+                print(f"Package {requirement.project_name} is not installed.")
+                requirements_met = False
         if not requirements_met:
             print('Run "pip3 install -r {}" to complete installation'.format(requirements_file_path))
             sys.exit(1)
