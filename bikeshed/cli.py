@@ -664,8 +664,13 @@ def handleSource(options: argparse.Namespace) -> None:
     if options.bigText:
         from . import fonts
 
-        font = fonts.Font.fromPath()
-        fonts.replaceComments(font=font, inputFilename=options.infile, outputFilename=options.outfile)
+        try:
+            fontPath = config.scriptPath("fonts", "smallblocks.bsfont")
+            font = fonts.Font.fromPath(fontPath)
+            fonts.replaceComments(font=font, inputFilename=options.infile, outputFilename=options.outfile)
+        except Exception as e:
+            m.die("Error trying to embiggen text:\n{e}")
+            return
 
 
 def handleTest(options: argparse.Namespace, extras: list[str]) -> None:
