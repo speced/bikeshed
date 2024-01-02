@@ -16,6 +16,7 @@ from . import (
     updateMdn,
     updateWpt,
 )
+from .mode import UpdateMode
 
 
 def update(
@@ -30,43 +31,48 @@ def update(
     wpt: bool = False,
     path: str | None = None,
     dryRun: bool = False,
-    manifestMode: str | None = None,
+    updateMode: UpdateMode = UpdateMode.BOTH,
 ) -> manifest.Manifest | None:
     if path is None:
         path = config.scriptPath("spec-data")
     assert path is not None
 
-    # Update via manifest by default, falling back to a full update only if failed or forced.
-    if manifestMode is None or manifestMode == "force":
-        success = manifest.updateByManifest(path=path, dryRun=dryRun, force=manifestMode == "force")
-        if success:
-            return None
-        else:
+    if updateMode & UpdateMode.MANIFEST:
+        newManifest = manifest.updateByManifest(path=path, dryRun=dryRun, updateMode=updateMode)
+        if newManifest:
+            return newManifest
+        if updateMode & UpdateMode.MANUAL:
             m.say("Falling back to a manual update...")
 
-    # fmt: off
-    # If all are False, update everything
-    if anchors == backrefs == biblio == boilerplate == caniuse == linkDefaults == mdn == languages == wpt == False:  # noqa: E712
-        anchors = backrefs =  biblio =  boilerplate =  caniuse =  linkDefaults =  mdn =  languages =  wpt =  True
+    if updateMode & UpdateMode.MANUAL:
+        # fmt: off
+        # If all are False, update everything
+        if anchors == backrefs == biblio == boilerplate == caniuse == linkDefaults == mdn == languages == wpt == False:  # noqa: E712
+            anchors = backrefs =  biblio =  boilerplate =  caniuse =  linkDefaults =  mdn =  languages =  wpt =  True
 
-    touchedPaths: dict[str, set[str]|None] = {
-        "anchors": updateCrossRefs.update(path=path, dryRun=dryRun) if anchors else None,
-        "backrefs": updateBackRefs.update(path=path, dryRun=dryRun) if backrefs else None,
-        "biblio": updateBiblio.update(path=path, dryRun=dryRun) if biblio else None,
-        "boilerplate": updateBoilerplates.update(path=path, dryRun=dryRun) if boilerplate else None,
-        "caniuse": updateCanIUse.update(path=path, dryRun=dryRun) if caniuse else None,
-        "mdn": updateMdn.update(path=path, dryRun=dryRun) if mdn else None,
-        "linkDefaults": updateLinkDefaults.update(path=path, dryRun=dryRun) if linkDefaults else None,
-        "languages": updateLanguages.update(path=path, dryRun=dryRun) if languages else None,
-        "wpt": updateWpt.update(path=path, dryRun=dryRun) if wpt else None,
-    }
-    # fmt: on
+        try:
+            touchedPaths: dict[str, set[str]|None] = {
+                "anchors": updateCrossRefs.update(path=path, dryRun=dryRun) if anchors else None,
+                "backrefs": updateBackRefs.update(path=path, dryRun=dryRun) if backrefs else None,
+                "biblio": updateBiblio.update(path=path, dryRun=dryRun) if biblio else None,
+                "boilerplate": updateBoilerplates.update(path=path, dryRun=dryRun) if boilerplate else None,
+                "caniuse": updateCanIUse.update(path=path, dryRun=dryRun) if caniuse else None,
+                "mdn": updateMdn.update(path=path, dryRun=dryRun) if mdn else None,
+                "linkDefaults": updateLinkDefaults.update(path=path, dryRun=dryRun) if linkDefaults else None,
+                "languages": updateLanguages.update(path=path, dryRun=dryRun) if languages else None,
+                "wpt": updateWpt.update(path=path, dryRun=dryRun) if wpt else None,
+            }
+        except Exception as e:
+            msg = f"Encountered an error during manual update:\n{e}"
+            m.die(msg)
+            return None
+        # fmt: on
 
-    cleanupFiles(path, touchedPaths=touchedPaths, dryRun=dryRun)
+        cleanupFiles(path, touchedPaths=touchedPaths, dryRun=dryRun)
     return manifest.createManifest(path=path, dryRun=dryRun)
 
 
-def fixupDataFiles(skipUpdate: bool = False) -> None:
+def fixupDataFiles(updateMode: UpdateMode = UpdateMode.NONE) -> None:
     """
     Checks the readonly/ version is more recent than your current mutable data files.
     This happens if I changed the datafile format and shipped updated files as a result;
@@ -97,15 +103,15 @@ def fixupDataFiles(skipUpdate: bool = False) -> None:
             return
 
     # Now see if the local datafiles are likely out-of-date.
-    if skipUpdate:
+    if not (updateMode):
         return
     if liveManifest is None:
         m.warn("Couldn't find manifest from previous update run.\nTriggering a datafiles update to be safe...")
-        update()
+        update(updateMode=UpdateMode.BOTH)
         return
-    if liveManifest.daysOld() >= 7:
+    elif liveManifest.daysOld() >= 7:
         m.say("Bringing data files up-to-date...")
-        update()
+        update(updateMode=updateMode)
 
 
 def updateReadonlyDataFiles() -> None:

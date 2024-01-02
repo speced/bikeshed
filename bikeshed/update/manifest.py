@@ -17,6 +17,7 @@ from result import Err, Ok, Result
 
 from .. import messages as m
 from .. import t
+from .mode import UpdateMode
 
 
 def isOk(x: t.Any) -> t.TypeGuard[Ok]:
@@ -70,7 +71,7 @@ def createManifest(path: str, dryRun: bool = False) -> Manifest:
     return manifest
 
 
-def updateByManifest(path: str, dryRun: bool = False, force: bool = False) -> Manifest | None:
+def updateByManifest(path: str, dryRun: bool = False, updateMode: UpdateMode = UpdateMode.MANIFEST) -> Manifest | None:
     """
     Attempts to update only the recently updated datafiles by using a manifest file.
     Returns None if updating failed and a full update should be performed;
@@ -120,7 +121,9 @@ def updateByManifest(path: str, dryRun: bool = False, force: bool = False) -> Ma
             m.warn(
                 f"Remote data ({printDt(remoteManifest.dt)}) is more than two days older than local time ({printDt(dtNow())}); either your local time is wrong (no worries, this warning will just repeat each time) or the update process has fallen over (please report this!).",
             )
-        if not force:
+        if not (updateMode & UpdateMode.FORCE):
+            # If the update isn't forced, allow it to be skipped
+            # if the data is already sufficiently fresh.
             if localManifest.dt == remoteManifest.dt and localManifest.dt == dtZero():
                 m.say(f"Local data is already up-to-date with remote ({printDt(localManifest.dt)})")
                 return localManifest

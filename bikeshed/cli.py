@@ -83,9 +83,10 @@ def main() -> None:
     )
     argparser.add_argument(
         "--no-update",
-        dest="noUpdate",
-        default=False,
-        action="store_true",
+        dest="updateMode",
+        default=update.UpdateMode.MANIFEST,
+        action="store_const",
+        const=update.UpdateMode.NONE,
         help="Skips checking if your data files are up-to-date.",
     )
     argparser.add_argument(
@@ -249,19 +250,23 @@ def main() -> None:
         help="Update supporting files (those in /spec-data).",
         epilog="If no options are specified, everything is downloaded.",
     )
-    updateParser.add_argument(
+    updateModeGroup = updateParser.add_mutually_exclusive_group()
+    updateModeGroup.add_argument(
         "--skip-manifest",
-        dest="manifest",
+        dest="updateMode",
         action="store_const",
-        const="skip",
+        const=update.UpdateMode.MANUAL,
         help="Forces Bikeshed to do a full update manually, rather than using the manifest to get the preprocessed update (which can be several minutes old).",
     )
-    updateParser.add_argument(
+    updateModeGroup.add_argument(
         "--force-manifest",
-        dest="manifest",
+        dest="updateMode",
         action="store_const",
-        const="force",
+        const=update.UpdateMode.MANIFEST | update.UpdateMode.FORCE,
         help="Force a manifest-based update even if local manifest data is more recent than the remote manifest.",
+    )
+    updateModeGroup.set_defaults(
+        updateMode=update.UpdateMode.BOTH,
     )
     updateParser.add_argument("--anchors", action="store_true", help="Download crossref anchor data.")
     updateParser.add_argument("--backrefs", action="store_true", help="Download link backref data.")
@@ -450,7 +455,7 @@ def main() -> None:
     constants.chroot = not options.allowNonlocalFiles
     constants.executeCode = options.allowExecute
 
-    update.fixupDataFiles(options.noUpdate)
+    update.fixupDataFiles(updateMode=options.updateMode)
     if options.subparserName == "update":
         handleUpdate(options)
     elif options.subparserName == "spec":
@@ -491,7 +496,7 @@ def handleUpdate(options: argparse.Namespace) -> None:
         languages=options.languages,
         wpt=options.wpt,
         dryRun=constants.dryRun,
-        manifestMode=options.manifest,
+        updateMode=options.updateMode,
     )
 
 
