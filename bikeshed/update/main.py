@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import http
 import os
 
 from .. import config, t
@@ -103,15 +104,22 @@ def fixupDataFiles(updateMode: UpdateMode = UpdateMode.NONE) -> None:
             return
 
     # Now see if the local datafiles are likely out-of-date.
-    if not (updateMode):
+    if not updateMode:
         return
+    um = UpdateMode.NONE
     if liveManifest is None:
         m.warn("Couldn't find manifest from previous update run.\nTriggering a datafiles update to be safe...")
-        update(updateMode=UpdateMode.BOTH)
-        return
+        um = updateMode.BOTH
     elif liveManifest.daysOld() >= 7:
         m.say("Bringing data files up-to-date...")
-        update(updateMode=updateMode)
+        um=updateMode
+
+    if um:
+        if not probablyHaveInternet():
+            m.warn("Can't immediately see the internet, so stopping automatic update. Run `bikeshed update` to update manually, if you think you do have internet.")
+            return
+        else:
+            update(updateMode=UpdateMode.BOTH)
 
 
 def updateReadonlyDataFiles() -> None:
@@ -202,3 +210,14 @@ def getDatafilePaths(basePath: str) -> t.Generator[tuple[str, str], None, None]:
         for filename in files:
             filePath = os.path.join(root, filename)
             yield filePath, os.path.relpath(filePath, basePath)
+
+
+def probablyHaveInternet() -> bool:
+    conn = http.client.HTTPSConnection("8.8.8.8", timeout=1)
+    try:
+        conn.request("HEAD", "/")
+        return True
+    except Exception:
+        return False
+    finally:
+        conn.close()
