@@ -2,10 +2,7 @@
 from __future__ import annotations
 
 import dataclasses
-import itertools
-import re
 import string
-import sys
 
 import kdl
 
@@ -17,7 +14,7 @@ else:
     from .. import messages as m
 
 if t.TYPE_CHECKING:
-    Characters: t.TypeAlias = dict[str, list[str]]
+    Glyphs: t.TypeAlias = dict[str, Glyph]
     T = t.TypeVar("T")
     U = t.TypeVar("U")
     from pathlib import Path
@@ -26,17 +23,17 @@ if t.TYPE_CHECKING:
 @dataclasses.dataclass
 class Font:
     md: FontMetadata
-    characters: Characters
+    glyphs: Glyphs
 
-    def __init__(self, characters: Characters, md: FontMetadata) -> None:
-        if len(characters) == 0:
+    def __init__(self, glyphs: Glyphs, md: FontMetadata) -> None:
+        if len(glyphs) == 0:
             m.die("Font file has no character data at all.")
             raise Exception
         self.md = md
-        self.characters = normalizeCharacters(characters, md)
+        self.glyphs = normalizeCharacters(glyphs, md)
 
     @staticmethod
-    def fromPath(fontfilepath: str | Path = config.scriptPath("fonts", "smallblocks.kdl")) -> Font:
+    def fromPath(fontfilepath: str | Path) -> Font:
         try:
             with open(fontfilepath, encoding="utf-8") as fh:
                 text = fh.read()
@@ -47,20 +44,28 @@ class Font:
 
     @staticmethod
     def fromKdl(kdlText: str) -> Font:
-        doc = kdl.parse(kdlText)
+        try:
+            doc = kdl.parse(kdlText)
+        except Exception as e:
+            m.die("Invalid font:\n{e}")
+            raise e
         partialMd = getMetadata(doc)
-        chars = {}
-        for node in doc["characters"].nodes:
-            lines = node.args[0].split("\n")
-            chars[node.name] = lines
-        md = partialMd.inferFromCharacters(chars)
-        return Font(chars, md)
+        glyphsNode = doc.get("glyphs")
+        assert glyphsNode is not None
+        assert len(glyphsNode.nodes) != 0
+        glyphs: Glyphs = {}
+        for node in glyphsNode.nodes:
+            glyphs[node.name] = Glyph.fromKdl(node)
+        md = partialMd.inferFromGlyphs(glyphs)
+
+        return Font(glyphs, md)
 
     def write(self, text: str) -> list[str]:
         output = [""] * self.md.height
         for letterIndex, letter in enumerate(text):
-            if letter in self.characters:
-                for i, line in enumerate(self.characters[letter]):
+            if letter in self.glyphs:
+                for i, line in enumerate(self.glyphs[letter].data):
+                    # Give letters one space of letter-spacing
                     if letterIndex != 0:
                         output[i] += " "
                     output[i] += line
@@ -72,89 +77,109 @@ class Font:
 
 
 @dataclasses.dataclass
+class Glyph:
+    name: str
+    data: list[str]
+    width: int
+
+    @property
+    def height(self) -> int:
+        return len(self.data)
+
+    @staticmethod
+    def fromKdl(node: kdl.Node) -> Glyph:
+        width = node.props.get("width")
+        if width is not None:
+            width = int(width)
+        lines = None
+        for arg in node.args:
+            if isinstance(arg, str):
+                lines = arg.split("\n")
+                break
+        if lines is None:
+            if width is not None:
+                lines = [" " * width]
+            else:
+                m.die(f"Letter '{node.name}' doesn't contain any glyph data.")
+                raise ValueError
+        assert lines is not None
+
+        if len(lines) > 2:
+            # When I update to kdl v2, remove this adjuster,
+            # since that'll just be part of multiline string syntax.
+            # For now, remove the first and last (hopefully empty) lines
+            # from multiline strings
+            lines = lines[1:-1]
+
+        # Make sure the char is rectangular
+        maxWidth = max(len(line) for line in lines)
+        if width:
+            if width >= maxWidth:
+                maxWidth = width
+            else:
+                m.die(f"Letter '{node.name}' is wider ({maxWidth}) than its declared width ({width}).")
+                raise ValueError
+        for i, line in enumerate(lines):
+            if len(line) < maxWidth:
+                lines[i] += " " * (maxWidth - len(line))
+
+        return Glyph(
+            name=node.name,
+            data=lines,
+            width=maxWidth,
+        )
+
+
+@dataclasses.dataclass
 class FontMetadata:
     height: int
-    stripFirstLine: bool
 
 
 @dataclasses.dataclass
 class PartialFontMetadata:
     height: int | None = None
-    stripFirstLine: bool | None = None
 
-    def inferFromCharacters(
-        self,
-        chars: Characters,
-        height: int | None = None,
-        stripFirstLine: bool | None = None,
-    ) -> FontMetadata:
-        if self.stripFirstLine is None:
-            self.stripFirstLine = inferStripFirstLine(chars)
+    def inferFromGlyphs(self, glyphs: Glyphs) -> FontMetadata:
         if self.height is None:
-            self.height = inferHeight(chars, stripFirstLine=self.stripFirstLine)
-        return FontMetadata(self.height, self.stripFirstLine)
+            self.height = inferHeight(glyphs)
+        return FontMetadata(self.height)
 
 
-def normalizeCharacters(chars: Characters, md: FontMetadata) -> Characters:
+def normalizeCharacters(glyphs: Glyphs, md: FontMetadata) -> Glyphs:
     # Ensure that:
     # * every character is the same height
     # * within each character, every line is the same length
     # * copy uppercase from lowercase, and vice versa,
     #   if both versions dont' exist
-    # * if stripFirstLines is true, the first (empty) line of each is removed
-    for name, lines in chars.items():
-        if md.stripFirstLine:
-            if lines[0].strip() == "":
-                lines = lines[1:]
-            else:
-                m.die(f"Character '{name}' has a non-empty first line, but strip-first-line was set to True.")
-        if len(lines) == md.height:
+    for name, glyph in glyphs.items():
+        if glyph.height == md.height:
             pass
-        elif len(lines) > md.height:
-            m.die(f"Character '{name}' has more lines ({len(lines)}) than the declared font height ({md.height}).")
-        elif len(lines) < md.height:
-            lines.extend([""] * (md.height - len(lines)))
-        width = max(len(line) for line in lines)
-        for i, line in enumerate(lines):
-            # Make sure the letter is a rectangle.
-            if len(line) < width:
-                lines[i] += " " * (width - len(line))
-    for char in string.ascii_lowercase:
+        elif glyph.height > md.height:
+            m.die(f"Character '{name}' has more lines ({glyph.height}) than the declared font height ({md.height}).")
+            raise ValueError
+        elif glyph.height < md.height:
+            glyph.data.extend([" " * glyph.width] * (md.height - glyph.height))
+    for letter in string.ascii_lowercase:
         # Allow people to specify only one case for letters if they want.
-        if char in chars and char.upper() not in chars:
-            chars[char.upper()] = chars[char]
-        if char.upper() in chars and char not in chars:
-            chars[char] = chars[char.upper()]
-    return chars
+        if letter in glyphs and letter.upper() not in glyphs:
+            glyphs[letter.upper()] = dataclasses.replace(glyphs[letter], name=letter.upper())
+        if letter.upper() in glyphs and letter not in glyphs:
+            glyphs[letter] = dataclasses.replace(glyphs[letter.upper()], name=letter)
+    return glyphs
 
 
 def getMetadata(doc: kdl.Document) -> PartialFontMetadata:
     height = None
-    stripFirstLine = None
-    if doc.has("config"):
-        config = doc.get("config")
-        if "height" in config.props:
-            height = int(config.props["height"])
-        if "stripFirstLine" in config.props:
-            stripFirstLine = bool(config.props["stripFirstLine"])
-    return PartialFontMetadata(height=height, stripFirstLine=stripFirstLine)
+    if node := doc.get("config"):
+        if "height" in node.props:
+            height = int(node.props["height"])
+    return PartialFontMetadata(height=height)
 
 
-def inferHeight(chars: Characters, stripFirstLine: bool) -> int:
+def inferHeight(glyphs: Glyphs) -> int:
     # All characters need to be the same height,
     # so the largest height must be the height of *all* characters.
-    heights = []
-    for lines in chars.values():
-        if stripFirstLine and lines[0].strip() == "":
-            charHeight = len(lines) - 1
-        else:
-            charHeight = len(lines)
-        heights.append(charHeight)
-    return max(heights)
-
-
-def inferStripFirstLine(chars: Characters) -> bool:
-    return all(lines[0].strip() == "" for lines in chars.values())
+    return max((x.height for x in glyphs.values()), default=0)
 
 
 def main() -> None:
@@ -164,8 +189,8 @@ def main() -> None:
     argparser.add_argument(
         "--font",
         dest="fontPath",
-        default=config.scriptPath("fonts", "smallblocks.kdl"),
-        help="What .kdl font file to use to render the text with.",
+        default=config.scriptPath("fonts", "smallblocks.bsfont"),
+        help="What KDL font file to use to render the text with.",
     )
     argparser.add_argument("text", help="Text to ASCII-ify.")
     options = argparser.parse_args()
