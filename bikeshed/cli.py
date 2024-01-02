@@ -455,7 +455,8 @@ def main() -> None:
     constants.chroot = not options.allowNonlocalFiles
     constants.executeCode = options.allowExecute
 
-    update.fixupDataFiles(updateMode=options.updateMode)
+    if options.subparserName in ("spec", "echnida", "watch", "serve", "refs"):
+        update.fixupDataFiles(updateMode=options.updateMode)
     if options.subparserName == "update":
         handleUpdate(options)
     elif options.subparserName == "spec":
