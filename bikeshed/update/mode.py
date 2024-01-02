@@ -2,9 +2,10 @@ import enum
 
 
 class UpdateMode(enum.Flag):
-    '''
+    """
     Enum dictating how the update process should run.
-    '''
+    """
+
     NONE = 0
 
     # Try to update via manifest

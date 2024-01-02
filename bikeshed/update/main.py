@@ -109,14 +109,16 @@ def fixupDataFiles(updateMode: UpdateMode = UpdateMode.NONE) -> None:
     um = UpdateMode.NONE
     if liveManifest is None:
         m.warn("Couldn't find manifest from previous update run.\nTriggering a datafiles update to be safe...")
-        um = updateMode.BOTH
+        um = UpdateMode.BOTH
     elif liveManifest.daysOld() >= 7:
         m.say("Bringing data files up-to-date...")
-        um=updateMode
+        um = updateMode
 
     if um:
         if not probablyHaveInternet():
-            m.warn("Can't immediately see the internet, so stopping automatic update. Run `bikeshed update` to update manually, if you think you do have internet.")
+            m.warn(
+                "Can't immediately see the internet, so stopping automatic update. Run `bikeshed update` to update manually, if you think you do have internet.",
+            )
             return
         else:
             update(updateMode=UpdateMode.BOTH)
