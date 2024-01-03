@@ -669,7 +669,7 @@ def handleSource(options: argparse.Namespace) -> None:
             font = fonts.Font.fromPath(fontPath)
             fonts.replaceComments(font=font, inputFilename=options.infile, outputFilename=options.outfile)
         except Exception as e:
-            m.die("Error trying to embiggen text:\n{e}")
+            m.die(f"Error trying to embiggen text:\n{e}")
             return
 
 
