@@ -324,26 +324,10 @@ def xor(a: t.Any, b: t.Any) -> bool:
     return bool(a) != bool(b)
 
 
-def commonPathPrefix(paths: t.Iterable[str]) -> str | None:
-    splitPaths = [x.split("/")[:-1] for x in paths]
-    commonPrefix = splitPaths[0]
-    for pathSegs in splitPaths[1:]:
-        # can't have a common prefix longer than the shortest path
-        if len(pathSegs) < len(commonPrefix):
-            commonPrefix = commonPrefix[: len(pathSegs)]
-        # now compare the remaining segments
-        for i in range(0, min(len(commonPrefix), len(pathSegs))):
-            if pathSegs[i] != commonPrefix[i]:
-                commonPrefix = commonPrefix[:i]
-                break
-    if len(commonPrefix) >= 1:
-        return "/" + "/".join(commonPrefix) + "/"
-    return None
-
-
-def commonPathPrefixes(paths: t.Iterable[str]) -> str:
+def commonPathPrefixes(paths: t.Iterable[str]) -> list[str]:
     # Split the paths into segments, and drop the filename
-    paths = [x.strip("/").split("/")[:-1] for x in paths]
-    # Only record the first two segments
-    prefixes = list({"/" + "/".join(x[0:2]) + "/" for x in paths})
+    splitPaths = [x.strip("/").split("/")[:-1] for x in paths]
+    # Only record the first two segments, that's good enough
+    # for limiting the data slurped.
+    prefixes = list({"/" + "/".join(x[0:2]) + "/" for x in splitPaths})
     return prefixes
