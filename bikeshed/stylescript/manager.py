@@ -135,20 +135,16 @@ class JCManager:
     def addWptCSS(self) -> None:
         self._addCSS("wpt", "wpt")
 
-    def addWpt(self, path: str | None) -> None:
+    def addWpt(self, paths: list[str] | None) -> None:
         script = self._addJS("wpt", "wpt")
         if not script.style:
             script.style = Style("wpt", Path(config.scriptPath("wpt/wpt.css")))
         if "dom-helper" not in script.libraries:
             script.libraries["dom-helper"] = Library("dom-helper", Path(config.scriptPath("stylescript/dom-helper.js")))
         if not script.data:
-            if path is None:
-                path = "/"
-            if not path.startswith("/"):
-                path = "/" + path
-            if not path.endswith("/"):
-                path = path + "/"
-            script.data = ("wptData", {"path": path})
+            script.data = ("wptData", {"paths": []})
+        if paths:
+            script.data[1]["paths"] = list(set(script.data[1]["paths"] + paths))
 
     def addDfnPanels(self) -> t.JSONT:
         script = self._addJS("dfn-panel", "dfnpanels")

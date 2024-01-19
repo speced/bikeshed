@@ -1,22 +1,26 @@
 document.addEventListener("DOMContentLoaded", async ()=>{
-    if(wptData.path == "/") return;
+    if(wptData.paths.length == 0) return;
 
     const runsUrl = "https://wpt.fyi/api/runs?label=master&label=stable&max-count=1&product=chrome&product=firefox&product=safari&product=edge";
     const runs = await (await fetch(runsUrl)).json();
 
-    const testResults = await (await fetch("https://wpt.fyi/api/search", {
-        method:"POST",
-        headers:{
-            "Content-Type":"application/json",
-        },
-        body: JSON.stringify({
-            "run_ids": runs.map(x=>x.id),
-            "query": {"path": wptData.path},
-        })
-    })).json();
+    let testResults = [];
+    for(const pathPrefix of wptData.paths) {
+        const pathResults = await (await fetch("https://wpt.fyi/api/search", {
+            method:"POST",
+            headers:{
+                "Content-Type":"application/json",
+            },
+            body: JSON.stringify({
+                "run_ids": runs.map(x=>x.id),
+                "query": {"path": pathPrefix},
+            })
+        })).json();
+        testResults = testResults.concat(pathResults.results);
+    }
 
     const browsers = runs.map(x=>({name:x.browser_name, version:x.browser_version, passes:0, total: 0}));
-    const resultsFromPath = new Map(testResults.results.map(result=>{
+    const resultsFromPath = new Map(testResults.map(result=>{
         const testPath = result.test;
         const passes = result.legacy_status.map(x=>[x.passes, x.total]);
         return [testPath, passes];

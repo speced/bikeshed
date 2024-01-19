@@ -77,13 +77,12 @@ def processWptElements(doc: t.SpecT) -> None:
             checkForOmittedTests(pathPrefix, testData, seenTestNames)
 
     if atLeastOneVisibleTest:
-        if pathPrefix is None:
-            pathPrefix = commonPathPrefix(seenTestNames)
         if pathPrefix and pathPrefix.startswith("https:"):
-            pass
-        elif pathPrefix and not pathPrefix.startswith("/"):
-            pathPrefix = "/" + pathPrefix
+            dataPaths = [pathPrefix]
+        else:
+            dataPaths = commonPathPrefixes(seenTestNames)
         if pathPrefix and pathPrefix != "/" and not pathPrefix.startswith("https:"):
+            pathPrefix = "/" + pathPrefix.strip("/") + "/"
             doc.md.otherMetadata.setdefault(_("Test Suite"), []).append(
                 h.E.dd(
                     {"class": "wpt-overview"},
@@ -100,7 +99,7 @@ def processWptElements(doc: t.SpecT) -> None:
             doc.extraJC.addWptCSS()
         if atLeastOneVisibleTest:
             # But I only need script if there's actually some tests.
-            doc.extraJC.addWpt(pathPrefix)
+            doc.extraJC.addWpt(dataPaths)
 
 
 def createHTML(
@@ -340,3 +339,11 @@ def commonPathPrefix(paths: t.Iterable[str]) -> str | None:
     if len(commonPrefix) >= 1:
         return "/" + "/".join(commonPrefix) + "/"
     return None
+
+
+def commonPathPrefixes(paths: t.Iterable[str]) -> str:
+    # Split the paths into segments, and drop the filename
+    paths = [x.strip("/").split("/")[:-1] for x in paths]
+    # Only record the first two segments
+    prefixes = list({"/" + "/".join(x[0:2]) + "/" for x in paths})
+    return prefixes
