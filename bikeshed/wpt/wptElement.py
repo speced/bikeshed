@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import Counter
+
 from .. import h, t
 from .. import messages as m
 from ..translate import _
@@ -81,14 +83,20 @@ def processWptElements(doc: t.SpecT) -> None:
             dataPaths = [pathPrefix]
         else:
             dataPaths = commonPathPrefixes(seenTestNames)
-        if pathPrefix and pathPrefix != "/" and not pathPrefix.startswith("https:"):
+
+        testSuiteUrl = None
+        if pathPrefix and not pathPrefix.startswith("https:"):
             pathPrefix = "/" + pathPrefix.strip("/") + "/"
+            testSuiteUrl = f"https://wpt.fyi/results{pathPrefix}"
+        elif not pathPrefix:
+            testSuiteUrl = guessTestSuiteUrl(seenTestNames)
+        if testSuiteUrl:
             doc.md.otherMetadata.setdefault(_("Test Suite"), []).append(
                 h.E.dd(
                     {"class": "wpt-overview"},
                     h.E.a(
-                        {"href": f"https://wpt.fyi/results{pathPrefix}"},
-                        f"https://wpt.fyi/results{pathPrefix}",
+                        {"href": testSuiteUrl},
+                        testSuiteUrl,
                     ),
                 ),
             )
@@ -329,5 +337,28 @@ def commonPathPrefixes(paths: t.Iterable[str]) -> list[str]:
     splitPaths = [x.strip("/").split("/")[:-1] for x in paths]
     # Only record the first two segments, that's good enough
     # for limiting the data slurped.
-    prefixes = list({"/" + "/".join(x[0:2]) + "/" for x in splitPaths})
-    return prefixes
+    oneSegs = set()
+    twoSegs = set()
+    for pathSegs in splitPaths:
+        prefix = pathSegs[0:2]
+        if len(prefix) == 1:
+            oneSegs.add("/" + prefix[0] + "/")
+        else:
+            twoSegs.add("/" + "/".join(prefix) + "/")
+    # Filter out any 2-length segments already covered by a 1-length seg
+    for short in oneSegs:
+        twoSegs = {x for x in twoSegs if not x.startswith(short)}
+    return list(oneSegs) + list(twoSegs)
+
+
+def guessTestSuiteUrl(paths: t.Iterable[str]) -> str:
+    # Do the same transforms as commonPathPrefixes, but then
+    # just count the number of paths under each,
+    # and return the one that wins.
+    splitPaths = [x.strip("/").split("/")[:-1] for x in paths]
+    prefixCounter: Counter[str] = Counter()
+    for pathSegs in splitPaths:
+        prefix = "/" + "/".join(pathSegs[0:2]) + "/"
+        prefixCounter[prefix] += 1
+    bestGuess = prefixCounter.most_common(1)[0][0]
+    return f"https://wpt.fyi/results{bestguess}"
