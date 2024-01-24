@@ -144,7 +144,7 @@ class JCManager:
         if not script.data:
             script.data = ("wptData", {"paths": []})
         if paths:
-            script.data[1]["paths"] = list(set(script.data[1]["paths"] + paths))
+            script.data[1]["paths"] = list(sorted(set(script.data[1]["paths"] + paths)))
 
     def addDfnPanels(self) -> t.JSONT:
         script = self._addJS("dfn-panel", "dfnpanels")
