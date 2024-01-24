@@ -38,21 +38,30 @@ def createRelease():
         action="store_true",
         help="Upload to test.pypi.org instead.",
     )
+    args.add_argument(
+        "--version",
+        dest="version",
+        nargs=3,
+        type=int,
+    )
     options, _ = args.parse_known_args()
 
     # Bump the semver
-    if options.bump == "break":
-        semver[0] += 1
-        semver[1] = 0
-        semver[2] = 0
-    elif options.bump == "feature":
-        semver[1] += 1
-        semver[2] = 0
-    elif options.bump == "bugfix":
-        semver[2] += 1
+    if options.version:
+        semver = options.version
+    else:
+        if options.bump == "break":
+            semver[0] += 1
+            semver[1] = 0
+            semver[2] = 0
+        elif options.bump == "feature":
+            semver[1] += 1
+            semver[2] = 0
+        elif options.bump == "bugfix":
+            semver[2] += 1
     newVersion = ".".join(str(x) for x in semver)
     print(f"Bumping to {newVersion}...")
-
+    raise "foo"
     # Update the hash-version
     bikeshedVersion = (
         subprocess.check_output(r"git log -1 --format='Bikeshed version %h, updated %cd'", shell=True)
