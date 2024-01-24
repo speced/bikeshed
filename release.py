@@ -61,7 +61,7 @@ def createRelease():
             semver[2] += 1
     newVersion = ".".join(str(x) for x in semver)
     print(f"Bumping to {newVersion}...")
-    raise "foo"
+
     # Update the hash-version
     bikeshedVersion = (
         subprocess.check_output(r"git log -1 --format='Bikeshed version %h, updated %cd'", shell=True)
