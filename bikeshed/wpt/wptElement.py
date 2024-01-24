@@ -361,4 +361,4 @@ def guessTestSuiteUrl(paths: t.Iterable[str]) -> str:
         prefix = "/" + "/".join(pathSegs[0:2]) + "/"
         prefixCounter[prefix] += 1
     bestGuess = prefixCounter.most_common(1)[0][0]
-    return f"https://wpt.fyi/results{bestguess}"
+    return f"https://wpt.fyi/results{bestGuess}"
