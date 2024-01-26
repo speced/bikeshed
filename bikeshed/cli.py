@@ -515,6 +515,10 @@ def handleSpec(options: argparse.Namespace, extras: list[str]) -> None:
         m.die("Spec is in an invalid state; exitting.")
         return
     doc.mdCommandLine = metadata.fromCommandLine(extras)
+    if options.errorLevel:
+        doc.mdCommandLine.addData("Die On", options.errorLevel)
+    if options.errorTiming:
+        doc.mdCommandLine.addData("Die When", options.errorTiming)
     if options.byos:
         doc.mdCommandLine.addData("Group", "byos")
     doc.preprocess()
