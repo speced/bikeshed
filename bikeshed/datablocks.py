@@ -596,10 +596,13 @@ def parseDefBlock(
         if "<!--" in line:
             commentMatch = re.match(r"(.*)<!--.*?-->(.*)", line)
             if not commentMatch:
-                m.die(f"Detected the start of a comment on a line, but couldn't find the end. Please remove the comment, or keep it on a single line:\n{line}", lineNum=lineNum)
+                m.die(
+                    f"Detected the start of a comment on a line, but couldn't find the end. Please remove the comment, or keep it on a single line:\n{line}",
+                    lineNum=lineNum,
+                )
                 continue
             # Just pull the comment out, and continue
-            line = commentMatch[1]+commentMatch[2]
+            line = commentMatch[1] + commentMatch[2]
             if line.strip() == "":
                 # If the whole line was a comment, just ignore it.
                 continue

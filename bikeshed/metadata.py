@@ -1008,9 +1008,9 @@ def parseInlineTagCommand(key: str, val: str, lineNum: str | int | None) -> dict
 
 def parseDieOn(key: str, val: str, lineNum: str | int | None) -> str:
     val = val.strip()
-    if val in list(m.MESSAGE_LEVELS.keys()):
+    if val in m.MESSAGE_LEVELS:
         return val
-    choices = config.messageFromList(f"'{x}'" for x in m.MESSAGE_LEVELS.keys())
+    choices = config.englishFromList(f"'{x}'" for x in m.MESSAGE_LEVELS)
     m.die(
         f"Die On metadata only accepts the values {choices}. Got '{val}'.",
         lineNum=lineNum,
@@ -1022,7 +1022,7 @@ def parseDieWhen(key: str, val: str, lineNum: str | int | None) -> str:
     val = val.strip()
     if val in m.DEATH_TIMING:
         return val
-    choices = config.messageFromList(f"'{x}'" for x in m.DEATH_TIMING)
+    choices = config.englishFromList(f"'{x}'" for x in m.DEATH_TIMING)
     m.die(
         f"Die When metadata only accepts the values {choices}. Got '{val}'.",
         lineNum=lineNum,
