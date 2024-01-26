@@ -392,7 +392,7 @@ class Spec:
     def printResultMessage(self) -> None:
         # If I reach this point, I've succeeded, but maybe with reservations.
         fatals = m.state.categoryCounts["fatal"]
-        links = m.state.categoryCounts["linkerror"]
+        links = m.state.categoryCounts["link-error"]
         warnings = m.state.categoryCounts["warning"]
         if self.lineNumbers:
             m.warn("Because --line-numbers was used, no output was saved.")
