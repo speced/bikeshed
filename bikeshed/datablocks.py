@@ -322,7 +322,6 @@ def transformPropdef(lines: list[str], tagName: str, firstLine: str, lineNum: in
     # drop the default 'Animation type' entry.
     if "Animatable" in parsedAttrs:
         attrs.pop("Animation type")
-
     attrsToPrint = []
     for key, val in attrs.items():
         if key in parsedAttrs:
@@ -594,6 +593,16 @@ def parseDefBlock(
     vals: OrderedDict[str, str] = OrderedDict()
     lastKey = None
     for line in lines:
+        if "<!--" in line:
+            commentMatch = re.match(r"(.*)<!--.*?-->(.*)", line)
+            if not commentMatch:
+                m.die(f"Detected the start of a comment on a line, but couldn't find the end. Please remove the comment, or keep it on a single line:\n{line}", lineNum=lineNum)
+                continue
+            # Just pull the comment out, and continue
+            line = commentMatch[1]+commentMatch[2]
+            if line.strip() == "":
+                # If the whole line was a comment, just ignore it.
+                continue
         match = re.match(r"\s*([^:]+):\s*(\S.*)?", line)
         if match is None:
             if lastKey is not None and (line.strip() == "" or re.match(r"\s+", line)):
