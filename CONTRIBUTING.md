@@ -86,17 +86,15 @@ so running these before submitting a PR is important.
         * `npm run pwtests-update`
 
 
-Pipenv, Pipfile, and `requirements.txt`
----------------------------------------
+Managing Requirements
+---------------------
 
-I'm using `pipenv` to maintain Bikeshed's requirements in a clean way;
-users don't *need* to do it themselves
-(it installs in the standard global fashion just fine),
-but if they also want a hermetic install without dep clashes, they can.
+Now that Bikeshed's recommended install path is via `pipx`,
+which automatically puts it in a clean environment for the user,
+I've simplified dependency management back to just relying on `requirements.txt`.
 
-This means we have to keep `Pipfile` and `Pipfile.lock` in sync,
-and keep `requirements.txt` in sync with the lockfile.
-Whenever new packages are installed or updated,
-run `pipenv lock` (to generate a `Pipfile.lock`)
-and `pipenv lock -r` (to generate a `requirements.txt`)
-and commit those alongside the new code that requires it.
+If you add a new dependency, make sure to add it to this file.
+Use exact versions **only**, not ranges.
+(It makes installs more predictable, and doesn't affect users.
+It can affect devs, but they can be expected to know how to use `pipenv`
+or similar environment isolation tools.)
