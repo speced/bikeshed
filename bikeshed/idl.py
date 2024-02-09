@@ -271,10 +271,10 @@ class IDLMarker(widlparser.protocols.Marker):
                 readonly = "data-readonly"
             else:
                 readonly = ""
-            extraParameters = '{} data-type="{}"'.format(readonly, str(rest.type.type) + str(rest.type.suffix or ''))
+            extraParameters = '{} data-type="{}"'.format(readonly, str(rest.type.type) + str(rest.type.suffix or ""))
         elif idlType == "dict-member":
             assert isinstance(construct, widlparser.DictionaryMember)
-            extraParameters = 'data-type="{}"'.format(str(construct.type.type) + str(construct.type.suffix or ''))
+            extraParameters = 'data-type="{}"'.format(str(construct.type.type) + str(construct.type.suffix or ""))
             if construct.default is not None:
                 value = str(construct.default).split("=", 1)[1].strip()
                 if value.startswith("["):
