@@ -312,7 +312,7 @@ def addToHeadings(
 ) -> None:
     heading: HeadingT = {
         "url": rawAnchor["href"],
-        "number": rawAnchor["number"] if "number" in rawAnchor else "",
+        "number": rawAnchor.get("number", ""),
         "text": rawAnchor["title"],
         "spec": spec["title"],
     }
