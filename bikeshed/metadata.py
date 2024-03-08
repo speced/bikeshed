@@ -418,8 +418,7 @@ def parsedTextFromRawLines(lines: list[str], doc: t.SpecT, indent: int, context:
 if t.TYPE_CHECKING:
 
     class ParseFunc(t.Protocol):
-        def __call__(self, key: str, val: str, lineNum: str | int | None) -> t.Any:
-            ...
+        def __call__(self, key: str, val: str, lineNum: str | int | None) -> t.Any: ...
 
 
 def parseDate(key: str, val: str, lineNum: str | int | None) -> date | None:

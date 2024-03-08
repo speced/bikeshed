@@ -62,8 +62,7 @@ def generateNodes(s: Stream, start: int) -> t.Generator[ParserNode, None, None]:
         if nodes is None:
             return
         elif isinstance(nodes, list):
-            for node in nodes:
-                yield node
+            yield from nodes
         else:
             yield nodes
 

@@ -867,9 +867,11 @@ class MultipleChoice(DiagramMultiContainer):
         text = DiagramItem("g", attrs={"class": "diagram-text"}).addTo(self)
         DiagramItem(
             "title",
-            text="take one or more branches, once each, in any order"
-            if self.type == "any"
-            else "take all branches, once each, in any order",
+            text=(
+                "take one or more branches, once each, in any order"
+                if self.type == "any"
+                else "take all branches, once each, in any order"
+            ),
         ).addTo(text)
         DiagramItem(
             "path",

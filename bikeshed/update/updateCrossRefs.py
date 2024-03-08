@@ -262,9 +262,11 @@ def canonSpecFromWebref(rawSpec: WebrefSpecT) -> SpecT:
         "title": rawSpec["shortTitle"],
         "description": rawSpec["title"],
         "abstract": None,
-        "level": int(rawSpec["seriesVersion"])
-        if "seriesVersion" in rawSpec and re.match(r"^\d+$", rawSpec.get("seriesVersion", ""))
-        else None,
+        "level": (
+            int(rawSpec["seriesVersion"])
+            if "seriesVersion" in rawSpec and re.match(r"^\d+$", rawSpec.get("seriesVersion", ""))
+            else None
+        ),
     }
     return spec
 

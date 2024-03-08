@@ -191,14 +191,12 @@ class RefSource:
         def allRefsIterator() -> t.Generator[t.RefWrapper, None, None]:
             # Turns a dict of arrays of refs into an iterator of refs
             for _, group in self.fetchAllRefs():
-                for ref in group:
-                    yield ref
+                yield from group
 
         def textRefsIterator(texts: list[str]) -> t.Generator[t.RefWrapper, None, None]:
             # Same as above, but only grabs those keyed to a given text
             for text in texts:
-                for ref in self.fetchRefs(text):
-                    yield ref
+                yield from self.fetchRefs(text)
 
         def forRefsIterator(targetFors: str | list[str]) -> t.Generator[t.RefWrapper, None, None]:
             # Same as above, but only grabs those for certain values
@@ -206,8 +204,7 @@ class RefSource:
                 targetFors = [targetFors]
             for for_ in targetFors:
                 for text in self.fors[for_]:
-                    for ref in self.fetchRefs(text):
-                        yield ref
+                    yield from self.fetchRefs(text)
 
         # Set up the initial list of refs to query
         if text:

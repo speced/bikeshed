@@ -59,8 +59,7 @@ if t.TYPE_CHECKING:
 
 
 @t.overload
-def reSubObject(pattern: re.Pattern, string: str, repl: None) -> list[str | re.Match]:
-    ...
+def reSubObject(pattern: re.Pattern, string: str, repl: None) -> list[str | re.Match]: ...
 
 
 @t.overload
@@ -68,8 +67,7 @@ def reSubObject(
     pattern: re.Pattern,
     string: str,
     repl: t.Callable[[re.Match], ReSubObjectU],
-) -> list[str | ReSubObjectU]:
-    ...
+) -> list[str | ReSubObjectU]: ...
 
 
 def reSubObject(
@@ -110,13 +108,11 @@ def simplifyText(text: str) -> str:
 
 
 @t.overload
-def splitForValues(forValues: str) -> list[str]:
-    ...
+def splitForValues(forValues: str) -> list[str]: ...
 
 
 @t.overload
-def splitForValues(forValues: None) -> None:
-    ...
+def splitForValues(forValues: None) -> None: ...
 
 
 def splitForValues(forValues: str | None) -> list[str] | None:
