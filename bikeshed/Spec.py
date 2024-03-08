@@ -312,6 +312,7 @@ class Spec:
         caniuse.addCanIUsePanels(self)
         highlight.addSyntaxHighlighting(self)
         boilerplate.addBikeshedBoilerplate(self)
+        boilerplate.addDarkmodeIndicators(self)
         fingerprinting.addTrackingVector(self)
         u.fixIntraDocumentReferences(self)
         u.fixInterDocumentReferences(self)

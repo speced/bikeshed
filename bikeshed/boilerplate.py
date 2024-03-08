@@ -1206,3 +1206,38 @@ def formatBiblioTerm(linkText: str) -> str:
     if linkText.islower():
         return linkText.upper()
     return linkText
+
+
+def addDarkmodeIndicators(doc: t.SpecT) -> None:
+    # Unless otherwise indicated, Bikeshed docs are assumed
+    # to be darkmode-aware.
+    if not doc.md.darkMode:
+        return
+
+    # If a boilerplate already contains a color-scheme,
+    # assume they know what they're doing.
+    # Otherwise, add the color-scheme meta to indicate darkmode-ness.
+    existingColorScheme = h.find('meta[name="color-scheme"]', doc)
+    if existingColorScheme is not None:
+        return
+    h.appendChild(
+        doc.head,
+        h.E.meta({"name": "color-scheme", "content": "dark light"}),
+    )
+
+    # Specs using the Bikeshed stylesheet will get darkmode colors
+    # automatically, but W3C specs don't. Instead, auto-add their
+    # darkmode styles.
+    w3cStylesheet = h.find('link[href^="https://www.w3.org/StyleSheets/TR"]', doc)
+    if w3cStylesheet is not None:
+        h.appendChild(
+            doc.head,
+            h.E.link(
+                {
+                    "rel": "stylesheet",
+                    "href": "https://www.w3.org/StyleSheets/TR/2021/dark.css",
+                    "type": "text/css",
+                    "media": "(prefers-color-scheme: dark)",
+                },
+            ),
+        )
