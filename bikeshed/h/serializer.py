@@ -201,7 +201,16 @@ class Serializer:
         write(" " * indent)
         self.startTag(tag, el, write)
 
-    def _writeRawElement(self, tag: str, el: t.ElementT, write: WriterFn) -> None:
+    def _writeRawElement(self, tag: str, el: t.ElementT, write: WriterFn, indent: int) -> None:
+        if tag == "script" and el.get("src") is not None:
+            # A *linking* script, doesn't need to be treated specially.
+            write(" " * indent)
+            self.startTag(tag, el, write)
+            self.endTag(tag, write)
+            return
+
+        # Otherwise, dedent completely, since I don't know if indenting
+        # is significant for the element.
         self.startTag(tag, el, write)
         for node in dom.childNodes(el):
             if self.isElement(node):
@@ -309,7 +318,7 @@ class Serializer:
             self._writeVoidElement(tag, el, write, indent)
         elif self.isRawElement(tag):
             assert self.isElement(el)
-            self._writeRawElement(tag, el, write)
+            self._writeRawElement(tag, el, write, indent)
         elif pre or self.isOpaqueElement(tag):
             assert self.isElement(el)
             self._writeOpaqueElement(tag, el, write, indent)
