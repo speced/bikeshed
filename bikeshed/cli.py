@@ -556,8 +556,6 @@ def handleWatch(options: argparse.Namespace, extras: list[str]) -> None:
     from . import metadata
     from .Spec import Spec
 
-    # Can't have an error killing the watcher
-    m.state.dieOn = "nothing"
     doc = Spec(inputFilename=options.infile, token=options.ghToken)
     if not doc.valid:
         m.die("Spec is in an invalid state; exitting.")
@@ -572,12 +570,13 @@ def handleServe(options: argparse.Namespace, extras: list[str]) -> None:
     from . import metadata
     from .Spec import Spec
 
-    m.state.dieOn = "nothing"
     doc = Spec(inputFilename=options.infile, token=options.ghToken)
     if not doc.valid:
         m.die("Spec is in an invalid state; exitting.")
         return
     doc.mdCommandLine = metadata.fromCommandLine(extras)
+    # Can't have an error killing the watcher
+    doc.mdCommandLine.addData("Die On", "nothing")
     if options.byos:
         doc.mdCommandLine.addData("Group", "byos")
     doc.watch(outputFilename=options.outfile, port=int(options.port))

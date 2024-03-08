@@ -58,6 +58,8 @@ class MessagesState:
         return dataclasses.replace(self, seenMessages=set(), categoryCounts=Counter(), **kwargs)
 
     def shouldDie(self, category: str, timing: str = "early") -> bool:
+        if self.dieWhen == "never":
+            return False
         if self.dieWhen == "late" and timing == "early":
             return False
         deathLevel = MESSAGE_LEVELS[self.dieOn]
