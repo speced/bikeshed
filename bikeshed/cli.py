@@ -197,6 +197,13 @@ def main() -> None:
         help="Don't actually submit to the echidna service, instead just echo the prepared TAR file to stdout.",
     )
 
+    w3cParser = subparsers.add_parser("w3c", help="Commands to interact with W3C services.")
+    w3cParser.add_argument(
+        "--pub-status",
+        dest="pubToken",
+        help="Check the status of an Echidna publication. Pass the publication id.",
+    )
+
     watchParser = subparsers.add_parser(
         "watch",
         help="Process a spec source file into a valid output file, automatically rebuilding when it changes.",
@@ -483,6 +490,8 @@ def main() -> None:
         handleTemplate()
     elif options.subparserName == "wpt":
         handleWpt(options)
+    elif options.subparserName == "w3c":
+        handleW3c(options)
 
 
 def handleUpdate(options: argparse.Namespace) -> None:
@@ -580,6 +589,13 @@ def handleServe(options: argparse.Namespace, extras: list[str]) -> None:
     if options.byos:
         doc.mdCommandLine.addData("Group", "byos")
     doc.watch(outputFilename=options.outfile, port=int(options.port))
+
+
+def handleW3c(options: argparse.Namespace) -> None:
+    from . import w3c
+
+    if options.pubToken:
+        w3c.checkEchidna(options.pubToken)
 
 
 def handleDebug(options: argparse.Namespace, extras: list[str]) -> None:
