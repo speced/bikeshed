@@ -696,7 +696,26 @@ def parseRawPreToEnd(s: Stream, start: int) -> Result[str]:
     assert False
 
 
-def parseCSSProduction(s: Stream, start: int) -> Result[list[ParserNode]]:
+PROPDESC_RE = re.compile(r"^'(?:(\S*)/)?([\w*-]+)(?:!!([\w-]+))?'$")
+FUNC_RE = re.compile(r"^(?:(\S*)/)?([\w*-]+\(\))$")
+ATRULE_RE = re.compile(r"^(?:(\S*)/)?(@[\w*-]+)$")
+TYPE_RE = re.compile(
+    r"""
+    ^(?:(\S*)/)?
+    (\S+)
+    (?:\s+
+        \[\s*
+        (-?(?:\d+[\w-]*|∞|[Ii]nfinity|&infin;))\s*
+        ,\s*
+        (-?(?:\d+[\w-]*|∞|[Ii]nfinity|&infin;))\s*
+        \]\s*
+    )?$
+    """,
+    re.X,
+)
+
+
+def parseCSSProduction(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
     if s[start : start + 2] != "<<":
         return Result.fail(start)
     textStart = start + 2
@@ -704,13 +723,15 @@ def parseCSSProduction(s: Stream, start: int) -> Result[list[ParserNode]]:
     text, textEnd = s.skipTo(textStart, ">>").vi
     if text is None:
         m.die("Saw the start of a CSS production (like <<foo>>), but couldn't find the end.", lineNum=s.loc(start))
-        return Result.fail(start)
+        failNode = SafeText(line=s.line(start), endLine=s.line(start + 2), text="<<")
+        return Result(failNode, start + 2)
     elif "\n" in text:
         m.die(
             "Saw the start of a CSS production (like <<foo>>), but couldn't find the end on the same line.",
             lineNum=s.loc(start),
         )
-        return Result.fail(start)
+        failNode = SafeText(line=s.line(start), endLine=s.line(start + 2), text="<<")
+        return Result(failNode, start + 2)
     elif "<" in text or ">" in text:
         # Allow <<boolean [<<foo>>]>>
         if "[" in text:
@@ -721,7 +742,8 @@ def parseCSSProduction(s: Stream, start: int) -> Result[list[ParserNode]]:
                     "It seems like you wrote a CSS production with an argument (like <<foo [<<bar>>]>>), but either included more [] in the argument, or otherwise messed up the syntax.",
                     lineNum=s.loc(start),
                 )
-                return Result.fail(start)
+                failNode = SafeText(line=s.line(start), endLine=s.line(start + 2), text="<<")
+                return Result(failNode, start + 2)
             textEnd = newTextEnd
             text = s[textStart:textEnd]
         else:
@@ -729,14 +751,96 @@ def parseCSSProduction(s: Stream, start: int) -> Result[list[ParserNode]]:
                 "It seems like you wrote a CSS production (like <<foo>>), but there's more markup inside of it, or you didn't close it properly.",
                 lineNum=s.loc(start),
             )
-            return Result.fail(start)
+            failNode = SafeText(line=s.line(start), endLine=s.line(start + 2), text="<<")
+            return Result(failNode, start + 2)
     nodeEnd = textEnd + 2
+
+    attrs: dict[str, str] = {
+        "bs-autolink-syntax": s[start:nodeEnd],
+        "class": "production",
+        "bs-opaque": "",
+    }
+    for _ in [1]:
+        match = PROPDESC_RE.match(text)
+        if match:
+            linkFor, lt, linkType = match.groups()
+            if linkFor == "":
+                linkFor = "/"
+            if linkType is None:
+                if linkFor is None:
+                    linkType = "property"
+                else:
+                    linkType = "propdesc"
+            elif linkType in ("property", "descriptor"):
+                pass
+            else:
+                m.die(
+                    f"Shorthand <<{match[0]}>> gives type as '{match[3]}', but only 'property' and 'descriptor' are allowed.",
+                    lineNum=s.line(start),
+                )
+                failNode = SafeText(line=s.line(start), endLine=s.line(nodeEnd), text=s[start:nodeEnd])
+                return Result(failNode, nodeEnd)
+            attrs["data-link-type"] = linkType
+            attrs["data-lt"] = lt
+            if linkFor is not None:
+                attrs["data-link-for"] = linkFor
+            text = f"<'{lt}'>"
+            break
+
+        match = FUNC_RE.match(text)
+        if match:
+            attrs["data-link-type"] = "function"
+            attrs["data-lt"] = match[2]
+            if match[1] is not None:
+                attrs["data-link-for"] = match[1]
+            text = f"<{match[2]}>"
+            break
+
+        match = ATRULE_RE.match(text)
+        if match:
+            attrs["data-link-type"] = "at-rule"
+            attrs["data-lt"] = match[2]
+            if match[1] is not None:
+                attrs["data-link-for"] = match[1]
+            text = f"<{match[2]}>"
+            break
+
+        match = TYPE_RE.match(text)
+        if match:
+            for_, term, rangeStart, rangeEnd = match.groups()
+            attrs["data-link-type"] = "type"
+            attrs["data-lt"] = f"<{term}>"
+            if for_ is not None:
+                attrs["data-link-for"] = for_
+            if rangeStart is not None:
+                formattedStart, numStart = parseRangeComponent(rangeStart)
+                formattedEnd, numEnd = parseRangeComponent(rangeEnd)
+                if formattedStart is None or formattedEnd is None:
+                    m.die(f"Shorthand <<{text}>> has an invalid range.", lineNum=s.line(start))
+                    failNode = SafeText(line=s.line(start), endLine=s.line(nodeEnd), text=s[start:nodeEnd])
+                    return Result(failNode, nodeEnd)
+                elif numStart >= numEnd:
+                    m.die(
+                        f"Shorthand <<{text}>> has a range whose start is equal or greater than its end.",
+                        lineNum=s.line(start),
+                    )
+                    failNode = SafeText(line=s.line(start), endLine=s.line(nodeEnd), text=s[start:nodeEnd])
+                    return Result(failNode, nodeEnd)
+                else:
+                    text = f"<{term} [{formattedStart},{formattedEnd}]>"
+            else:
+                text = f"<{term}>"
+            break
+    else:
+        m.die(f"Shorthand <<{text}>> does not match any recognized shorthand grammar.", lineNum=s.line(start))
+        failNode = SafeText(line=s.line(start), endLine=s.line(nodeEnd), text=s[start:nodeEnd])
+        return Result(failNode, nodeEnd)
 
     startTag = StartTag(
         line=s.line(start),
-        endLine=s.line(start),
-        tag="fake-production-placeholder",
-        attrs={"bs-autolink-syntax": s[start:nodeEnd], "class": "production", "bs-opaque": ""},
+        endLine=s.line(textStart),
+        tag="a",
+        attrs=attrs,
     ).finalize()
     contents = SafeText(
         line=s.line(textStart),
@@ -749,6 +853,33 @@ def parseCSSProduction(s: Stream, start: int) -> Result[list[ParserNode]]:
         tag=startTag.tag,
     )
     return Result([startTag, contents, endTag], nodeEnd)
+
+
+def parseRangeComponent(val: str) -> tuple[str | None, float | int]:
+    sign = ""
+    signVal = 1
+    num: float | int
+    val = val.strip()
+    if val[0] in ["-", "−"]:
+        sign = "-"
+        signVal = -1
+        val = val[1:]
+
+    if val.lower() == "infinity":
+        val = "∞"
+    if val.lower() == "&infin;":
+        val = "∞"
+    if val == "∞":
+        return sign + val, signVal * float("inf")
+
+    match = re.match(r"(\d+)([\w-]*)", val)
+    if match is None:
+        return None, 0
+    (digits, unit) = match.groups()
+    num = int(digits) * signVal
+    val = str(num)
+
+    return val + unit, num
 
 
 def parseCSSMaybe(s: Stream, start: int) -> Result[RawElement]:

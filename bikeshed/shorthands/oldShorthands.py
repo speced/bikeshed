@@ -7,7 +7,8 @@ from .. import messages as m
 
 
 def transformProductionPlaceholders(doc: t.SpecT) -> None:
-    propdescRe = re.compile(r"^'(?:(\S*)/)?([\w*-]+)(?:!!([\w-]+))?'$")  # pylint: disable=redefined-outer-name
+    return
+    propdescRe = re.compile(r"^'(?:(\S*)/)?([\w*-]+)(?:!!([\w-]+))?'$")
     funcRe = re.compile(r"^(?:(\S*)/)?([\w*-]+\(\))$")
     atruleRe = re.compile(r"^(?:(\S*)/)?(@[\w*-]+)$")
     typeRe = re.compile(
