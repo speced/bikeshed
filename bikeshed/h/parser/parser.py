@@ -714,6 +714,15 @@ TYPE_RE = re.compile(
     re.X,
 )
 
+TYPEWITHARGS_RE = re.compile(
+    r"""
+    ^(?:(\S*)/)?
+    (\S+)
+    \s*\[([^\]]*)\]\s*$
+    """,
+    re.X,
+)
+
 
 def parseCSSProduction(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
     if s[start : start + 2] != "<<":
@@ -831,6 +840,19 @@ def parseCSSProduction(s: Stream, start: int) -> Result[ParserNode | list[Parser
             else:
                 text = f"<{term}>"
             break
+
+            match = TYPEWITHARGS_RE.match(text)
+            if match:
+                for_, term, arg = match.groups()
+                attrs["data-lt"] = f"<{term}>"
+                attrs["data-link-type"] = "type"
+                if for_ is not None:
+                    attrs["data-link-for"] = for_
+                if "<<" in arg:
+                    arg = arg.replace("<<", "<").replace(">>", ">")
+                text = f"<{term}[{arg}]>"
+                break
+
     else:
         m.die(f"Shorthand <<{text}>> does not match any recognized shorthand grammar.", lineNum=s.line(start))
         failNode = SafeText(line=s.line(start), endLine=s.line(nodeEnd), text=s[start:nodeEnd])
