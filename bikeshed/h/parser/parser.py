@@ -828,7 +828,7 @@ def parseCSSProduction(s: Stream, start: int) -> Result[ParserNode | list[Parser
         tag="a",
         attrs=attrs,
     ).finalize()
-    contents = RawText(
+    contents = SafeText(
         line=s.line(textStart),
         endLine=s.line(textEnd),
         text=text,
