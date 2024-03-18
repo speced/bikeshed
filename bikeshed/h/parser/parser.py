@@ -833,10 +833,9 @@ def parseCSSProduction(s: Stream, start: int) -> Result[ParserNode | list[Parser
                         f"Shorthand <<{text}>> has a range whose start is equal or greater than its end.",
                         lineNum=s.line(start),
                     )
-                    failNode = SafeText(line=s.line(start), endLine=s.line(nodeEnd), text=s[start:nodeEnd])
-                    return Result(failNode, nodeEnd)
-                else:
-                    text = f"<{term} [{formattedStart},{formattedEnd}]>"
+                    # Getting this wrong is an error, but shouldn't stop
+                    # the link from working, so continue on if you can.
+                text = f"<{term} [{formattedStart},{formattedEnd}]>"
             else:
                 text = f"<{term}>"
             break
