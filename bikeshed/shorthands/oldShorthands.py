@@ -6,37 +6,6 @@ from .. import config, h, t
 from .. import messages as m
 
 
-def transformProductionPlaceholders(doc: t.SpecT) -> None:
-    return
-
-
-def parseRangeComponent(val: str) -> tuple[str | None, float | int]:
-    sign = ""
-    signVal = 1
-    num: float | int
-    val = val.strip()
-    if val[0] in ["-", "−"]:
-        sign = "-"
-        signVal = -1
-        val = val[1:]
-
-    if val.lower() == "infinity":
-        val = "∞"
-    if val.lower() == "&infin;":
-        val = "∞"
-    if val == "∞":
-        return sign + val, signVal * float("inf")
-
-    match = re.match(r"(\d+)([\w-]*)", val)
-    if match is None:
-        return None, 0
-    (digits, unit) = match.groups()
-    num = int(digits) * signVal
-    val = str(num)
-
-    return val + unit, num
-
-
 def transformMaybePlaceholders(doc: t.SpecT) -> None:
     propRe = re.compile(r"^([\w-]+): .+")
     valRe = re.compile(r"^(?:(\S*)/)?(\S[^!]*)(?:!!([\w-]+))?$")
