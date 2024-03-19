@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from enum import Enum
 
-from ... import constants, t
+from ... import config, constants, t
 from ... import messages as m
 from . import preds
 from .nodes import (
@@ -16,7 +16,6 @@ from .nodes import (
     SafeText,
     SelfClosedTag,
     StartTag,
-    escapeAttr,
     escapeHTML,
 )
 from .preds import charRefs
@@ -148,9 +147,9 @@ def parseNode(
             return Result(node, start + 2)
     if s.config.css:
         if s[start] == "'":
-            el, i = parseCSSMaybe(s, start).vi
-            if el is not None:
-                return Result(el, i)
+            maybeRes = parseCSSMaybe(s, start)
+            if maybeRes.err is None:
+                return maybeRes
     if s[start : start + 2] == "[[":
         # biblio link, for now just pass it thru
         node = RawText(
@@ -903,7 +902,11 @@ def parseRangeComponent(val: str) -> tuple[str | None, float | int]:
     return val + unit, num
 
 
-def parseCSSMaybe(s: Stream, start: int) -> Result[RawElement]:
+MAYBE_PROP_RE = re.compile(r"^(@[\w-]+/)?([\w-]+): .+")
+MAYBE_VAL_RE = re.compile(r"^(?:(\S*)/)?(\S[^!]*)(?:!!([\w-]+))?$")
+
+
+def parseCSSMaybe(s: Stream, start: int) -> Result[list[ParserNode]]:
     # Maybes can cause parser issues,
     # like ''<length>/px'',
     # but also can contain other markup that would split the text,
@@ -912,41 +915,152 @@ def parseCSSMaybe(s: Stream, start: int) -> Result[RawElement]:
         return Result.fail(start)
     i = start + 2
 
+    textStart = i
+
     text, i = s.skipTo(i, "''").vi
     if text is None:
         return Result.fail(start)
     if "\n" in text:
         return Result.fail(start)
-    i += 2
+    textEnd = i
+    nodeEnd = i + 2
 
     # A lot of maybes have <<foo>> links in them.
     # They break in interesting ways sometimes, but
     # also if it actually produces a link
     # (like ''width: <<length>>'' linking to 'width')
     # it'll be broken anyway.
-    # So we'll hack this in - << gets turned into &lt;
+    # So we'll hack this in - << gets turned into <
     # within a maybe.
     # No chance of a link, but won't misparse in weird ways.
-
     if "<<" in text:
-        rawContents = text.replace("<<", "&lt;").replace(">>", "&gt;")
-    else:
-        rawContents = text
+        text = re.sub(r"<<", "<", text)
+        text = re.sub(r">>", ">", text)
 
+    # This syntax does double duty as both a linking syntax
+    # and just a "style as CSS code" syntax.
+    # So, you have to be careful that something that might *look* like
+    # an autolink, but actually wasn't intended as such and thus fails
+    # to link, doesn't have its text mangled as a result.
+    # * text like `foo: ...` is probably a propdesc link,
+    #   with the same text as what's written,
+    #   so it's safe
+    # * text like `foo` is probably a maybe link,
+    #   with the same text as what's written,
+    #   so it's safe too
+    # * text like `foo/bar` might be a maybe link;
+    #   if it is, its text is `bar`, but if not it should
+    #   stay as `foo/bar`.
+    #   So it's not safe, and we need to guard against this.
+    # * anything else isn't a link, should just keep its text as-is.
+    # In all cases,
+
+    match = MAYBE_PROP_RE.match(text)
+    if match:
+        for_, propdescname = match.groups()
+        startTag = StartTag(
+            line=s.line(start),
+            endLine=s.line(textStart),
+            tag="a",
+            attrs={
+                "bs-autolink-syntax": s[start:nodeEnd],
+                "class": "css",
+                "data-link-type": "propdesc",
+                "data-lt": propdescname,
+            },
+        )
+        if for_:
+            startTag.attrs["data-link-for"] = for_
+            startTag.attrs["data-link-type"] = "descriptor"
+        startTag.finalize()
+        tagMiddle = SafeText(
+            line=s.line(textStart),
+            endLine=s.line(textEnd),
+            text=text,
+        )
+        endTag = EndTag(
+            line=s.line(textEnd),
+            endLine=s.line(nodeEnd),
+            tag=startTag.tag,
+        )
+        return Result([startTag, tagMiddle, endTag], nodeEnd)
+
+    match = MAYBE_VAL_RE.match(text)
+    if match:
+        for_, valueName, linkType = match.groups()
+        if linkType is None:
+            linkType = "maybe"
+        elif linkType in config.maybeTypes:
+            pass
+        else:
+            m.die(
+                f"Shorthand ''{text}'' gives type as '{linkType}', but only “maybe” sub-types are allowed: {config.englishFromList(config.maybeTypes)}.",
+                lineNum=s.line(start),
+            )
+            startTag = StartTag(
+                line=s.line(start),
+                endLine=s.line(textStart),
+                tag="css",
+            )
+            tagMiddle = SafeText(
+                line=s.line(textStart),
+                endLine=s.line(textEnd),
+                text=valueName,
+            )
+            endTag = EndTag(
+                line=s.line(textEnd),
+                endLine=s.line(nodeEnd),
+                tag=startTag.tag,
+            )
+            return Result([startTag, tagMiddle, endTag], nodeEnd)
+
+        # Probably a valid link, but *possibly* not,
+        # so keep the text as-is, but set the intended link text
+        # if it *does* succeed.
+        startTag = StartTag(
+            line=s.line(start),
+            endLine=s.line(textStart),
+            tag="a",
+            attrs={
+                "bs-autolink-syntax": s[start:nodeEnd],
+                "bs-replace-text-on-link-success": valueName,
+                "class": "css",
+                "data-link-type": linkType,
+                "data-lt": valueName,
+            },
+        )
+        if for_:
+            startTag.attrs["data-link-for"] = for_
+        startTag.finalize()
+        tagMiddle = SafeText(
+            line=s.line(textStart),
+            endLine=s.line(textEnd),
+            text=text,
+        )
+        endTag = EndTag(
+            line=s.line(textEnd),
+            endLine=s.line(nodeEnd),
+            tag=startTag.tag,
+        )
+        return Result([startTag, tagMiddle, endTag], nodeEnd)
+
+    # Doesn't look like a maybe link, so it's just CSS text.
     startTag = StartTag(
         line=s.line(start),
-        endLine=s.line(start),
-        tag="fake-maybe-placeholder",
-        attrs={"bs-autolink-syntax": s[start:i], "bs-original-contents": escapeAttr(text)},
-    ).finalize()
-    el = RawElement(
-        line=startTag.line,
-        tag=startTag.tag,
-        startTag=startTag,
-        data=rawContents,
-        endLine=s.line(i),
+        endLine=s.line(textStart),
+        tag="css",
     )
-    return Result(el, i)
+    tagMiddle = SafeText(
+        line=s.line(textStart),
+        endLine=s.line(textEnd),
+        text=text,
+    )
+    endTag = EndTag(
+        line=s.line(textEnd),
+        endLine=s.line(nodeEnd),
+        tag=startTag.tag,
+    )
+    return Result([startTag, tagMiddle, endTag], nodeEnd)
 
 
 codeSpanStartRe = re.compile(r"`+")
