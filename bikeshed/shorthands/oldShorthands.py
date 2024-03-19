@@ -6,67 +6,6 @@ from .. import config, h, t
 from .. import messages as m
 
 
-def transformMaybePlaceholders(doc: t.SpecT) -> None:
-    propRe = re.compile(r"^([\w-]+): .+")
-    valRe = re.compile(r"^(?:(\S*)/)?(\S[^!]*)(?:!!([\w-]+))?$")
-    for el in h.findAll("fake-maybe-placeholder", doc):
-        text = el.get("bs-original-contents")
-        assert text is not None
-        match = propRe.match(text)
-        if match:
-            el.tag = "a"
-            el.set("class", "css")
-            el.set("data-link-type", "propdesc")
-            el.set("data-lt", match.group(1))
-            continue
-        match = valRe.match(text)
-        if match:
-            if match.group(3) is None:
-                linkType = "maybe"
-            elif match.group(3) in config.maybeTypes:
-                linkType = match.group(3)
-            else:
-                m.die(
-                    f"Shorthand ''{match.group(0)}'' gives type as '{match.group(3)}', but only “maybe” types are allowed.",
-                    el=el,
-                )
-                el.tag = "css"
-                continue
-            el.tag = "a"
-            el.set("class", "css")
-            el.set("data-link-type", linkType)
-            el.set("data-lt", match.group(2))
-            # Three cases to worry about:
-            # 1. ''foo/valid-value'' (successful link)
-            # 2. ''foo/invalid-value'' (intended link, but unsuccessful)
-            # 3. ''foo&0x2f;bar'' (not a link, just wants a slash in text)
-            #
-            # Handling (1) is easy - on successful link, I'll swap the text
-            # for the reffed value.
-            # Distinguish (2) from (3) is hard, and they need to be treated
-            # differently - (3) should be left alone, while (2) needs to
-            # have its text swapped to "invalid-value".
-            #
-            # Compromise: if it looks *sufficiently close* to a link
-            # I'll swap the text ahead of time, to remove any metadata
-            # that shouldn't display for a link.
-            # Otherwise I'll leave it alone, but if it successfully links
-            # based on literal text, it'll swap its text out.
-            #
-            # "Sufficiently close" means it has a for or type value,
-            # and *doesn't* contain what looks like a close tag
-            # (which would otherwise look like a for value due to the slash).
-            if (match.group(1) is not None or match.group(3) is not None) and "</" not in text:
-                h.clearContents(el)
-                el.text = match.group(2)
-            else:
-                el.set("bs-replace-text-on-link-success", match.group(2))
-            if match.group(1) is not None:
-                el.set("for", match.group(1))
-            continue
-        el.tag = "css"
-
-
 def transformAutolinkShortcuts(doc: t.SpecT) -> None:
     # Do the remaining textual replacements
 
