@@ -1014,16 +1014,19 @@ def parseCSSMaybe(s: Stream, start: int) -> Result[list[ParserNode]]:
             )
             return Result([startTag, tagMiddle, endTag], nodeEnd)
 
-        # Probably a valid link, but *possibly* not,
-        # so keep the text as-is, but set the intended link text
-        # if it *does* succeed.
+        # Probably a valid link, but *possibly* not.
+        # If it looks *sufficiently like* an autolink,
+        # swap the text out as if it was one
+        # (has a for value and/or a type value, and the for value
+        #  doesn't look like it's an end tag).
+        # Otherwise, keep the text as-is, but set the intended
+        # link text if it *does* succeed.
         startTag = StartTag(
             line=s.line(start),
             endLine=s.line(textStart),
             tag="a",
             attrs={
                 "bs-autolink-syntax": s[start:nodeEnd],
-                "bs-replace-text-on-link-success": valueName,
                 "class": "css",
                 "data-link-type": linkType,
                 "data-lt": valueName,
@@ -1031,12 +1034,22 @@ def parseCSSMaybe(s: Stream, start: int) -> Result[list[ParserNode]]:
         )
         if for_:
             startTag.attrs["data-link-for"] = for_
+        if (for_ is not None and not for_.endswith("<")) or match[3] is not None:
+            tagMiddle = SafeText(
+                line=s.line(textStart),
+                endLine=s.line(textEnd),
+                text=valueName,
+            )
+        else:
+            startTag.attrs["bs-replace-text-on-link-success"] = valueName
+            tagMiddle = SafeText(
+                line=s.line(textStart),
+                endLine=s.line(textEnd),
+                text=text,
+            )
+
+
         startTag.finalize()
-        tagMiddle = SafeText(
-            line=s.line(textStart),
-            endLine=s.line(textEnd),
-            text=text,
-        )
         endTag = EndTag(
             line=s.line(textEnd),
             endLine=s.line(nodeEnd),
