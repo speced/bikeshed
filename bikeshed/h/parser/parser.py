@@ -16,6 +16,7 @@ from .nodes import (
     SafeText,
     SelfClosedTag,
     StartTag,
+    escapeAttr,
     escapeHTML,
 )
 from .preds import charRefs
@@ -930,11 +931,11 @@ def parseCSSMaybe(s: Stream, start: int) -> Result[list[ParserNode]]:
     # also if it actually produces a link
     # (like ''width: <<length>>'' linking to 'width')
     # it'll be broken anyway.
-    # So we'll hack this in - << gets turned into <
+    # So we'll hack this in - << gets turned into &lt;
     # within a maybe.
     # No chance of a link, but won't misparse in weird ways.
     if "<<" in text:
-        text = re.sub(r"<<", "<", text)
+        text = re.sub(r"<<", "&lt;", text)
         text = re.sub(r">>", ">", text)
 
     # This syntax does double duty as both a linking syntax
@@ -961,19 +962,19 @@ def parseCSSMaybe(s: Stream, start: int) -> Result[list[ParserNode]]:
         startTag = StartTag(
             line=s.line(start),
             endLine=s.line(textStart),
-            tag="a",
+            tag="bs-link",
             attrs={
-                "bs-autolink-syntax": s[start:nodeEnd],
+                "bs-autolink-syntax": escapeAttr(s[start:nodeEnd]),
                 "class": "css",
                 "data-link-type": "propdesc",
                 "data-lt": propdescname,
             },
         )
         if for_:
-            startTag.attrs["data-link-for"] = for_
+            startTag.attrs["data-link-for"] = escapeAttr(for_)
             startTag.attrs["data-link-type"] = "descriptor"
         startTag.finalize()
-        tagMiddle = SafeText(
+        tagMiddle = RawText(
             line=s.line(textStart),
             endLine=s.line(textEnd),
             text=text,
@@ -1024,16 +1025,20 @@ def parseCSSMaybe(s: Stream, start: int) -> Result[list[ParserNode]]:
         startTag = StartTag(
             line=s.line(start),
             endLine=s.line(textStart),
-            tag="a",
+            tag="bs-link",
             attrs={
-                "bs-autolink-syntax": s[start:nodeEnd],
+                "bs-autolink-syntax": escapeAttr(s[start:nodeEnd]),
                 "class": "css",
                 "data-link-type": linkType,
-                "data-lt": valueName,
+                "data-lt": escapeAttr(valueName),
             },
         )
+        if "&lt;" in valueName:
+            m.die(f"The autolink {s[start:nodeEnd]} is using an HTML escape (or <<) in its value; you probably don't want to escape things there.", lineNum=s.line(start))
         if for_:
-            startTag.attrs["data-link-for"] = for_
+            if "&lt;" in for_:
+                m.die(f"The autolink {s[start:nodeEnd]} is using an HTML escape in its for value; you probably don't want to escape things there.", lineNum=s.line(start))
+            startTag.attrs["data-link-for"] = escapeAttr(for_)
         if (for_ is not None and not for_.endswith("<")) or match[3] is not None:
             tagMiddle = SafeText(
                 line=s.line(textStart),
@@ -1042,7 +1047,7 @@ def parseCSSMaybe(s: Stream, start: int) -> Result[list[ParserNode]]:
             )
         else:
             startTag.attrs["bs-replace-text-on-link-success"] = valueName
-            tagMiddle = SafeText(
+            tagMiddle = RawText(
                 line=s.line(textStart),
                 endLine=s.line(textEnd),
                 text=text,
@@ -1063,7 +1068,7 @@ def parseCSSMaybe(s: Stream, start: int) -> Result[list[ParserNode]]:
         endLine=s.line(textStart),
         tag="css",
     )
-    tagMiddle = SafeText(
+    tagMiddle = RawText(
         line=s.line(textStart),
         endLine=s.line(textEnd),
         text=text,
