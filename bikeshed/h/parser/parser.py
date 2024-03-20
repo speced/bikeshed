@@ -903,10 +903,6 @@ def parseRangeComponent(val: str) -> tuple[str | None, float | int]:
     return val + unit, num
 
 
-MAYBE_PROP_RE = re.compile(r"^(@[\w-]+/)?([\w-]+): .+")
-MAYBE_VAL_RE = re.compile(r"^(?:(\S*)/)?(\S[^!]*)(?:!!([\w-]+))?$")
-
-
 def parseCSSMaybe(s: Stream, start: int) -> Result[list[ParserNode]]:
     # Maybes can cause parser issues,
     # like ''<length>/px'',
@@ -934,9 +930,6 @@ def parseCSSMaybe(s: Stream, start: int) -> Result[list[ParserNode]]:
     # So we'll hack this in - << gets turned into &lt;
     # within a maybe.
     # No chance of a link, but won't misparse in weird ways.
-    if "<<" in text:
-        text = re.sub(r"<<", "&lt;", text)
-        text = re.sub(r">>", ">", text)
 
     # This syntax does double duty as both a linking syntax
     # and just a "style as CSS code" syntax.
@@ -955,112 +948,13 @@ def parseCSSMaybe(s: Stream, start: int) -> Result[list[ParserNode]]:
     #   So it's not safe, and we need to guard against this.
     # * anything else isn't a link, should just keep its text as-is.
     # In all cases,
+    res = parseMaybeDecl(s, start, textStart, textEnd, nodeEnd)
+    if res.err is None:
+        return res
 
-    match = MAYBE_PROP_RE.match(text)
-    if match:
-        for_, propdescname = match.groups()
-        startTag = StartTag(
-            line=s.line(start),
-            endLine=s.line(textStart),
-            tag="bs-link",
-            attrs={
-                "bs-autolink-syntax": escapeAttr(s[start:nodeEnd]),
-                "class": "css",
-                "data-link-type": "propdesc",
-                "data-lt": propdescname,
-            },
-        )
-        if for_:
-            startTag.attrs["data-link-for"] = escapeAttr(for_)
-            startTag.attrs["data-link-type"] = "descriptor"
-        startTag.finalize()
-        tagMiddle = RawText(
-            line=s.line(textStart),
-            endLine=s.line(textEnd),
-            text=text,
-        )
-        endTag = EndTag(
-            line=s.line(textEnd),
-            endLine=s.line(nodeEnd),
-            tag=startTag.tag,
-        )
-        return Result([startTag, tagMiddle, endTag], nodeEnd)
-
-    match = MAYBE_VAL_RE.match(text)
-    if match:
-        for_, valueName, linkType = match.groups()
-        if linkType is None:
-            linkType = "maybe"
-        elif linkType in config.maybeTypes:
-            pass
-        else:
-            m.die(
-                f"Shorthand ''{text}'' gives type as '{linkType}', but only “maybe” sub-types are allowed: {config.englishFromList(config.maybeTypes)}.",
-                lineNum=s.line(start),
-            )
-            startTag = StartTag(
-                line=s.line(start),
-                endLine=s.line(textStart),
-                tag="css",
-            )
-            tagMiddle = SafeText(
-                line=s.line(textStart),
-                endLine=s.line(textEnd),
-                text=valueName,
-            )
-            endTag = EndTag(
-                line=s.line(textEnd),
-                endLine=s.line(nodeEnd),
-                tag=startTag.tag,
-            )
-            return Result([startTag, tagMiddle, endTag], nodeEnd)
-
-        # Probably a valid link, but *possibly* not.
-        # If it looks *sufficiently like* an autolink,
-        # swap the text out as if it was one
-        # (has a for value and/or a type value, and the for value
-        #  doesn't look like it's an end tag).
-        # Otherwise, keep the text as-is, but set the intended
-        # link text if it *does* succeed.
-        startTag = StartTag(
-            line=s.line(start),
-            endLine=s.line(textStart),
-            tag="bs-link",
-            attrs={
-                "bs-autolink-syntax": escapeAttr(s[start:nodeEnd]),
-                "class": "css",
-                "data-link-type": linkType,
-                "data-lt": escapeAttr(valueName),
-            },
-        )
-        if "&lt;" in valueName:
-            m.die(f"The autolink {s[start:nodeEnd]} is using an HTML escape (or <<) in its value; you probably don't want to escape things there.", lineNum=s.line(start))
-        if for_:
-            if "&lt;" in for_:
-                m.die(f"The autolink {s[start:nodeEnd]} is using an HTML escape in its for value; you probably don't want to escape things there.", lineNum=s.line(start))
-            startTag.attrs["data-link-for"] = escapeAttr(for_)
-        if (for_ is not None and not for_.endswith("<")) or match[3] is not None:
-            tagMiddle = SafeText(
-                line=s.line(textStart),
-                endLine=s.line(textEnd),
-                text=valueName,
-            )
-        else:
-            startTag.attrs["bs-replace-text-on-link-success"] = valueName
-            tagMiddle = RawText(
-                line=s.line(textStart),
-                endLine=s.line(textEnd),
-                text=text,
-            )
-
-
-        startTag.finalize()
-        endTag = EndTag(
-            line=s.line(textEnd),
-            endLine=s.line(nodeEnd),
-            tag=startTag.tag,
-        )
-        return Result([startTag, tagMiddle, endTag], nodeEnd)
+    res = parseMaybeValue(s, start, textStart, textEnd, nodeEnd)
+    if res.err is None:
+        return res
 
     # Doesn't look like a maybe link, so it's just CSS text.
     startTag = StartTag(
@@ -1071,7 +965,7 @@ def parseCSSMaybe(s: Stream, start: int) -> Result[list[ParserNode]]:
     tagMiddle = RawText(
         line=s.line(textStart),
         endLine=s.line(textEnd),
-        text=text,
+        text=rawFromDoubleAngles(text),
     )
     endTag = EndTag(
         line=s.line(textEnd),
@@ -1079,6 +973,162 @@ def parseCSSMaybe(s: Stream, start: int) -> Result[list[ParserNode]]:
         tag=startTag.tag,
     )
     return Result([startTag, tagMiddle, endTag], nodeEnd)
+
+
+MAYBE_PROP_RE = re.compile(r"^(@[\w-]+/)?([\w-]+): .+")
+
+
+def parseMaybeDecl(s: Stream, start: int, textStart: int, textEnd: int, nodeEnd: int) -> Result[list[ParserNode]]:
+    text = s[textStart:textEnd]
+    match = MAYBE_PROP_RE.match(text)
+    if not match:
+        return Result.fail(nodeEnd)
+
+    for_, propdescname = match.groups()
+    startTag = StartTag(
+        line=s.line(start),
+        endLine=s.line(textStart),
+        # Maybe autolinks are sometimes nested inside of real <a>s.
+        # To avoid parsing issues, I'll turn these into a custom el first,
+        # then swap them into an <a> post-parsing (in processAutolinks).
+        # I can probably avoid doing this later, when I'm parsing
+        # *only* with my bespoke parser, and can just emit a parsing error.
+        tag="bs-link",
+        attrs={
+            "bs-autolink-syntax": escapeAttr(s[start:nodeEnd]),
+            "class": "css",
+            "data-link-type": "propdesc",
+            "data-lt": escapeAttr(propdescname),
+        },
+    )
+    if for_:
+        startTag.attrs["data-link-for"] = escapeAttr(for_)
+        startTag.attrs["data-link-type"] = "descriptor"
+    startTag.finalize()
+    tagMiddle = RawText(
+        line=s.line(textStart),
+        endLine=s.line(textEnd),
+        text=rawFromDoubleAngles(text),
+    )
+    endTag = EndTag(
+        line=s.line(textEnd),
+        endLine=s.line(nodeEnd),
+        tag=startTag.tag,
+    )
+    return Result([startTag, tagMiddle, endTag], nodeEnd)
+
+
+MAYBE_VAL_RE = re.compile(r"^(?:(\S*)/)?(\S[^!]*)(?:!!([\w-]+))?$")
+
+
+def parseMaybeValue(s: Stream, start: int, textStart: int, textEnd: int, nodeEnd: int) -> Result[list[ParserNode]]:
+    text = s[textStart:textEnd]
+    match = MAYBE_VAL_RE.match(text)
+    if not match:
+        return Result.fail(nodeEnd)
+
+    tagMiddle: RawText | SafeText
+    for_, valueName, linkType = match.groups()
+    if linkType is None:
+        linkType = "maybe"
+    elif linkType in config.maybeTypes:
+        pass
+    else:
+        m.die(
+            f"Shorthand ''{text}'' gives type as '{linkType}', but only “maybe” sub-types are allowed: {config.englishFromList(config.maybeTypes)}.",
+            lineNum=s.line(start),
+        )
+        startTag = StartTag(
+            line=s.line(start),
+            endLine=s.line(textStart),
+            tag="css",
+        )
+        tagMiddle = SafeText(
+            line=s.line(textStart),
+            endLine=s.line(textEnd),
+            text=valueName,
+        )
+        endTag = EndTag(
+            line=s.line(textEnd),
+            endLine=s.line(nodeEnd),
+            tag=startTag.tag,
+        )
+        return Result([startTag, tagMiddle, endTag], nodeEnd)
+
+    # Probably a valid link, but *possibly* not.
+    # If it looks *sufficiently like* an autolink,
+    # swap the text out as if it was one
+    # (has a for value and/or a type value, and the for value
+    #  doesn't look like it's an end tag).
+    # Otherwise, keep the text as-is, but set the intended
+    # link text if it *does* succeed.
+    startTag = StartTag(
+        line=s.line(start),
+        endLine=s.line(textStart),
+        tag="bs-link",
+        attrs={
+            "bs-autolink-syntax": escapeAttr(s[start:nodeEnd]),
+            "class": "css",
+            "data-link-type": linkType,
+            "data-lt": escapeAttr(valueName),
+        },
+    )
+    if "&lt;" in valueName:
+        m.die(
+            f"The autolink {s[start:nodeEnd]} is using an HTML escape (or <<) in its value; you probably don't want to escape things there.",
+            lineNum=s.line(start),
+        )
+        m.say("(See https://speced.github.io/bikeshed/#autolink-limits )")
+    elif "<<" in valueName:
+        m.die(
+            f"The autolink {s[start:nodeEnd]} is using << in its value; you probably just want to use a single < and >.",
+            lineNum=s.line(start),
+        )
+        m.say("(See https://speced.github.io/bikeshed/#autolink-limits )")
+    if for_:
+        if "&lt;" in for_ or "<<" in for_:
+            m.die(
+                f"The autolink {s[start:nodeEnd]} is using an HTML escape (or <<) in its for value; you probably don't want to escape things there.",
+                lineNum=s.line(start),
+            )
+            m.say("(See https://speced.github.io/bikeshed/#autolink-limits )")
+        startTag.attrs["data-link-for"] = escapeAttr(for_)
+    if (for_ is not None and not for_.endswith("<")) or match[3] is not None:
+        tagMiddle = SafeText(
+            line=s.line(textStart),
+            endLine=s.line(textEnd),
+            text=safeFromDoubleAngles(valueName),
+        )
+    else:
+        startTag.attrs["bs-replace-text-on-link-success"] = escapeAttr(safeFromDoubleAngles(valueName))
+        tagMiddle = RawText(
+            line=s.line(textStart),
+            endLine=s.line(textEnd),
+            text=rawFromDoubleAngles(text),
+        )
+
+    startTag.finalize()
+    endTag = EndTag(
+        line=s.line(textEnd),
+        endLine=s.line(nodeEnd),
+        tag=startTag.tag,
+    )
+    return Result([startTag, tagMiddle, endTag], nodeEnd)
+
+
+def rawFromDoubleAngles(text: str) -> str:
+    # <<foo>> is used a lot in maybe autolinks, but it's never
+    # actually meant to be a link. Generally, I just want to
+    # turn them into single angles as text.
+    text = re.sub(r"<<", "&lt;", text)
+    text = re.sub(r">>", ">", text)
+    return text
+
+
+def safeFromDoubleAngles(text: str) -> str:
+    text = re.sub(r"<<", "<", text)
+    text = re.sub(r">>", ">", text)
+    return text
 
 
 codeSpanStartRe = re.compile(r"`+")
