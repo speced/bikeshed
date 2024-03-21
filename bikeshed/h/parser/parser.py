@@ -16,6 +16,7 @@ from .nodes import (
     SafeText,
     SelfClosedTag,
     StartTag,
+    Text,
     escapeAttr,
     escapeHTML,
 )
@@ -85,7 +86,7 @@ def parseAnything(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]
         return Result.fail(start)
     if s[start] in POSSIBLE_NODE_START_CHARS:
         res = parseNode(s, start)
-        if res.err is None:
+        if res.valid:
             return res
     i = start + 1
     end = len(s)
@@ -139,7 +140,7 @@ def parseNode(
             els, i = parseCodeSpan(s, start).vi
             if els is not None:
                 return Result(els, i)
-        if s[start : start + 2] == "\\`":
+        if s[start : start + 2] == r"\`":
             node = RawText(
                 line=s.line(start),
                 endLine=s.line(start),
@@ -147,10 +148,28 @@ def parseNode(
             )
             return Result(node, start + 2)
     if s.config.css:
-        if s[start] == "'":
+        if s[start : start + 3] == r"\''":
+            node = RawText(
+                line=s.line(start),
+                endLine=s.line(start),
+                text="''",
+            )
+            return Result(node, start + 3)
+        elif s[start : start + 2] == r"\'":
+            node = RawText(
+                line=s.line(start),
+                endLine=s.line(start),
+                text="'",
+            )
+            return Result(node, start + 2)
+        elif s[start : start + 2] == "''":
             maybeRes = parseCSSMaybe(s, start)
-            if maybeRes.err is None:
+            if maybeRes.valid:
                 return maybeRes
+        elif s[start] == "'":
+            propdescRes = parseCSSPropdesc(s, start)
+            if propdescRes.valid:
+                return propdescRes
     if s[start : start + 2] == "[[":
         # biblio link, for now just pass it thru
         node = RawText(
@@ -161,7 +180,7 @@ def parseNode(
         return Result(node, start + 2)
     if s[start] == "[":
         macroRes = parseMacro(s, start)
-        if macroRes.err is None:
+        if macroRes.valid:
             return macroRes
     if s[start : start + 2] == "\\[":
         if s[start + 2].isalpha() or s[start + 2].isdigit():
@@ -206,10 +225,10 @@ def parseAngleStart(s: Stream, start: int) -> Result[ParserNode | list[ParserNod
     i = start + 1
     if s[i] == "!":
         dtRes = parseDoctype(s, start)
-        if dtRes.err is None:
+        if dtRes.valid:
             return dtRes
         commentRes = parseComment(s, start)
-        if commentRes.err is None:
+        if commentRes.valid:
             return commentRes
         return Result.fail(start)
 
@@ -949,11 +968,11 @@ def parseCSSMaybe(s: Stream, start: int) -> Result[list[ParserNode]]:
     # * anything else isn't a link, should just keep its text as-is.
     # In all cases,
     res = parseMaybeDecl(s, start, textStart, textEnd, nodeEnd)
-    if res.err is None:
+    if res.valid:
         return res
 
     res = parseMaybeValue(s, start, textStart, textEnd, nodeEnd)
-    if res.err is None:
+    if res.valid:
         return res
 
     # Doesn't look like a maybe link, so it's just CSS text.
@@ -1129,6 +1148,132 @@ def safeFromDoubleAngles(text: str) -> str:
     text = re.sub(r"<<", "<", text)
     text = re.sub(r">>", ">", text)
     return text
+
+
+PROPDESC_RE = re.compile(
+    r"""
+    '
+    (?:(@[\w-]+|)/)?
+    ([\w*-]+)
+    (?:!!([\w-]+))?
+    """,
+    re.X,
+)
+
+
+def parseCSSPropdesc(s: Stream, start: int) -> Result[SafeText | list[ParserNode]]:
+    match, innerEnd = s.matchRe(start, PROPDESC_RE).vi
+    if match is None:
+        return Result.fail(start)
+
+    linkFor, lt, linkType = match.groups()
+
+    if s[innerEnd] == "'":
+        textOverride = False
+    elif s[innerEnd] == "|":
+        textOverride = True
+    else:
+        # If you provided a for or type, you almost certainly *meant*
+        # this to be a propdesc, and just left off the closing '.
+        if linkFor is not None or linkType is not None:
+            m.die(
+                f"It appears that you meant to write a property/descriptor autolink ({s[start:innerEnd]}), but didn't finish it. Close it with a final ', or escape the initial ' character.",
+                lineNum=s.line(start),
+            )
+            return Result(SafeText(line=s.line(start), endLine=s.line(innerEnd), text=s[start:innerEnd]), innerEnd)
+        else:
+            # Otherwise this is likely just an innocent apostrophe
+            # used for other purposes, and should just fail to parse.
+            return Result.fail(start)
+
+    if linkType is None:
+        if linkFor is None:
+            linkType = "property"
+        else:
+            linkType = "propdesc"
+    elif linkType in ("property", "descriptor"):
+        pass
+    else:
+        m.die(
+            f"Propdesc link '{s[start+1:innerEnd]}' gave its type as '{linkType}', but only 'property' or 'descriptor' is allowed.",
+            lineNum=s.line(start),
+        )
+        linkType = "propdesc"
+
+    startTag = StartTag(
+        line=s.line(start),
+        endLine=s.line(start + 1),
+        tag="a",
+        attrs={
+            "class": "property",
+            "data-link-type": linkType,
+            "data-lt": escapeAttr(lt),
+            "bs-autolink-syntax": escapeAttr(s[start:innerEnd+1]),
+        },
+    )
+    if linkFor is not None:
+        startTag.attrs["data-link-for"] = escapeAttr(linkFor)
+    startTag = startTag.finalize()
+
+    if not textOverride:
+        nodeEnd = innerEnd + 1
+        endTag = EndTag(
+            line=s.line(innerEnd),
+            endLine=s.line(nodeEnd),
+            tag=startTag.tag,
+        )
+        middleText = SafeText(
+            line=s.line(start + 1),
+            endLine=innerEnd,
+            text=lt,
+        )
+        return Result([startTag, middleText, endTag], nodeEnd)
+
+    # Otherwise we need to parse what's left, until we find the ending '
+    innerContent: list[ParserNode] = []
+    startLine = s.line(innerEnd)
+    for node in generateNodes(s, innerEnd + 1):
+        if node.endLine > startLine:
+            m.die(
+                "Propdesc autolinks can't be spread across multiple lines. You might have forgotten to close your autolink; if not, switch to the HTML syntax to spread your link across multiple lines.",
+                lineNum=s.line(start),
+            )
+            return Result(
+                SafeText(line=s.line(start), endLine=s.line(innerEnd + 1), text=s[start : innerEnd + 1]),
+                innerEnd + 1,
+            )
+        if isinstance(node, StartTag) and node.tag in ("a", "bs-link"):
+            m.die("Propdesc autolinks can't contain more links in their linktext.", lineNum=s.line(start))
+            return Result(
+                SafeText(line=s.line(start), endLine=s.line(innerEnd + 1), text=s[start : innerEnd + 1]),
+                innerEnd + 1,
+            )
+        if not isinstance(node, Text):
+            innerContent.append(node)
+            continue
+        assert isinstance(node, Text)
+        if "'" not in node.text:
+            innerContent.append(node)
+            continue
+        contentEnd = node.text.index("'")
+        node.text = node.text[:contentEnd]
+        innerContent.append(node)
+        break
+    else:
+        m.die("Propdesc autolink was opened, but was never closed.", lineNum=s.line(start))
+        return Result(
+            SafeText(line=s.line(start), endLine=s.line(innerEnd + 1), text=s[start : innerEnd + 1]),
+            innerEnd + 1,
+        )
+
+    endTag = EndTag(
+        line=s.line(contentEnd),
+        endLine=s.line(contentEnd + 1),
+        tag=startTag.tag,
+    )
+    startTag.attrs["bs-autolink-syntax"] = escapeAttr(s[start:contendEnd+1]),
+
+    return Result([startTag, *innerContent, endTag], contentEnd + 1)
 
 
 codeSpanStartRe = re.compile(r"`+")

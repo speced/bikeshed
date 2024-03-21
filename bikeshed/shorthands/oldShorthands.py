@@ -28,7 +28,8 @@ def transformAutolinkShortcuts(doc: t.SpecT) -> None:
     def transformText(text: str) -> list[t.NodeT]:
         nodes: list[t.NodeT] = [text]
         if "css" in doc.md.markupShorthands:
-            nodes = config.processTextNodes(nodes, propdescRe, propdescReplacer)
+            pass
+            # nodes = config.processTextNodes(nodes, propdescRe, propdescReplacer)
         if "dfn" in doc.md.markupShorthands:
             nodes = config.processTextNodes(nodes, dfnRe, dfnReplacer)
             nodes = config.processTextNodes(nodes, abstractRe, abstractReplacer)
