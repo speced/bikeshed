@@ -1217,19 +1217,29 @@ def parseCSSPropdesc(s: Stream, start: int) -> Result[SafeText | list[ParserNode
         )
         linkType = "propdesc"
 
-    startTag = StartTag(
-        line=s.line(start),
-        endLine=s.line(start + 1),
-        tag="a",
-        attrs={
-            "class": "property",
-            "data-link-type": linkType,
-            "data-lt": escapeAttr(lt),
-            "bs-autolink-syntax": escapeAttr(s[start : innerEnd + 1]),
-        },
-    )
-    if linkFor is not None:
-        startTag.attrs["data-link-for"] = escapeAttr(linkFor)
+    if "*" in lt or lt.startswith("--"):
+        startTag = StartTag(
+            line=s.line(start),
+            endLine=s.line(start+1),
+            tag="css",
+            attrs={
+                "bs-autolink-syntax": escapeAttr(s[start : innerEnd + 1]),
+            },
+        )
+    else:
+        startTag = StartTag(
+            line=s.line(start),
+            endLine=s.line(start + 1),
+            tag="a",
+            attrs={
+                "class": "property",
+                "data-link-type": linkType,
+                "data-lt": escapeAttr(lt),
+                "bs-autolink-syntax": escapeAttr(s[start : innerEnd + 1]),
+            },
+        )
+        if linkFor is not None:
+            startTag.attrs["data-link-for"] = escapeAttr(linkFor)
     startTag = startTag.finalize()
 
     if not textOverride:
