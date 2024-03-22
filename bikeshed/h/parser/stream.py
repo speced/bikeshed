@@ -129,6 +129,10 @@ class Stream:
     def __len__(self) -> int:
         return self._len
 
+    @property
+    def context(self) -> str | None:
+        return self.config.context
+
     def line(self, index: int) -> int:
         # Zero-based line index
         lineIndex = bisect.bisect_left(self._lineBreaks, index)
