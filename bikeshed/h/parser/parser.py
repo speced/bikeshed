@@ -448,7 +448,7 @@ def parseStartTag(s: Stream, start: int) -> Result[StartTag | SelfClosedTag]:
     # Only look at next 20 chars, tho, so I don't spam the console.
     next20 = s[i : i + 20]
     if ">" in next20 or " " in next20:
-        garbageEnd = min(next20.index(">") or 20, next20.index(" ") or 20)
+        garbageEnd = min(config.safeIndex(next20, ">", 20), config.safeIndex(next20, " ", 20))
         m.die(
             f"While trying to parse a <{tagname}> start tag, ran into some unparseable stuff ({next20[:garbageEnd]}).",
             lineNum=s.loc(i),

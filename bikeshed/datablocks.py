@@ -329,7 +329,10 @@ def transformPropdef(lines: list[str], tagName: str, firstLine: str, lineNum: in
             val = parsedAttrs[key]
         elif val is None:
             # Required key, not provided
-            m.die(f"The propdef for '{parsedAttrs.get('Name', '???')}' is missing a '{key}' line.", lineNum=lineNum)
+            if "Name" in parsedAttrs:
+                m.die(f"The propdef for '{parsedAttrs.get('Name', '')}' is missing a '{key}' line.", lineNum=lineNum)
+            else:
+                m.die(f"The propdef block is missing a '{key}' line.", lineNum=lineNum)
             continue
         else:
             # Optional key, just use default
@@ -590,15 +593,17 @@ def parseDefBlock(
     capitalizeKeys: bool = True,
     lineNum: int | None = None,
 ) -> OrderedDict[str, str]:
-    vals: OrderedDict[str, str] = OrderedDict()
+    vals: OrderedDict[str, tuple[int, str]] = OrderedDict()
+    if lineNum is None:
+        lineNum = 0
     lastKey = None
-    for line in lines:
+    for li, line in enumerate(lines, lineNum + 1):
         if "<!--" in line:
             commentMatch = re.match(r"(.*)<!--.*?-->(.*)", line)
             if not commentMatch:
                 m.die(
                     f"Detected the start of a comment on a line, but couldn't find the end. Please remove the comment, or keep it on a single line:\n{line}",
-                    lineNum=lineNum,
+                    lineNum=li,
                 )
                 continue
             # Just pull the comment out, and continue
@@ -612,7 +617,7 @@ def parseDefBlock(
                 key = lastKey
                 val = line.strip()
             else:
-                m.die(f"Incorrectly formatted {type} line for '{vals.get('Name', '???')}':\n{line}", lineNum=lineNum)
+                m.die(f"Incorrectly formatted {type} line for '{vals.get('Name', '???')}':\n{line}", lineNum=li)
                 continue
         else:
             key = match.group(1).strip()
@@ -621,13 +626,27 @@ def parseDefBlock(
             lastKey = key
             val = (match.group(2) or "").strip()
         if key in vals:
-            vals[key] += "\n" + val
+            vals[key] = (vals[key][0], vals[key][1] + "\n" + val)
         else:
-            vals[key] = val
-    for key, val in vals.items():
+            vals[key] = (lineNum, val)
+    retVals: OrderedDict[str, str] = OrderedDict()
+    for key, (li, val) in vals.items():
         context = f"'{key}' key in (line {lineNum}) {type}"
-        vals[key] = h.parseText(val, h.ParseConfig.fromSpec(doc, context=context), startLine=1)
-    return vals
+        pConfig = h.ParseConfig.fromSpec(doc, context=context)
+        if type in ("propdef", "descdef") and key == "Name":
+            newVal = ""
+            for node in h.nodesFromHtml(val, pConfig, startLine=1):
+                if isinstance(node, h.parser.Text):
+                    newVal += str(node)
+                else:
+                    m.die(
+                        f"'Name' key should contain just the property/descriptor name, or a comma-separated list. Found markup:\n  {val}",
+                        lineNum=li,
+                    )
+            retVals[key] = newVal
+        else:
+            retVals[key] = h.parseText(val, pConfig, startLine=1)
+    return retVals
 
 
 def transformRailroad(lines: list[str], tagName: str, firstLine: str, lineNum: int | None, doc: t.SpecT) -> list[str]:

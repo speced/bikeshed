@@ -1,3 +1,4 @@
+from . import parser
 from .dom import (
     DuplicatedLinkText,
     E,
@@ -81,6 +82,7 @@ from .parser import (
     ParseConfig,
     debugNodes,
     initialDocumentParse,
+    nodesFromHtml,
     parseLines,
     parseText,
     parseTitle,

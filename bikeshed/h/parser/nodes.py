@@ -112,7 +112,7 @@ class SelfClosedTag(ParserNode):
     def __str__(self) -> str:
         s = f"<{self.tag} bs-line-number={self.line}"
         if self.context:
-            s += f" bs-parse-context={escapeAttr(self.context)}"
+            s += f' bs-parse-context="{escapeAttr(self.context)}"'
         for k, v in sorted(self.attrs.items()):
             if k == "bs-line-number":
                 continue
