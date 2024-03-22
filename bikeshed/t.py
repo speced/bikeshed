@@ -13,6 +13,7 @@ if TYPE_CHECKING:
         AnyStr,
         Awaitable,
         Callable,
+        Collection,
         DefaultDict,
         Deque,
         FrozenSet,
