@@ -13,6 +13,7 @@ from ... import t
 class ParserNode(metaclass=ABCMeta):
     line: int
     endLine: int
+    context: str | None
 
     @property
     def height(self) -> int:
@@ -77,6 +78,8 @@ class StartTag(ParserNode):
 
     def __str__(self) -> str:
         s = f"<{self.tag} bs-line-number={self.line}"
+        if self.context:
+            s += f' bs-parse-context="{escapeAttr(self.context)}"'
         for k, v in sorted(self.attrs.items()):
             if k == "bs-line-number":
                 continue
@@ -108,6 +111,8 @@ class SelfClosedTag(ParserNode):
 
     def __str__(self) -> str:
         s = f"<{self.tag} bs-line-number={self.line}"
+        if self.context:
+            s += f" bs-parse-context={escapeAttr(self.context)}"
         for k, v in sorted(self.attrs.items()):
             if k == "bs-line-number":
                 continue
@@ -115,7 +120,24 @@ class SelfClosedTag(ParserNode):
             s += f' {k}="{v}"'
         if self.classes:
             s += f' class="{" ".join(sorted(self.classes))}"'
-        if self.tag in ("area", "base", "br", "col", "command", "embed", "hr", "img", "input", "keygen", "link", "meta", "param", "source", "track", "wbr"):
+        if self.tag in (
+            "area",
+            "base",
+            "br",
+            "col",
+            "command",
+            "embed",
+            "hr",
+            "img",
+            "input",
+            "keygen",
+            "link",
+            "meta",
+            "param",
+            "source",
+            "track",
+            "wbr",
+        ):
             s += ">"
         else:
             s += f"></{self.tag}>"
@@ -135,6 +157,7 @@ class SelfClosedTag(ParserNode):
         return cls(
             line=tag.line,
             endLine=tag.endLine,
+            context=tag.context,
             tag=tag.tag,
             attrs=tag.attrs,
             classes=tag.classes,
