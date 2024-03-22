@@ -355,9 +355,12 @@ def parseStartTag(s: Stream, start: int) -> Result[StartTag | SelfClosedTag]:
 
     tag = StartTag(line=s.line(start), endLine=s.line(start), tag=tagname)
 
+    attr = None
     while True:
         ws, i = parseWhitespace(s, i).vi
         if ws is None:
+            if attr and s[i] not in ("/", ">"):
+                m.die(f"No whitespace after the end of an attribute in <{tagname}>. (Saw {attr[0]}={s[i-1]}{attr[1]}{s[i-1]}.) Did you forget to escape your quote character?", lineNum=s.loc(i))
             break
         startAttr = i
         attr, i = parseAttribute(s, i).vi
@@ -408,7 +411,18 @@ def parseStartTag(s: Stream, start: int) -> Result[StartTag | SelfClosedTag]:
         m.die(f"Tag <{tagname}> wasn't closed at end of file.", lineNum=s.loc(start))
         return Result.fail(start)
 
-    m.die(f"Garbage at {s.loc(i)} in <{tagname}>.", lineNum=s.loc(start))
+    # If I can, guess at what the 'garbage' is so I can display it.
+    # Only look at next 20 chars, tho, so I don't spam the console.
+    next20 = s[i:i+20]
+    garbageEnd = None
+    if ">" in next20:
+        garbageEnd = next20.index(">")
+    if " " in next20:
+        garbageEnd = min(garbageEnd, next20.index(" "))
+    if garbageEnd:
+        m.die(f"While trying to parse a <{tagname}> start tag, ran into some unparseable stuff ({next20[:garbageEnd]}).", lineNum=s.loc(i))
+    else:
+        m.die(f"While trying to parse a <{tagname}> start tag, ran into some unparseable stuff.", lineNum=s.loc(i))
     return Result.fail(start)
 
 
