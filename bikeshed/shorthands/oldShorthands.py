@@ -31,7 +31,7 @@ def transformAutolinkShortcuts(doc: t.SpecT) -> None:
             pass
             # nodes = config.processTextNodes(nodes, propdescRe, propdescReplacer)
         if "dfn" in doc.md.markupShorthands:
-            nodes = config.processTextNodes(nodes, dfnRe, dfnReplacer)
+            #nodes = config.processTextNodes(nodes, dfnRe, dfnReplacer)
             nodes = config.processTextNodes(nodes, abstractRe, abstractReplacer)
         if "http" in doc.md.markupShorthands:
             nodes = config.processTextNodes(nodes, headerRe, headerReplacer)
