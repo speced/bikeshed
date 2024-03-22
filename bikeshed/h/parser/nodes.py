@@ -111,7 +111,8 @@ class SelfClosedTag(ParserNode):
         for k, v in sorted(self.attrs.items()):
             if k == "bs-line-number":
                 continue
-            s += f' {k}="{escapeAttr(v)}"'
+            v = v.replace('"', "&#34;")
+            s += f' {k}="{v}"'
         if self.classes:
             s += f' class="{" ".join(sorted(self.classes))}"'
         if self.tag in ("area", "base", "br", "col", "command", "embed", "hr", "img", "input", "keygen", "link", "meta", "param", "source", "track", "wbr"):
