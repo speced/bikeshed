@@ -226,6 +226,11 @@ def serializeTag(el: t.ElementT) -> str:
     # but it might be a container with a lot of content.
     tag = "<" + el.tag
     for n, v in el.attrib.items():
+        # Don't output the bs-* attributes, they're added by BS
+        # and don't show up in the source, so it's confusing to
+        # print them.
+        if n.startswith("bs-"):
+            continue
         tag += ' {n}="{v}"'.format(n=str(n), v=escapeAttr(str(v)))
     tag += ">"
     return tag
