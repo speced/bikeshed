@@ -427,7 +427,7 @@ def parseStartTag(s: Stream, start: int) -> Result[StartTag | SelfClosedTag]:
             # Skip past and handle it normally
         else:
             m.die(
-                f"Invalid use of self-closing syntax (trailing / on start tag) on a non-XML element (<{tagname}).",
+                f"Invalid use of self-closing syntax (trailing / on start tag) on a non-XML element (<{tagname}>).",
                 lineNum=s.loc(start),
             )
             i += 1
