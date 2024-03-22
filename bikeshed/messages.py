@@ -113,7 +113,11 @@ def getLineNum(lineNum: str | int | None = None, el: t.ElementT | None = None) -
     if lineNum is not None:
         return lineNum
     if el is not None and el.get("bs-line-number"):
-        return el.get("bs-line-number", "")
+        s = el.get("bs-line-number", "")
+        context = el.get("bs-parse-context", None)
+        if context:
+            s += " of " + context
+        return s
     return None
 
 
