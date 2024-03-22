@@ -16,7 +16,6 @@ from .nodes import (
     SafeText,
     SelfClosedTag,
     StartTag,
-    Text,
     escapeAttr,
     escapeHTML,
 )
@@ -69,6 +68,18 @@ def generateNodes(s: Stream, start: int) -> t.Generator[ParserNode, None, None]:
             yield nodes
 
 
+def generateResults(s: Stream, start: int) -> t.Generator[Result[ParserNode | list[ParserNode]], None, None]:
+    i = start
+    end = len(s)
+    while i < end:
+        res = parseAnything(s, i)
+        if res.valid:
+            yield res
+            i = res.i
+        else:
+            return
+
+
 POSSIBLE_NODE_START_CHARS = "&<`'~[\\—-|"
 
 
@@ -86,6 +97,7 @@ def parseAnything(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]
         return Result.fail(start)
     if s[start] in POSSIBLE_NODE_START_CHARS:
         res = parseNode(s, start)
+        s.observeResult(start, res)
         if res.valid:
             return res
     i = start + 1
@@ -148,28 +160,29 @@ def parseNode(
             )
             return Result(node, start + 2)
     if s.config.css:
-        if s[start : start + 3] == r"\''":
-            node = RawText(
-                line=s.line(start),
-                endLine=s.line(start),
-                text="''",
-            )
-            return Result(node, start + 3)
-        elif s[start : start + 2] == r"\'":
-            node = RawText(
-                line=s.line(start),
-                endLine=s.line(start),
-                text="'",
-            )
-            return Result(node, start + 2)
-        elif s[start : start + 2] == "''":
-            maybeRes = parseCSSMaybe(s, start)
-            if maybeRes.valid:
-                return maybeRes
-        elif s[start] == "'":
-            propdescRes = parseCSSPropdesc(s, start)
-            if propdescRes.valid:
-                return propdescRes
+        if not s.inOpaqueElement():
+            if s[start : start + 3] == r"\''":
+                node = RawText(
+                    line=s.line(start),
+                    endLine=s.line(start),
+                    text="''",
+                )
+                return Result(node, start + 3)
+            elif s[start : start + 2] == r"\'":
+                node = RawText(
+                    line=s.line(start),
+                    endLine=s.line(start),
+                    text="'",
+                )
+                return Result(node, start + 2)
+            elif s[start : start + 2] == "''":
+                maybeRes = parseCSSMaybe(s, start)
+                if maybeRes.valid:
+                    return maybeRes
+            elif s[start] == "'":
+                propdescRes = parseCSSPropdesc(s, start)
+                if propdescRes.valid:
+                    return propdescRes
     if s[start : start + 2] == "[[":
         # biblio link, for now just pass it thru
         node = RawText(
@@ -366,7 +379,8 @@ def parseStartTag(s: Stream, start: int) -> Result[StartTag | SelfClosedTag]:
     if s[i] == "/":
         if s[i + 1] == ">" and tagname in ("br", "link", "meta"):
             tag.endLine = s.line(i + 1)
-            return Result(tag, i + 2)
+            el = SelfClosedTag.fromStartTag(tag)
+            return Result(el, i + 2)
         elif s[i + 1] == ">" and preds.isXMLishTagname(tagname):
             tag.endLine = s.line(i + 1)
             el = SelfClosedTag.fromStartTag(tag)
@@ -377,6 +391,9 @@ def parseStartTag(s: Stream, start: int) -> Result[StartTag | SelfClosedTag]:
 
     if s[i] == ">":
         tag.endLine = s.line(i)
+        if tagname in ("area", "base", "br", "col", "command", "embed", "hr", "img", "input", "keygen", "link", "meta", "param", "source", "track", "wbr"):
+            el = SelfClosedTag.fromStartTag(tag)
+            return Result(el, i + 1)
         return Result(tag, i + 1)
 
     if s.eof(i):
@@ -1208,7 +1225,7 @@ def parseCSSPropdesc(s: Stream, start: int) -> Result[SafeText | list[ParserNode
             "class": "property",
             "data-link-type": linkType,
             "data-lt": escapeAttr(lt),
-            "bs-autolink-syntax": escapeAttr(s[start:innerEnd+1]),
+            "bs-autolink-syntax": escapeAttr(s[start : innerEnd + 1]),
         },
     )
     if linkFor is not None:
@@ -1224,41 +1241,38 @@ def parseCSSPropdesc(s: Stream, start: int) -> Result[SafeText | list[ParserNode
         )
         middleText = SafeText(
             line=s.line(start + 1),
-            endLine=innerEnd,
+            endLine=s.line(innerEnd),
             text=lt,
         )
         return Result([startTag, middleText, endTag], nodeEnd)
 
     # Otherwise we need to parse what's left, until we find the ending '
     innerContent: list[ParserNode] = []
-    startLine = s.line(innerEnd)
-    for node in generateNodes(s, innerEnd + 1):
-        if node.endLine > startLine:
-            m.die(
-                "Propdesc autolinks can't be spread across multiple lines. You might have forgotten to close your autolink; if not, switch to the HTML syntax to spread your link across multiple lines.",
-                lineNum=s.line(start),
-            )
-            return Result(
-                SafeText(line=s.line(start), endLine=s.line(innerEnd + 1), text=s[start : innerEnd + 1]),
-                innerEnd + 1,
-            )
-        if isinstance(node, StartTag) and node.tag in ("a", "bs-link"):
+    for res in generateResults(s, innerEnd + 1):
+        value = res.value
+        assert value is not None
+        if linkInValue(value):
             m.die("Propdesc autolinks can't contain more links in their linktext.", lineNum=s.line(start))
             return Result(
                 SafeText(line=s.line(start), endLine=s.line(innerEnd + 1), text=s[start : innerEnd + 1]),
                 innerEnd + 1,
             )
-        if not isinstance(node, Text):
-            innerContent.append(node)
-            continue
-        assert isinstance(node, Text)
-        if "'" not in node.text:
-            innerContent.append(node)
-            continue
-        contentEnd = node.text.index("'")
-        node.text = node.text[:contentEnd]
-        innerContent.append(node)
-        break
+        if isinstance(value, list):
+            innerContent.extend(value)
+        else:
+            innerContent.append(value)
+        if s[res.i + 1] == "'":
+            if s.line(res.i + 1) > s.line(start):
+                m.die(
+                    "Propdesc autolinks can't be spread across multiple lines. You might have forgotten to close your autolink; if not, switch to the HTML syntax to spread your link across multiple lines.",
+                    lineNum=s.line(start),
+                )
+                return Result(
+                    SafeText(line=s.line(start), endLine=s.line(innerEnd + 1), text=s[start : innerEnd + 1]),
+                    innerEnd + 1,
+                )
+            nodeEnd = res.i + 1
+            break
     else:
         m.die("Propdesc autolink was opened, but was never closed.", lineNum=s.line(start))
         return Result(
@@ -1267,13 +1281,20 @@ def parseCSSPropdesc(s: Stream, start: int) -> Result[SafeText | list[ParserNode
         )
 
     endTag = EndTag(
-        line=s.line(contentEnd),
-        endLine=s.line(contentEnd + 1),
+        line=s.line(nodeEnd - 1),
+        endLine=s.line(nodeEnd),
         tag=startTag.tag,
     )
-    startTag.attrs["bs-autolink-syntax"] = escapeAttr(s[start:contendEnd+1]),
+    startTag.attrs["bs-autolink-syntax"] = escapeAttr(s[start:nodeEnd])
 
-    return Result([startTag, *innerContent, endTag], contentEnd + 1)
+    return Result([startTag, *innerContent, endTag], nodeEnd)
+
+
+def linkInValue(val: ParserNode | list[ParserNode]) -> bool:
+    if isinstance(val, list):
+        return any(linkInValue(x) for x in val)
+    else:
+        return isinstance(val, StartTag) and val.tag in ("a", "bs-link")
 
 
 codeSpanStartRe = re.compile(r"`+")
