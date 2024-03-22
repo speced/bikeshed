@@ -219,6 +219,19 @@ def parseNode(
         macroRes = parseMacro(s, start)
         if macroRes.valid:
             return macroRes
+    if s.config.dfn:
+        if s[start : start + 3] == "\\[=":
+            node = RawText(
+                line=s.line(start),
+                endLine=s.line(start),
+                context=s.context,
+                text="[=",
+            )
+            return Result(node, start + 3)
+        if s[start : start + 2] == "[=" and not s.inOpaqueElement():
+            dfnRes = parseAutolinkDfn(s, start)
+            if dfnRes.valid:
+                return dfnRes
     if s[start : start + 2] == "\\[":
         if s[start + 2].isalpha() or s[start + 2].isdigit():
             # an escaped macro, so handle it here
@@ -1406,6 +1419,127 @@ def linkInValue(val: ParserNode | list[ParserNode]) -> bool:
         return any(linkInValue(x) for x in val)
     else:
         return isinstance(val, StartTag) and val.tag in ("a", "bs-link")
+
+
+AUTOLINK_DFN_RE = re.compile(r".*?(?=\||=])")
+
+
+def parseAutolinkDfn(s: Stream, start: int) -> Result[SafeText | list[ParserNode]]:
+    if s[start : start + 2] != "[=":
+        return Result.fail(start)
+    # Otherwise we're locked in, this opener is a very strong signal.
+    match, innerEnd = s.searchRe(start + 2, AUTOLINK_DFN_RE).vi
+    if match is None:
+        m.die(
+            "Dfn autolink was opened, but no closing =] was found. Either close your autolink, or escape the initial [ as &#91;",
+            lineNum=s.loc(start),
+        )
+        return Result.fail(start)
+
+    innerText = match.group(0)
+    if "/" in innerText:
+        linkFor, _, lt = innerText.partition("/")
+        if linkFor == "":
+            linkFor = "/"
+    else:
+        linkFor = None
+        lt = innerText
+
+    if s[innerEnd : innerEnd + 2] == "=]":
+        textOverride = False
+    elif s[innerEnd] == "|":
+        textOverride = True
+    else:
+        m.die("PROGRAMMING ERROR: my regex didn't correctly capture the end of the dfn autolink :(\nPlease report this to <https://github.com/speced/bikeshed>.", s.loc(start))
+        return Result.fail(start)
+
+    startTag = StartTag(
+        line=s.line(start),
+        endLine=s.line(start + 1),
+        context=s.context,
+        tag="a",
+        attrs={
+            "data-link-type": "dfn",
+            "data-lt": escapeAttr(lt),
+            "bs-autolink-syntax": escapeAttr(s[start : innerEnd + 2]),
+        },
+    )
+    if linkFor is not None:
+        startTag.attrs["data-link-for"] = escapeAttr(linkFor)
+    startTag = startTag.finalize()
+
+    if not textOverride:
+        nodeEnd = innerEnd + 2
+        endTag = EndTag(
+            line=s.line(innerEnd),
+            endLine=s.line(nodeEnd),
+            context=s.context,
+            tag=startTag.tag,
+        )
+        middleText = SafeText(
+            line=s.line(start + 1),
+            endLine=s.line(innerEnd),
+            context=s.context,
+            text=lt,
+        )
+        return Result([startTag, middleText, endTag], nodeEnd)
+
+    # Otherwise we need to parse what's left, until we find the ending braces
+    innerContent: list[ParserNode] = []
+    for res in generateResults(s, innerEnd + 1):
+        value = res.value
+        assert value is not None
+        if linkInValue(value):
+            m.die("Dfn autolinks can't contain more links in their linktext.", lineNum=s.loc(start))
+            return Result(
+                SafeText(
+                    line=s.line(start),
+                    endLine=s.line(innerEnd + 1),
+                    context=s.context,
+                    text=s[start : innerEnd + 1],
+                ),
+                innerEnd + 1,
+            )
+        if isinstance(value, list):
+            innerContent.extend(value)
+        else:
+            innerContent.append(value)
+        if s[res.i + 1 : res.i + 3] == "=]":
+            if s.line(res.i + 1) > s.line(start):
+                m.die(
+                    "Dfn autolinks can't be spread across multiple lines. You might have forgotten to close your autolink; if not, switch to the HTML syntax to spread your link across multiple lines.",
+                    lineNum=s.loc(start),
+                )
+                return Result(
+                    SafeText(
+                        line=s.line(start),
+                        endLine=s.line(innerEnd + 1),
+                        context=s.context,
+                        text=s[start : innerEnd + 1],
+                    ),
+                    innerEnd + 1,
+                )
+            nodeEnd = res.i + 2
+            break
+    else:
+        m.die(
+            "Dfn autolink was opened, but no closing =] was found. Either close your autolink, or escape the initial [ as &#91;",
+            lineNum=s.loc(start),
+        )
+        return Result(
+            SafeText(line=s.line(start), endLine=s.line(innerEnd + 1), context=s.context, text=s[start : innerEnd + 1]),
+            innerEnd + 1,
+        )
+
+    endTag = EndTag(
+        line=s.line(nodeEnd - 2),
+        endLine=s.line(nodeEnd),
+        context=s.context,
+        tag=startTag.tag,
+    )
+    startTag.attrs["bs-autolink-syntax"] = escapeAttr(s[start:nodeEnd])
+
+    return Result([startTag, *innerContent, endTag], nodeEnd)
 
 
 codeSpanStartRe = re.compile(r"`+")
