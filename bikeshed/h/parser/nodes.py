@@ -114,7 +114,10 @@ class SelfClosedTag(ParserNode):
             s += f' {k}="{escapeAttr(v)}"'
         if self.classes:
             s += f' class="{" ".join(sorted(self.classes))}"'
-        s += f"></{self.tag}>"
+        if self.tag in ("area", "base", "br", "col", "command", "embed", "hr", "img", "input", "keygen", "link", "meta", "param", "source", "track", "wbr"):
+            s += ">"
+        else:
+            s += f"></{self.tag}>"
         return s
 
     def finalize(self) -> SelfClosedTag:
