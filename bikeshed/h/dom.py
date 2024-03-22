@@ -229,7 +229,7 @@ def serializeTag(el: t.ElementT) -> str:
         # Don't output the bs-* attributes, they're added by BS
         # and don't show up in the source, so it's confusing to
         # print them.
-        if n.startswith("bs-"):
+        if t.cast(str, n).startswith("bs-"):
             continue
         tag += ' {n}="{v}"'.format(n=str(n), v=escapeAttr(str(v)))
     tag += ">"
