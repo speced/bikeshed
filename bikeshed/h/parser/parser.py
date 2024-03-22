@@ -23,6 +23,9 @@ from .preds import charRefs
 from .stream import Result, Stream
 
 
+VOID_ELEMENTS = {"area", "base", "br", "col", "command", "embed", "hr", "img", "input", "keygen", "link", "meta", "param", "source", "track", "wbr"}
+
+
 def nodesFromStream(s: Stream, start: int) -> t.Generator[ParserNode, None, None]:
     lastNode: ParserNode | None = None
     heldLast = False
@@ -385,13 +388,18 @@ def parseStartTag(s: Stream, start: int) -> Result[StartTag | SelfClosedTag]:
             tag.endLine = s.line(i + 1)
             el = SelfClosedTag.fromStartTag(tag)
             return Result(el, i + 2)
+        elif tagname in VOID_ELEMENTS:
+            m.die(f"Void element (<{tagname}>) with a spurious trailing /.", lineNum=s.loc(start))
+            i += 1
+            # Skip past and handle it normally
         else:
-            m.die(f"Spurious / in <{tagname}>.", lineNum=s.loc(start))
-            return Result.fail(start)
+            m.die(f"Invalid use of self-closing syntax (trailing / on start tag) on a non-XML element (<{tagname}).", lineNum=s.loc(start))
+            i += 1
+            # Again, just skip it and keep going.
 
     if s[i] == ">":
         tag.endLine = s.line(i)
-        if tagname in ("area", "base", "br", "col", "command", "embed", "hr", "img", "input", "keygen", "link", "meta", "param", "source", "track", "wbr"):
+        if tagname in VOID_ELEMENTS:
             el = SelfClosedTag.fromStartTag(tag)
             return Result(el, i + 1)
         return Result(tag, i + 1)
