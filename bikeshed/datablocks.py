@@ -254,7 +254,7 @@ def transformPre(lines: list[str], tagName: str, firstLine: str, lineNum: int | 
 
 
 def transformSimpleDef(lines: list[str], tagName: str, firstLine: str, lineNum: int | None, doc: t.SpecT) -> list[str]:
-    rows = parseDefBlock(lines, "simpledef", capitalizeKeys=False, doc=doc)
+    rows = parseDefBlock(lines, "simpledef", capitalizeKeys=False, doc=doc, lineNum=lineNum)
     lineNumAttr = ""
     if lineNum is not None:
         lineNumAttr = f" bs-line-number={lineNum}"
@@ -271,7 +271,7 @@ def transformSimpleDef(lines: list[str], tagName: str, firstLine: str, lineNum: 
 
 def transformPropdef(lines: list[str], tagName: str, firstLine: str, lineNum: int | None, doc: t.SpecT) -> list[str]:
     attrs: OrderedDict[str, str | None] = OrderedDict()
-    parsedAttrs = parseDefBlock(lines, "propdef", doc=doc)
+    parsedAttrs = parseDefBlock(lines, "propdef", doc=doc, lineNum=lineNum)
     # Displays entries in the order specified in attrs,
     # then if there are any unknown parsedAttrs values,
     # they're displayed afterward in the order they were specified.
@@ -383,7 +383,7 @@ def transformDescdef(lines: list[str], tagName: str, firstLine: str, lineNum: in
     lineNumAttr = ""
     if lineNum is not None:
         lineNumAttr = f" bs-line-number={lineNum}"
-    vals = parseDefBlock(lines, "descdef", doc=doc)
+    vals = parseDefBlock(lines, "descdef", doc=doc, lineNum=lineNum)
     if "partial" in firstLine or "New values" in vals:
         requiredKeys = ["Name", "For"]
         ret = [
@@ -435,7 +435,7 @@ def transformElementdef(lines: list[str], tagName: str, firstLine: str, lineNum:
     if lineNum is not None:
         lineNumAttr = f" bs-line-number={lineNum}"
     attrs: OrderedDict[str, str | None] = OrderedDict()
-    parsedAttrs = parseDefBlock(lines, "elementdef", doc=doc)
+    parsedAttrs = parseDefBlock(lines, "elementdef", doc=doc, lineNum=lineNum)
     if "Attribute groups" in parsedAttrs or "Attributes" in parsedAttrs:
         html = "<ul>"
         if "Attribute groups" in parsedAttrs:
@@ -625,7 +625,8 @@ def parseDefBlock(
         else:
             vals[key] = val
     for key, val in vals.items():
-        vals[key] = h.parseText(val, h.ParseConfig.fromSpec(doc))
+        context = f"'{key}' key in (line {lineNum}) {type}"
+        vals[key] = h.parseText(val, h.ParseConfig.fromSpec(doc, context=context), startLine=1)
     return vals
 
 
