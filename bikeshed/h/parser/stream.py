@@ -6,6 +6,10 @@ import re
 from dataclasses import dataclass, field
 
 from ... import t
+from .nodes import TagStack
+
+if t.TYPE_CHECKING:
+    from .nodes import ParserNode
 
 
 @dataclass
@@ -72,6 +76,7 @@ class ParseConfig:
     css: bool = False
     macros: dict[str, str] = field(default_factory=dict)
     context: str | None = None
+    opaqueElements: set[str] = field(default_factory=lambda: {"pre", "xmp", "script", "style"})
 
     @staticmethod
     def fromSpec(doc: t.SpecT, context: str | None = None) -> ParseConfig:
@@ -80,6 +85,7 @@ class ParseConfig:
             css="css" in doc.md.markupShorthands,
             macros=doc.macros,
             context=context,
+            opaqueElements=set(doc.md.opaqueElements),
         )
 
 
@@ -90,6 +96,7 @@ class Stream:
     startLine: int
     config: ParseConfig
     depth: int = 1
+    openEls: TagStack = field(default_factory=TagStack)
 
     def __init__(self, chars: str, config: ParseConfig, startLine: int = 1, depth: int = 1) -> None:
         if depth > 10:
@@ -101,6 +108,7 @@ class Stream:
         self.startLine = startLine
         self.config = config
         self.depth = depth
+        self.openEls = TagStack()
         for i, char in enumerate(chars):
             if char == "\n":
                 self._lineBreaks.append(i)
@@ -209,3 +217,24 @@ class Stream:
         # The text on the current line from the start point on.
         # Includes the newline, if present.
         return self[start : self.nextLineStart(start)]
+
+    def observeResult(
+        self,
+        i: int,
+        res: Result[ParserNode | list[ParserNode]],
+    ) -> Result[ParserNode | list[ParserNode]]:
+        if res.value is None:
+            pass
+        elif isinstance(res.value, list):
+            for node in res.value:
+                self.observeNode(i, node)
+        else:
+            self.observeNode(i, res.value)
+        return res
+
+    def observeNode(self, i: int, node: ParserNode) -> ParserNode:
+        self.openEls.update(i, node)
+        return node
+
+    def inOpaqueElement(self) -> bool:
+        return self.openEls.inOpaqueElement(self.config.opaqueElements)

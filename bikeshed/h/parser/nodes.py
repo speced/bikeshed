@@ -5,6 +5,7 @@ import re
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass, field
 
+from ... import messages as m
 from ... import t
 
 
@@ -173,3 +174,222 @@ def escapeHTML(text: str) -> str:
 
 def escapeAttr(text: str) -> str:
     return text.replace("&", "&amp;").replace('"', "&quot;")
+
+
+@dataclass
+class TagStack:
+    tags: list[TagStackEntry] = field(default_factory=list)
+
+    def inOpaqueElement(self, opaqueTags: t.Collection[str] | None = None) -> bool:
+        if opaqueTags is None:
+            opaqueTags = {"pre", "xmp", "script", "style"}
+        return any(x.tag in opaqueTags or "bs-opaque" in x.startTag.attrs for x in self.tags)
+
+    def update(self, i: int, node: ParserNode) -> None:
+        # Updates the stack based on the passed node.
+        # Start tags add to the stack, close tags pop from it.
+        # Auto-closing tags mean start tags can also pop from the stack.
+        if isinstance(node, StartTag):
+            self.autoCloseStart(node.tag)
+            self.tags.append(TagStackEntry(i, node))
+            return
+        elif isinstance(node, EndTag):
+            self.autoCloseEnd(node.tag)
+            if self.tags and self.tags[-1].tag == node.tag:
+                self.tags.pop()
+            else:
+                if node.tag in ("html", "head", "body", "main"):
+                    # If your boilerplate closes these for safety,
+                    # but they're not actually open,
+                    # that's fine
+                    return
+                for entry in reversed(self.tags):
+                    if entry.tag == node.tag:
+                        m.die(
+                            f"Saw an end tag {node}, but there were unclosed elements remaining before the nearest matching start tag (on line {entry.startTag.line}).\nOpen tags: {', '.join(x.tag for x in self.tags)}",
+                            lineNum=node.line,
+                        )
+                        break
+                else:
+                    m.die(f"Saw an end tag {node}, but there's no open element corresponding to it.", lineNum=node.line)
+        elif isinstance(node, (SelfClosedTag, RawElement)):
+            self.autoCloseStart(node.tag)
+
+    def autoCloseStart(self, tag: str) -> None:
+        # Handle any auto-closing that occurs as a result
+        # of seeing a particular start tag.
+        # (Only valid HTML; real parsers do a lot more work.)
+        if not self.tags:
+            return
+        if tag in (
+            "address",
+            "article",
+            "aside",
+            "blockquote",
+            "center",
+            "details",
+            "dialog",
+            "dir",
+            "div",
+            "dl",
+            "fieldset",
+            "figcaption",
+            "figure",
+            "footer",
+            "header",
+            "hgroup",
+            "main",
+            "menu",
+            "nav",
+            "ol",
+            "p",
+            "search",
+            "section",
+            "summary",
+            "ul",
+            "h1",
+            "h2",
+            "h3",
+            "h4",
+            "h5",
+            "h6",
+            "pre",
+            "listing",
+            "form",
+            "plaintext",
+            "table",
+            "hr",
+            "xmp",
+        ):
+            self.virtualClose("p")
+        if tag == "li":
+            self.virtualClose("p")
+            self.virtualClose("li")
+        elif tag in ("dt", "dd"):
+            self.virtualClose("p")
+            self.virtualClose("dt", "dd")
+        elif tag == "option":
+            self.virtualClose("option")
+        elif tag == "optgroup":
+            self.virtualClose("option")
+            self.virtualClose("optgroup")
+        elif tag in ("td", "th"):
+            self.virtualClose("p")
+            self.virtualClose("td", "th")
+        elif tag == "tr":
+            self.virtualClose("p")
+            self.virtualClose("td", "th")
+            self.virtualClose("tr")
+            self.virtualClose("caption", "colgroup")
+        elif tag in ("thead", "tbody", "tfoot"):
+            self.virtualClose("p")
+            self.virtualClose("td", "th")
+            self.virtualClose("tr")
+            self.virtualClose("thead", "tbody", "tfoot", "caption", "colgroup")
+        elif tag in ("caption", "colgroup"):
+            self.virtualClose("p")
+            self.virtualClose("td", "th")
+            self.virtualClose("tr")
+            self.virtualClose("thead", "tbody", "tfoot", "caption", "colgroup")
+        elif tag == "col":
+            self.virtualClose("p")
+            self.virtualClose("td", "th")
+            self.virtualClose("tr")
+            self.virtualClose("thead", "tbody", "tfoot", "caption")
+        elif tag in ("rb", "rtc"):
+            self.virtualClose("rb", "rp", "rt")
+            self.virtualClose("rtc")
+        elif tag in ("rp", "rt"):
+            self.virtualClose("rb", "rp", "rt")
+
+    def autoCloseEnd(self, tag: str) -> None:
+        # Handle any auto-closing that occurs as a result
+        # of seeing a particular end tag.
+        # (Only valid HTML; real parsers do a lot more work.)
+        if tag in (
+            "address",
+            "article",
+            "aside",
+            "blockquote",
+            "center",
+            "details",
+            "dialog",
+            "dir",
+            "div",
+            "dl",
+            "fieldset",
+            "figcaption",
+            "figure",
+            "footer",
+            "header",
+            "hgroup",
+            "main",
+            "menu",
+            "nav",
+            "ol",
+            "search",
+            "section",
+            "summary",
+            "ul",
+            "h1",
+            "h2",
+            "h3",
+            "h4",
+            "h5",
+            "h6",
+            "pre",
+            "listing",
+            "form",
+            "plaintext",
+            "table",
+            "caption",
+            "thead",
+            "tbody",
+            "tfoot",
+            "tr",
+            "td",
+            "th",
+            "li",
+            "dt",
+            "dd",
+        ):
+            self.virtualClose("p")
+        if tag in ("ol", "ul"):
+            self.virtualClose("li")
+        elif tag == "dl":
+            self.virtualClose("dt", "dd")
+        elif tag == "tr":
+            self.virtualClose("td", "th")
+        elif tag in ("thead", "tbody", "tfoot"):
+            self.virtualClose("td", "th")
+            self.virtualClose("tr")
+        elif tag == "table":
+            self.virtualClose("td", "th")
+            self.virtualClose("tr")
+            self.virtualClose("thead", "tbody", "tfoot", "caption", "colgroup")
+        elif tag == "rtc":
+            self.virtualClose("rt")
+        elif tag == "ruby":
+            self.virtualClose("rt", "rb", "rp")
+            self.virtualClose("rtc")
+        elif tag == "optgroup":
+            self.virtualClose("option")
+        elif tag == "select":
+            self.virtualClose("option")
+            self.virtualClose("optgroup")
+
+    def virtualClose(self, *tags: str) -> None:
+        if not self.tags:
+            return
+        if self.tags[-1].tag in tags:
+            self.tags.pop()
+
+
+@dataclass
+class TagStackEntry:
+    i: int
+    startTag: StartTag
+
+    @property
+    def tag(self) -> str:
+        return self.startTag.tag
