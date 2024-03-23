@@ -99,7 +99,13 @@ def generateResults(s: Stream, start: int) -> t.Generator[Result[ParserNode | li
             return
 
 
-POSSIBLE_NODE_START_CHARS = "&<`'~[\\—-|"
+# This needs to be any character that can start a node,
+# *or anything that can signal the end of a markup shorthand*,
+# since I depend on the ends of markup shorthands being at the
+# start of unconsumed text.
+# (Adding more just means parseAnything will break text into
+#  smaller chunks; it doesn't affect correctness.)
+POSSIBLE_NODE_START_CHARS = "&<>`'~[]{}\\—-|=$:"
 
 
 def parseAnything(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
