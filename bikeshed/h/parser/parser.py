@@ -412,12 +412,12 @@ def parseStartTag(s: Stream, start: int) -> Result[StartTag | SelfClosedTag]:
             m.die(f"Attribute {attrName} appears twice in <{tagname}>.", lineNum=s.loc(startAttr))
             return Result.fail(start)
         if "[" in attrValue:
-            attrValue = replaceMacrosInAttr(
+            attrValue = replaceMacrosInText(
                 text=attrValue,
                 macros=s.config.macros,
                 s=s,
                 start=i,
-                attrName=attrName,
+                context=f"<{tagname} {attrName}='...'>",
             )
         tag.attrs[attrName] = attrValue
 
@@ -1268,7 +1268,7 @@ PROPDESC_RE = re.compile(
     ([\w*-]+)
     (?:!!([\w-]+))?
     """,
-    re.X,
+    flags=re.X,
 )
 
 
@@ -1434,7 +1434,14 @@ def parseAutolinkDfn(s: Stream, start: int) -> Result[SafeText | list[ParserNode
         )
         return Result.fail(start)
 
-    innerText = match.group(0)
+    innerText = match[0]
+    innerText = replaceMacrosInText(
+        text=innerText,
+        macros=s.config.macros,
+        s=s,
+        start=start,
+        context=f"[={innerText}=]",
+    )
     if "/" in innerText:
         linkFor, _, lt = innerText.partition("/")
         if linkFor == "":
@@ -1677,7 +1684,7 @@ def parseFencedCodeBlock(s: Stream, start: int) -> Result[RawElement]:
     return Result(el, i)
 
 
-macroRe = re.compile(r"([\[\\]?)\[([A-Z\d-]*[A-Z][A-Z\d-]*)(\??)\]")
+MACRO_RE = re.compile(r"([A-Z\d-]*[A-Z][A-Z\d-]*)(\??)\]")
 
 
 def parseMacro(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
@@ -1687,17 +1694,17 @@ def parseMacro(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
 
     if s[start] != "[":
         return Result.fail(start)
-    match, i = s.matchRe(start, macroRe).vi
+    match, i = s.matchRe(start + 1, MACRO_RE).vi
     if match is None:
         return Result.fail(start)
-    macroName = match[2].lower()
-    optional = match[3] == "?"
+    macroName = match[1].lower()
+    optional = match[2] == "?"
     if macroName not in s.config.macros:
         if optional:
             return Result([], i)
         else:
             m.die(
-                f"Found unmatched text macro {match[0]}. Correct the macro, or escape it by replacing the opening [ with &#91;",
+                f"Found unmatched text macro {s[start:i]}. Correct the macro, or escape it by replacing the opening [ with &#91;",
                 lineNum=s.loc(i),
             )
             return Result(
@@ -1705,17 +1712,17 @@ def parseMacro(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
                     line=s.line(start),
                     endLine=s.line(i),
                     context=s.context,
-                    text=match[0],
+                    text=s[start:i],
                 ),
                 i,
             )
     macroText = s.config.macros[macroName]
-    context = f"macro {match[0]}"
+    context = f"macro {s[start:i]}"
     try:
         newStream = s.subStream(context=context, chars=macroText)
     except RecursionError:
         m.die(
-            f"Macro replacement for {match[0]} recursed more than {s.depth} levels deep; probably your text macros are accidentally recursive.",
+            f"Macro replacement for {s[start:i]} recursed more than {s.depth} levels deep; probably your text macros are accidentally recursive.",
             lineNum=s.loc(start),
         )
         return Result(
@@ -1723,15 +1730,19 @@ def parseMacro(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
                 line=s.line(start),
                 endLine=s.line(i),
                 context=s.context,
-                text=match[0],
+                text=s[start:i],
             ),
             i,
         )
     nodes = list(nodesFromStream(newStream, 0))
     return Result(nodes, i)
 
+# Treat [ as an escape character, too, so [[RFC2119]]/etc won't
+# get accidentally recognized as a macro.
+MACRO_ATTRIBUTE_RE = re.compile(r"([\[\\]?)\[([A-Z\d-]*[A-Z][A-Z\d-]*)(\??)\]")
 
-def replaceMacrosInAttr(text: str, macros: dict[str, str], s: Stream, start: int, attrName: str) -> str:
+
+def replaceMacrosInText(text: str, macros: dict[str, str], s: Stream, start: int, context: str) -> str:
     # Since I just loop over the substituted text,
     # rather than recursing as I go like I do for content macros,
     # I need to protect against accidentally replacing something
@@ -1759,24 +1770,24 @@ def replaceMacrosInAttr(text: str, macros: dict[str, str], s: Stream, start: int
         if optional:
             return msc + mec
         m.die(
-            f"Found unmatched text macro {match[0]} in {attrName}='...'. Correct the macro, or escape it by replacing the opening [ with &#91;.",
+            f"Found unmatched text macro {match[0]} in {context}. Correct the macro, or escape it by replacing the opening [ with &#91;.",
             lineNum=s.loc(start),
         )
         return msc + "&#91;" + t.cast("str", match[0][1:-1]) + "&#93;" + mec
 
-    text, count = macroRe.subn(doRep, text)
+    text, count = MACRO_ATTRIBUTE_RE.subn(doRep, text)
     if count > 0:
         loops = 1
         while True:
             if loops > 10:
                 m.die(
-                    f"Macro replacement in {attrName}='...' recursed more than 10 levels deep; probably your text macros are accidentally recursive.",
+                    f"Macro replacement in {context} recursed more than 10 levels deep; probably your text macros are accidentally recursive.",
                     lineNum=s.loc(start),
                 )
                 break
             if "[" not in text:
                 break
-            newText = macroRe.sub(doRep, text)
+            newText = MACRO_ATTRIBUTE_RE.sub(doRep, text)
             if text == newText:
                 break
             text = newText
