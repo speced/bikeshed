@@ -1377,7 +1377,7 @@ def parseCSSPropdesc(s: Stream, start: int) -> Result[SafeText | list[ParserNode
             innerContent.extend(value)
         else:
             innerContent.append(value)
-        if s[res.i + 1] == "'":
+        if s[res.i] == "'":
             if s.line(res.i + 1) > s.line(start):
                 m.die(
                     "Propdesc autolinks can't be spread across multiple lines. You might have forgotten to close your autolink; if not, switch to the HTML syntax to spread your link across multiple lines.",
@@ -1419,7 +1419,7 @@ def linkInValue(val: ParserNode | list[ParserNode]) -> bool:
         return isinstance(val, StartTag) and val.tag in ("a", "bs-link")
 
 
-AUTOLINK_DFN_RE = re.compile(r".*?(?=\||=])")
+AUTOLINK_DFN_RE = re.compile(r".*?(?=\||=])", flags=re.DOTALL)
 
 
 def parseAutolinkDfn(s: Stream, start: int) -> Result[SafeText | list[ParserNode]]:
@@ -1443,19 +1443,26 @@ def parseAutolinkDfn(s: Stream, start: int) -> Result[SafeText | list[ParserNode
         context=f"[={innerText}=]",
     )
     if "/" in innerText:
-        linkFor, _, lt = innerText.partition("/")
+        linkFor, _, lt = innerText.rpartition("/")
         if linkFor == "":
             linkFor = "/"
+        linkFor = linkFor.strip()
+        linkFor = re.sub(r"\s+", " ", linkFor)
     else:
         linkFor = None
         lt = innerText
+    lt = lt.strip()
+    lt = re.sub(r"\s+", " ", lt)
 
     if s[innerEnd : innerEnd + 2] == "=]":
         textOverride = False
     elif s[innerEnd] == "|":
         textOverride = True
     else:
-        m.die("PROGRAMMING ERROR: my regex didn't correctly capture the end of the dfn autolink :(\nPlease report this to <https://github.com/speced/bikeshed>.", s.loc(start))
+        m.die(
+            "PROGRAMMING ERROR: my regex didn't correctly capture the end of the dfn autolink :(\nPlease report this to <https://github.com/speced/bikeshed>.",
+            lineNum=s.loc(start),
+        )
         return Result.fail(start)
 
     startTag = StartTag(
@@ -1467,6 +1474,7 @@ def parseAutolinkDfn(s: Stream, start: int) -> Result[SafeText | list[ParserNode
             "data-link-type": "dfn",
             "data-lt": escapeAttr(lt),
             "bs-autolink-syntax": escapeAttr(s[start : innerEnd + 2]),
+            "bs-opaque": "",
         },
     )
     if linkFor is not None:
@@ -1509,10 +1517,10 @@ def parseAutolinkDfn(s: Stream, start: int) -> Result[SafeText | list[ParserNode
             innerContent.extend(value)
         else:
             innerContent.append(value)
-        if s[res.i + 1 : res.i + 3] == "=]":
-            if s.line(res.i + 1) > s.line(start):
+        if s[res.i : res.i + 2] == "=]":
+            if s.line(res.i + 1) > s.line(innerEnd) + 2:
                 m.die(
-                    "Dfn autolinks can't be spread across multiple lines. You might have forgotten to close your autolink; if not, switch to the HTML syntax to spread your link across multiple lines.",
+                    "Dfn autolinks can't be spread across too many lines. You might have forgotten to close your autolink; if not, switch to the HTML syntax to spread your link across multiple lines.",
                     lineNum=s.loc(start),
                 )
                 return Result(
