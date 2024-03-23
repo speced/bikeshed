@@ -148,6 +148,8 @@ def parseNode(
 
     node: ParserNode | list[ParserNode] | None
 
+    inOpaque = s.inOpaqueElement()
+
     if s[start] == "&":
         ch, i = parseCharRef(s, start, context=CharRefContext.NON_ATTR).vi
         if ch is not None:
@@ -180,47 +182,33 @@ def parseNode(
                 text="`",
             )
             return Result(node, start + 2)
-    if s.config.css:
-        if not s.inOpaqueElement():
-            if s[start : start + 3] == r"\''":
-                node = RawText(
-                    line=s.line(start),
-                    endLine=s.line(start),
-                    context=s.context,
-                    text="''",
-                )
-                return Result(node, start + 3)
-            elif s[start : start + 2] == r"\'":
-                node = RawText(
-                    line=s.line(start),
-                    endLine=s.line(start),
-                    context=s.context,
-                    text="'",
-                )
-                return Result(node, start + 2)
-            elif s[start : start + 2] == "''":
-                maybeRes = parseCSSMaybe(s, start)
-                if maybeRes.valid:
-                    return maybeRes
-            elif s[start] == "'":
-                propdescRes = parseCSSPropdesc(s, start)
-                if propdescRes.valid:
-                    return propdescRes
-    if s[start : start + 2] == "[[":
-        # biblio link, for now just pass it thru
-        node = RawText(
-            line=s.line(start),
-            endLine=s.line(start),
-            context=s.context,
-            text="[[",
-        )
-        return Result(node, start + 2)
-    if s[start] == "[":
-        macroRes = parseMacro(s, start)
-        if macroRes.valid:
-            return macroRes
-    if s.config.dfn:
-        if s[start : start + 3] == "\\[=":
+    if s.config.css and not inOpaque:
+        if s[start : start + 3] == r"\''":
+            node = RawText(
+                line=s.line(start),
+                endLine=s.line(start),
+                context=s.context,
+                text="''",
+            )
+            return Result(node, start + 3)
+        elif s[start : start + 2] == r"\'":
+            node = RawText(
+                line=s.line(start),
+                endLine=s.line(start),
+                context=s.context,
+                text="'",
+            )
+            return Result(node, start + 2)
+        elif s[start : start + 2] == "''":
+            maybeRes = parseCSSMaybe(s, start)
+            if maybeRes.valid:
+                return maybeRes
+        elif s[start] == "'":
+            propdescRes = parseCSSPropdesc(s, start)
+            if propdescRes.valid:
+                return propdescRes
+    if s.config.dfn and not inOpaque:
+        if s[start] == "\\" and s[start + 1] == "[" and s[start + 2] == "=":
             node = RawText(
                 line=s.line(start),
                 endLine=s.line(start),
@@ -228,7 +216,7 @@ def parseNode(
                 text="[=",
             )
             return Result(node, start + 3)
-        if s[start : start + 2] == "[=" and not s.inOpaqueElement():
+        if s[start] == "[" and s[start + 1] == "=":
             dfnRes = parseAutolinkDfn(s, start)
             if dfnRes.valid:
                 return dfnRes
@@ -255,6 +243,10 @@ def parseNode(
             text=text,
         )
         return Result(node, endI)
+    if s[start] == "[" and s[start - 1] != "[":
+        macroRes = parseMacro(s, start)
+        if macroRes.valid:
+            return macroRes
     match, i = s.matchRe(start, emdashRe).vi
     if match is not None:
         # Fix line-ending em dashes, or --, by moving the previous line up, so no space.
