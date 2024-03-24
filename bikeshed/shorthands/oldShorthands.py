@@ -38,7 +38,8 @@ def transformAutolinkShortcuts(doc: t.SpecT) -> None:
             pass
             # nodes = config.processTextNodes(nodes, headerRe, headerReplacer)
         if "idl" in doc.md.markupShorthands:
-            nodes = config.processTextNodes(nodes, idlRe, idlReplacer)
+            pass
+            # nodes = config.processTextNodes(nodes, idlRe, idlReplacer)
         if "markup" in doc.md.markupShorthands:
             nodes = config.processTextNodes(nodes, elementRe, elementReplacer)
         if "biblio" in doc.md.markupShorthands:
@@ -91,12 +92,13 @@ def transformShorthandElements(doc: t.SpecT) -> None:
         return False
 
     for el in h.findAll("l", doc):
-        # Autolinks that aren't HTML-parsing-compatible
-        # are already specially handled by fixAwkwardCSSShorthands().
-        child = h.hasOnlyChild(el)
-        if child is not None and child.get("bs-autolink-syntax") is not None:
-            h.replaceNode(el, child)
-            h.transferAttributes(el, child)
+        # The shorthands that get handled in the parser just need
+        # their attributes moved over. (Eventually this'll be all
+        # of them).
+        alreadyDone = h.find("[bs-autolink-syntax]", el)
+        if alreadyDone is not None:
+            h.transferAttributes(el, alreadyDone)
+            h.replaceWithContents(el)
             continue
 
         text = h.textContent(el)
