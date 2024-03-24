@@ -399,6 +399,10 @@ def insertAfter(target: t.ElementT, *els: t.NodesT) -> t.ElementT:
 
 
 def removeNode(node: t.ElementT) -> t.ElementT:
+    # Kills the node *and* its children.
+    # If you just want to remove the node itself, and lift
+    # the contents up into its place, you wanna call
+    # replaceWithContents()
     parent = node.getparent()
     if parent is None:
         return node
