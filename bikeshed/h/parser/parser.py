@@ -1559,7 +1559,7 @@ def parseAutolinkDfn(s: Stream, start: int) -> Result[SafeText | list[ParserNode
     return Result([startTag, *innerContent, endTag], nodeEnd)
 
 
-AUTOLINK_ABSTRACT_RE = re.compile(r".*?(?=\||=])", flags=re.DOTALL)
+AUTOLINK_ABSTRACT_RE = re.compile(r".*?(?=\||\$])", flags=re.DOTALL)
 
 
 def parseAutolinkAbstract(s: Stream, start: int) -> Result[SafeText | list[ParserNode]]:
