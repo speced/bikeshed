@@ -230,6 +230,19 @@ def parseNode(
             abstractRes = parseAutolinkAbstract(s, start)
             if abstractRes.valid:
                 return abstractRes
+    if s.config.header and not inOpaque:
+        if s[start] == "\\" and s[start + 1] == "[" and s[start + 2] == ":":
+            node = RawText(
+                line=s.line(start),
+                endLine=s.line(start),
+                context=s.context,
+                text="[" + s[start + 2],
+            )
+            return Result(node, start + 3)
+        if s[start] == "[" and s[start + 1] == ":":
+            headerRes = parseAutolinkHeader(s, start)
+            if headerRes.valid:
+                return headerRes
     if s[start : start + 2] == "\\[":
         if s[start + 2].isalpha() or s[start + 2].isdigit():
             # an escaped macro, so handle it here
@@ -1580,7 +1593,7 @@ def parseAutolinkAbstract(s: Stream, start: int) -> Result[SafeText | list[Parse
         macros=s.config.macros,
         s=s,
         start=start,
-        context=f"[={innerText}=]",
+        context=f"[${innerText}$]",
     )
     if "/" in innerText:
         linkFor, _, lt = innerText.rpartition("/")
@@ -1693,6 +1706,180 @@ def parseAutolinkAbstract(s: Stream, start: int) -> Result[SafeText | list[Parse
     startTag.attrs["bs-autolink-syntax"] = escapeAttr(s[start:nodeEnd])
 
     return Result([startTag, *innerContent, endTag], nodeEnd)
+
+
+AUTOLINK_HEADER_RE = re.compile(r":?.*?(?=\||:])", flags=re.DOTALL)
+
+
+def parseAutolinkHeader(s: Stream, start: int) -> Result[SafeText | list[ParserNode]]:
+    if s[start : start + 2] != "[:":
+        return Result.fail(start)
+    # Otherwise we're locked in, this opener is a very strong signal.
+    match, innerEnd = s.searchRe(start + 2, AUTOLINK_HEADER_RE).vi
+    if match is None:
+        m.die(
+            "HTTP Header autolink was opened, but no closing :] was found. Either close your autolink, or escape the initial [ as &#91;",
+            lineNum=s.loc(start),
+        )
+        return Result.fail(start)
+
+    innerText = match[0]
+    innerText = replaceMacrosInText(
+        text=innerText,
+        macros=s.config.macros,
+        s=s,
+        start=start,
+        context=f"[:{innerText}:]",
+    )
+    if "/" in innerText:
+        linkFor, _, lt = innerText.rpartition("/")
+        if linkFor == "":
+            linkFor = "/"
+        linkFor = linkFor.strip()
+        linkFor = re.sub(r"\s+", " ", linkFor)
+    else:
+        linkFor = None
+        lt = innerText
+    lt = lt.strip()
+    lt = re.sub(r"\s+", " ", lt)
+
+    if s[innerEnd : innerEnd + 2] == ":]":
+        textOverride = False
+    elif s[innerEnd] == "|":
+        textOverride = True
+    else:
+        m.die(
+            "PROGRAMMING ERROR: my regex didn't correctly capture the end of the HTTP Header autolink :(\nPlease report this to <https://github.com/speced/bikeshed>.",
+            lineNum=s.loc(start),
+        )
+        return Result.fail(start)
+
+    startTag = StartTag(
+        line=s.line(start),
+        endLine=s.line(start + 1),
+        context=s.context,
+        tag="a",
+        attrs={
+            "data-link-type": "http-header",
+            "data-lt": escapeAttr(lt),
+            "bs-autolink-syntax": escapeAttr(s[start : innerEnd + 2]),
+            "bs-opaque": "",
+        },
+    )
+    if linkFor is not None:
+        startTag.attrs["data-link-for"] = escapeAttr(linkFor)
+    startTag = startTag.finalize()
+
+    startTick = RawText(
+        line=s.line(start),
+        endLine=s.line(start + 1),
+        context=s.context,
+        text="`",
+        )
+    startCode = StartTag(
+        line=s.line(start),
+        endLine=s.line(start + 1),
+        context=s.context,
+        tag="code",
+    )
+
+    if not textOverride:
+        nodeEnd = innerEnd + 2
+        endTag = EndTag(
+            line=s.line(innerEnd),
+            endLine=s.line(nodeEnd),
+            context=s.context,
+            tag=startTag.tag,
+        )
+        endCode = EndTag(
+            line=s.line(innerEnd),
+            endLine=s.line(nodeEnd),
+            context=s.context,
+            tag=startCode.tag,
+        )
+        endTick = RawText(
+            line=s.line(innerEnd),
+            endLine=s.line(nodeEnd),
+            context=s.context,
+            text="`",
+        )
+
+        middleText = SafeText(
+            line=s.line(start + 1),
+            endLine=s.line(innerEnd),
+            context=s.context,
+            text=lt,
+        )
+        return Result([startTick, startCode, startTag, middleText, endTag, endCode, endTick], nodeEnd)
+
+    # Otherwise we need to parse what's left, until we find the ending braces
+    innerContent: list[ParserNode] = []
+    for res in generateResults(s, innerEnd + 1):
+        value = res.value
+        assert value is not None
+        if linkInValue(value):
+            m.die("HTTP Header autolinks can't contain more links in their linktext.", lineNum=s.loc(start))
+            return Result(
+                SafeText(
+                    line=s.line(start),
+                    endLine=s.line(innerEnd + 1),
+                    context=s.context,
+                    text=s[start : innerEnd + 1],
+                ),
+                innerEnd + 1,
+            )
+        if isinstance(value, list):
+            innerContent.extend(value)
+        else:
+            innerContent.append(value)
+        if s[res.i : res.i + 2] == ":]":
+            if s.line(res.i + 1) > s.line(innerEnd) + 2:
+                m.die(
+                    "HTTP Header autolinks can't be spread across too many lines. You might have forgotten to close your autolink; if not, switch to the HTML syntax to spread your link across multiple lines.",
+                    lineNum=s.loc(start),
+                )
+                return Result(
+                    SafeText(
+                        line=s.line(start),
+                        endLine=s.line(innerEnd + 1),
+                        context=s.context,
+                        text=s[start : innerEnd + 1],
+                    ),
+                    innerEnd + 1,
+                )
+            nodeEnd = res.i + 2
+            break
+    else:
+        m.die(
+            "HTTP Header autolink was opened, but no closing :] was found. Either close your autolink, or escape the initial [ as &#91;",
+            lineNum=s.loc(start),
+        )
+        return Result(
+            SafeText(line=s.line(start), endLine=s.line(innerEnd + 1), context=s.context, text=s[start : innerEnd + 1]),
+            innerEnd + 1,
+        )
+
+    endTag = EndTag(
+        line=s.line(nodeEnd - 2),
+        endLine=s.line(nodeEnd),
+        context=s.context,
+        tag=startTag.tag,
+    )
+    startTag.attrs["bs-autolink-syntax"] = escapeAttr(s[start:nodeEnd])
+    endCode = EndTag(
+        line=s.line(nodeEnd - 2),
+        endLine=s.line(nodeEnd),
+        context=s.context,
+        tag=startCode.tag,
+    )
+    endTick = RawText(
+        line=s.line(nodeEnd - 2),
+        endLine=s.line(nodeEnd),
+        context=s.context,
+        text="`",
+    )
+
+    return Result([startTick, startCode, startTag, *innerContent, endTag, endCode, endTick], nodeEnd)
 
 
 codeSpanStartRe = re.compile(r"`+")
