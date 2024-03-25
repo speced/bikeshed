@@ -1402,7 +1402,10 @@ def addNoteHeaders(doc: t.SpecT) -> None:
             preText = _t("EXAMPLE: ")
         else:
             preText = ""
-        h.prependChild(el, h.E.div({"class": "marker"}, preText, *h.parseHTML(el.get("heading", ""))))
+        lineNum = int(el.get("bs-line-number", "1"))
+        config = h.ParseConfig.fromSpec(doc=doc, context=f"heading='' attribute")
+        parsedHeading = h.parseHTML(h.parseText(el.get("heading", ""), config, startLine=lineNum))
+        h.prependChild(el, h.E.div({"class": "marker"}, preText, *parsedHeading))
         h.removeAttr(el, "heading")
 
 
