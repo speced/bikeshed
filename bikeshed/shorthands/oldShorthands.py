@@ -41,7 +41,8 @@ def transformAutolinkShortcuts(doc: t.SpecT) -> None:
             pass
             # nodes = config.processTextNodes(nodes, idlRe, idlReplacer)
         if "markup" in doc.md.markupShorthands:
-            nodes = config.processTextNodes(nodes, elementRe, elementReplacer)
+            pass
+            # nodes = config.processTextNodes(nodes, elementRe, elementReplacer)
         if "biblio" in doc.md.markupShorthands:
             nodes = config.processTextNodes(nodes, biblioRe, biblioReplacer)
             nodes = config.processTextNodes(nodes, sectionRe, sectionReplacer)

@@ -256,6 +256,19 @@ def parseNode(
             idlRes = parseAutolinkIdl(s, start)
             if idlRes.valid:
                 return idlRes
+    if s.config.markup and not inOpaque:
+        if s[start] == "\\" and s[start + 1] == "<" and s[start + 2] == "{":
+            node = RawText(
+                line=s.line(start),
+                endLine=s.line(start),
+                context=s.context,
+                text="<{",
+            )
+            return Result(node, start + 3)
+        if s[start] == "<" and s[start + 1] == "{":
+            elementRes = parseAutolinkElement(s, start)
+            if elementRes.valid:
+                return elementRes
     if s[start : start + 2] == "\\[":
         if s[start + 2].isalpha() or s[start + 2].isdigit():
             # an escaped macro, so handle it here
@@ -1943,7 +1956,6 @@ def parseAutolinkIdl(s: Stream, start: int) -> Result[SafeText | list[ParserNode
     lt = lt.strip()
     lt = re.sub(r"\s+", " ", lt)
 
-
     if lt.startswith("constructor(") and linkFor and linkFor != "/":
         # make {{Foo/constructor()}} output as "Foo()" so you know what it's linking to.
         if "/" in linkFor:
@@ -2052,6 +2064,181 @@ def parseAutolinkIdl(s: Stream, start: int) -> Result[SafeText | list[ParserNode
     else:
         m.die(
             "IDL autolink was opened, but no closing }} was found. Either close your autolink, or escape the initial { as &#123;",
+            lineNum=s.loc(start),
+        )
+        return Result(
+            SafeText(line=s.line(start), endLine=s.line(innerEnd + 1), context=s.context, text=s[start : innerEnd + 1]),
+            innerEnd + 1,
+        )
+
+    endTag = EndTag(
+        line=s.line(nodeEnd - 2),
+        endLine=s.line(nodeEnd),
+        context=s.context,
+        tag=startTag.tag,
+    )
+    startTag.attrs["bs-autolink-syntax"] = escapeAttr(s[start:nodeEnd])
+    endCode = EndTag(
+        line=s.line(nodeEnd - 2),
+        endLine=s.line(nodeEnd),
+        context=s.context,
+        tag=startCode.tag,
+    )
+
+    return Result([startCode, startTag, *innerContent, endTag, endCode], nodeEnd)
+
+
+AUTOLINK_ELEMENT_RE = re.compile(r".*?(?=\||}>)", flags=re.DOTALL)
+
+
+def parseAutolinkElement(s: Stream, start: int) -> Result[SafeText | list[ParserNode]]:
+    if s[start : start + 2] != "<{":
+        return Result.fail(start)
+    # Otherwise we're locked in, this opener is a very strong signal.
+    match, innerEnd = s.searchRe(start + 2, AUTOLINK_ELEMENT_RE).vi
+    if match is None:
+        m.die(
+            "Markup autolink was opened, but no closing }> was found. Either close your autolink, or escape the initial < as &lt;",
+            lineNum=s.loc(start),
+        )
+        return Result.fail(start)
+
+    innerText = match[0]
+    innerText = replaceMacrosInText(
+        text=innerText,
+        macros=s.config.macros,
+        s=s,
+        start=start,
+        context="<<" + innerText + ">>",
+    )
+    if "/" in innerText:
+        linkFor, _, innerText = innerText.rpartition("/")
+        if linkFor == "":
+            linkFor = "/"
+        linkFor = linkFor.strip()
+        linkFor = re.sub(r"\s+", " ", linkFor)
+        if "/" in linkFor:
+            linkType = "attr-value"
+        else:
+            # either element-state or element-attr
+            linkType = "element-sub"
+    else:
+        linkFor = None
+        linkType = "element"
+    if "!!" in innerText:
+        lt, _, linkType = innerText.partition("!!")
+        linkType = linkType.strip()
+        if linkType in config.markupTypes:
+            pass
+        else:
+            m.die(
+                f"Markup autolink <{{{s[start+1:innerEnd]}}}> gave its type as '{linkType}', but only markup types are allowed.",
+                lineNum=s.loc(start),
+            )
+            linkType = "idl"
+    else:
+        lt = innerText
+    lt = lt.strip()
+    lt = re.sub(r"\s+", " ", lt)
+
+    if s[innerEnd : innerEnd + 2] == "}>":
+        textOverride = False
+    elif s[innerEnd] == "|":
+        textOverride = True
+    else:
+        m.die(
+            "PROGRAMMING ERROR: my regex didn't correctly capture the end of the markup autolink :(\nPlease report this to <https://github.com/speced/bikeshed>.",
+            lineNum=s.loc(start),
+        )
+        return Result.fail(start)
+
+    startTag = StartTag(
+        line=s.line(start),
+        endLine=s.line(start + 1),
+        context=s.context,
+        tag="a",
+        attrs={
+            "data-link-type": linkType,
+            "data-lt": escapeAttr(lt),
+            "bs-autolink-syntax": escapeAttr(s[start : innerEnd + 2]),
+            "bs-opaque": "",
+        },
+    )
+    if linkFor is not None:
+        startTag.attrs["data-link-for"] = escapeAttr(linkFor)
+    startTag = startTag.finalize()
+
+    startCode = StartTag(
+        line=s.line(start),
+        endLine=s.line(start + 1),
+        context=s.context,
+        tag="code",
+        attrs={"nohighlight": ""},
+    ).finalize()
+
+    if not textOverride:
+        nodeEnd = innerEnd + 2
+        endTag = EndTag(
+            line=s.line(innerEnd),
+            endLine=s.line(nodeEnd),
+            context=s.context,
+            tag=startTag.tag,
+        )
+        endCode = EndTag(
+            line=s.line(innerEnd),
+            endLine=s.line(nodeEnd),
+            context=s.context,
+            tag=startCode.tag,
+        )
+
+        middleText = SafeText(
+            line=s.line(start + 1),
+            endLine=s.line(innerEnd),
+            context=s.context,
+            text=lt,
+        )
+        return Result([startCode, startTag, middleText, endTag, endCode], nodeEnd)
+
+    # Otherwise we need to parse what's left, until we find the ending braces
+    innerContent: list[ParserNode] = []
+    for res in generateResults(s, innerEnd + 1):
+        value = res.value
+        assert value is not None
+        if linkInValue(value):
+            m.die("Element autolinks can't contain more links in their linktext.", lineNum=s.loc(start))
+            return Result(
+                SafeText(
+                    line=s.line(start),
+                    endLine=s.line(innerEnd + 1),
+                    context=s.context,
+                    text=s[start : innerEnd + 1],
+                ),
+                innerEnd + 1,
+            )
+        if isinstance(value, list):
+            innerContent.extend(value)
+        else:
+            innerContent.append(value)
+        if s[res.i : res.i + 2] == "}>":
+            if s.line(res.i + 1) > s.line(innerEnd) + 2:
+                m.die(
+                    "Element autolinks can't be spread across too many lines. You might have forgotten to close your autolink; if not, switch to the HTML syntax to spread your link across multiple lines.",
+                    lineNum=s.loc(start),
+                )
+                return Result(
+                    SafeText(
+                        line=s.line(start),
+                        endLine=s.line(innerEnd + 1),
+                        context=s.context,
+                        text=s[start : innerEnd + 1],
+                    ),
+                    innerEnd + 1,
+                )
+            nodeEnd = res.i + 2
+            break
+    else:
+        m.die(
+            "Element autolink was opened, but no closing }> was found. Either close your autolink, or escape the initial < as &lt;",
             lineNum=s.loc(start),
         )
         return Result(
