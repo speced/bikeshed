@@ -269,6 +269,38 @@ def parseNode(
             elementRes = parseAutolinkElement(s, start)
             if elementRes.valid:
                 return elementRes
+    if s.config.algorithm and not inOpaque:
+        if s[start] == "\\" and s[start + 1] == "|":
+            node = RawText(
+                line=s.line(start),
+                endLine=s.line(start),
+                context=s.context,
+                text="|",
+            )
+            return Result(node, start + 2)
+        if s[start] == "|":
+            varMatch, i = s.matchRe(start + 1, re.compile(r"(\w(?:[\w\s-]*\w)?)\|")).vi
+            if varMatch:
+                varStart = StartTag(
+                    line=s.line(start),
+                    endLine=s.line(start),
+                    context=s.context,
+                    tag="var",
+                    attrs={"bs-autolink-syntax": s[start:i]},
+                )
+                varMiddle = RawText(
+                    line=s.line(start - 1),
+                    endLine=s.line(i - 2),
+                    context=s.context,
+                    text=varMatch[1],
+                )
+                varEnd = EndTag(
+                    line=s.line(i - 1),
+                    endLine=s.line(i - 1),
+                    context=s.context,
+                    tag=varStart.tag,
+                )
+                return Result([varStart, varMiddle, varEnd], i)
     if s[start : start + 2] == "\\[":
         if s[start + 2].isalpha() or s[start + 2].isdigit():
             # an escaped macro, so handle it here
