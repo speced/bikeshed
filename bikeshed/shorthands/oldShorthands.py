@@ -47,7 +47,8 @@ def transformAutolinkShortcuts(doc: t.SpecT) -> None:
             nodes = config.processTextNodes(nodes, biblioRe, biblioReplacer)
             nodes = config.processTextNodes(nodes, sectionRe, sectionReplacer)
         if "algorithm" in doc.md.markupShorthands:
-            nodes = config.processTextNodes(nodes, varRe, varReplacer)
+            pass
+            # nodes = config.processTextNodes(nodes, varRe, varReplacer)
         if "markdown" in doc.md.markupShorthands:
             nodes = config.processTextNodes(nodes, inlineLinkRe, inlineLinkReplacer)
             nodes = config.processTextNodes(nodes, strongRe, strongReplacer)
@@ -63,8 +64,8 @@ def transformAutolinkShortcuts(doc: t.SpecT) -> None:
         if h.isElement(node):
             addLineNumber(node)
 
-    for el in h.findAll("var", doc):
-        h.fixSurroundingTypography(el)
+    # for el in h.findAll("var", doc):
+    #    h.fixSurroundingTypography(el)
 
 
 def transformShorthandElements(doc: t.SpecT) -> None:

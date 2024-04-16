@@ -78,6 +78,7 @@ class ParseConfig:
     header: bool = False
     idl: bool = False
     markup: bool = False
+    algorithm: bool = False
     macros: dict[str, str] = field(default_factory=dict)
     context: str | None = None
     opaqueElements: set[str] = field(default_factory=lambda: {"pre", "xmp", "script", "style"})
@@ -91,6 +92,7 @@ class ParseConfig:
             header="http" in doc.md.markupShorthands,
             idl="idl" in doc.md.markupShorthands,
             markup="markup" in doc.md.markupShorthands,
+            algorithm="algorithm" in doc.md.markupShorthands,
             macros=doc.macros,
             context=context,
             opaqueElements=set(doc.md.opaqueElements),
