@@ -283,20 +283,20 @@ def parseNode(
             if varMatch:
                 varStart = StartTag(
                     line=s.line(start),
-                    endLine=s.line(start),
+                    endLine=s.line(start+1),
                     context=s.context,
                     tag="var",
                     attrs={"bs-autolink-syntax": s[start:i]},
                 )
                 varMiddle = RawText(
-                    line=s.line(start - 1),
+                    line=s.line(start + 1),
                     endLine=s.line(i - 2),
                     context=s.context,
                     text=varMatch[1],
                 )
                 varEnd = EndTag(
                     line=s.line(i - 1),
-                    endLine=s.line(i - 1),
+                    endLine=s.line(i),
                     context=s.context,
                     tag=varStart.tag,
                 )
