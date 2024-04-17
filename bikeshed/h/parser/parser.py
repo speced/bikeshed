@@ -279,28 +279,9 @@ def parseNode(
             )
             return Result(node, start + 2)
         if s[start] == "|":
-            varMatch, i = s.matchRe(start + 1, re.compile(r"(\w(?:[\w\s-]*\w)?)\|")).vi
-            if varMatch:
-                varStart = StartTag(
-                    line=s.line(start),
-                    endLine=s.line(start+1),
-                    context=s.context,
-                    tag="var",
-                    attrs={"bs-autolink-syntax": s[start:i]},
-                )
-                varMiddle = RawText(
-                    line=s.line(start + 1),
-                    endLine=s.line(i - 2),
-                    context=s.context,
-                    text=varMatch[1],
-                )
-                varEnd = EndTag(
-                    line=s.line(i - 1),
-                    endLine=s.line(i),
-                    context=s.context,
-                    tag=varStart.tag,
-                )
-                return Result([varStart, varMiddle, varEnd], i)
+            varRes = parseShorthandVariable(s, start)
+            if varRes.valid:
+                return varRes
     if s[start : start + 2] == "\\[":
         if s[start + 2].isalpha() or s[start + 2].isdigit():
             # an escaped macro, so handle it here
@@ -2293,6 +2274,61 @@ def parseAutolinkElement(s: Stream, start: int) -> Result[SafeText | list[Parser
     )
 
     return Result([startCode, startTag, *innerContent, endTag, endCode], nodeEnd)
+
+
+def parseShorthandVariable(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
+    if s[start] != "|" or s[start+1] in (" ", "\n"):
+        return Result.fail(start)
+    startLine = s.line(start)
+    innerContent: list[ParserNode] = []
+    for res in generateResults(s, start + 1):
+        value = res.value
+        assert value is not None
+        if isinstance(value, list):
+            innerContent.extend(value)
+        else:
+            innerContent.append(value)
+        if s.line(res.i + 1) > startLine + 2:
+            m.die(
+                f"It looks like a variable shorthand (like |foo bar|) was started on line {startLine}, but not closed within a few lines. If you didn't mean to write a variable shorthand, escape the | like &#124;. If you did mean to write a variable across that many lines, use <var> instead.",
+                lineNum=s.loc(start),
+            )
+            return Result(
+                SafeText(
+                    line=s.line(start),
+                    endLine=s.line(start + 1),
+                    context=s.context,
+                    text="|",
+                ),
+                start + 1,
+            )
+        if s[res.i] == "|":
+            nodeEnd = res.i + 1
+            break
+    else:
+        m.die(
+            f"It looks like a variable shorthand (like |foo bar|) was started on line {startLine}, but never closed. If you didn't mean to write a variable shorthand, escape the | like &#124;.",
+            lineNum=s.loc(start),
+        )
+        return Result(
+            RawText(line=s.line(start), endLine=s.line(start + 1), context=s.context, text="|"),
+            start + 1,
+        )
+
+    varStart = StartTag(
+        line=s.line(start),
+        endLine=s.line(start + 1),
+        context=s.context,
+        tag="var",
+        attrs={"bs-autolink-syntax": s[start:nodeEnd]},
+    )
+    varEnd = EndTag(
+        line=s.line(nodeEnd - 1),
+        endLine=s.line(nodeEnd),
+        context=s.context,
+        tag=varStart.tag,
+    )
+    return Result([varStart, *innerContent, varEnd], nodeEnd)
 
 
 codeSpanStartRe = re.compile(r"`+")
