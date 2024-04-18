@@ -269,7 +269,7 @@ def parseNode(
             elementRes = parseAutolinkElement(s, start)
             if elementRes.valid:
                 return elementRes
-    if s.config.algorithm and not inOpaque:
+    if False:#s.config.algorithm and not inOpaque:
         if s[start] == "\\" and s[start + 1] == "|":
             node = RawText(
                 line=s.line(start),
@@ -2329,6 +2329,180 @@ def parseShorthandVariable(s: Stream, start: int) -> Result[ParserNode | list[Pa
         tag=varStart.tag,
     )
     return Result([varStart, *innerContent, varEnd], nodeEnd)
+
+
+AUTOLINK_BIBLIO_NAME_RE = re.compile(r"[\w.+-]+", flags=re.DOTALL)
+AUTOLINK_BIBLIO_KEYWORDS_RE = re.compile(r"(\s+\w+){1,3}", flags=re.DOTALL)
+AUTOLINK_BIBLIO_KEYWORDS = ["current", "snapshot", "inline", "index", "direct", "obsolete"]
+
+def parseAutolinkDfn(s: Stream, start: int) -> Result[SafeText | list[ParserNode]]:
+    if s[start : start + 2] != "[[":
+        return Result.fail(start)
+    # Otherwise we're locked in, this opener is a very strong signal.
+    i = start+2
+
+    if s[i] == "!":
+        normative=True
+        i += 1
+    else:
+        normative = False
+
+    match, nameEnd = s.matchRe(i, AUTOLINK_BIBLIO_NAME_RE).vi
+    if match is None:
+        m.die("Biblio autolink was opened, but the first part didn't look like a biblio name. If you didn't intend this to be a biblio autolink, escape the initial [ as &#91;",
+            lineNum=s.loc(start),
+        )
+        return Result.fail(start)
+    lt = match[0]
+
+    if s[nameEnd].isspace():
+        match, modifierEnd = s.matchRe(nameEnd, AUTOLINK_BIBLIO_KEYWORDS_RE).vi
+        if match is None:
+            m.die(f"It looks like you meant to specify some keywords in the biblio autolink, but I couldn't find any. Allowed keywords are {config.englishFromList(AUTOLINK_BIBLIO_KEYWORDS)}. (Or close the biblio autolink immediately after the biblio name.)",
+                lineNum=s.loc(nameEnd),)
+            return Result.fail(start)
+        modifiers = re.split(r"\s+", match[0].strip())
+        for modifier in modifiers:
+            if modifier not in AUTOLINK_BIBLIO_KEYWORDS:
+                m.die(f"You specified an unknown/invalid keyword ({modifier}) in your biblio autolink. Allowed keywords are {config.englishFromList(AUTOLINK_BIBLIO_KEYWORDS)}.",
+                    lineNum=s.loc(nameEnd))
+                return Result.fail(start)
+        innerEnd = modifierEnd
+    else:
+        modifiers = []
+        innerEnd = nameEnd
+
+    attrs = {
+        "data-lt": lt,
+        "data-link-type": "biblio",
+        "data-biblio-type": "normative" if normative else "informative",
+        "bs-autolink-syntax": match.group(0),
+    }
+    statusCurrent = "current" in modifiers
+    statusSnapshot = "snapshot" in modifiers
+    if statusCurrent and statusSnapshot:
+        m.die(f"Biblio shorthand [{name} ...] contains *both* 'current' and 'snapshot' keywords. Please pick only one.")
+        return Result.fail(start)
+    elif statusCurrent or statusSnapshot:
+        attrs["data-biblio-status"] = "current" if statusCurrent else "snapshot"
+
+    displayInline = "inline" in modifiers
+    displayIndex = "index" in modifiers
+    displayDirect = "direct" in modifiers
+    if (displayInline + displayIndex + displayDirect) > 1:
+        m.die(
+            f"Biblio shorthand {match.group(0)} contains more than one of 'inline', 'index' and 'direct', please pick one.",
+        )
+        return t.cast(str, match.group(0))
+    elif displayInline:
+        attrs["data-biblio-display"] = "inline"
+    elif displayIndex:
+        attrs["data-biblio-display"] = "index"
+    elif displayDirect:
+        attrs["data-biblio-display"] = "direct"
+
+    if "obsolete" in modifiers:
+        attrs["data-biblio-obsolete"] = ""
+
+    if s[innerEnd : innerEnd + 2] == "]":
+        textOverride = False
+    elif s[innerEnd] == "|":
+        textOverride = True
+    else:
+        m.die(
+            "Biblio autolink was opened, but had something invalid before I saw its end. If you didn't intend this to be a biblio autolink, escape the initial [ as &#91;",
+            lineNum=s.loc(innerEnd),
+        )
+        return Result.fail(start)
+
+    startTag = StartTag(
+        line=s.line(start),
+        endLine=s.line(start + 1),
+        context=s.context,
+        tag="a",
+        attrs={
+            "data-link-type": "dfn",
+            "data-lt": escapeAttr(lt),
+            "bs-autolink-syntax": escapeAttr(s[start : innerEnd + 2]),
+            "bs-opaque": "",
+        },
+    )
+    if linkFor is not None:
+        startTag.attrs["data-link-for"] = escapeAttr(linkFor)
+    startTag = startTag.finalize()
+
+    if not textOverride:
+        nodeEnd = innerEnd + 2
+        endTag = EndTag(
+            line=s.line(innerEnd),
+            endLine=s.line(nodeEnd),
+            context=s.context,
+            tag=startTag.tag,
+        )
+        middleText = SafeText(
+            line=s.line(start + 1),
+            endLine=s.line(innerEnd),
+            context=s.context,
+            text=lt,
+        )
+        return Result([startTag, middleText, endTag], nodeEnd)
+
+    # Otherwise we need to parse what's left, until we find the ending braces
+    innerContent: list[ParserNode] = []
+    for res in generateResults(s, innerEnd + 1):
+        value = res.value
+        assert value is not None
+        if linkInValue(value):
+            m.die("Dfn autolinks can't contain more links in their linktext.", lineNum=s.loc(start))
+            return Result(
+                SafeText(
+                    line=s.line(start),
+                    endLine=s.line(innerEnd + 1),
+                    context=s.context,
+                    text=s[start : innerEnd + 1],
+                ),
+                innerEnd + 1,
+            )
+        if isinstance(value, list):
+            innerContent.extend(value)
+        else:
+            innerContent.append(value)
+        if s[res.i : res.i + 2] == "=]":
+            if s.line(res.i + 1) > s.line(innerEnd) + 2:
+                m.die(
+                    "Dfn autolinks can't be spread across too many lines. You might have forgotten to close your autolink; if not, switch to the HTML syntax to spread your link across multiple lines.",
+                    lineNum=s.loc(start),
+                )
+                return Result(
+                    SafeText(
+                        line=s.line(start),
+                        endLine=s.line(innerEnd + 1),
+                        context=s.context,
+                        text=s[start : innerEnd + 1],
+                    ),
+                    innerEnd + 1,
+                )
+            nodeEnd = res.i + 2
+            break
+    else:
+        m.die(
+            "Dfn autolink was opened, but no closing =] was found. Either close your autolink, or escape the initial [ as &#91;",
+            lineNum=s.loc(start),
+        )
+        return Result(
+            SafeText(line=s.line(start), endLine=s.line(innerEnd + 1), context=s.context, text=s[start : innerEnd + 1]),
+            innerEnd + 1,
+        )
+
+    endTag = EndTag(
+        line=s.line(nodeEnd - 2),
+        endLine=s.line(nodeEnd),
+        context=s.context,
+        tag=startTag.tag,
+    )
+    startTag.attrs["bs-autolink-syntax"] = escapeAttr(s[start:nodeEnd])
+
+    return Result([startTag, *innerContent, endTag], nodeEnd)
 
 
 codeSpanStartRe = re.compile(r"`+")
