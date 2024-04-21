@@ -183,7 +183,7 @@ def parseNode(
         if s[start : start + 2] == r"\`":
             node = RawText(
                 line=s.line(start),
-                endLine=s.line(start),
+                endLine=s.line(start + 2),
                 context=s.context,
                 text="`",
             )
@@ -192,7 +192,7 @@ def parseNode(
         if s[start : start + 3] == r"\''":
             node = RawText(
                 line=s.line(start),
-                endLine=s.line(start),
+                endLine=s.line(start + 3),
                 context=s.context,
                 text="''",
             )
@@ -200,7 +200,7 @@ def parseNode(
         elif s[start : start + 2] == r"\'":
             node = RawText(
                 line=s.line(start),
-                endLine=s.line(start),
+                endLine=s.line(start + 2),
                 context=s.context,
                 text="'",
             )
@@ -217,7 +217,7 @@ def parseNode(
         if s[start] == "\\" and s[start + 1] == "[" and s[start + 2] in ("=", "$"):
             node = RawText(
                 line=s.line(start),
-                endLine=s.line(start),
+                endLine=s.line(start + 3),
                 context=s.context,
                 text="[" + s[start + 2],
             )
@@ -234,7 +234,7 @@ def parseNode(
         if s[start] == "\\" and s[start + 1] == "[" and s[start + 2] == ":":
             node = RawText(
                 line=s.line(start),
-                endLine=s.line(start),
+                endLine=s.line(start + 3),
                 context=s.context,
                 text="[" + s[start + 2],
             )
@@ -247,7 +247,7 @@ def parseNode(
         if s[start] == "\\" and s[start + 1] == "{" and s[start + 2] == "{":
             node = RawText(
                 line=s.line(start),
-                endLine=s.line(start),
+                endLine=s.line(start + 3),
                 context=s.context,
                 text="{{",
             )
@@ -260,7 +260,7 @@ def parseNode(
         if s[start] == "\\" and s[start + 1] == "<" and s[start + 2] == "{":
             node = RawText(
                 line=s.line(start),
-                endLine=s.line(start),
+                endLine=s.line(start + 3),
                 context=s.context,
                 text="<{",
             )
@@ -269,11 +269,11 @@ def parseNode(
             elementRes = parseAutolinkElement(s, start)
             if elementRes.valid:
                 return elementRes
-    if False:#s.config.algorithm and not inOpaque:
+    if False:  # s.config.algorithm and not inOpaque:
         if s[start] == "\\" and s[start + 1] == "|":
             node = RawText(
                 line=s.line(start),
-                endLine=s.line(start),
+                endLine=s.line(start + 2),
                 context=s.context,
                 text="|",
             )
@@ -282,30 +282,41 @@ def parseNode(
             varRes = parseShorthandVariable(s, start)
             if varRes.valid:
                 return varRes
-    if s[start : start + 2] == "\\[":
-        if s[start + 2].isalpha() or s[start + 2].isdigit():
-            # an escaped macro, so handle it here
-            text = "["
-            endI = start + 2
-        elif s[start + 2] == "[":
-            # actually an escaped biblio, so let the
-            # biblio/autolink code handle it for now.
-            # FIXME when biblio shorthands are built into
-            # this parser
-            text = r"\[["
-            endI = start + 3
-        else:
-            # same, but actually an an escaped autolink
-            text = r"\["
-            endI = start + 2
+    if s.config.biblio and not inOpaque:
+        if s[start] == "\\" and s[start + 1] == "[" and s[start + 2] == "[":
+            node = RawText(
+                line=s.line(start),
+                endLine=s.line(start + 3),
+                context=s.context,
+                text="[[",
+            )
+            return Result(node, start + 3)
+        if s[start] == "[" and s[start + 1] == "[":
+            biblioRes = parseAutolinkBiblioSection(s, start)
+            if biblioRes.valid:
+                return biblioRes
+            else:
+                m.die(
+                    "Biblio/section autolink was opened, but its syntax wasn't recognized. If you didn't intend this to be a biblio/section autolink, escape the initial [ as &#91;",
+                    lineNum=s.loc(start),
+                )
+                node = RawText(
+                    line=s.line(start),
+                    endLine=s.line(start + 2),
+                    context=s.context,
+                    text="[[",
+                )
+                return Result(node, start + 2)
+    if s[start] == "\\" and s[start + 1] == "[" and (s[start + 2].isalpha() or s[start + 2].isdigit()):
+        # an escaped macro, so handle it here
         node = RawText(
             line=s.line(start),
-            endLine=s.line(start),
+            endLine=s.line(start + 2),
             context=s.context,
-            text=text,
+            text="[",
         )
-        return Result(node, endI)
-    if s[start] == "[" and s[start - 1] != "[":
+        return Result(node, start + 2)
+    if s[start] == "[" and (s[start + 1].isalpha() or s[start + 1].isdigit()):
         macroRes = parseMacro(s, start)
         if macroRes.valid:
             return macroRes
@@ -2277,7 +2288,7 @@ def parseAutolinkElement(s: Stream, start: int) -> Result[SafeText | list[Parser
 
 
 def parseShorthandVariable(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
-    if s[start] != "|" or s[start+1] in (" ", "\n"):
+    if s[start] != "|" or s[start + 1] in (" ", "\n"):
         return Result.fail(start)
     startLine = s.line(start)
     innerContent: list[ParserNode] = []
@@ -2331,107 +2342,34 @@ def parseShorthandVariable(s: Stream, start: int) -> Result[ParserNode | list[Pa
     return Result([varStart, *innerContent, varEnd], nodeEnd)
 
 
-AUTOLINK_BIBLIO_NAME_RE = re.compile(r"[\w.+-]+", flags=re.DOTALL)
-AUTOLINK_BIBLIO_KEYWORDS_RE = re.compile(r"(\s+\w+){1,3}", flags=re.DOTALL)
-AUTOLINK_BIBLIO_KEYWORDS = ["current", "snapshot", "inline", "index", "direct", "obsolete"]
-
-def parseAutolinkDfn(s: Stream, start: int) -> Result[SafeText | list[ParserNode]]:
+def parseAutolinkBiblioSection(s: Stream, start: int) -> Result[SafeText | list[ParserNode]]:
     if s[start : start + 2] != "[[":
         return Result.fail(start)
     # Otherwise we're locked in, this opener is a very strong signal.
-    i = start+2
+    innerStart = start + 2
 
-    if s[i] == "!":
-        normative=True
-        i += 1
-    else:
-        normative = False
+    innerResult = parseBiblioInner(s, innerStart)
+    if not innerResult.valid:
+        innerResult = parseSectionInner(s, innerStart)
+        if not innerResult.valid:
+            m.die(
+                "Saw a [[ opening a biblio or section autolink, but couldn't parse the following contents. If you didn't intend this to be a biblio autolink, escape the initial [ as &#91;",
+                lineNum=s.loc(start),
+            )
+            return Result(
+                SafeText(
+                    line=s.line(start),
+                    endLine=s.line(innerStart),
+                    context=s.context,
+                    text="[[",
+                ),
+                innerStart,
+            )
+    parseOutcome, innerEnd = innerResult.vi
+    assert parseOutcome is not None
+    startTag, visibleText = parseOutcome
 
-    match, nameEnd = s.matchRe(i, AUTOLINK_BIBLIO_NAME_RE).vi
-    if match is None:
-        m.die("Biblio autolink was opened, but the first part didn't look like a biblio name. If you didn't intend this to be a biblio autolink, escape the initial [ as &#91;",
-            lineNum=s.loc(start),
-        )
-        return Result.fail(start)
-    lt = match[0]
-
-    if s[nameEnd].isspace():
-        match, modifierEnd = s.matchRe(nameEnd, AUTOLINK_BIBLIO_KEYWORDS_RE).vi
-        if match is None:
-            m.die(f"It looks like you meant to specify some keywords in the biblio autolink, but I couldn't find any. Allowed keywords are {config.englishFromList(AUTOLINK_BIBLIO_KEYWORDS)}. (Or close the biblio autolink immediately after the biblio name.)",
-                lineNum=s.loc(nameEnd),)
-            return Result.fail(start)
-        modifiers = re.split(r"\s+", match[0].strip())
-        for modifier in modifiers:
-            if modifier not in AUTOLINK_BIBLIO_KEYWORDS:
-                m.die(f"You specified an unknown/invalid keyword ({modifier}) in your biblio autolink. Allowed keywords are {config.englishFromList(AUTOLINK_BIBLIO_KEYWORDS)}.",
-                    lineNum=s.loc(nameEnd))
-                return Result.fail(start)
-        innerEnd = modifierEnd
-    else:
-        modifiers = []
-        innerEnd = nameEnd
-
-    attrs = {
-        "data-lt": lt,
-        "data-link-type": "biblio",
-        "data-biblio-type": "normative" if normative else "informative",
-        "bs-autolink-syntax": match.group(0),
-    }
-    statusCurrent = "current" in modifiers
-    statusSnapshot = "snapshot" in modifiers
-    if statusCurrent and statusSnapshot:
-        m.die(f"Biblio shorthand [{name} ...] contains *both* 'current' and 'snapshot' keywords. Please pick only one.")
-        return Result.fail(start)
-    elif statusCurrent or statusSnapshot:
-        attrs["data-biblio-status"] = "current" if statusCurrent else "snapshot"
-
-    displayInline = "inline" in modifiers
-    displayIndex = "index" in modifiers
-    displayDirect = "direct" in modifiers
-    if (displayInline + displayIndex + displayDirect) > 1:
-        m.die(
-            f"Biblio shorthand {match.group(0)} contains more than one of 'inline', 'index' and 'direct', please pick one.",
-        )
-        return t.cast(str, match.group(0))
-    elif displayInline:
-        attrs["data-biblio-display"] = "inline"
-    elif displayIndex:
-        attrs["data-biblio-display"] = "index"
-    elif displayDirect:
-        attrs["data-biblio-display"] = "direct"
-
-    if "obsolete" in modifiers:
-        attrs["data-biblio-obsolete"] = ""
-
-    if s[innerEnd : innerEnd + 2] == "]":
-        textOverride = False
-    elif s[innerEnd] == "|":
-        textOverride = True
-    else:
-        m.die(
-            "Biblio autolink was opened, but had something invalid before I saw its end. If you didn't intend this to be a biblio autolink, escape the initial [ as &#91;",
-            lineNum=s.loc(innerEnd),
-        )
-        return Result.fail(start)
-
-    startTag = StartTag(
-        line=s.line(start),
-        endLine=s.line(start + 1),
-        context=s.context,
-        tag="a",
-        attrs={
-            "data-link-type": "dfn",
-            "data-lt": escapeAttr(lt),
-            "bs-autolink-syntax": escapeAttr(s[start : innerEnd + 2]),
-            "bs-opaque": "",
-        },
-    )
-    if linkFor is not None:
-        startTag.attrs["data-link-for"] = escapeAttr(linkFor)
-    startTag = startTag.finalize()
-
-    if not textOverride:
+    if s[innerEnd] == "]":
         nodeEnd = innerEnd + 2
         endTag = EndTag(
             line=s.line(innerEnd),
@@ -2440,10 +2378,10 @@ def parseAutolinkDfn(s: Stream, start: int) -> Result[SafeText | list[ParserNode
             tag=startTag.tag,
         )
         middleText = SafeText(
-            line=s.line(start + 1),
+            line=s.line(innerStart),
             endLine=s.line(innerEnd),
             context=s.context,
-            text=lt,
+            text=visibleText,
         )
         return Result([startTag, middleText, endTag], nodeEnd)
 
@@ -2453,7 +2391,7 @@ def parseAutolinkDfn(s: Stream, start: int) -> Result[SafeText | list[ParserNode
         value = res.value
         assert value is not None
         if linkInValue(value):
-            m.die("Dfn autolinks can't contain more links in their linktext.", lineNum=s.loc(start))
+            m.die("Biblio/section autolinks can't contain more links in their linktext.", lineNum=s.loc(start))
             return Result(
                 SafeText(
                     line=s.line(start),
@@ -2467,10 +2405,10 @@ def parseAutolinkDfn(s: Stream, start: int) -> Result[SafeText | list[ParserNode
             innerContent.extend(value)
         else:
             innerContent.append(value)
-        if s[res.i : res.i + 2] == "=]":
+        if s[res.i : res.i + 2] == "]]":
             if s.line(res.i + 1) > s.line(innerEnd) + 2:
                 m.die(
-                    "Dfn autolinks can't be spread across too many lines. You might have forgotten to close your autolink; if not, switch to the HTML syntax to spread your link across multiple lines.",
+                    "Biblio/section autolinks can't be spread across too many lines. You might have forgotten to close your autolink; if not, switch to the HTML syntax to spread your link across multiple lines.",
                     lineNum=s.loc(start),
                 )
                 return Result(
@@ -2486,7 +2424,7 @@ def parseAutolinkDfn(s: Stream, start: int) -> Result[SafeText | list[ParserNode
             break
     else:
         m.die(
-            "Dfn autolink was opened, but no closing =] was found. Either close your autolink, or escape the initial [ as &#91;",
+            "Biblio/section autolink was opened, but no closing ]] was found. Either close your autolink, or escape the initial [ as &#91;",
             lineNum=s.loc(start),
         )
         return Result(
@@ -2503,6 +2441,149 @@ def parseAutolinkDfn(s: Stream, start: int) -> Result[SafeText | list[ParserNode
     startTag.attrs["bs-autolink-syntax"] = escapeAttr(s[start:nodeEnd])
 
     return Result([startTag, *innerContent, endTag], nodeEnd)
+
+
+AUTOLINK_BIBLIO_RE = re.compile(r"(!?)([\w.+-]+)((?:\s+\w+)*)(?=\||\]\])", flags=re.DOTALL)
+AUTOLINK_BIBLIO_KEYWORDS = ["current", "snapshot", "inline", "index", "direct", "obsolete"]
+
+
+def parseBiblioInner(s: Stream, innerStart: int) -> Result[tuple[StartTag, str]]:
+    nodeStart = innerStart - 2
+    match, innerEnd = s.matchRe(nodeStart, AUTOLINK_BIBLIO_RE).vi
+    if not match:
+        return Result.fail(nodeStart)
+
+    normative = match[1] == "!"
+    lt = match[2]
+    modifierSequence = match[3].strip()
+    attrs = {
+        "data-lt": lt,
+        "data-link-type": "biblio",
+        "data-biblio-type": "normative" if normative else "informative",
+        "bs-autolink-syntax": s[nodeStart:innerEnd] + "]]",
+        "bs-opaque": "",
+    }
+
+    failureStart = StartTag(
+        line=s.line(nodeStart),
+        endLine=s.line(innerStart),
+        context=s.context,
+        tag="span",
+    )
+    failureResult = Result(
+        (failureStart, f"[{lt}]"),
+        innerEnd,
+    )
+
+    modifiers = re.split(r"\s+", modifierSequence)
+    for modifier in modifiers:
+        if modifier in ("current", "snapshot"):
+            if "data-biblio-status" not in attrs:
+                attrs["data-biblio-status"] = modifier
+            else:
+                m.die(
+                    f"Biblio shorthand [{lt} ...] contains multiple current/snapshot keywords. Please use only one.",
+                    lineNum=s.loc(nodeStart),
+                )
+                return failureResult
+        elif modifier in ("inline", "index", "direct"):
+            if "data-biblio-display" not in attrs:
+                attrs["data-biblio-display"] = modifier
+            else:
+                m.die(
+                    f"Biblio shorthand [{lt} ...] contains multiple inline/index/direct keywords. Please use only one.",
+                    lineNum=s.loc(nodeStart),
+                )
+                return failureResult
+        elif modifier == "obsolete":
+            if "data-biblio-obsolete" not in attrs:
+                attrs["data-biblio-obsolete"] = ""
+            else:
+                m.die(
+                    f"Biblio shorthand [{lt} ...] contains multiple 'obsolete' keywords. Please use only one.",
+                    lineNum=s.loc(nodeStart),
+                )
+                return failureResult
+        else:
+            m.die(
+                f"Biblio shorthand [{lt} ...] has an unknown/invalid keyword ({modifier}). Allowed keywords are {config.englishFromList(AUTOLINK_BIBLIO_KEYWORDS)}.",
+                lineNum=s.loc(nodeStart),
+            )
+            return failureResult
+
+    startTag = StartTag(
+        line=s.line(nodeStart),
+        endLine=s.line(innerStart),
+        context=s.context,
+        tag="a",
+        attrs=attrs,
+    ).finalize()
+    return Result(
+        (startTag, f"[{lt}]"),
+        innerEnd,
+    )
+
+
+AUTOLINK_SECTION_RE = re.compile(
+    r"""
+    ([\w.+-]+)?                           # optional spec name
+    (?:
+        ((?:\/[\w.+-]*)?(?:\#[\w.+-]+)) | # /page#heading
+        (\/[\w.+-]+)                      # /page only
+    )
+    (?=\||\]\])
+    """,
+    re.X,
+)
+
+
+def parseSectionInner(s: Stream, innerStart: int) -> Result[tuple[StartTag, str]]:
+    nodeStart = innerStart - 2
+    match, innerEnd = s.matchRe(innerStart, AUTOLINK_SECTION_RE).vi
+    if not match:
+        return Result.fail(innerStart)
+
+    spec, section, justPage = match.groups()
+    if spec is None:
+        # local section link
+        startTag = StartTag(
+            line=s.line(nodeStart),
+            endLine=s.line(innerStart),
+            context=s.context,
+            tag="a",
+            attrs={
+                "section": "",
+                "href": section,
+                "bs-autolink-syntax": f"[[{match[0]}]]",
+            },
+        )
+    elif justPage is not None:
+        # foreign link, to an actual page from a multipage spec
+        startTag = StartTag(
+            line=s.line(nodeStart),
+            endLine=s.line(innerStart),
+            context=s.context,
+            tag="span",
+            attrs={
+                "spec-section": justPage + "#",
+                "spec": spec,
+                "bs-autolink-syntax": f"[[{match[0]}]]",
+            },
+        )
+    else:
+        # foreign link
+        startTag = StartTag(
+            line=s.line(nodeStart),
+            endLine=s.line(innerStart),
+            context=s.context,
+            tag="span",
+            attrs={
+                "spec-section": section,
+                "spec": spec,
+                "bs-autolink-syntax": f"[[{match[0]}]]",
+            },
+        )
+    return Result((startTag, ""), innerEnd)
 
 
 codeSpanStartRe = re.compile(r"`+")
