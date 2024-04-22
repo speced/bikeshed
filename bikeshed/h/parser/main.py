@@ -69,6 +69,7 @@ def linesFromNodes(nodes: t.Iterable[ParserNode]) -> list[str]:
 def debugNodes(nodes: t.Iterable[ParserNode]) -> list[ParserNode]:
     nodes = list(nodes)
     for node in nodes:
+        print("------")  # noqa: T201
         print(repr(node))  # noqa: T201
         print(repr(strFromNodes([node], withIlcc=True)))  # noqa: T201
     return nodes
