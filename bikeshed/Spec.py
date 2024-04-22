@@ -185,7 +185,10 @@ class Spec:
         m.retroactivelyCheckErrorLevel()
 
     def earlyParse(self, inputContent: InputSource.InputContent) -> list[l.Line]:
-        text = h.strFromNodes(h.initialDocumentParse(inputContent.content, h.ParseConfig.fromSpec(self)), withIlcc=True)
+        nodes = h.initialDocumentParse(inputContent.content, h.ParseConfig.fromSpec(self))
+        if self.debug:
+            h.debugNodes(nodes)
+        text = h.strFromNodes(nodes, withIlcc=True)
         inputContent.rawLines = [x + "\n" for x in text.split("\n")]
         return inputContent.lines
 
