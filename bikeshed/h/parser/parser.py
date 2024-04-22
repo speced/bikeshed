@@ -307,7 +307,7 @@ def parseNode(
                     text="[[",
                 )
                 return Result(node, start + 2)
-    if s[start] == "\\" and s[start + 1] == "[" and (s[start + 2].isalpha() or s[start + 2].isdigit()):
+    if s[start] == "\\" and s[start + 1] == "[" and (s[start + 2].isalpha() or s[start + 2].isdigit() or s[start + 2] == "-"):
         # an escaped macro, so handle it here
         node = RawText(
             line=s.line(start),
@@ -316,7 +316,7 @@ def parseNode(
             text="[",
         )
         return Result(node, start + 2)
-    if s[start] == "[" and (s[start + 1].isalpha() or s[start + 1].isdigit()):
+    if s[start] == "[" and (s[start + 1].isalpha() or s[start + 1].isdigit() or s[start + 1] == "-"):
         macroRes = parseMacro(s, start)
         if macroRes.valid:
             return macroRes
