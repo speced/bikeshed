@@ -2443,13 +2443,13 @@ def parseAutolinkBiblioSection(s: Stream, start: int) -> Result[SafeText | list[
     return Result([startTag, *innerContent, endTag], nodeEnd)
 
 
-AUTOLINK_BIBLIO_RE = re.compile(r"(!?)([\w.+-]+)((?:\s+\w+)*)(?=\||\]\])", flags=re.DOTALL)
+AUTOLINK_BIBLIO_RE = re.compile(r"(!?)([\w.+-]+)((?:\s+\w+)*)(?=\||\]\])")
 AUTOLINK_BIBLIO_KEYWORDS = ["current", "snapshot", "inline", "index", "direct", "obsolete"]
 
 
 def parseBiblioInner(s: Stream, innerStart: int) -> Result[tuple[StartTag, str]]:
     nodeStart = innerStart - 2
-    match, innerEnd = s.matchRe(nodeStart, AUTOLINK_BIBLIO_RE).vi
+    match, innerEnd = s.matchRe(innerStart, AUTOLINK_BIBLIO_RE).vi
     if not match:
         return Result.fail(nodeStart)
 
@@ -2475,41 +2475,41 @@ def parseBiblioInner(s: Stream, innerStart: int) -> Result[tuple[StartTag, str]]
         innerEnd,
     )
 
-    modifiers = re.split(r"\s+", modifierSequence)
-    for modifier in modifiers:
-        if modifier in ("current", "snapshot"):
-            if "data-biblio-status" not in attrs:
-                attrs["data-biblio-status"] = modifier
+    if modifierSequence != "":
+        for modifier in re.split(r"\s+", modifierSequence):
+            if modifier in ("current", "snapshot"):
+                if "data-biblio-status" not in attrs:
+                    attrs["data-biblio-status"] = modifier
+                else:
+                    m.die(
+                        f"Biblio shorthand [{lt} ...] contains multiple current/snapshot keywords. Please use only one.",
+                        lineNum=s.loc(nodeStart),
+                    )
+                    return failureResult
+            elif modifier in ("inline", "index", "direct"):
+                if "data-biblio-display" not in attrs:
+                    attrs["data-biblio-display"] = modifier
+                else:
+                    m.die(
+                        f"Biblio shorthand [{lt} ...] contains multiple inline/index/direct keywords. Please use only one.",
+                        lineNum=s.loc(nodeStart),
+                    )
+                    return failureResult
+            elif modifier == "obsolete":
+                if "data-biblio-obsolete" not in attrs:
+                    attrs["data-biblio-obsolete"] = ""
+                else:
+                    m.die(
+                        f"Biblio shorthand [{lt} ...] contains multiple 'obsolete' keywords. Please use only one.",
+                        lineNum=s.loc(nodeStart),
+                    )
+                    return failureResult
             else:
                 m.die(
-                    f"Biblio shorthand [{lt} ...] contains multiple current/snapshot keywords. Please use only one.",
+                    f"Biblio shorthand [{lt} ...] has an unknown/invalid keyword ({modifier}). Allowed keywords are {config.englishFromList(AUTOLINK_BIBLIO_KEYWORDS)}.",
                     lineNum=s.loc(nodeStart),
                 )
                 return failureResult
-        elif modifier in ("inline", "index", "direct"):
-            if "data-biblio-display" not in attrs:
-                attrs["data-biblio-display"] = modifier
-            else:
-                m.die(
-                    f"Biblio shorthand [{lt} ...] contains multiple inline/index/direct keywords. Please use only one.",
-                    lineNum=s.loc(nodeStart),
-                )
-                return failureResult
-        elif modifier == "obsolete":
-            if "data-biblio-obsolete" not in attrs:
-                attrs["data-biblio-obsolete"] = ""
-            else:
-                m.die(
-                    f"Biblio shorthand [{lt} ...] contains multiple 'obsolete' keywords. Please use only one.",
-                    lineNum=s.loc(nodeStart),
-                )
-                return failureResult
-        else:
-            m.die(
-                f"Biblio shorthand [{lt} ...] has an unknown/invalid keyword ({modifier}). Allowed keywords are {config.englishFromList(AUTOLINK_BIBLIO_KEYWORDS)}.",
-                lineNum=s.loc(nodeStart),
-            )
-            return failureResult
 
     startTag = StartTag(
         line=s.line(nodeStart),
