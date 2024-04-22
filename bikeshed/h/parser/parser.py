@@ -2461,7 +2461,6 @@ def parseBiblioInner(s: Stream, innerStart: int) -> Result[tuple[StartTag, str]]
         "data-link-type": "biblio",
         "data-biblio-type": "normative" if normative else "informative",
         "bs-autolink-syntax": s[nodeStart:innerEnd] + "]]",
-        "bs-opaque": "",
     }
 
     failureStart = StartTag(
