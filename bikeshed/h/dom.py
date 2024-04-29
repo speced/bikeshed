@@ -225,7 +225,7 @@ def serializeTag(el: t.ElementT) -> str:
     # Use when you want to output the HTML,
     # but it might be a container with a lot of content.
     tag = "<" + el.tag
-    for n, v in el.attrib.items():
+    for n, v in sorted(el.attrib.items()):
         # Don't output the bs-* attributes, they're added by BS
         # and don't show up in the source, so it's confusing to
         # print them.
