@@ -254,3 +254,6 @@ class Stream:
 
     def inOpaqueElement(self) -> bool:
         return self.openEls.inOpaqueElement(self.config.opaqueElements)
+
+    def inIDLContext(self) -> bool:
+        return self.openEls.inIDLContext()

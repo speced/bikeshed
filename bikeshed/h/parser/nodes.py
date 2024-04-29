@@ -6,7 +6,7 @@ from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass, field
 
 from ... import messages as m
-from ... import t
+from ... import config, t
 
 
 @dataclass
@@ -211,6 +211,39 @@ class TagStack:
         if opaqueTags is None:
             opaqueTags = {"pre", "xmp", "script", "style"}
         return any(x.tag in opaqueTags or "bs-opaque" in x.startTag.attrs for x in self.tags)
+
+    def inIDLContext(self) -> bool:
+        # IDL contexts are imposed by IDL dfns or links,
+        # so we can fail fast if there's nothing.
+        if not any(x.tag in ("a", "dfn") for x in self.tags):
+            return False
+
+        # Determining whether the dfn/link is an *IDL* dfn/link is more difficult,
+        # since the type can be set on an ancestor.
+        # So I have to crawl all the tags, and look for alternate spellings,
+        # since there are several possible shortenings.
+        spottedDfn = False
+        spottedLink = False
+        for tag in reversed(self.tags):
+            tagName = tag.tag
+            attrs = tag.startTag.attrs
+            if tagName == "dfn":
+                spottedDfn = True
+            elif tagName == "a":
+                spottedLink = True
+            if spottedDfn and "data-dfn-type" in attrs:
+                return attrs["data-dfn-type"] in config.idlTypes
+            if spottedDfn and "dfn-type" in attrs:
+                return attrs["dfn-type"] in config.idlTypes
+            if tagName == "dfn" and any(x in attrs for x in config.idlTypes):
+                return True
+            if spottedLink and "data-link-type" in attrs:
+                return attrs["data-link-type"] in config.idlTypes or attrs["data-link-type"] == "idl"
+            if spottedLink and "link-type" in attrs:
+                return attrs["link-type"] in config.idlTypes or attrs["link-type"] == "idl"
+            if tagName == "a" and any(x in attrs for x in config.idlTypes) or "idl" in attrs:
+                return True
+        return False
 
     def update(self, i: int, node: ParserNode) -> None:
         # Updates the stack based on the passed node.
