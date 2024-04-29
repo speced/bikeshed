@@ -291,7 +291,11 @@ def parseNode(
                 text="[[",
             )
             return Result(node, start + 3)
-        if s[start] == "[" and s[start + 1] == "[":
+        if s[start] == "[" and s[start + 1] == "[" and not s.inIDLContext():
+            # To avoid lots of false positives with IDL stuff,
+            # don't recognize biblios within IDL definitions,
+            # or the linktext of IDL autolinks.
+
             biblioRes = parseAutolinkBiblioSection(s, start)
             if biblioRes.valid:
                 return biblioRes
@@ -316,7 +320,7 @@ def parseNode(
             text="[",
         )
         return Result(node, start + 2)
-    if s[start] == "[" and (s[start + 1].isalpha() or s[start + 1].isdigit() or s[start + 1] == "-"):
+    if s[start] == "[" and s[start-1] != "[" and (s[start + 1].isalpha() or s[start + 1].isdigit() or s[start + 1] == "-"):
         macroRes = parseMacro(s, start)
         if macroRes.valid:
             return macroRes
@@ -2341,7 +2345,7 @@ def parseAutolinkBiblioSection(s: Stream, start: int) -> Result[SafeText | list[
             context=s.context,
             tag=startTag.tag,
         )
-        middleText = SafeText(
+        middleText = RawText(
             line=s.line(innerStart),
             endLine=s.line(innerEnd),
             context=s.context,
@@ -2434,7 +2438,7 @@ def parseBiblioInner(s: Stream, innerStart: int) -> Result[tuple[StartTag, str]]
         tag="span",
     )
     failureResult = Result(
-        (failureStart, f"[{lt}]"),
+        (failureStart, f"&#91;{lt}]"),
         innerEnd,
     )
 
@@ -2469,7 +2473,7 @@ def parseBiblioInner(s: Stream, innerStart: int) -> Result[tuple[StartTag, str]]
                     return failureResult
             else:
                 m.die(
-                    f"Biblio shorthand [{lt} ...] has an unknown/invalid keyword ({modifier}). Allowed keywords are {config.englishFromList(AUTOLINK_BIBLIO_KEYWORDS)}.",
+                    f"Biblio shorthand [{lt} ...] has an unknown/invalid keyword ({modifier}). Allowed keywords are {config.englishFromList(AUTOLINK_BIBLIO_KEYWORDS)}. If this isn't meant to be a biblio autolink at all, escape the initial [ as &#91;",
                     lineNum=s.loc(nodeStart),
                 )
                 return failureResult
@@ -2482,7 +2486,7 @@ def parseBiblioInner(s: Stream, innerStart: int) -> Result[tuple[StartTag, str]]
         attrs=attrs,
     ).finalize()
     return Result(
-        (startTag, f"[{lt}]"),
+        (startTag, f"&#91;{lt}]"),
         innerEnd,
     )
 
