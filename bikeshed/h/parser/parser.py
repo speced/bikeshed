@@ -152,17 +152,21 @@ def parseNode(
     if s.eof(start):
         return Result.fail(start)
 
+    first1 = s[start]
+    first2 = s[start:start+2]
+    first3 = s[start:start+3]
+
     node: ParserNode | list[ParserNode] | None
 
     inOpaque = s.inOpaqueElement()
 
-    if s[start] == "&":
+    if first1 == "&":
         ch, i = parseCharRef(s, start, context=CharRefContext.NON_ATTR).vi
         if ch is not None:
             node = RawText(text=f"&#{ord(ch)};", line=s.line(start), endLine=s.line(i), context=s.context)
             return Result(node, i)
 
-    if s[start] == "<":
+    if first1 == "<":
         node, i = parseAngleStart(s, start).vi
         if node is not None:
             return Result(node, i)
@@ -171,16 +175,16 @@ def parseNode(
     # but it'll have to wait until I munge
     # the markdown and HTML parsers together.
     el: ParserNode | None
-    if s[start] in ("`", "~"):
+    if first1 in ("`", "~"):
         el, i = parseFencedCodeBlock(s, start).vi
         if el is not None:
             return Result(el, i)
     if s.config.markdown:
-        if s[start] == "`":
+        if first1 == "`":
             els, i = parseCodeSpan(s, start).vi
             if els is not None:
                 return Result(els, i)
-        if s[start : start + 2] == r"\`":
+        if first2 == r"\`":
             node = RawText(
                 line=s.line(start),
                 endLine=s.line(start + 2),
@@ -189,7 +193,7 @@ def parseNode(
             )
             return Result(node, start + 2)
     if s.config.css and not inOpaque:
-        if s[start : start + 3] == r"\''":
+        if first3 == r"\''":
             node = RawText(
                 line=s.line(start),
                 endLine=s.line(start + 3),
@@ -197,7 +201,7 @@ def parseNode(
                 text="''",
             )
             return Result(node, start + 3)
-        elif s[start : start + 2] == r"\'":
+        elif first2 == r"\'":
             node = RawText(
                 line=s.line(start),
                 endLine=s.line(start + 2),
@@ -205,16 +209,16 @@ def parseNode(
                 text="'",
             )
             return Result(node, start + 2)
-        elif s[start : start + 2] == "''":
+        elif first2 == "''":
             maybeRes = parseCSSMaybe(s, start)
             if maybeRes.valid:
                 return maybeRes
-        elif s[start] == "'":
+        elif first1 == "'":
             propdescRes = parseCSSPropdesc(s, start)
             if propdescRes.valid:
                 return propdescRes
     if s.config.dfn and not inOpaque:
-        if s[start] == "\\" and s[start + 1] == "[" and s[start + 2] in ("=", "$"):
+        if first3 == "\\[=" or first3 == "\\[$":
             node = RawText(
                 line=s.line(start),
                 endLine=s.line(start + 3),
@@ -222,16 +226,16 @@ def parseNode(
                 text="[" + s[start + 2],
             )
             return Result(node, start + 3)
-        if s[start] == "[" and s[start + 1] == "=":
+        if first2 == "[=":
             dfnRes = parseAutolinkDfn(s, start)
             if dfnRes.valid:
                 return dfnRes
-        if s[start] == "[" and s[start + 1] == "$":
+        if first2 == "[$":
             abstractRes = parseAutolinkAbstract(s, start)
             if abstractRes.valid:
                 return abstractRes
     if s.config.header and not inOpaque:
-        if s[start] == "\\" and s[start + 1] == "[" and s[start + 2] == ":":
+        if first3 == "\\[:":
             node = RawText(
                 line=s.line(start),
                 endLine=s.line(start + 3),
@@ -239,12 +243,12 @@ def parseNode(
                 text="[" + s[start + 2],
             )
             return Result(node, start + 3)
-        if s[start] == "[" and s[start + 1] == ":":
+        if first2 == "[:":
             headerRes = parseAutolinkHeader(s, start)
             if headerRes.valid:
                 return headerRes
     if s.config.idl and not inOpaque:
-        if s[start] == "\\" and s[start + 1] == "{" and s[start + 2] == "{":
+        if first3 == "\\{{":
             node = RawText(
                 line=s.line(start),
                 endLine=s.line(start + 3),
@@ -252,12 +256,12 @@ def parseNode(
                 text="{{",
             )
             return Result(node, start + 3)
-        if s[start] == "{" and s[start + 1] == "{":
+        if first2 == "{{":
             idlRes = parseAutolinkIdl(s, start)
             if idlRes.valid:
                 return idlRes
     if s.config.markup and not inOpaque:
-        if s[start] == "\\" and s[start + 1] == "<" and s[start + 2] == "{":
+        if first3 == "\\<{":
             node = RawText(
                 line=s.line(start),
                 endLine=s.line(start + 3),
@@ -265,12 +269,12 @@ def parseNode(
                 text="<{",
             )
             return Result(node, start + 3)
-        if s[start] == "<" and s[start + 1] == "{":
+        if first2 == "<{":
             elementRes = parseAutolinkElement(s, start)
             if elementRes.valid:
                 return elementRes
     if False:  # s.config.algorithm and not inOpaque:
-        if s[start] == "\\" and s[start + 1] == "|":
+        if first2 == "\\|":
             node = RawText(
                 line=s.line(start),
                 endLine=s.line(start + 2),
@@ -278,12 +282,12 @@ def parseNode(
                 text="|",
             )
             return Result(node, start + 2)
-        if s[start] == "|":
+        if first1 == "|":
             varRes = parseShorthandVariable(s, start)
             if varRes.valid:
                 return varRes
     if s.config.biblio and not inOpaque:
-        if s[start] == "\\" and s[start + 1] == "[" and s[start + 2] == "[":
+        if first3 == "\\[[":
             node = RawText(
                 line=s.line(start),
                 endLine=s.line(start + 3),
@@ -291,7 +295,7 @@ def parseNode(
                 text="[[",
             )
             return Result(node, start + 3)
-        if s[start] == "[" and s[start + 1] == "[" and not s.inIDLContext():
+        if first2 == "[[" and not s.inIDLContext():
             # To avoid lots of false positives with IDL stuff,
             # don't recognize biblios within IDL definitions,
             # or the linktext of IDL autolinks.
@@ -311,7 +315,7 @@ def parseNode(
                     text="[[",
                 )
                 return Result(node, start + 2)
-    if s[start] == "\\" and s[start + 1] == "[" and (s[start + 2].isalpha() or s[start + 2].isdigit() or s[start + 2] == "-"):
+    if first2 == "\\[" and isMacroStart(s, start+2):
         # an escaped macro, so handle it here
         node = RawText(
             line=s.line(start),
@@ -320,20 +324,21 @@ def parseNode(
             text="[",
         )
         return Result(node, start + 2)
-    if s[start] == "[" and s[start-1] != "[" and (s[start + 1].isalpha() or s[start + 1].isdigit() or s[start + 1] == "-"):
+    if first1 == "[" and s[start-1] != "[" and isMacroStart(s, start+1):
         macroRes = parseMacro(s, start)
         if macroRes.valid:
             return macroRes
-    match, i = s.matchRe(start, emdashRe).vi
-    if match is not None:
-        # Fix line-ending em dashes, or --, by moving the previous line up, so no space.
-        node = RawText(
-            line=s.line(start),
-            endLine=s.line(i),
-            context=s.context,
-            text="—\u200b",
-        )
-        return Result(node, i)
+    if first2 == "—\n" or first3 == "--\n":
+        match, i = s.matchRe(start, emdashRe).vi
+        if match is not None:
+            # Fix line-ending em dashes, or --, by moving the previous line up, so no space.
+            node = RawText(
+                line=s.line(start),
+                endLine=s.line(i),
+                context=s.context,
+                text="—\u200b",
+            )
+            return Result(node, i)
 
     return Result.fail(start)
 
@@ -2900,6 +2905,10 @@ def parseMetadataBlock(s: Stream, start: int) -> Result[RawElement]:
         context=s.context,
     )
     return Result(el, i)
+
+def isMacroStart(s: Stream, start: int):
+    ch = s[start]
+    return ch.isalpha() or ch.isdigit() or ch == "-"
 
 
 ########################
