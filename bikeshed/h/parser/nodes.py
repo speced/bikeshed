@@ -5,8 +5,11 @@ import re
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass, field
 
-from ... import messages as m
 from ... import config, t
+from ... import messages as m
+
+if t.TYPE_CHECKING:
+    from .stream import Stream  # pylint: disable=cyclic-import
 
 
 @dataclass
@@ -36,6 +39,15 @@ class RawText(Text):
     def __str__(self) -> str:
         return self.text
 
+    @classmethod
+    def fromStream(cls, s: Stream, start: int, end: int, text: str | None = None) -> t.Self:  # noqa: ANN102
+        return cls(
+            line=s.line(start),
+            endLine=s.line(end),
+            context=s.context,
+            text=text if text is not None else s[start:end],
+        )
+
     def curlifyApostrophes(self, lastNode: ParserNode | None) -> RawText:
         if re.match(r"'\w", self.text):
             if isinstance(lastNode, (EndTag, RawElement, SelfClosedTag)):
@@ -61,6 +73,15 @@ class SafeText(Text):
     def __str__(self) -> str:
         return escapeHTML(self.text)
 
+    @classmethod
+    def fromStream(cls, s: Stream, start: int, end: int, text: str | None = None) -> t.Self:  # noqa: ANN102
+        return cls(
+            line=s.line(start),
+            endLine=s.line(end),
+            context=s.context,
+            text=text if text is not None else s[start:end],
+        )
+
 
 @dataclass
 class Doctype(ParserNode):
@@ -69,12 +90,40 @@ class Doctype(ParserNode):
     def __str__(self) -> str:
         return self.data
 
+    @classmethod
+    def fromStream(cls, s: Stream, start: int, end: int, data: str) -> t.Self:  # noqa: ANN102
+        return cls(
+            line=s.line(start),
+            endLine=s.line(end),
+            context=s.context,
+            data=data,
+        )
+
 
 @dataclass
 class StartTag(ParserNode):
     tag: str
     attrs: dict[str, str] = field(default_factory=dict)
     classes: set[str] = field(default_factory=set)
+
+    @classmethod
+    def fromStream(
+        cls,  # noqa: ANN102
+        s: Stream,
+        start: int,
+        end: int,
+        tag: str,
+        attrs: None | dict[str, str] = None,
+    ) -> t.Self:
+        if attrs is None:
+            attrs = {}
+        return cls(
+            line=s.line(start),
+            endLine=s.line(end),
+            context=s.context,
+            tag=tag,
+            attrs=attrs,
+        )
 
     def __str__(self) -> str:
         s = f"<{self.tag} bs-line-number={self.line}"
@@ -108,6 +157,36 @@ class SelfClosedTag(ParserNode):
     tag: str
     attrs: dict[str, str] = field(default_factory=dict)
     classes: set[str] = field(default_factory=set)
+
+    @classmethod
+    def fromStream(
+        cls,  # noqa: ANN102
+        s: Stream,
+        start: int,
+        end: int,
+        tag: str,
+        attrs: None | dict[str, str] = None,
+    ) -> t.Self:
+        if attrs is None:
+            attrs = {}
+        return cls(
+            line=s.line(start),
+            endLine=s.line(end),
+            context=s.context,
+            tag=tag,
+            attrs=attrs,
+        )
+
+    @classmethod
+    def fromStartTag(cls, tag: StartTag) -> t.Self:  # noqa: ANN102
+        return cls(
+            line=tag.line,
+            endLine=tag.endLine,
+            context=tag.context,
+            tag=tag.tag,
+            attrs=tag.attrs,
+            classes=tag.classes,
+        )
 
     def __str__(self) -> str:
         s = f"<{self.tag} bs-line-number={self.line}"
@@ -152,21 +231,19 @@ class SelfClosedTag(ParserNode):
     def clone(self, **kwargs: t.Any) -> SelfClosedTag:
         return dataclasses.replace(self, **kwargs)
 
-    @classmethod
-    def fromStartTag(cls: t.Type[SelfClosedTag], tag: StartTag) -> SelfClosedTag:
-        return cls(
-            line=tag.line,
-            endLine=tag.endLine,
-            context=tag.context,
-            tag=tag.tag,
-            attrs=tag.attrs,
-            classes=tag.classes,
-        )
-
 
 @dataclass
 class EndTag(ParserNode):
     tag: str
+
+    @classmethod
+    def fromStream(cls, s: Stream, start: int, end: int, tag: str | StartTag) -> t.Self:  # noqa: ANN102
+        return cls(
+            line=s.line(start),
+            endLine=s.line(end),
+            context=s.context,
+            tag=tag if isinstance(tag, str) else tag.tag,
+        )
 
     def __str__(self) -> str:
         return f"</{self.tag}>"
@@ -175,6 +252,15 @@ class EndTag(ParserNode):
 @dataclass
 class Comment(ParserNode):
     data: str
+
+    @classmethod
+    def fromStream(cls, s: Stream, start: int, end: int, data: str) -> t.Self:  # noqa: ANN102
+        return cls(
+            line=s.line(start),
+            endLine=s.line(end),
+            context=s.context,
+            data=data,
+        )
 
     def __str__(self) -> str:
         return f"<!--{escapeHTML(self.data)}-->"
@@ -189,6 +275,17 @@ class RawElement(ParserNode):
     tag: str
     startTag: StartTag
     data: str
+
+    @classmethod
+    def fromStream(cls, s: Stream, start: int, end: int, startTag: StartTag, data: str) -> t.Self:  # noqa: ANN102
+        return cls(
+            line=s.line(start),
+            endLine=s.line(end),
+            context=s.context,
+            tag=startTag.tag,
+            startTag=startTag,
+            data=data,
+        )
 
     def __str__(self) -> str:
         return f"{self.startTag}{self.data}</{self.tag}>"
