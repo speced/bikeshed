@@ -17,7 +17,6 @@ from .nodes import (
     SelfClosedTag,
     StartTag,
     escapeAttr,
-    escapeHTML,
 )
 from .preds import charRefs
 from .stream import Result, Stream
@@ -129,12 +128,7 @@ def parseAnything(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]
     end = len(s)
     while s[i] not in POSSIBLE_NODE_START_CHARS and i < end:
         i += 1
-    node = RawText(
-        line=s.line(start),
-        endLine=s.line(i),
-        context=s.context,
-        text=s[start:i],
-    )
+    node = RawText.fromStream(s, start, i)
     return Result(node, i)
 
 
@@ -153,8 +147,8 @@ def parseNode(
         return Result.fail(start)
 
     first1 = s[start]
-    first2 = s[start:start+2]
-    first3 = s[start:start+3]
+    first2 = s[start : start + 2]
+    first3 = s[start : start + 3]
 
     node: ParserNode | list[ParserNode] | None
 
@@ -163,7 +157,7 @@ def parseNode(
     if first1 == "&":
         ch, i = parseCharRef(s, start, context=CharRefContext.NON_ATTR).vi
         if ch is not None:
-            node = RawText(text=f"&#{ord(ch)};", line=s.line(start), endLine=s.line(i), context=s.context)
+            node = RawText.fromStream(s, start, i, f"&#{ord(ch)};")
             return Result(node, i)
 
     if first1 == "<":
@@ -185,29 +179,14 @@ def parseNode(
             if els is not None:
                 return Result(els, i)
         if first2 == r"\`":
-            node = RawText(
-                line=s.line(start),
-                endLine=s.line(start + 2),
-                context=s.context,
-                text="`",
-            )
+            node = RawText.fromStream(s, start, start + 2, "`")
             return Result(node, start + 2)
     if s.config.css and not inOpaque:
         if first3 == r"\''":
-            node = RawText(
-                line=s.line(start),
-                endLine=s.line(start + 3),
-                context=s.context,
-                text="''",
-            )
+            node = RawText.fromStream(s, start, start + 3, "''")
             return Result(node, start + 3)
         elif first2 == r"\'":
-            node = RawText(
-                line=s.line(start),
-                endLine=s.line(start + 2),
-                context=s.context,
-                text="'",
-            )
+            node = RawText.fromStream(s, start, start + 2, "'")
             return Result(node, start + 2)
         elif first2 == "''":
             maybeRes = parseCSSMaybe(s, start)
@@ -218,13 +197,8 @@ def parseNode(
             if propdescRes.valid:
                 return propdescRes
     if s.config.dfn and not inOpaque:
-        if first3 == "\\[=" or first3 == "\\[$":
-            node = RawText(
-                line=s.line(start),
-                endLine=s.line(start + 3),
-                context=s.context,
-                text="[" + s[start + 2],
-            )
+        if first3 in ("\\[=", "\\[$"):
+            node = RawText.fromStream(s, start, start + 3, "[" + s[start + 2])
             return Result(node, start + 3)
         if first2 == "[=":
             dfnRes = parseAutolinkDfn(s, start)
@@ -236,12 +210,7 @@ def parseNode(
                 return abstractRes
     if s.config.header and not inOpaque:
         if first3 == "\\[:":
-            node = RawText(
-                line=s.line(start),
-                endLine=s.line(start + 3),
-                context=s.context,
-                text="[" + s[start + 2],
-            )
+            node = RawText.fromStream(s, start, start + 3, "[:")
             return Result(node, start + 3)
         if first2 == "[:":
             headerRes = parseAutolinkHeader(s, start)
@@ -249,12 +218,7 @@ def parseNode(
                 return headerRes
     if s.config.idl and not inOpaque:
         if first3 == "\\{{":
-            node = RawText(
-                line=s.line(start),
-                endLine=s.line(start + 3),
-                context=s.context,
-                text="{{",
-            )
+            node = RawText.fromStream(s, start, start + 3, "{{")
             return Result(node, start + 3)
         if first2 == "{{":
             idlRes = parseAutolinkIdl(s, start)
@@ -262,12 +226,7 @@ def parseNode(
                 return idlRes
     if s.config.markup and not inOpaque:
         if first3 == "\\<{":
-            node = RawText(
-                line=s.line(start),
-                endLine=s.line(start + 3),
-                context=s.context,
-                text="<{",
-            )
+            node = RawText.fromStream(s, start, start + 3, "<{")
             return Result(node, start + 3)
         if first2 == "<{":
             elementRes = parseAutolinkElement(s, start)
@@ -275,12 +234,7 @@ def parseNode(
                 return elementRes
     if False:  # s.config.algorithm and not inOpaque:
         if first2 == "\\|":
-            node = RawText(
-                line=s.line(start),
-                endLine=s.line(start + 2),
-                context=s.context,
-                text="|",
-            )
+            node = RawText.fromStream(s, start, start + 2, "|")
             return Result(node, start + 2)
         if first1 == "|":
             varRes = parseShorthandVariable(s, start)
@@ -288,12 +242,7 @@ def parseNode(
                 return varRes
     if s.config.biblio and not inOpaque:
         if first3 == "\\[[":
-            node = RawText(
-                line=s.line(start),
-                endLine=s.line(start + 3),
-                context=s.context,
-                text="[[",
-            )
+            node = RawText.fromStream(s, start, start + 3, "[[")
             return Result(node, start + 3)
         if first2 == "[[" and not s.inIDLContext():
             # To avoid lots of false positives with IDL stuff,
@@ -308,23 +257,13 @@ def parseNode(
                     "Biblio/section autolink was opened, but its syntax wasn't recognized. If you didn't intend this to be a biblio/section autolink, escape the initial [ as &#91;",
                     lineNum=s.loc(start),
                 )
-                node = RawText(
-                    line=s.line(start),
-                    endLine=s.line(start + 2),
-                    context=s.context,
-                    text="[[",
-                )
+                node = RawText.fromStream(s, start, start + 2, "[[")
                 return Result(node, start + 2)
-    if first2 == "\\[" and isMacroStart(s, start+2):
+    if first2 == "\\[" and isMacroStart(s, start + 2):
         # an escaped macro, so handle it here
-        node = RawText(
-            line=s.line(start),
-            endLine=s.line(start + 2),
-            context=s.context,
-            text="[",
-        )
+        node = RawText.fromStream(s, start, start + 2, "[")
         return Result(node, start + 2)
-    if first1 == "[" and s[start-1] != "[" and isMacroStart(s, start+1):
+    if first1 == "[" and s[start - 1] != "[" and isMacroStart(s, start + 1):
         macroRes = parseMacro(s, start)
         if macroRes.valid:
             return macroRes
@@ -332,12 +271,7 @@ def parseNode(
         match, i = s.matchRe(start, emdashRe).vi
         if match is not None:
             # Fix line-ending em dashes, or --, by moving the previous line up, so no space.
-            node = RawText(
-                line=s.line(start),
-                endLine=s.line(i),
-                context=s.context,
-                text="—\u200b",
-            )
+            node = RawText.fromStream(s, start, i, "—\u200b")
             return Result(node, i)
 
     return Result.fail(start)
@@ -370,53 +304,25 @@ def parseAngleStart(s: Stream, start: int) -> Result[ParserNode | list[ParserNod
                 text, i = parseRawPreToEnd(s, i).vi
                 if text is None:
                     return Result.fail(start)
-                el = RawElement(
-                    line=startTag.line,
-                    tag="pre",
-                    startTag=startTag,
-                    data=text,
-                    endLine=s.line(i),
-                    context=s.context,
-                )
+                el = RawElement.fromStream(s, start, i, startTag, text)
                 return Result(el, i)
         if startTag.tag == "script":
             text, i = parseScriptToEnd(s, i).vi
             if text is None:
                 return Result.fail(start)
-            el = RawElement(
-                line=startTag.line,
-                tag="script",
-                startTag=startTag,
-                data=text,
-                endLine=s.line(i),
-                context=s.context,
-            )
+            el = RawElement.fromStream(s, start, i, startTag, text)
             return Result(el, i)
         elif startTag.tag == "style":
             text, i = parseStyleToEnd(s, i).vi
             if text is None:
                 return Result.fail(start)
-            el = RawElement(
-                line=startTag.line,
-                tag="style",
-                startTag=startTag,
-                data=text,
-                endLine=s.line(i),
-                context=s.context,
-            )
+            el = RawElement.fromStream(s, start, i, startTag, text)
             return Result(el, i)
         elif startTag.tag == "xmp":
             text, i = parseXmpToEnd(s, i).vi
             if text is None:
                 return Result.fail(start)
-            el = RawElement(
-                line=startTag.line,
-                tag="xmp",
-                startTag=startTag,
-                data=text,
-                endLine=s.line(i),
-                context=s.context,
-            )
+            el = RawElement.fromStream(s, start, i, startTag, text)
             return Result(el, i)
         else:
             return Result(startTag, i)
@@ -467,9 +373,8 @@ def parseStartTag(s: Stream, start: int) -> Result[StartTag | SelfClosedTag]:
     # After this point we're committed to a start tag,
     # so failure will really be a parse error.
 
-    tag = StartTag(line=s.line(start), endLine=s.line(start), context=s.context, tag=tagname)
-
     attr = None
+    attrs: dict[str, str] = {}
     while True:
         ws, i = parseWhitespace(s, i).vi
         if ws is None:
@@ -484,7 +389,7 @@ def parseStartTag(s: Stream, start: int) -> Result[StartTag | SelfClosedTag]:
         if attr is None:
             break
         attrName, attrValue = attr
-        if attrName in tag.attrs:
+        if attrName in attrs:
             m.die(f"Attribute {attrName} appears twice in <{tagname}>.", lineNum=s.loc(startAttr))
             return Result.fail(start)
         if "[" in attrValue:
@@ -495,18 +400,17 @@ def parseStartTag(s: Stream, start: int) -> Result[StartTag | SelfClosedTag]:
                 start=i,
                 context=f"<{tagname} {attrName}='...'>",
             )
-        tag.attrs[attrName] = attrValue
+        attrs[attrName] = attrValue
 
     i = parseWhitespace(s, i).i
 
+    el: SelfClosedTag | StartTag
     if s[i] == "/":
         if s[i + 1] == ">" and tagname in ("br", "link", "meta"):
-            tag.endLine = s.line(i + 1)
-            el = SelfClosedTag.fromStartTag(tag)
+            el = SelfClosedTag.fromStream(s, start, i + 2, tagname, attrs)
             return Result(el, i + 2)
         elif s[i + 1] == ">" and preds.isXMLishTagname(tagname):
-            tag.endLine = s.line(i + 1)
-            el = SelfClosedTag.fromStartTag(tag)
+            el = SelfClosedTag.fromStream(s, start, i + 2, tagname, attrs)
             return Result(el, i + 2)
         elif tagname in VOID_ELEMENTS:
             m.die(f"Void element (<{tagname}>) with a spurious trailing /.", lineNum=s.loc(start))
@@ -521,11 +425,11 @@ def parseStartTag(s: Stream, start: int) -> Result[StartTag | SelfClosedTag]:
             # Again, just skip it and keep going.
 
     if s[i] == ">":
-        tag.endLine = s.line(i)
         if tagname in VOID_ELEMENTS:
-            el = SelfClosedTag.fromStartTag(tag)
-            return Result(el, i + 1)
-        return Result(tag, i + 1)
+            el = SelfClosedTag.fromStream(s, start, i + 1, tagname, attrs)
+        else:
+            el = StartTag.fromStream(s, start, i + 1, tagname, attrs)
+        return Result(el, i + 1)
 
     if s.eof(i):
         m.die(f"Tag <{tagname}> wasn't closed at end of file.", lineNum=s.loc(start))
@@ -764,7 +668,7 @@ def parseEndTag(s: Stream, start: int) -> Result[EndTag]:
         m.die(f"Garbage after the tagname in </{tagname}>.", lineNum=s.loc(start))
         return Result.fail(start)
     i += 1
-    return Result(EndTag(line=s.line(start), endLine=s.line(i), context=s.context, tag=tagname), i)
+    return Result(EndTag.fromStream(s, start, i, tagname), i)
 
 
 def parseComment(s: Stream, start: int) -> Result[Comment]:
@@ -785,7 +689,7 @@ def parseComment(s: Stream, start: int) -> Result[Comment]:
             i += 1
         if s[i : i + 3] == "-->":
             return Result(
-                Comment(line=s.line(start), endLine=s.line(i + 2), context=s.context, data=s[dataStart:i]),
+                Comment.fromStream(s, start, i + 3, s[dataStart:i]),
                 i + 3,
             )
         if s[i : i + 4] == "--!>":
@@ -806,7 +710,7 @@ def parseDoctype(s: Stream, start: int) -> Result[Doctype]:
     if s[start + 9 : start + 15].lower() != " html>":
         m.die("Unnecessarily complex doctype - use <!doctype html>.", lineNum=s.loc(start))
         return Result.fail(start)
-    node = Doctype(line=s.line(start), endLine=s.line(start + 15), context=s.context, data=s[start : start + 15])
+    node = Doctype.fromStream(s, start, start + 15, s[start : start + 15])
     return Result(node, start + 15)
 
 
@@ -912,14 +816,14 @@ def parseCSSProduction(s: Stream, start: int) -> Result[ParserNode | list[Parser
     text, textEnd = s.skipTo(textStart, ">>").vi
     if text is None:
         m.die("Saw the start of a CSS production (like <<foo>>), but couldn't find the end.", lineNum=s.loc(start))
-        failNode = SafeText(line=s.line(start), endLine=s.line(start + 2), context=s.context, text="<<")
+        failNode = SafeText.fromStream(s, start, start + 2)
         return Result(failNode, start + 2)
     elif "\n" in text:
         m.die(
             "Saw the start of a CSS production (like <<foo>>), but couldn't find the end on the same line.",
             lineNum=s.loc(start),
         )
-        failNode = SafeText(line=s.line(start), endLine=s.line(start + 2), context=s.context, text="<<")
+        failNode = SafeText.fromStream(s, start, start + 2)
         return Result(failNode, start + 2)
     elif "<" in text or ">" in text:
         # Allow <<boolean [<<foo>>]>>
@@ -931,7 +835,7 @@ def parseCSSProduction(s: Stream, start: int) -> Result[ParserNode | list[Parser
                     "It seems like you wrote a CSS production with an argument (like <<foo [<<bar>>]>>), but either included more [] in the argument, or otherwise messed up the syntax.",
                     lineNum=s.loc(start),
                 )
-                failNode = SafeText(line=s.line(start), endLine=s.line(start + 2), context=s.context, text="<<")
+                failNode = SafeText.fromStream(s, start, start + 2)
                 return Result(failNode, start + 2)
             textEnd = newTextEnd
             text = s[textStart:textEnd]
@@ -940,7 +844,7 @@ def parseCSSProduction(s: Stream, start: int) -> Result[ParserNode | list[Parser
                 "It seems like you wrote a CSS production (like <<foo>>), but there's more markup inside of it, or you didn't close it properly.",
                 lineNum=s.loc(start),
             )
-            failNode = SafeText(line=s.line(start), endLine=s.line(start + 2), context=s.context, text="<<")
+            failNode = SafeText.fromStream(s, start, start + 2)
             return Result(failNode, start + 2)
     nodeEnd = textEnd + 2
 
@@ -967,12 +871,7 @@ def parseCSSProduction(s: Stream, start: int) -> Result[ParserNode | list[Parser
                     f"Shorthand <<{match[0]}>> gives type as '{match[3]}', but only 'property' and 'descriptor' are allowed.",
                     lineNum=s.loc(start),
                 )
-                failNode = SafeText(
-                    line=s.line(start),
-                    endLine=s.line(nodeEnd),
-                    context=s.context,
-                    text=s[start:nodeEnd],
-                )
+                failNode = SafeText.fromStream(s, start, nodeEnd)
                 return Result(failNode, nodeEnd)
             attrs["data-link-type"] = linkType
             attrs["data-lt"] = lt
@@ -1011,12 +910,7 @@ def parseCSSProduction(s: Stream, start: int) -> Result[ParserNode | list[Parser
                 formattedEnd, numEnd = parseRangeComponent(rangeEnd)
                 if formattedStart is None or formattedEnd is None:
                     m.die(f"Shorthand <<{text}>> has an invalid range.", lineNum=s.loc(start))
-                    failNode = SafeText(
-                        line=s.line(start),
-                        endLine=s.line(nodeEnd),
-                        context=s.context,
-                        text=s[start:nodeEnd],
-                    )
+                    failNode = SafeText.fromStream(s, start, nodeEnd)
                     return Result(failNode, nodeEnd)
                 elif numStart >= numEnd:
                     m.die(
@@ -1044,28 +938,12 @@ def parseCSSProduction(s: Stream, start: int) -> Result[ParserNode | list[Parser
 
     else:
         m.die(f"Shorthand <<{text}>> does not match any recognized shorthand grammar.", lineNum=s.loc(start))
-        failNode = SafeText(line=s.line(start), endLine=s.line(nodeEnd), context=s.context, text=s[start:nodeEnd])
+        failNode = SafeText.fromStream(s, start, nodeEnd)
         return Result(failNode, nodeEnd)
 
-    startTag = StartTag(
-        line=s.line(start),
-        endLine=s.line(textStart),
-        context=s.context,
-        tag="a",
-        attrs=attrs,
-    ).finalize()
-    contents = SafeText(
-        line=s.line(textStart),
-        endLine=s.line(textEnd),
-        context=s.context,
-        text=text,
-    )
-    endTag = EndTag(
-        line=s.line(textEnd),
-        endLine=s.line(nodeEnd),
-        context=s.context,
-        tag=startTag.tag,
-    )
+    startTag = StartTag.fromStream(s, start, textStart, "a", attrs).finalize()
+    contents = SafeText.fromStream(s, textStart, textEnd, text)
+    endTag = EndTag.fromStream(s, textEnd, nodeEnd, startTag)
     return Result([startTag, contents, endTag], nodeEnd)
 
 
@@ -1150,24 +1028,9 @@ def parseCSSMaybe(s: Stream, start: int) -> Result[list[ParserNode]]:
         return res
 
     # Doesn't look like a maybe link, so it's just CSS text.
-    startTag = StartTag(
-        line=s.line(start),
-        endLine=s.line(textStart),
-        context=s.context,
-        tag="css",
-    )
-    tagMiddle = RawText(
-        line=s.line(textStart),
-        endLine=s.line(textEnd),
-        context=s.context,
-        text=rawFromDoubleAngles(text),
-    )
-    endTag = EndTag(
-        line=s.line(textEnd),
-        endLine=s.line(nodeEnd),
-        context=s.context,
-        tag=startTag.tag,
-    )
+    startTag = StartTag.fromStream(s, start, textStart, "css")
+    tagMiddle = RawText.fromStream(s, textStart, textEnd, rawFromDoubleAngles(text))
+    endTag = EndTag.fromStream(s, textEnd, nodeEnd, startTag)
     return Result([startTag, tagMiddle, endTag], nodeEnd)
 
 
@@ -1181,39 +1044,30 @@ def parseMaybeDecl(s: Stream, start: int, textStart: int, textEnd: int, nodeEnd:
         return Result.fail(nodeEnd)
 
     for_, propdescname = match.groups()
-    startTag = StartTag(
-        line=s.line(start),
-        endLine=s.line(textStart),
-        context=s.context,
-        # Maybe autolinks are sometimes nested inside of real <a>s.
-        # To avoid parsing issues, I'll turn these into a custom el first,
-        # then swap them into an <a> post-parsing (in processAutolinks).
-        # I can probably avoid doing this later, when I'm parsing
-        # *only* with my bespoke parser, and can just emit a parsing error.
-        tag="bs-link",
-        attrs={
+    startTag = StartTag.fromStream(
+        s,
+        start,
+        textStart,
+        "bs-link",
+        {
             "bs-autolink-syntax": escapeAttr(s[start:nodeEnd]),
             "class": "css",
             "data-link-type": "propdesc",
             "data-lt": escapeAttr(propdescname),
         },
     )
+    # Maybe autolinks are sometimes nested inside of real <a>s.
+    # To avoid parsing issues, I'll turn these into a custom el first,
+    # then swap them into an <a> post-parsing (in processAutolinks).
+    # I can probably avoid doing this later, when I'm parsing
+    # *only* with my bespoke parser, and can just emit a parsing error.
+    # FIXME
     if for_:
         startTag.attrs["data-link-for"] = escapeAttr(for_)
         startTag.attrs["data-link-type"] = "descriptor"
     startTag.finalize()
-    tagMiddle = RawText(
-        line=s.line(textStart),
-        endLine=s.line(textEnd),
-        context=s.context,
-        text=rawFromDoubleAngles(text),
-    )
-    endTag = EndTag(
-        line=s.line(textEnd),
-        endLine=s.line(nodeEnd),
-        context=s.context,
-        tag=startTag.tag,
-    )
+    tagMiddle = RawText.fromStream(s, textStart, textEnd, rawFromDoubleAngles(text))
+    endTag = EndTag.fromStream(s, textEnd, nodeEnd, startTag)
     return Result([startTag, tagMiddle, endTag], nodeEnd)
 
 
@@ -1237,24 +1091,9 @@ def parseMaybeValue(s: Stream, start: int, textStart: int, textEnd: int, nodeEnd
             f"Shorthand ''{text}'' gives type as '{linkType}', but only “maybe” sub-types are allowed: {config.englishFromList(config.maybeTypes)}.",
             lineNum=s.loc(start),
         )
-        startTag = StartTag(
-            line=s.line(start),
-            endLine=s.line(textStart),
-            context=s.context,
-            tag="css",
-        )
-        tagMiddle = SafeText(
-            line=s.line(textStart),
-            endLine=s.line(textEnd),
-            context=s.context,
-            text=valueName,
-        )
-        endTag = EndTag(
-            line=s.line(textEnd),
-            endLine=s.line(nodeEnd),
-            context=s.context,
-            tag=startTag.tag,
-        )
+        startTag = StartTag.fromStream(s, start, textStart, "css")
+        tagMiddle = SafeText.fromStream(s, textStart, textEnd, valueName)
+        endTag = EndTag.fromStream(s, textEnd, nodeEnd, startTag)
         return Result([startTag, tagMiddle, endTag], nodeEnd)
 
     # Probably a valid link, but *possibly* not.
@@ -1264,12 +1103,12 @@ def parseMaybeValue(s: Stream, start: int, textStart: int, textEnd: int, nodeEnd
     #  doesn't look like it's an end tag).
     # Otherwise, keep the text as-is, but set the intended
     # link text if it *does* succeed.
-    startTag = StartTag(
-        line=s.line(start),
-        endLine=s.line(textStart),
-        context=s.context,
-        tag="bs-link",
-        attrs={
+    startTag = StartTag.fromStream(
+        s,
+        start,
+        textStart,
+        "bs-link",
+        {
             "bs-autolink-syntax": escapeAttr(s[start:nodeEnd]),
             "class": "css",
             "data-link-type": linkType,
@@ -1297,28 +1136,13 @@ def parseMaybeValue(s: Stream, start: int, textStart: int, textEnd: int, nodeEnd
             m.say("(See https://speced.github.io/bikeshed/#autolink-limits )")
         startTag.attrs["data-link-for"] = escapeAttr(for_)
     if (for_ is not None and not for_.endswith("<")) or match[3] is not None:
-        tagMiddle = SafeText(
-            line=s.line(textStart),
-            endLine=s.line(textEnd),
-            context=s.context,
-            text=safeFromDoubleAngles(valueName),
-        )
+        tagMiddle = SafeText.fromStream(s, textStart, textEnd, safeFromDoubleAngles(valueName))
     else:
         startTag.attrs["bs-replace-text-on-link-success"] = escapeAttr(safeFromDoubleAngles(valueName))
-        tagMiddle = RawText(
-            line=s.line(textStart),
-            endLine=s.line(textEnd),
-            context=s.context,
-            text=rawFromDoubleAngles(text),
-        )
+        tagMiddle = RawText.fromStream(s, textStart, textEnd, rawFromDoubleAngles(text))
 
     startTag.finalize()
-    endTag = EndTag(
-        line=s.line(textEnd),
-        endLine=s.line(nodeEnd),
-        context=s.context,
-        tag=startTag.tag,
-    )
+    endTag = EndTag.fromStream(s, textEnd, nodeEnd, startTag)
     return Result([startTag, tagMiddle, endTag], nodeEnd)
 
 
@@ -1368,7 +1192,7 @@ def parseCSSPropdesc(s: Stream, start: int) -> Result[SafeText | list[ParserNode
                 lineNum=s.loc(start),
             )
             return Result(
-                SafeText(line=s.line(start), endLine=s.line(innerEnd), context=s.context, text=s[start:innerEnd]),
+                SafeText.fromStream(s, start, innerEnd),
                 innerEnd,
             )
         else:
@@ -1391,22 +1215,22 @@ def parseCSSPropdesc(s: Stream, start: int) -> Result[SafeText | list[ParserNode
         linkType = "propdesc"
 
     if "*" in lt or lt.startswith("--"):
-        startTag = StartTag(
-            line=s.line(start),
-            endLine=s.line(start + 1),
-            context=s.context,
-            tag="css",
-            attrs={
+        startTag = StartTag.fromStream(
+            s,
+            start,
+            start + 1,
+            "css",
+            {
                 "bs-autolink-syntax": escapeAttr(s[start : innerEnd + 1]),
             },
         )
     else:
-        startTag = StartTag(
-            line=s.line(start),
-            endLine=s.line(start + 1),
-            context=s.context,
-            tag="a",
-            attrs={
+        startTag = StartTag.fromStream(
+            s,
+            start,
+            start + 1,
+            "a",
+            {
                 "class": "property",
                 "data-link-type": linkType,
                 "data-lt": escapeAttr(lt),
@@ -1419,18 +1243,8 @@ def parseCSSPropdesc(s: Stream, start: int) -> Result[SafeText | list[ParserNode
 
     if not textOverride:
         nodeEnd = innerEnd + 1
-        endTag = EndTag(
-            line=s.line(innerEnd),
-            endLine=s.line(nodeEnd),
-            context=s.context,
-            tag=startTag.tag,
-        )
-        middleText = SafeText(
-            line=s.line(start + 1),
-            endLine=s.line(innerEnd),
-            context=s.context,
-            text=lt,
-        )
+        endTag = EndTag.fromStream(s, innerEnd, nodeEnd, startTag)
+        middleText = SafeText.fromStream(s, start + 1, innerEnd, lt)
         return Result([startTag, middleText, endTag], nodeEnd)
 
     # Otherwise we need to parse what's left, until we find the ending '
@@ -1441,12 +1255,7 @@ def parseCSSPropdesc(s: Stream, start: int) -> Result[SafeText | list[ParserNode
         if linkInValue(value):
             m.die("Propdesc autolinks can't contain more links in their linktext.", lineNum=s.loc(start))
             return Result(
-                SafeText(
-                    line=s.line(start),
-                    endLine=s.line(innerEnd + 1),
-                    context=s.context,
-                    text=s[start : innerEnd + 1],
-                ),
+                SafeText.fromStream(s, start, innerEnd + 1),
                 innerEnd + 1,
             )
         if isinstance(value, list):
@@ -1460,12 +1269,7 @@ def parseCSSPropdesc(s: Stream, start: int) -> Result[SafeText | list[ParserNode
                     lineNum=s.loc(start),
                 )
                 return Result(
-                    SafeText(
-                        line=s.line(start),
-                        endLine=s.line(innerEnd + 1),
-                        context=s.context,
-                        text=s[start : innerEnd + 1],
-                    ),
+                    SafeText.fromStream(s, start, innerEnd + 1),
                     innerEnd + 1,
                 )
             nodeEnd = res.i + 1
@@ -1473,16 +1277,11 @@ def parseCSSPropdesc(s: Stream, start: int) -> Result[SafeText | list[ParserNode
     else:
         m.die("Propdesc autolink was opened, but was never closed.", lineNum=s.loc(start))
         return Result(
-            SafeText(line=s.line(start), endLine=s.line(innerEnd + 1), context=s.context, text=s[start : innerEnd + 1]),
+            SafeText.fromStream(s, start, innerEnd + 1),
             innerEnd + 1,
         )
 
-    endTag = EndTag(
-        line=s.line(nodeEnd - 1),
-        endLine=s.line(nodeEnd),
-        context=s.context,
-        tag=startTag.tag,
-    )
+    endTag = EndTag.fromStream(s, nodeEnd - 1, nodeEnd, startTag)
     startTag.attrs["bs-autolink-syntax"] = escapeAttr(s[start:nodeEnd])
 
     return Result([startTag, *innerContent, endTag], nodeEnd)
@@ -1541,12 +1340,12 @@ def parseAutolinkDfn(s: Stream, start: int) -> Result[SafeText | list[ParserNode
         )
         return Result.fail(start)
 
-    startTag = StartTag(
-        line=s.line(start),
-        endLine=s.line(start + 1),
-        context=s.context,
-        tag="a",
-        attrs={
+    startTag = StartTag.fromStream(
+        s,
+        start,
+        start + 1,
+        "a",
+        {
             "data-link-type": "dfn",
             "data-lt": escapeAttr(lt),
             "bs-autolink-syntax": escapeAttr(s[start : innerEnd + 2]),
@@ -1559,18 +1358,8 @@ def parseAutolinkDfn(s: Stream, start: int) -> Result[SafeText | list[ParserNode
 
     if not textOverride:
         nodeEnd = innerEnd + 2
-        endTag = EndTag(
-            line=s.line(innerEnd),
-            endLine=s.line(nodeEnd),
-            context=s.context,
-            tag=startTag.tag,
-        )
-        middleText = SafeText(
-            line=s.line(start + 1),
-            endLine=s.line(innerEnd),
-            context=s.context,
-            text=lt,
-        )
+        endTag = EndTag.fromStream(s, innerEnd, nodeEnd, startTag)
+        middleText = SafeText.fromStream(s, start + 1, innerEnd, lt)
         return Result([startTag, middleText, endTag], nodeEnd)
 
     # Otherwise we need to parse what's left, until we find the ending braces
@@ -1581,12 +1370,7 @@ def parseAutolinkDfn(s: Stream, start: int) -> Result[SafeText | list[ParserNode
         if linkInValue(value):
             m.die("Dfn autolinks can't contain more links in their linktext.", lineNum=s.loc(start))
             return Result(
-                SafeText(
-                    line=s.line(start),
-                    endLine=s.line(innerEnd + 1),
-                    context=s.context,
-                    text=s[start : innerEnd + 1],
-                ),
+                SafeText.fromStream(s, start, innerEnd + 1),
                 innerEnd + 1,
             )
         if isinstance(value, list):
@@ -1600,12 +1384,7 @@ def parseAutolinkDfn(s: Stream, start: int) -> Result[SafeText | list[ParserNode
                     lineNum=s.loc(start),
                 )
                 return Result(
-                    SafeText(
-                        line=s.line(start),
-                        endLine=s.line(innerEnd + 1),
-                        context=s.context,
-                        text=s[start : innerEnd + 1],
-                    ),
+                    SafeText.fromStream(s, start, innerEnd + 1),
                     innerEnd + 1,
                 )
             nodeEnd = res.i + 2
@@ -1616,16 +1395,11 @@ def parseAutolinkDfn(s: Stream, start: int) -> Result[SafeText | list[ParserNode
             lineNum=s.loc(start),
         )
         return Result(
-            SafeText(line=s.line(start), endLine=s.line(innerEnd + 1), context=s.context, text=s[start : innerEnd + 1]),
+            SafeText.fromStream(s, start, innerEnd + 1),
             innerEnd + 1,
         )
 
-    endTag = EndTag(
-        line=s.line(nodeEnd - 2),
-        endLine=s.line(nodeEnd),
-        context=s.context,
-        tag=startTag.tag,
-    )
+    endTag = EndTag.fromStream(s, nodeEnd - 2, nodeEnd, startTag)
     startTag.attrs["bs-autolink-syntax"] = escapeAttr(s[start:nodeEnd])
 
     return Result([startTag, *innerContent, endTag], nodeEnd)
@@ -1677,12 +1451,12 @@ def parseAutolinkAbstract(s: Stream, start: int) -> Result[SafeText | list[Parse
         )
         return Result.fail(start)
 
-    startTag = StartTag(
-        line=s.line(start),
-        endLine=s.line(start + 1),
-        context=s.context,
-        tag="a",
-        attrs={
+    startTag = StartTag.fromStream(
+        s,
+        start,
+        start + 1,
+        "a",
+        {
             "data-link-type": "abstract-op",
             "data-lt": escapeAttr(lt),
             "bs-autolink-syntax": escapeAttr(s[start : innerEnd + 2]),
@@ -1695,18 +1469,8 @@ def parseAutolinkAbstract(s: Stream, start: int) -> Result[SafeText | list[Parse
 
     if not textOverride:
         nodeEnd = innerEnd + 2
-        endTag = EndTag(
-            line=s.line(innerEnd),
-            endLine=s.line(nodeEnd),
-            context=s.context,
-            tag=startTag.tag,
-        )
-        middleText = SafeText(
-            line=s.line(start + 1),
-            endLine=s.line(innerEnd),
-            context=s.context,
-            text=lt,
-        )
+        endTag = EndTag.fromStream(s, innerEnd, nodeEnd, startTag)
+        middleText = SafeText.fromStream(s, start + 1, innerEnd, lt)
         return Result([startTag, middleText, endTag], nodeEnd)
 
     # Otherwise we need to parse what's left, until we find the ending braces
@@ -1717,12 +1481,7 @@ def parseAutolinkAbstract(s: Stream, start: int) -> Result[SafeText | list[Parse
         if linkInValue(value):
             m.die("Abstract-op autolinks can't contain more links in their linktext.", lineNum=s.loc(start))
             return Result(
-                SafeText(
-                    line=s.line(start),
-                    endLine=s.line(innerEnd + 1),
-                    context=s.context,
-                    text=s[start : innerEnd + 1],
-                ),
+                SafeText.fromStream(s, start, innerEnd + 1),
                 innerEnd + 1,
             )
         if isinstance(value, list):
@@ -1736,12 +1495,7 @@ def parseAutolinkAbstract(s: Stream, start: int) -> Result[SafeText | list[Parse
                     lineNum=s.loc(start),
                 )
                 return Result(
-                    SafeText(
-                        line=s.line(start),
-                        endLine=s.line(innerEnd + 1),
-                        context=s.context,
-                        text=s[start : innerEnd + 1],
-                    ),
+                    SafeText.fromStream(s, start, innerEnd + 1),
                     innerEnd + 1,
                 )
             nodeEnd = res.i + 2
@@ -1752,16 +1506,11 @@ def parseAutolinkAbstract(s: Stream, start: int) -> Result[SafeText | list[Parse
             lineNum=s.loc(start),
         )
         return Result(
-            SafeText(line=s.line(start), endLine=s.line(innerEnd + 1), context=s.context, text=s[start : innerEnd + 1]),
+            SafeText.fromStream(s, start, innerEnd + 1),
             innerEnd + 1,
         )
 
-    endTag = EndTag(
-        line=s.line(nodeEnd - 2),
-        endLine=s.line(nodeEnd),
-        context=s.context,
-        tag=startTag.tag,
-    )
+    endTag = EndTag.fromStream(s, nodeEnd - 2, nodeEnd, startTag)
     startTag.attrs["bs-autolink-syntax"] = escapeAttr(s[start:nodeEnd])
 
     return Result([startTag, *innerContent, endTag], nodeEnd)
@@ -1813,12 +1562,12 @@ def parseAutolinkHeader(s: Stream, start: int) -> Result[SafeText | list[ParserN
         )
         return Result.fail(start)
 
-    startTag = StartTag(
-        line=s.line(start),
-        endLine=s.line(start + 1),
-        context=s.context,
-        tag="a",
-        attrs={
+    startTag = StartTag.fromStream(
+        s,
+        start,
+        start + 1,
+        "a",
+        {
             "data-link-type": "http-header",
             "data-lt": escapeAttr(lt),
             "bs-autolink-syntax": escapeAttr(s[start : innerEnd + 2]),
@@ -1829,46 +1578,16 @@ def parseAutolinkHeader(s: Stream, start: int) -> Result[SafeText | list[ParserN
         startTag.attrs["data-link-for"] = escapeAttr(linkFor)
     startTag = startTag.finalize()
 
-    startTick = RawText(
-        line=s.line(start),
-        endLine=s.line(start + 1),
-        context=s.context,
-        text="`",
-    )
-    startCode = StartTag(
-        line=s.line(start),
-        endLine=s.line(start + 1),
-        context=s.context,
-        tag="code",
-    )
+    startTick = RawText.fromStream(s, start, start + 1, "`")
+    startCode = StartTag.fromStream(s, start + 1, start + 1, "code")
 
     if not textOverride:
         nodeEnd = innerEnd + 2
-        endTag = EndTag(
-            line=s.line(innerEnd),
-            endLine=s.line(nodeEnd),
-            context=s.context,
-            tag=startTag.tag,
-        )
-        endCode = EndTag(
-            line=s.line(innerEnd),
-            endLine=s.line(nodeEnd),
-            context=s.context,
-            tag=startCode.tag,
-        )
-        endTick = RawText(
-            line=s.line(innerEnd),
-            endLine=s.line(nodeEnd),
-            context=s.context,
-            text="`",
-        )
+        endTag = EndTag.fromStream(s, innerEnd, nodeEnd, startTag)
+        endCode = EndTag.fromStream(s, nodeEnd, nodeEnd, startCode)
+        endTick = RawText.fromStream(s, nodeEnd, nodeEnd, "`")
 
-        middleText = SafeText(
-            line=s.line(start + 1),
-            endLine=s.line(innerEnd),
-            context=s.context,
-            text=lt,
-        )
+        middleText = SafeText.fromStream(s, start + 1, innerEnd, lt)
         return Result([startTick, startCode, startTag, middleText, endTag, endCode, endTick], nodeEnd)
 
     # Otherwise we need to parse what's left, until we find the ending braces
@@ -1879,12 +1598,7 @@ def parseAutolinkHeader(s: Stream, start: int) -> Result[SafeText | list[ParserN
         if linkInValue(value):
             m.die("HTTP Header autolinks can't contain more links in their linktext.", lineNum=s.loc(start))
             return Result(
-                SafeText(
-                    line=s.line(start),
-                    endLine=s.line(innerEnd + 1),
-                    context=s.context,
-                    text=s[start : innerEnd + 1],
-                ),
+                SafeText.fromStream(s, start, innerEnd + 1),
                 innerEnd + 1,
             )
         if isinstance(value, list):
@@ -1898,12 +1612,7 @@ def parseAutolinkHeader(s: Stream, start: int) -> Result[SafeText | list[ParserN
                     lineNum=s.loc(start),
                 )
                 return Result(
-                    SafeText(
-                        line=s.line(start),
-                        endLine=s.line(innerEnd + 1),
-                        context=s.context,
-                        text=s[start : innerEnd + 1],
-                    ),
+                    SafeText.fromStream(s, start, innerEnd + 1),
                     innerEnd + 1,
                 )
             nodeEnd = res.i + 2
@@ -1914,29 +1623,14 @@ def parseAutolinkHeader(s: Stream, start: int) -> Result[SafeText | list[ParserN
             lineNum=s.loc(start),
         )
         return Result(
-            SafeText(line=s.line(start), endLine=s.line(innerEnd + 1), context=s.context, text=s[start : innerEnd + 1]),
+            SafeText.fromStream(s, start, innerEnd + 1),
             innerEnd + 1,
         )
 
-    endTag = EndTag(
-        line=s.line(nodeEnd - 2),
-        endLine=s.line(nodeEnd),
-        context=s.context,
-        tag=startTag.tag,
-    )
+    endTag = EndTag.fromStream(s, nodeEnd - 2, nodeEnd, startTag)
     startTag.attrs["bs-autolink-syntax"] = escapeAttr(s[start:nodeEnd])
-    endCode = EndTag(
-        line=s.line(nodeEnd - 2),
-        endLine=s.line(nodeEnd),
-        context=s.context,
-        tag=startCode.tag,
-    )
-    endTick = RawText(
-        line=s.line(nodeEnd - 2),
-        endLine=s.line(nodeEnd),
-        context=s.context,
-        text="`",
-    )
+    endCode = EndTag.fromStream(s, nodeEnd, nodeEnd, startCode)
+    endTick = RawText.fromStream(s, nodeEnd, nodeEnd, "`")
 
     return Result([startTick, startCode, startTag, *innerContent, endTag, endCode, endTick], nodeEnd)
 
@@ -2010,12 +1704,12 @@ def parseAutolinkIdl(s: Stream, start: int) -> Result[SafeText | list[ParserNode
         )
         return Result.fail(start)
 
-    startTag = StartTag(
-        line=s.line(start),
-        endLine=s.line(start + 1),
-        context=s.context,
-        tag="a",
-        attrs={
+    startTag = StartTag.fromStream(
+        s,
+        start,
+        start + 1,
+        "a",
+        {
             "data-link-type": linkType,
             "data-lt": escapeAttr(lt),
             "bs-autolink-syntax": escapeAttr(s[start : innerEnd + 2]),
@@ -2026,35 +1720,20 @@ def parseAutolinkIdl(s: Stream, start: int) -> Result[SafeText | list[ParserNode
         startTag.attrs["data-link-for"] = escapeAttr(linkFor)
     startTag = startTag.finalize()
 
-    startCode = StartTag(
-        line=s.line(start),
-        endLine=s.line(start + 1),
-        context=s.context,
-        tag="code",
-        attrs={"class": "idl", "nohighlight": ""},
+    startCode = StartTag.fromStream(
+        s,
+        start + 1,
+        start + 1,
+        "code",
+        {"class": "idl", "nohighlight": ""},
     ).finalize()
 
     if not textOverride:
         nodeEnd = innerEnd + 2
-        endTag = EndTag(
-            line=s.line(innerEnd),
-            endLine=s.line(nodeEnd),
-            context=s.context,
-            tag=startTag.tag,
-        )
-        endCode = EndTag(
-            line=s.line(innerEnd),
-            endLine=s.line(nodeEnd),
-            context=s.context,
-            tag=startCode.tag,
-        )
+        endTag = EndTag.fromStream(s, innerEnd, nodeEnd, startTag)
+        endCode = EndTag.fromStream(s, nodeEnd, nodeEnd, startCode)
 
-        middleText = SafeText(
-            line=s.line(start + 1),
-            endLine=s.line(innerEnd),
-            context=s.context,
-            text=visibleText,
-        )
+        middleText = SafeText.fromStream(s, start + 1, innerEnd, visibleText)
         return Result([startCode, startTag, middleText, endTag, endCode], nodeEnd)
 
     # Otherwise we need to parse what's left, until we find the ending braces
@@ -2065,12 +1744,7 @@ def parseAutolinkIdl(s: Stream, start: int) -> Result[SafeText | list[ParserNode
         if linkInValue(value):
             m.die("IDL autolinks can't contain more links in their linktext.", lineNum=s.loc(start))
             return Result(
-                SafeText(
-                    line=s.line(start),
-                    endLine=s.line(innerEnd + 1),
-                    context=s.context,
-                    text=s[start : innerEnd + 1],
-                ),
+                SafeText.fromStream(s, start, innerEnd + 1),
                 innerEnd + 1,
             )
         if isinstance(value, list):
@@ -2084,12 +1758,7 @@ def parseAutolinkIdl(s: Stream, start: int) -> Result[SafeText | list[ParserNode
                     lineNum=s.loc(start),
                 )
                 return Result(
-                    SafeText(
-                        line=s.line(start),
-                        endLine=s.line(innerEnd + 1),
-                        context=s.context,
-                        text=s[start : innerEnd + 1],
-                    ),
+                    SafeText.fromStream(s, start, innerEnd + 1),
                     innerEnd + 1,
                 )
             nodeEnd = res.i + 2
@@ -2100,23 +1769,13 @@ def parseAutolinkIdl(s: Stream, start: int) -> Result[SafeText | list[ParserNode
             lineNum=s.loc(start),
         )
         return Result(
-            SafeText(line=s.line(start), endLine=s.line(innerEnd + 1), context=s.context, text=s[start : innerEnd + 1]),
+            SafeText.fromStream(s, start, innerEnd + 1),
             innerEnd + 1,
         )
 
-    endTag = EndTag(
-        line=s.line(nodeEnd - 2),
-        endLine=s.line(nodeEnd),
-        context=s.context,
-        tag=startTag.tag,
-    )
+    endTag = EndTag.fromStream(s, nodeEnd - 2, nodeEnd, startTag)
     startTag.attrs["bs-autolink-syntax"] = escapeAttr(s[start:nodeEnd])
-    endCode = EndTag(
-        line=s.line(nodeEnd - 2),
-        endLine=s.line(nodeEnd),
-        context=s.context,
-        tag=startCode.tag,
-    )
+    endCode = EndTag.fromStream(s, nodeEnd, nodeEnd, startCode)
 
     return Result([startCode, startTag, *innerContent, endTag, endCode], nodeEnd)
 
@@ -2185,12 +1844,12 @@ def parseAutolinkElement(s: Stream, start: int) -> Result[SafeText | list[Parser
         )
         return Result.fail(start)
 
-    startTag = StartTag(
-        line=s.line(start),
-        endLine=s.line(start + 1),
-        context=s.context,
-        tag="a",
-        attrs={
+    startTag = StartTag.fromStream(
+        s,
+        start,
+        start + 1,
+        "a",
+        {
             "data-link-type": linkType,
             "data-lt": escapeAttr(lt),
             "bs-autolink-syntax": escapeAttr(s[start : innerEnd + 2]),
@@ -2201,35 +1860,14 @@ def parseAutolinkElement(s: Stream, start: int) -> Result[SafeText | list[Parser
         startTag.attrs["data-link-for"] = escapeAttr(linkFor)
     startTag = startTag.finalize()
 
-    startCode = StartTag(
-        line=s.line(start),
-        endLine=s.line(start + 1),
-        context=s.context,
-        tag="code",
-        attrs={"nohighlight": ""},
-    ).finalize()
+    startCode = StartTag.fromStream(s, start, start + 1, "code", {"nohighlight": ""})
 
     if not textOverride:
         nodeEnd = innerEnd + 2
-        endTag = EndTag(
-            line=s.line(innerEnd),
-            endLine=s.line(nodeEnd),
-            context=s.context,
-            tag=startTag.tag,
-        )
-        endCode = EndTag(
-            line=s.line(innerEnd),
-            endLine=s.line(nodeEnd),
-            context=s.context,
-            tag=startCode.tag,
-        )
+        endTag = EndTag.fromStream(s, innerEnd, nodeEnd, startTag)
+        endCode = EndTag.fromStream(s, nodeEnd, nodeEnd, startCode)
 
-        middleText = SafeText(
-            line=s.line(start + 1),
-            endLine=s.line(innerEnd),
-            context=s.context,
-            text=lt,
-        )
+        middleText = SafeText.fromStream(s, start + 1, innerEnd, lt)
         return Result([startCode, startTag, middleText, endTag, endCode], nodeEnd)
 
     # Otherwise we need to parse what's left, until we find the ending braces
@@ -2240,12 +1878,7 @@ def parseAutolinkElement(s: Stream, start: int) -> Result[SafeText | list[Parser
         if linkInValue(value):
             m.die("Element autolinks can't contain more links in their linktext.", lineNum=s.loc(start))
             return Result(
-                SafeText(
-                    line=s.line(start),
-                    endLine=s.line(innerEnd + 1),
-                    context=s.context,
-                    text=s[start : innerEnd + 1],
-                ),
+                SafeText.fromStream(s, start, innerEnd + 1),
                 innerEnd + 1,
             )
         if isinstance(value, list):
@@ -2259,12 +1892,7 @@ def parseAutolinkElement(s: Stream, start: int) -> Result[SafeText | list[Parser
                     lineNum=s.loc(start),
                 )
                 return Result(
-                    SafeText(
-                        line=s.line(start),
-                        endLine=s.line(innerEnd + 1),
-                        context=s.context,
-                        text=s[start : innerEnd + 1],
-                    ),
+                    SafeText.fromStream(s, start, innerEnd + 1),
                     innerEnd + 1,
                 )
             nodeEnd = res.i + 2
@@ -2275,23 +1903,13 @@ def parseAutolinkElement(s: Stream, start: int) -> Result[SafeText | list[Parser
             lineNum=s.loc(start),
         )
         return Result(
-            SafeText(line=s.line(start), endLine=s.line(innerEnd + 1), context=s.context, text=s[start : innerEnd + 1]),
+            SafeText.fromStream(s, start, innerEnd + 1),
             innerEnd + 1,
         )
 
-    endTag = EndTag(
-        line=s.line(nodeEnd - 2),
-        endLine=s.line(nodeEnd),
-        context=s.context,
-        tag=startTag.tag,
-    )
+    endTag = EndTag.fromStream(s, nodeEnd - 2, nodeEnd, startTag)
     startTag.attrs["bs-autolink-syntax"] = escapeAttr(s[start:nodeEnd])
-    endCode = EndTag(
-        line=s.line(nodeEnd - 2),
-        endLine=s.line(nodeEnd),
-        context=s.context,
-        tag=startCode.tag,
-    )
+    endCode = EndTag.fromStream(s, nodeEnd, nodeEnd, startCode)
 
     return Result([startCode, startTag, *innerContent, endTag, endCode], nodeEnd)
 
@@ -2314,12 +1932,7 @@ def parseShorthandVariable(s: Stream, start: int) -> Result[ParserNode | list[Pa
                 lineNum=s.loc(start),
             )
             return Result(
-                SafeText(
-                    line=s.line(start),
-                    endLine=s.line(start + 1),
-                    context=s.context,
-                    text="|",
-                ),
+                SafeText.fromStream(s, start, start + 1, "|"),
                 start + 1,
             )
         if s[res.i] == "|":
@@ -2331,23 +1944,18 @@ def parseShorthandVariable(s: Stream, start: int) -> Result[ParserNode | list[Pa
             lineNum=s.loc(start),
         )
         return Result(
-            RawText(line=s.line(start), endLine=s.line(start + 1), context=s.context, text="|"),
+            RawText.fromStream(s, start, start + 1, "|"),
             start + 1,
         )
 
-    varStart = StartTag(
-        line=s.line(start),
-        endLine=s.line(start + 1),
-        context=s.context,
-        tag="var",
-        attrs={"bs-autolink-syntax": s[start:nodeEnd]},
+    varStart = StartTag.fromStream(
+        s,
+        start,
+        start + 1,
+        "var",
+        {"bs-autolink-syntax": s[start:nodeEnd]},
     )
-    varEnd = EndTag(
-        line=s.line(nodeEnd - 1),
-        endLine=s.line(nodeEnd),
-        context=s.context,
-        tag=varStart.tag,
-    )
+    varEnd = EndTag.fromStream(s, nodeEnd - 1, nodeEnd, varStart)
     return Result([varStart, *innerContent, varEnd], nodeEnd)
 
 
@@ -2366,12 +1974,7 @@ def parseAutolinkBiblioSection(s: Stream, start: int) -> Result[SafeText | list[
                 lineNum=s.loc(start),
             )
             return Result(
-                SafeText(
-                    line=s.line(start),
-                    endLine=s.line(innerStart),
-                    context=s.context,
-                    text="[[",
-                ),
+                SafeText.fromStream(s, start, innerStart, "[["),
                 innerStart,
             )
     parseOutcome, innerEnd = innerResult.vi
@@ -2380,18 +1983,8 @@ def parseAutolinkBiblioSection(s: Stream, start: int) -> Result[SafeText | list[
 
     if s[innerEnd] == "]":
         nodeEnd = innerEnd + 2
-        endTag = EndTag(
-            line=s.line(innerEnd),
-            endLine=s.line(nodeEnd),
-            context=s.context,
-            tag=startTag.tag,
-        )
-        middleText = RawText(
-            line=s.line(innerStart),
-            endLine=s.line(innerEnd),
-            context=s.context,
-            text=visibleText,
-        )
+        endTag = EndTag.fromStream(s, innerEnd, nodeEnd, startTag)
+        middleText = RawText.fromStream(s, innerStart, innerEnd, visibleText)
         return Result([startTag, middleText, endTag], nodeEnd)
 
     # Otherwise we need to parse what's left, until we find the ending braces
@@ -2402,12 +1995,7 @@ def parseAutolinkBiblioSection(s: Stream, start: int) -> Result[SafeText | list[
         if linkInValue(value):
             m.die("Biblio/section autolinks can't contain more links in their linktext.", lineNum=s.loc(start))
             return Result(
-                SafeText(
-                    line=s.line(start),
-                    endLine=s.line(innerEnd + 1),
-                    context=s.context,
-                    text=s[start : innerEnd + 1],
-                ),
+                SafeText.fromStream(s, start, innerEnd + 1),
                 innerEnd + 1,
             )
         if isinstance(value, list):
@@ -2421,12 +2009,7 @@ def parseAutolinkBiblioSection(s: Stream, start: int) -> Result[SafeText | list[
                     lineNum=s.loc(start),
                 )
                 return Result(
-                    SafeText(
-                        line=s.line(start),
-                        endLine=s.line(innerEnd + 1),
-                        context=s.context,
-                        text=s[start : innerEnd + 1],
-                    ),
+                    SafeText.fromStream(s, start, innerEnd + 1),
                     innerEnd + 1,
                 )
             nodeEnd = res.i + 2
@@ -2437,16 +2020,11 @@ def parseAutolinkBiblioSection(s: Stream, start: int) -> Result[SafeText | list[
             lineNum=s.loc(start),
         )
         return Result(
-            SafeText(line=s.line(start), endLine=s.line(innerEnd + 1), context=s.context, text=s[start : innerEnd + 1]),
+            SafeText.fromStream(s, start, innerEnd + 1),
             innerEnd + 1,
         )
 
-    endTag = EndTag(
-        line=s.line(nodeEnd - 2),
-        endLine=s.line(nodeEnd),
-        context=s.context,
-        tag=startTag.tag,
-    )
+    endTag = EndTag.fromStream(s, nodeEnd - 2, nodeEnd, startTag)
     startTag.attrs["bs-autolink-syntax"] = escapeAttr(s[start:nodeEnd])
 
     return Result([startTag, *innerContent, endTag], nodeEnd)
@@ -2472,12 +2050,7 @@ def parseBiblioInner(s: Stream, innerStart: int) -> Result[tuple[StartTag, str]]
         "bs-autolink-syntax": s[nodeStart:innerEnd] + "]]",
     }
 
-    failureStart = StartTag(
-        line=s.line(nodeStart),
-        endLine=s.line(innerStart),
-        context=s.context,
-        tag="span",
-    )
+    failureStart = StartTag.fromStream(s, nodeStart, innerStart, "span")
     failureResult = Result(
         (failureStart, f"&#91;{lt}]"),
         innerEnd,
@@ -2519,13 +2092,7 @@ def parseBiblioInner(s: Stream, innerStart: int) -> Result[tuple[StartTag, str]]
                 )
                 return failureResult
 
-    startTag = StartTag(
-        line=s.line(nodeStart),
-        endLine=s.line(innerStart),
-        context=s.context,
-        tag="a",
-        attrs=attrs,
-    ).finalize()
+    startTag = StartTag.fromStream(s, nodeStart, innerStart, "a", attrs).finalize()
     return Result(
         (startTag, f"&#91;{lt}]"),
         innerEnd,
@@ -2554,12 +2121,12 @@ def parseSectionInner(s: Stream, innerStart: int) -> Result[tuple[StartTag, str]
     spec, section, justPage = match.groups()
     if spec is None:
         # local section link
-        startTag = StartTag(
-            line=s.line(nodeStart),
-            endLine=s.line(innerStart),
-            context=s.context,
-            tag="a",
-            attrs={
+        startTag = StartTag.fromStream(
+            s,
+            nodeStart,
+            innerStart,
+            "a",
+            {
                 "section": "",
                 "href": section,
                 "bs-autolink-syntax": f"[[{match[0]}]]",
@@ -2567,12 +2134,12 @@ def parseSectionInner(s: Stream, innerStart: int) -> Result[tuple[StartTag, str]
         )
     elif justPage is not None:
         # foreign link, to an actual page from a multipage spec
-        startTag = StartTag(
-            line=s.line(nodeStart),
-            endLine=s.line(innerStart),
-            context=s.context,
-            tag="span",
-            attrs={
+        startTag = StartTag.fromStream(
+            s,
+            nodeStart,
+            innerStart,
+            "span",
+            {
                 "spec-section": justPage + "#",
                 "spec": spec,
                 "bs-autolink-syntax": f"[[{match[0]}]]",
@@ -2580,12 +2147,12 @@ def parseSectionInner(s: Stream, innerStart: int) -> Result[tuple[StartTag, str]
         )
     else:
         # foreign link
-        startTag = StartTag(
-            line=s.line(nodeStart),
-            endLine=s.line(innerStart),
-            context=s.context,
-            tag="span",
-            attrs={
+        startTag = StartTag.fromStream(
+            s,
+            nodeStart,
+            innerStart,
+            "span",
+            {
                 "spec-section": section,
                 "spec": spec,
                 "bs-autolink-syntax": f"[[{match[0]}]]",
@@ -2630,25 +2197,15 @@ def parseCodeSpan(s: Stream, start: int) -> Result[list[ParserNode]]:
         # (So you can put ticks at the start/end of your code span.)
         text = text[1:-1]
 
-    startTag = StartTag(
-        line=s.line(start),
-        endLine=s.line(contentStart),
-        context=s.context,
-        tag="code",
-        attrs={"bs-autolink-syntax": f"{ticks}{text}{ticks}", "bs-opaque": ""},
+    startTag = StartTag.fromStream(
+        s,
+        start,
+        contentStart,
+        "code",
+        {"bs-autolink-syntax": f"{ticks}{text}{ticks}", "bs-opaque": ""},
     )
-    content = RawText(
-        line=s.line(contentStart),
-        endLine=s.line(contentEnd),
-        context=s.context,
-        text=escapeHTML(text),
-    )
-    endTag = EndTag(
-        line=s.line(contentEnd),
-        endLine=s.line(i),
-        context=s.context,
-        tag=startTag.tag,
-    )
+    content = SafeText.fromStream(s, contentStart, contentEnd, text)
+    endTag = EndTag.fromStream(s, contentEnd, i, startTag)
     return Result([startTag, content, endTag], i)
 
 
@@ -2710,24 +2267,12 @@ def parseFencedCodeBlock(s: Stream, start: int) -> Result[RawElement]:
         contents += match.group(0)
 
     # At this point i is past the end of the code block.
-    tag = StartTag(
-        line=s.line(start),
-        endLine=s.line(start),
-        context=s.context,
-        tag="xmp",
-    )
+    tag = StartTag.fromStream(s, start, start, "xmp")
     if infoString:
         tag.attrs["bs-infostring"] = infoString
         lang = infoString.split(" ")[0]
         tag.classes.add(f"language-{lang}")
-    el = RawElement(
-        line=tag.line,
-        tag=tag.tag,
-        startTag=tag,
-        data=contents,
-        endLine=s.line(i),
-        context=s.context,
-    )
+    el = RawElement.fromStream(s, start, i, tag, contents)
     return Result(el, i)
 
 
@@ -2755,12 +2300,7 @@ def parseMacro(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
                 lineNum=s.loc(i),
             )
             return Result(
-                RawText(
-                    line=s.line(start),
-                    endLine=s.line(i),
-                    context=s.context,
-                    text=s[start:i],
-                ),
+                RawText.fromStream(s, start, i),
                 i,
             )
     macroText = s.config.macros[macroName]
@@ -2773,12 +2313,7 @@ def parseMacro(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
             lineNum=s.loc(start),
         )
         return Result(
-            RawText(
-                line=s.line(start),
-                endLine=s.line(i),
-                context=s.context,
-                text=s[start:i],
-            ),
+            RawText.fromStream(s, start, i),
             i,
         )
     nodes = list(nodesFromStream(newStream, 0))
@@ -2896,17 +2431,11 @@ def parseMetadataBlock(s: Stream, start: int) -> Result[RawElement]:
     # Since the internals aren't parsed, call it an <xmp>
     # so it'll survive later parses if necessary.
     startTag.tag = "xmp"
-    el = RawElement(
-        line=startTag.line,
-        tag="xmp",
-        startTag=startTag,
-        data=contents,
-        endLine=s.line(i),
-        context=s.context,
-    )
+    el = RawElement.fromStream(s, start, i, startTag, contents)
     return Result(el, i)
 
-def isMacroStart(s: Stream, start: int):
+
+def isMacroStart(s: Stream, start: int) -> bool:
     ch = s[start]
     return ch.isalpha() or ch.isdigit() or ch == "-"
 
