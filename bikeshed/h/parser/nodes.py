@@ -16,6 +16,8 @@ if t.TYPE_CHECKING:
 class ParserNode(metaclass=ABCMeta):
     line: int
     endLine: int
+    loc: str
+    endLoc: str
     context: str | None
 
     @property
@@ -44,6 +46,8 @@ class RawText(Text):
         return cls(
             line=s.line(start),
             endLine=s.line(end),
+            loc=s.loc(start),
+            endLoc=s.loc(end),
             context=s.context,
             text=text if text is not None else s[start:end],
         )
@@ -78,6 +82,8 @@ class SafeText(Text):
         return cls(
             line=s.line(start),
             endLine=s.line(end),
+            loc=s.loc(start),
+            endLoc=s.loc(end),
             context=s.context,
             text=text if text is not None else s[start:end],
         )
@@ -95,6 +101,8 @@ class Doctype(ParserNode):
         return cls(
             line=s.line(start),
             endLine=s.line(end),
+            loc=s.loc(start),
+            endLoc=s.loc(end),
             context=s.context,
             data=data,
         )
@@ -120,6 +128,8 @@ class StartTag(ParserNode):
         return cls(
             line=s.line(start),
             endLine=s.line(end),
+            loc=s.loc(start),
+            endLoc=s.loc(end),
             context=s.context,
             tag=tag,
             attrs=attrs,
@@ -172,6 +182,8 @@ class SelfClosedTag(ParserNode):
         return cls(
             line=s.line(start),
             endLine=s.line(end),
+            loc=s.loc(start),
+            endLoc=s.loc(end),
             context=s.context,
             tag=tag,
             attrs=attrs,
@@ -182,6 +194,8 @@ class SelfClosedTag(ParserNode):
         return cls(
             line=tag.line,
             endLine=tag.endLine,
+            loc=tag.loc,
+            endLoc=tag.endLoc,
             context=tag.context,
             tag=tag.tag,
             attrs=tag.attrs,
@@ -241,6 +255,8 @@ class EndTag(ParserNode):
         return cls(
             line=s.line(start),
             endLine=s.line(end),
+            loc=s.loc(start),
+            endLoc=s.loc(end),
             context=s.context,
             tag=tag if isinstance(tag, str) else tag.tag,
         )
@@ -258,6 +274,8 @@ class Comment(ParserNode):
         return cls(
             line=s.line(start),
             endLine=s.line(end),
+            loc=s.loc(start),
+            endLoc=s.loc(end),
             context=s.context,
             data=data,
         )
@@ -281,6 +299,8 @@ class RawElement(ParserNode):
         return cls(
             line=s.line(start),
             endLine=s.line(end),
+            loc=s.loc(start),
+            endLoc=s.loc(end),
             context=s.context,
             tag=startTag.tag,
             startTag=startTag,
