@@ -1140,7 +1140,7 @@ def parseCSSPropdesc(s: Stream, start: int) -> Result[SafeText | list[ParserNode
         Result.fail(start)
     innerStart = start + 1
 
-    match, innerEnd = s.matchRe(start+1, AUTOLINK_PROPDESC_RE).vi
+    match, innerEnd = s.matchRe(start + 1, AUTOLINK_PROPDESC_RE).vi
     if match is None:
         return Result.fail(start)
 
@@ -1659,6 +1659,7 @@ def parseLinkText(
     endingLength = len(endingSigil)
     startLine = s.line(start)
     content: list[ParserNode] = []
+    s.observeNode(start, startTag)
     for res in generateResults(s, start):
         value, i = res.vi
         assert value is not None
@@ -1673,7 +1674,9 @@ def parseLinkText(
             )
             return Result.fail(start)
         if s[i : i + endingLength] == endingSigil:
-            content.append(EndTag.fromStream(s, i, i + endingLength, startTag))
+            endTag = EndTag.fromStream(s, i, i + endingLength, startTag)
+            s.observeNode(i, endTag)
+            content.append(endTag)
             return Result(content, i + endingLength)
     m.die(
         f"{startingSigil}...{endingSigil} autolink was opened at {startTag.loc}, and used | to indicate it was providing explicit linktext, but never closed. Either close your autolink, or escape the initial characters that triggered autolink parsing.",
