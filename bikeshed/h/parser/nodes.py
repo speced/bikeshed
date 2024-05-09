@@ -324,6 +324,9 @@ def escapeAttr(text: str) -> str:
 class TagStack:
     tags: list[TagStackEntry] = field(default_factory=list)
 
+    def printOpenTags(self) -> list[str]:
+        return [f"{x.name} at {x.startTag.loc}" for x in self.tags]
+
     def inOpaqueElement(self, opaqueTags: t.Collection[str] | None = None) -> bool:
         if opaqueTags is None:
             opaqueTags = {"pre", "xmp", "script", "style"}
@@ -352,9 +355,8 @@ class TagStack:
                     return
                 for entry in reversed(self.tags):
                     if entry.startTag.tag == node.tag:
-                        openTags = [f"{x.name} at {x.startTag.loc}" for x in self.tags]
                         m.die(
-                            f"Saw an end tag {node}, but there were unclosed elements remaining before the nearest matching start tag (on line {entry.startTag.line}).\nOpen tags: {', '.join(openTags)}",
+                            f"Saw an end tag {node}, but there were unclosed elements remaining before the nearest matching start tag (on line {entry.startTag.line}).\nOpen tags: {', '.join(self.printOpenTags())}",
                             lineNum=node.line,
                         )
                         break
@@ -374,7 +376,7 @@ class TagStack:
         shorthand = sigils[0] + "..." + sigils[1]
         if any(x.startTag == startTag for x in self.tags):
             m.die(
-                f"Closing {shorthand} shorthand (opened on {startTag.loc}), but there were open tags before its opening.",
+                f"{shorthand} shorthand (opened on {startTag.loc}) was closed, but there were still open elements inside of it.\nOpen tags: {', '.join(self.printOpenTags())}",
                 lineNum=loc,
             )
             while self.tags and self.tags[-1].startTag != startTag:
