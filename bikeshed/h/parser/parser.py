@@ -153,6 +153,8 @@ def parseNode(
     node: ParserNode | list[ParserNode] | None
 
     inOpaque = s.inOpaqueElement()
+    inA = s.inTagContext("a")
+    inDfn = s.inTagContext("dfn")
 
     if first1 == "&":
         ch, i = parseCharRef(s, start, context=CharRefContext.NON_ATTR).vi
@@ -195,6 +197,11 @@ def parseNode(
         elif first1 == "'":
             propdescRes = parseCSSPropdesc(s, start)
             if propdescRes.valid:
+                if inA:
+                    m.die(
+                        "Parsed a CSS property autolink ('foo') inside of an <a>. Either close the <a> properly, or escape the autolink.",
+                        lineNum=s.loc(start),
+                    )
                 return propdescRes
     if s.config.dfn and not inOpaque:
         if first3 in ("\\[=", "\\[$"):
@@ -203,10 +210,20 @@ def parseNode(
         if first2 == "[=":
             dfnRes = parseAutolinkDfn(s, start)
             if dfnRes.valid:
+                if inA:
+                    m.die(
+                        "Parsed a dfn autolink ([=...=]) inside of an <a>. Either close the <a> properly, or escape the autolink.",
+                        lineNum=s.loc(start),
+                    )
                 return dfnRes
         if first2 == "[$":
             abstractRes = parseAutolinkAbstract(s, start)
             if abstractRes.valid:
+                if inA:
+                    m.die(
+                        "Parsed an abstract-op autolink ([$...$]) inside of an <a>. Either close the <a> properly, or escape the autolink.",
+                        lineNum=s.loc(start),
+                    )
                 return abstractRes
     if s.config.header and not inOpaque:
         if first3 == "\\[:":
@@ -215,6 +232,11 @@ def parseNode(
         if first2 == "[:":
             headerRes = parseAutolinkHeader(s, start)
             if headerRes.valid:
+                if inA:
+                    m.die(
+                        "Parsed an http-header autolink ([:...:]) inside of an <a>. Either close the <a> properly, or escape the autolink.",
+                        lineNum=s.loc(start),
+                    )
                 return headerRes
     if s.config.idl and not inOpaque:
         if first3 == "\\{{":
@@ -223,6 +245,11 @@ def parseNode(
         if first2 == "{{":
             idlRes = parseAutolinkIdl(s, start)
             if idlRes.valid:
+                if inA:
+                    m.die(
+                        "Parsed an IDL autolink ({{...}}) inside of an <a>. Either close the <a> properly, or escape the autolink.",
+                        lineNum=s.loc(start),
+                    )
                 return idlRes
     if s.config.markup and not inOpaque:
         if first3 == "\\<{":
@@ -231,6 +258,11 @@ def parseNode(
         if first2 == "<{":
             elementRes = parseAutolinkElement(s, start)
             if elementRes.valid:
+                if inA:
+                    m.die(
+                        "Parsed a markup autolink (<{...}>) inside of an <a>. Either close the <a> properly, or escape the autolink.",
+                        lineNum=s.loc(start),
+                    )
                 return elementRes
     if False:  # s.config.algorithm and not inOpaque:
         if first2 == "\\|":
@@ -240,25 +272,19 @@ def parseNode(
             varRes = parseShorthandVariable(s, start)
             if varRes.valid:
                 return varRes
-    if s.config.biblio and not inOpaque:
+    if s.config.biblio and not (inOpaque or inA or inDfn):
+        # Biblio autolinks extra don't belong in links or dfns,
+        # and they're more likely to trigger issues since
+        # [[foo]] is the conventional IDL shorthand for private
+        # slots. Rather than require escaping, just silently
+        # don't parse them, as if in an opaque element.
         if first3 == "\\[[":
             node = RawText.fromStream(s, start, start + 3, "[[")
             return Result(node, start + 3)
-        if first2 == "[[" and not s.inIDLContext():
-            # To avoid lots of false positives with IDL stuff,
-            # don't recognize biblios within IDL definitions,
-            # or the linktext of IDL autolinks.
-
+        if first2 == "[[":
             biblioRes = parseAutolinkBiblioSection(s, start)
             if biblioRes.valid:
                 return biblioRes
-            else:
-                m.die(
-                    "Biblio/section autolink was opened, but its syntax wasn't recognized. If you didn't intend this to be a biblio/section autolink, escape the initial [ as &#91;",
-                    lineNum=s.loc(start),
-                )
-                node = RawText.fromStream(s, start, start + 2, "[[")
-                return Result(node, start + 2)
     if first2 == "\\[" and isMacroStart(s, start + 2):
         # an escaped macro, so handle it here
         node = RawText.fromStream(s, start, start + 2, "[")
@@ -1286,7 +1312,6 @@ def parseAutolinkDfn(s: Stream, start: int) -> Result[SafeText | list[ParserNode
             "data-link-type": "dfn",
             "data-lt": escapeAttr(lt),
             "bs-autolink-syntax": escapeAttr("[=" + innerText + "=]"),
-            "bs-opaque": "",
         },
     )
     if linkFor is not None:
@@ -1344,7 +1369,6 @@ def parseAutolinkAbstract(s: Stream, start: int) -> Result[SafeText | list[Parse
             "data-link-type": "abstract-op",
             "data-lt": escapeAttr(lt),
             "bs-autolink-syntax": escapeAttr("[$" + innerText + "$]"),
-            "bs-opaque": "",
         },
     )
     if linkFor is not None:
@@ -1402,7 +1426,6 @@ def parseAutolinkHeader(s: Stream, start: int) -> Result[SafeText | list[ParserN
             "data-link-type": "http-header",
             "data-lt": escapeAttr(lt),
             "bs-autolink-syntax": escapeAttr("[:" + innerText + ":]"),
-            "bs-opaque": "",
         },
     )
     if linkFor is not None:
@@ -1478,7 +1501,6 @@ def parseAutolinkIdl(s: Stream, start: int) -> Result[ParserNode | list[ParserNo
             "data-link-type": linkType,
             "data-lt": escapeAttr(lt),
             "bs-autolink-syntax": escapeAttr(s[start : innerEnd + 2]),
-            "bs-opaque": "",
         },
     )
     if linkFor is not None:
@@ -1695,7 +1717,7 @@ def parseLinkText(
     endingLength = len(endingSigil)
     startLine = s.line(start)
     content: list[ParserNode] = []
-    s.observeNode(start, startTag)
+    s.observeShorthandOpen(start, startTag, (startingSigil, endingSigil))
     for res in generateResults(s, start):
         value, i = res.vi
         assert value is not None
@@ -1710,8 +1732,8 @@ def parseLinkText(
             )
             return Result.fail(start)
         if s[i : i + endingLength] == endingSigil:
+            s.observeShorthandClose(s.loc(i), startTag, (startingSigil, endingSigil))
             endTag = EndTag.fromStream(s, i, i + endingLength, startTag)
-            s.observeNode(i, endTag)
             content.append(endTag)
             return Result(content, i + endingLength)
     m.die(

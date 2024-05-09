@@ -9,7 +9,7 @@ from ... import t
 from .nodes import TagStack
 
 if t.TYPE_CHECKING:
-    from .nodes import ParserNode
+    from .nodes import ParserNode, StartTag
 
 
 @dataclass
@@ -252,8 +252,14 @@ class Stream:
         self.openEls.update(i, node)
         return node
 
+    def observeShorthandOpen(self, i: int, startTag: StartTag, sigils: tuple[str, str]) -> None:
+        self.openEls.updateShorthandOpen(i, startTag, sigils)
+
+    def observeShorthandClose(self, loc: str, startTag: StartTag, sigils: tuple[str, str]) -> None:
+        self.openEls.updateShorthandClose(loc, startTag, sigils)
+
     def inOpaqueElement(self) -> bool:
         return self.openEls.inOpaqueElement(self.config.opaqueElements)
 
-    def inIDLContext(self) -> bool:
-        return self.openEls.inIDLContext()
+    def inTagContext(self, tagName: str) -> bool:
+        return self.openEls.inTagContext(tagName)
