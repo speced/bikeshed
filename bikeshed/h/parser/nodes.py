@@ -382,8 +382,9 @@ class TagStack:
                     return
                 for entry in reversed(self.tags):
                     if entry.tag == node.tag:
+                        openTags = [f"<{x.tag}> at {x.startTag.loc}" for x in self.tags]
                         m.die(
-                            f"Saw an end tag {node}, but there were unclosed elements remaining before the nearest matching start tag (on line {entry.startTag.line}).\nOpen tags: {', '.join(x.tag for x in self.tags)}",
+                            f"Saw an end tag {node}, but there were unclosed elements remaining before the nearest matching start tag (on line {entry.startTag.line}).\nOpen tags: {', '.join(openTags)}",
                             lineNum=node.line,
                         )
                         break
