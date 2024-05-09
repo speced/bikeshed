@@ -5,8 +5,8 @@ import re
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass, field
 
-from ... import config, t
 from ... import messages as m
+from ... import t
 
 if t.TYPE_CHECKING:
     from .stream import Stream  # pylint: disable=cyclic-import
@@ -327,40 +327,10 @@ class TagStack:
     def inOpaqueElement(self, opaqueTags: t.Collection[str] | None = None) -> bool:
         if opaqueTags is None:
             opaqueTags = {"pre", "xmp", "script", "style"}
-        return any(x.tag in opaqueTags or "bs-opaque" in x.startTag.attrs for x in self.tags)
+        return any(x.startTag.tag in opaqueTags or "bs-opaque" in x.startTag.attrs for x in self.tags)
 
-    def inIDLContext(self) -> bool:
-        # IDL contexts are imposed by IDL dfns or links,
-        # so we can fail fast if there's nothing.
-        if not any(x.tag in ("a", "dfn") for x in self.tags):
-            return False
-
-        # Determining whether the dfn/link is an *IDL* dfn/link is more difficult,
-        # since the type can be set on an ancestor.
-        # So I have to crawl all the tags, and look for alternate spellings,
-        # since there are several possible shortenings.
-        spottedDfn = False
-        spottedLink = False
-        for tag in reversed(self.tags):
-            tagName = tag.tag
-            attrs = tag.startTag.attrs
-            if tagName == "dfn":
-                spottedDfn = True
-            elif tagName == "a":
-                spottedLink = True
-            if spottedDfn and "data-dfn-type" in attrs:
-                return attrs["data-dfn-type"] in config.idlTypes
-            if spottedDfn and "dfn-type" in attrs:
-                return attrs["dfn-type"] in config.idlTypes
-            if tagName == "dfn" and any(x in attrs for x in config.idlTypes):
-                return True
-            if spottedLink and "data-link-type" in attrs:
-                return attrs["data-link-type"] in config.idlTypes or attrs["data-link-type"] == "idl"
-            if spottedLink and "link-type" in attrs:
-                return attrs["link-type"] in config.idlTypes or attrs["link-type"] == "idl"
-            if tagName == "a" and any(x in attrs for x in config.idlTypes) or "idl" in attrs:
-                return True
-        return False
+    def inTagContext(self, tagName: str) -> bool:
+        return any(x.startTag.tag == tagName for x in self.tags)
 
     def update(self, i: int, node: ParserNode) -> None:
         # Updates the stack based on the passed node.
@@ -372,7 +342,7 @@ class TagStack:
             return
         elif isinstance(node, EndTag):
             self.autoCloseEnd(node.tag)
-            if self.tags and self.tags[-1].tag == node.tag:
+            if self.tags and self.tags[-1].startTag.tag == node.tag:
                 self.tags.pop()
             else:
                 if node.tag in ("html", "head", "body", "main"):
@@ -381,8 +351,8 @@ class TagStack:
                     # that's fine
                     return
                 for entry in reversed(self.tags):
-                    if entry.tag == node.tag:
-                        openTags = [f"<{x.tag}> at {x.startTag.loc}" for x in self.tags]
+                    if entry.startTag.tag == node.tag:
+                        openTags = [f"{x.name} at {x.startTag.loc}" for x in self.tags]
                         m.die(
                             f"Saw an end tag {node}, but there were unclosed elements remaining before the nearest matching start tag (on line {entry.startTag.line}).\nOpen tags: {', '.join(openTags)}",
                             lineNum=node.line,
@@ -392,6 +362,30 @@ class TagStack:
                     m.die(f"Saw an end tag {node}, but there's no open element corresponding to it.", lineNum=node.line)
         elif isinstance(node, (SelfClosedTag, RawElement)):
             self.autoCloseStart(node.tag)
+
+    def updateShorthandOpen(self, i: int, startTag: StartTag, sigils: tuple[str, str]) -> None:
+        entry = TagStackShorthandEntry(i, startTag, sigils)
+        self.tags.append(entry)
+
+    def updateShorthandClose(self, loc: str, startTag: StartTag, sigils: tuple[str, str]) -> None:
+        if self.tags and self.tags[-1].startTag == startTag:
+            self.tags.pop()
+            return
+        shorthand = sigils[0] + "..." + sigils[1]
+        if any(x.startTag == startTag for x in self.tags):
+            m.die(
+                f"Closing {shorthand} shorthand (opened on {startTag.loc}), but there were open tags before its opening.",
+                lineNum=loc,
+            )
+            while self.tags and self.tags[-1].startTag != startTag:
+                self.tags.pop()
+            if self.tags:
+                self.tags.pop()
+        else:
+            m.die(
+                f"PROGRAMMING ERROR: Tried to close a {shorthand} shorthand, but there's no matching open tag on the stack of open elements. Please report this!",
+                lineNum=loc,
+            )
 
     def autoCloseStart(self, tag: str) -> None:
         # Handle any auto-closing that occurs as a result
@@ -559,7 +553,7 @@ class TagStack:
     def virtualClose(self, *tags: str) -> None:
         if not self.tags:
             return
-        if self.tags[-1].tag in tags:
+        if self.tags[-1].startTag.tag in tags:
             self.tags.pop()
 
 
@@ -569,5 +563,14 @@ class TagStackEntry:
     startTag: StartTag
 
     @property
-    def tag(self) -> str:
-        return self.startTag.tag
+    def name(self) -> str:
+        return "<" + self.startTag.tag + ">"
+
+
+@dataclass
+class TagStackShorthandEntry(TagStackEntry):
+    sigils: tuple[str, str]
+
+    @property
+    def name(self) -> str:
+        return self.sigils[0] + "..." + self.sigils[1]
