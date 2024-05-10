@@ -934,33 +934,36 @@ def dedupIDs(doc: t.SpecT) -> None:
         if re.match(r"issue-[0-9a-fA-F]{8}$", dupeId):
             # Don't warn about issues, it's okay if they have the same ID because they're identical text.
             warnAboutDupes = False
-        ints = iter.count(1)
-        firstEl = els[0]
+        if dupeId.startswith("ref-for-"):
+            warnAboutDupes = False
+        complaintEls = []
+        if warnAboutDupes:
+            for el in els:
+                if el.get("data-silently-dedup") is not None:
+                    continue
+                complaintEls.append(el)
+        # Now dedup everything left in the list after the first one.
+        dedupIndex = 1
         for el in els[1:]:
-            # If I registered an alternate ID, try to use that.
             if el.get("data-alternate-id"):
                 altId = el.get("data-alternate-id")
                 assert altId is not None
                 if altId not in ids:
                     el.set("id", safeID(doc, altId))
-                    ids.setdefault(altId, []).append(el)
+                    ids[altId] = [el]
+                    complaintEls.remove(el)
                     continue
-            if el.get("data-silently-dedup") is not None:
-                warnAboutDupes = False
-            if dupeId.startswith("ref-for-"):
-                warnAboutDupes = False
-            # Try to de-dup the id by appending an integer after it.
-            if warnAboutDupes:
-                warn(
-                    f"<{el.tag}> has same ID ({dupeId}) as a <{firstEl.tag}> element on line {firstEl.get('bs-line-number', '??')}.\nDeduping, but this ID may not be stable across revisions.",
-                    el=el,
-                )
-            for x in ints:
-                altId = "{}{}".format(dupeId, circledDigits(x))
-                if altId not in ids:
-                    el.set("id", safeID(doc, altId))
-                    ids.setdefault(altId, []).append(el)
-                    break
+            altId = f"{dupeId}{circledDigits(dedupIndex)}"
+            while altId in ids:
+                dedupIndex += 1
+                altId = f"{dupeId}{circledDigits(dedupIndex)}"
+            el.set("id", safeID(doc, altId))
+            ids[altId] = [el]
+
+        if len(complaintEls) > 1:
+            complaintDetails = [f"<{el.tag}> on line {approximateLineNumber(el)}" for el in complaintEls]
+            warn(f"Multiple elements have the same id '{dupeId}':\n  {', '.join(complaintDetails)}\nDeduping, but this ID may not be stable across revisions.")
+
 
 
 def approximateLineNumber(el: t.ElementT, setIntermediate: bool = True) -> str | None:
@@ -968,8 +971,6 @@ def approximateLineNumber(el: t.ElementT, setIntermediate: bool = True) -> str |
         return el.get("bs-line-number")
     parent = parentElement(el)
     if not isElement(parent):
-        if el.tag == "html":
-            return None
         return None
     approx = approximateLineNumber(parent, setIntermediate=setIntermediate)
     if approx is None:
