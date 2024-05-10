@@ -272,16 +272,15 @@ def parseNode(
             varRes = parseShorthandVariable(s, start)
             if varRes.valid:
                 return varRes
-    if s.config.biblio and not (inOpaque or inA or inDfn):
-        # Biblio autolinks extra don't belong in links or dfns,
-        # and they're more likely to trigger issues since
-        # [[foo]] is the conventional IDL shorthand for private
-        # slots. Rather than require escaping, just silently
-        # don't parse them, as if in an opaque element.
+    if s.config.biblio and not inOpaque:
         if first3 == "\\[[":
             node = RawText.fromStream(s, start, start + 3, "[[")
             return Result(node, start + 3)
-        if first2 == "[[":
+        if not (inA or inDfn) and first2 == "[[":
+            # The WebIDL "private slot" syntax overlaps with biblio autolinks,
+            # but biblios don't belong in links or dfns *anyway*. So I'll just
+            # not parse biblios *at all* in those contexts, rather than throw
+            # errors like the other autolinks.
             biblioRes = parseAutolinkBiblioSection(s, start)
             if biblioRes.valid:
                 return biblioRes
