@@ -935,6 +935,7 @@ def dedupIDs(doc: t.SpecT) -> None:
             # Don't warn about issues, it's okay if they have the same ID because they're identical text.
             warnAboutDupes = False
         ints = iter.count(1)
+        firstEl = els[0]
         for el in els[1:]:
             # If I registered an alternate ID, try to use that.
             if el.get("data-alternate-id"):
@@ -951,7 +952,7 @@ def dedupIDs(doc: t.SpecT) -> None:
             # Try to de-dup the id by appending an integer after it.
             if warnAboutDupes:
                 warn(
-                    f"Multiple elements have the same ID '{dupeId}'.\nDeduping, but this ID may not be stable across revisions.",
+                    f"<{el.tag}> has same ID ({dupeId}) as a <{firstEl.tag}> element on line {firstEl.get('bs-line-number', '??')}.\nDeduping, but this ID may not be stable across revisions.",
                     el=el,
                 )
             for x in ints:
