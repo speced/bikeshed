@@ -921,8 +921,6 @@ def addOldIDs(els: t.Iterable[t.ElementT]) -> None:
 
 
 def dedupIDs(doc: t.SpecT) -> None:
-    import itertools as iter
-
     ids: OrderedDict[str, list[t.ElementT]] = OrderedDict()
     for el in findAll("[id]", doc):
         ids.setdefault(t.cast(str, el.get("id")), []).append(el)
@@ -962,8 +960,9 @@ def dedupIDs(doc: t.SpecT) -> None:
 
         if len(complaintEls) > 1:
             complaintDetails = [f"<{el.tag}> on line {approximateLineNumber(el)}" for el in complaintEls]
-            warn(f"Multiple elements have the same id '{dupeId}':\n  {', '.join(complaintDetails)}\nDeduping, but this ID may not be stable across revisions.")
-
+            warn(
+                f"Multiple elements have the same id '{dupeId}':\n  {', '.join(complaintDetails)}\nDeduping, but this ID may not be stable across revisions."
+            )
 
 
 def approximateLineNumber(el: t.ElementT, setIntermediate: bool = True) -> str | None:

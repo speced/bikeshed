@@ -1703,6 +1703,17 @@ def parseLinkInfo(
         linkType = linkType.strip()
     lt = lt.strip()
     lt = re.sub(r"\s+", " ", lt)
+
+    # Even tho you no longer *need* to escape [[..]] in links
+    # (used for WebIDL private slots), the parser still *allows*
+    # it, and graciously/silently handles the unnecessary escape.
+    # The one exception is if it's link details, since they're not
+    # parsed normally, so we need to fix it right here.
+    if linkFor and linkFor.startswith("\\[["):
+        linkFor = linkFor[1:]
+    if lt and lt.startswith("\\[["):
+        lt = lt[1:]
+
     return lt, linkFor, linkType
 
 
