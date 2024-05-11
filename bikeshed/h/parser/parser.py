@@ -1596,25 +1596,24 @@ def parseAutolinkElement(s: Stream, start: int) -> Result[ParserNode | list[Pars
     return Result([startCode, startTag, middleText, endTag, endCode], nodeEnd)
 
 
+SHORTHAND_VARIABLE_RE = re.compile(r"\|(\w(?:[\w\s-]*\w)?)\|")
+
+
 def parseShorthandVariable(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
-    if s[start] != "|":
+    match, nodeEnd = s.matchRe(start, SHORTHAND_VARIABLE_RE).vi
+    if not match:
         return Result.fail(start)
-    if s[start+1].lower() not in "1234567890abcdefghijklmnopqrstuvwxyz-_":
-        return Result.fail(start)
-    innerStart = start + 1
 
     startTag = StartTag.fromStream(
         s,
         start,
-        innerStart,
+        start + 1,
         "var",
+        {"bs-autolink-syntax": escapeAttr(match[0])},
     )
-    rest, nodeEnd = parseLinkText(s, innerStart, "|", "|", startTag).vi
-    if rest is not None:
-        startTag.attrs["bs-autolink-syntax"] = s[start:nodeEnd]
-        return Result([startTag, *rest], nodeEnd)
-    else:
-        return Result.fail(start)
+    contents = RawText.fromStream(s, start + 1, nodeEnd - 1)
+    endTag = EndTag.fromStream(s, nodeEnd - 1, nodeEnd, startTag)
+    return Result([startTag, contents, endTag], nodeEnd)
 
 
 def parseAutolinkBiblioSection(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
