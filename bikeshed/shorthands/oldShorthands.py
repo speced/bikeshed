@@ -27,29 +27,9 @@ def transformAutolinkShortcuts(doc: t.SpecT) -> None:
 
     def transformText(text: str) -> list[t.NodeT]:
         nodes: list[t.NodeT] = [text]
-        if "css" in doc.md.markupShorthands:
-            pass
-            # nodes = config.processTextNodes(nodes, propdescRe, propdescReplacer)
-        if "dfn" in doc.md.markupShorthands:
-            pass
-            # nodes = config.processTextNodes(nodes, dfnRe, dfnReplacer)
-            # nodes = config.processTextNodes(nodes, abstractRe, abstractReplacer)
-        if "http" in doc.md.markupShorthands:
-            pass
-            # nodes = config.processTextNodes(nodes, headerRe, headerReplacer)
-        if "idl" in doc.md.markupShorthands:
-            pass
-            # nodes = config.processTextNodes(nodes, idlRe, idlReplacer)
-        if "markup" in doc.md.markupShorthands:
-            pass
-            # nodes = config.processTextNodes(nodes, elementRe, elementReplacer)
-        if "biblio" in doc.md.markupShorthands:
-            pass
-            # nodes = config.processTextNodes(nodes, biblioRe, biblioReplacer)
-            # nodes = config.processTextNodes(nodes, sectionRe, sectionReplacer)
         if "algorithm" in doc.md.markupShorthands:
             pass
-            nodes = config.processTextNodes(nodes, varRe, varReplacer)
+            # nodes = config.processTextNodes(nodes, varRe, varReplacer)
         if "markdown" in doc.md.markupShorthands:
             nodes = config.processTextNodes(nodes, inlineLinkRe, inlineLinkReplacer)
             nodes = config.processTextNodes(nodes, strongRe, strongReplacer)

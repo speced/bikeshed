@@ -264,7 +264,7 @@ def parseNode(
                         lineNum=s.loc(start),
                     )
                 return elementRes
-    if False:  # s.config.algorithm and not inOpaque:
+    if s.config.algorithm and not inOpaque:
         if first2 == "\\|":
             node = RawText.fromStream(s, start, start + 2, "|")
             return Result(node, start + 2)
@@ -1597,48 +1597,24 @@ def parseAutolinkElement(s: Stream, start: int) -> Result[ParserNode | list[Pars
 
 
 def parseShorthandVariable(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
-    if s[start] != "|" or s[start + 1] in (" ", "\n"):
+    if s[start] != "|":
         return Result.fail(start)
-    startLine = s.line(start)
-    innerContent: list[ParserNode] = []
-    for res in generateResults(s, start + 1):
-        value = res.value
-        assert value is not None
-        if isinstance(value, list):
-            innerContent.extend(value)
-        else:
-            innerContent.append(value)
-        if s.line(res.i + 1) > startLine + 2:
-            m.die(
-                f"It looks like a variable shorthand (like |foo bar|) was started on line {startLine}, but not closed within a few lines. If you didn't mean to write a variable shorthand, escape the | like &#124;. If you did mean to write a variable across that many lines, use <var> instead.",
-                lineNum=s.loc(start),
-            )
-            return Result(
-                SafeText.fromStream(s, start, start + 1, "|"),
-                start + 1,
-            )
-        if s[res.i] == "|":
-            nodeEnd = res.i + 1
-            break
-    else:
-        m.die(
-            f"It looks like a variable shorthand (like |foo bar|) was started on line {startLine}, but never closed. If you didn't mean to write a variable shorthand, escape the | like &#124;.",
-            lineNum=s.loc(start),
-        )
-        return Result(
-            RawText.fromStream(s, start, start + 1, "|"),
-            start + 1,
-        )
+    if s[start+1].lower() not in "1234567890abcdefghijklmnopqrstuvwxyz-_":
+        return Result.fail(start)
+    innerStart = start + 1
 
-    varStart = StartTag.fromStream(
+    startTag = StartTag.fromStream(
         s,
         start,
-        start + 1,
+        innerStart,
         "var",
-        {"bs-autolink-syntax": s[start:nodeEnd]},
     )
-    varEnd = EndTag.fromStream(s, nodeEnd - 1, nodeEnd, varStart)
-    return Result([varStart, *innerContent, varEnd], nodeEnd)
+    rest, nodeEnd = parseLinkText(s, innerStart, "|", "|", startTag).vi
+    if rest is not None:
+        startTag.attrs["bs-autolink-syntax"] = s[start:nodeEnd]
+        return Result([startTag, *rest], nodeEnd)
+    else:
+        return Result.fail(start)
 
 
 def parseAutolinkBiblioSection(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
@@ -1740,6 +1716,7 @@ def parseLinkText(
                 f"{startingSigil}...{endingSigil} autolink opened at {startTag.loc} wasn't closed within 3 lines. You might have forgotten to close it; if not, switch to the HTML syntax to spread your link across that many lines.",
                 lineNum=startTag.loc,
             )
+            s.observeShorthandClose(s.loc(i), startTag, (startingSigil, endingSigil))
             return Result.fail(start)
         if s[i : i + endingLength] == endingSigil:
             s.observeShorthandClose(s.loc(i), startTag, (startingSigil, endingSigil))
