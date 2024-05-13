@@ -1000,110 +1000,77 @@ def parseRangeComponent(val: str) -> tuple[str | None, float | int]:
 
 
 def parseCSSMaybe(s: Stream, start: int) -> Result[list[ParserNode]]:
-    # Maybes can cause parser issues,
-    # like ''<length>/px'',
-    # but also can contain other markup that would split the text,
-    # which used to be a problem.
     if s[start : start + 2] != "''":
         return Result.fail(start)
-    i = start + 2
+    textStart = start + 2
 
-    textStart = i
-
-    text, i = s.skipTo(i, "''").vi
-    if text is None:
-        return Result.fail(start)
-    if "\n" in text:
-        return Result.fail(start)
-    textEnd = i
-    nodeEnd = i + 2
-
-    # A lot of maybes have <<foo>> links in them.
-    # They break in interesting ways sometimes, but
-    # also if it actually produces a link
-    # (like ''width: <<length>>'' linking to 'width')
-    # it'll be broken anyway.
-    # So we'll hack this in - << gets turned into &lt;
-    # within a maybe.
-    # No chance of a link, but won't misparse in weird ways.
-
-    # This syntax does double duty as both a linking syntax
-    # and just a "style as CSS code" syntax.
-    # So, you have to be careful that something that might *look* like
-    # an autolink, but actually wasn't intended as such and thus fails
-    # to link, doesn't have its text mangled as a result.
-    # * text like `foo: ...` is probably a propdesc link,
-    #   with the same text as what's written,
-    #   so it's safe
-    # * text like `foo` is probably a maybe link,
-    #   with the same text as what's written,
-    #   so it's safe too
-    # * text like `foo/bar` might be a maybe link;
-    #   if it is, its text is `bar`, but if not it should
-    #   stay as `foo/bar`.
-    #   So it's not safe, and we need to guard against this.
-    # * anything else isn't a link, should just keep its text as-is.
-    # In all cases,
-    res = parseMaybeDecl(s, start, textStart, textEnd, nodeEnd)
+    res = parseMaybeDecl(s, textStart)
     if res.valid:
         return res
 
-    res = parseMaybeValue(s, start, textStart, textEnd, nodeEnd)
+    res = parseMaybeValue(s, textStart)
     if res.valid:
         return res
 
-    # Doesn't look like a maybe link, so it's just CSS text.
-    startTag = StartTag.fromStream(s, start, textStart, "css")
-    tagMiddle = RawText.fromStream(s, textStart, textEnd, rawFromDoubleAngles(text))
-    endTag = EndTag.fromStream(s, textEnd, nodeEnd, startTag)
-    return Result([startTag, tagMiddle, endTag], nodeEnd)
+    startTag = StartTag.fromStream(s, start, start + 2, "span", {"class": "css"}).finalize()
+    rest, nodeEnd = parseLinkText(s, start + 2, "''", "''", startTag).vi
+    if rest:
+        return Result([startTag, *rest], nodeEnd)
+
+    return Result.fail(start)
 
 
-MAYBE_PROP_RE = re.compile(r"^(@[\w-]+/)?([\w-]+): .+")
+MAYBE_DECL_RE = re.compile(r"(@[\w-]+/)?([\w-]+): ")
 
 
-def parseMaybeDecl(s: Stream, start: int, textStart: int, textEnd: int, nodeEnd: int) -> Result[list[ParserNode]]:
-    text = s[textStart:textEnd]
-    match = MAYBE_PROP_RE.match(text)
+def parseMaybeDecl(s: Stream, textStart: int) -> Result[list[ParserNode]]:
+    match, colonEnd = s.matchRe(textStart, MAYBE_DECL_RE).vi
     if not match:
-        return Result.fail(nodeEnd)
+        return Result.fail(textStart)
 
     for_, propdescname = match.groups()
     startTag = StartTag.fromStream(
         s,
-        start,
+        textStart - 2,
         textStart,
-        "bs-link",
+        "a",
         {
-            "bs-autolink-syntax": escapeAttr(s[start:nodeEnd]),
+            "bs-autolink-syntax": escapeAttr("''" + match[0] + "...''"),
             "class": "css",
             "data-link-type": "propdesc",
             "data-lt": escapeAttr(propdescname),
         },
     )
-    # Maybe autolinks are sometimes nested inside of real <a>s.
-    # To avoid parsing issues, I'll turn these into a custom el first,
-    # then swap them into an <a> post-parsing (in processAutolinks).
-    # I can probably avoid doing this later, when I'm parsing
-    # *only* with my bespoke parser, and can just emit a parsing error.
-    # FIXME
     if for_:
         startTag.attrs["data-link-for"] = escapeAttr(for_)
         startTag.attrs["data-link-type"] = "descriptor"
     startTag.finalize()
-    tagMiddle = RawText.fromStream(s, textStart, textEnd, rawFromDoubleAngles(text))
-    endTag = EndTag.fromStream(s, textEnd, nodeEnd, startTag)
-    return Result([startTag, tagMiddle, endTag], nodeEnd)
+
+    declStart = RawText.fromStream(s, textStart, colonEnd, propdescname + ": ")
+
+    rest, nodeEnd = parseLinkText(s, colonEnd, "''", "''", startTag).vi
+    if rest is None:
+        return Result.fail(textStart)
+    return Result([startTag, declStart, *rest], nodeEnd)
 
 
 MAYBE_VAL_RE = re.compile(r"^(?:(\S*)/)?(\S[^!]*)(?:!!([\w-]+))?$")
 
 
-def parseMaybeValue(s: Stream, start: int, textStart: int, textEnd: int, nodeEnd: int) -> Result[list[ParserNode]]:
-    text = s[textStart:textEnd]
+def parseMaybeValue(s: Stream, textStart: int) -> Result[list[ParserNode]]:
+    text, textEnd = s.skipTo(textStart, "''").vi
+    if text is None:
+        return Result.fail(textStart)
+
+    if s.line(textEnd) > s.line(textStart) + 3:
+        return Result.fail(textStart)
+
     match = MAYBE_VAL_RE.match(text)
     if not match:
-        return Result.fail(nodeEnd)
+        return Result.fail(textStart)
+
+    start = textStart - 2
+    nodeEnd = textEnd + 2
 
     tagMiddle: RawText | SafeText
     for_, valueName, linkType = match.groups()
