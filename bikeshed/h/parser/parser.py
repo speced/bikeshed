@@ -190,6 +190,9 @@ def parseNode(
         elif first2 == r"\'":
             node = RawText.fromStream(s, start, start + 2, "'")
             return Result(node, start + 2)
+        elif first3 == "\\<<":
+            node = SafeText.fromStream(s, start, start+3, "<<")
+            return Result(node, start + 3)
         elif first2 == "''":
             maybeRes = parseCSSMaybe(s, start)
             if maybeRes.valid:
@@ -203,6 +206,14 @@ def parseNode(
                         lineNum=s.loc(start),
                     )
                 return propdescRes
+        elif first2 == "<<":
+            if inA:
+                m.die("Parsed a CSS production autolink (<<foo>>) inside of an <a> or another autolink. Either close the <a> properly, or escape the autolink.", lineNum=s.loc(start))
+                node = SafeText.fromStream(s, start, start+2)
+                return Result(node, start+2)
+            prodRes = parseCSSProduction(s, start)
+            if prodRes.valid:
+                return prodRes
     if s.config.dfn and not inOpaque:
         if first3 in ("\\[=", "\\[$"):
             node = RawText.fromStream(s, start, start + 3, "[" + s[start + 2])
@@ -355,11 +366,6 @@ def parseAngleStart(s: Stream, start: int) -> Result[ParserNode | list[ParserNod
     endTag, i = parseEndTag(s, start).vi
     if endTag is not None:
         return Result(endTag, i)
-
-    if s.config.css:
-        els, i = parseCSSProduction(s, start).vi
-        if els is not None:
-            return Result(els, i)
 
     return Result.fail(start)
 
