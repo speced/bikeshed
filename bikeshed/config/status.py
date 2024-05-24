@@ -222,6 +222,7 @@ megaGroups = {
             "gpuwg",
             "houdini",
             "html",
+            "htmlwg",
             "httpslocal",
             "i18n",
             "immersivewebcg",
