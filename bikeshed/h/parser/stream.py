@@ -130,6 +130,14 @@ class Stream:
         return Stream(chars, config=newConfig, startLine=startLine, depth=self.depth + 1)
 
     def __getitem__(self, key: int | slice) -> str:
+        if isinstance(key, int):
+            if key < 0:
+                return ""
+        else:
+            if key.start < 0:
+                key = slice(0, key.stop, key.step)
+            if key.stop < 0:
+                key = slice(key.start, 0, key.step)
         try:
             return self._chars[key]
         except IndexError:
