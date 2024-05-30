@@ -190,10 +190,14 @@ def parseNode(
         elif first2 == r"\'":
             node = RawText.fromStream(s, start, start + 2, "'")
             return Result(node, start + 2)
-        elif first3 == "\\<<":
-            node = SafeText.fromStream(s, start, start+3, "<<")
-            return Result(node, start + 3)
-        elif first2 == "''":
+        elif first3 == "'''":
+            m.die("Saw ''' (or more). This is probably a typo intended to be a double apostrophe, starting a CSS maybe autolink; if not, please escape some of the apostrophes.", lineNum=s.loc(start))
+            node = RawText.fromStream(s, start, start+3)
+            return Result(node, start+3)
+        elif first2 == "''" and s[start - 1] not in ("'", "="):
+            # Temporary check to remove some error cases -
+            # some weird HTML cases with an empty attr can trigger,
+            # or there's some bizarre '''' in CSS2.
             maybeRes = parseCSSMaybe(s, start)
             if maybeRes.valid:
                 return maybeRes
@@ -206,11 +210,18 @@ def parseNode(
                         lineNum=s.loc(start),
                     )
                 return propdescRes
+    if s.config.css:
+        if first3 == "\\<<":
+            node = SafeText.fromStream(s, start, start + 3, "<<")
+            return Result(node, start + 3)
         elif first2 == "<<":
             if inA:
-                m.die("Parsed a CSS production autolink (<<foo>>) inside of an <a> or another autolink. Either close the <a> properly, or escape the autolink.", lineNum=s.loc(start))
-                node = SafeText.fromStream(s, start, start+2)
-                return Result(node, start+2)
+                m.die(
+                    "Parsed a CSS production autolink (<<foo>>) inside of an <a> or another autolink. Either close the <a> properly, or escape the autolink.",
+                    lineNum=s.loc(start),
+                )
+                node = SafeText.fromStream(s, start, start + 2)
+                return Result(node, start + 2)
             prodRes = parseCSSProduction(s, start)
             if prodRes.valid:
                 return prodRes
