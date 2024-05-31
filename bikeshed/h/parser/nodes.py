@@ -389,6 +389,17 @@ class TagStack:
                 lineNum=loc,
             )
 
+    def cancelShorthandOpen(self, startTag: StartTag, sigils: tuple[str, str]) -> None:
+        if not any(x.startTag == startTag for x in self.tags):
+            shorthand = sigils[0] + "..." + sigils[1]
+            m.die(
+                f"Programming error - tried to close a {shorthand} shorthand, but there's no matching open tag on the stack of open elements. Please report this!",
+                lineNum=startTag.loc,
+            )
+        while self.tags and self.tags[-1].startTag != startTag:
+            self.tags.pop()
+        self.tags.pop()
+
     def autoCloseStart(self, tag: str) -> None:
         # Handle any auto-closing that occurs as a result
         # of seeing a particular start tag.

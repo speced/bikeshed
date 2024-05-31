@@ -101,6 +101,7 @@ class ParseConfig:
         )
 
 
+@dataclass
 class Stream:
     _chars: str
     _len: int
@@ -265,6 +266,9 @@ class Stream:
 
     def observeShorthandClose(self, loc: str, startTag: StartTag, sigils: tuple[str, str]) -> None:
         self.openEls.updateShorthandClose(loc, startTag, sigils)
+
+    def cancelShorthandOpen(self, startTag: StartTag, sigils: tuple[str, str]) -> None:
+        self.openEls.cancelShorthandOpen(startTag, sigils)
 
     def inOpaqueElement(self) -> bool:
         return self.openEls.inOpaqueElement(self.config.opaqueElements)
