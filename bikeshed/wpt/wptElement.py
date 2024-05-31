@@ -284,13 +284,11 @@ def prefixInPath(prefix: str | None, path: str) -> bool:
 
 
 @t.overload
-def normalizePathSegment(pathSeg: str) -> str:
-    ...
+def normalizePathSegment(pathSeg: str) -> str: ...
 
 
 @t.overload
-def normalizePathSegment(pathSeg: None) -> None:
-    ...
+def normalizePathSegment(pathSeg: None) -> None: ...
 
 
 def normalizePathSegment(pathSeg: str | None) -> str | None:
