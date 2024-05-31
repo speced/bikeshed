@@ -320,13 +320,11 @@ assert w3cIgs.issubset(megaGroups["w3c"])
 
 
 @t.overload
-def canonicalizeStatus(rawStatus: None, group: str | None) -> None:
-    ...
+def canonicalizeStatus(rawStatus: None, group: str | None) -> None: ...
 
 
 @t.overload
-def canonicalizeStatus(rawStatus: str, group: str | None) -> str:
-    ...
+def canonicalizeStatus(rawStatus: str, group: str | None) -> str: ...
 
 
 def canonicalizeStatus(rawStatus: str | None, group: str | None) -> str | None:
@@ -463,13 +461,11 @@ def canonicalizeStatus(rawStatus: str | None, group: str | None) -> str | None:
 
 
 @t.overload
-def splitStatus(st: None) -> tuple[None, None]:
-    ...
+def splitStatus(st: None) -> tuple[None, None]: ...
 
 
 @t.overload
-def splitStatus(st: str) -> tuple[str | None, str]:
-    ...
+def splitStatus(st: str) -> tuple[str | None, str]: ...
 
 
 def splitStatus(st: str | None) -> tuple[str | None, str | None]:

@@ -35,12 +35,10 @@ class BiblioEntry(metaclass=abc.ABCMeta):
             raise ValueError(msg)
 
     @abc.abstractmethod
-    def toHTML(self) -> t.NodesT:
-        ...
+    def toHTML(self) -> t.NodesT: ...
 
     @abc.abstractmethod
-    def valid(self) -> bool:
-        ...
+    def valid(self) -> bool: ...
 
     def strip(self) -> BiblioEntry:
         self.linkText = self.linkText.strip()
