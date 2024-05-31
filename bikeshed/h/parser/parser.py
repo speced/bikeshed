@@ -18,7 +18,7 @@ from .nodes import (
     StartTag,
     escapeAttr,
 )
-from .preds import charRefs
+from .preds import charRefs, isControl, isWhitespace
 from .stream import Result, Stream
 
 VOID_ELEMENTS = {
@@ -104,7 +104,7 @@ def generateResults(s: Stream, start: int) -> t.Generator[Result[ParserNode | li
 # start of unconsumed text.
 # (Adding more just means parseAnything will break text into
 #  smaller chunks; it doesn't affect correctness.)
-POSSIBLE_NODE_START_CHARS = "&<>`'~[]{}\\—-|=$:"
+POSSIBLE_NODE_START_CHARS = "&<>`'~[]{}()\\—-|=$:"
 
 
 def parseAnything(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
@@ -191,9 +191,12 @@ def parseNode(
             node = RawText.fromStream(s, start, start + 2, "'")
             return Result(node, start + 2)
         elif first3 == "'''":
-            m.die("Saw ''' (or more). This is probably a typo intended to be a double apostrophe, starting a CSS maybe autolink; if not, please escape some of the apostrophes.", lineNum=s.loc(start))
-            node = RawText.fromStream(s, start, start+3)
-            return Result(node, start+3)
+            m.die(
+                "Saw ''' (or more). This is probably a typo intended to be a double apostrophe, starting a CSS maybe autolink; if not, please escape some of the apostrophes.",
+                lineNum=s.loc(start),
+            )
+            node = RawText.fromStream(s, start, start + 3)
+            return Result(node, start + 3)
         elif first2 == "''" and s[start - 1] not in ("'", "="):
             # Temporary check to remove some error cases -
             # some weird HTML cases with an empty attr can trigger,
@@ -314,6 +317,17 @@ def parseNode(
         macroRes = parseMacro(s, start)
         if macroRes.valid:
             return macroRes
+    if s.config.markdown and not inOpaque:
+        if first2 == "\\[":
+            node = RawText.fromStream(s, start, start + 2, "[")
+            return Result(node, start + 2)
+        if first2 == "\\]":
+            node = RawText.fromStream(s, start, start + 2, "]")
+            return Result(node, start + 2)
+        if first1 == "[" and s[start - 1] != "[":
+            linkRes = parseMarkdownLink(s, start)
+            if linkRes.valid:
+                return linkRes
     if first2 == "—\n" or first3 == "--\n":
         match, i = s.matchRe(start, emdashRe).vi
         if match is not None:
@@ -2127,21 +2141,223 @@ def isMacroStart(s: Stream, start: int) -> bool:
 # Markdown
 ########################
 
-"""
-def parseMarkdownLink(s: Stream, start: int) -> Result[ParserNode]:
-    if s[start] != "[":
+
+def parseMarkdownLink(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
+    linkTextStart = start + 1
+    startingSigil = "["
+    endingSigil = "](...)"
+
+    startTag = StartTag.fromStream(s, start, linkTextStart, "a")
+    s.observeShorthandOpen(start, startTag, (startingSigil, endingSigil))
+
+    # At this point, we're still not committed to this being
+    # an autolink, so it should silently fail.
+    startLine = s.line(start)
+    content: list[ParserNode] = []
+    for res in generateResults(s, linkTextStart):
+        value, i = res.vi
+        assert value is not None
+        if isinstance(value, list):
+            content.extend(value)
+        else:
+            content.append(value)
+        if s.line(i) > startLine + 3:
+            s.cancelShorthandOpen(startTag, (startingSigil, endingSigil))
+            return Result.fail(start)
+        if s[i : i + 2] == "](":
+            s.observeShorthandClose(s.loc(i), startTag, (startingSigil, endingSigil))
+            linkTextEnd = i
+            linkDestStart = i + 2
+            break
+    # Now that we've seen the ](, we're committed.
+
+    # I'm not doing bracket-checking in the link text,
+    # as CommonMark requires, because I've already lost
+    # the information about whether they were escaped.
+    result, nodeEnd = parseMarkdownLinkDestTitle(s, linkDestStart).vi
+    if result is None:
+        # Return the already-parsed stuff, with the syntax
+        # chars turned back into text.
+        openingSquare = RawText.fromStream(s, start, start + 1)
+        middleBit = RawText.fromStream(s, linkTextEnd, linkDestStart)
+        return Result([openingSquare, *content, middleBit], linkDestStart)
+    dest, title = result
+    startTag.attrs["href"] = dest
+    if title:
+        startTag.attrs["title"] = title
+    endTag = EndTag.fromStream(s, nodeEnd - 1, nodeEnd, startTag)
+    return Result([startTag, *content, endTag], nodeEnd)
+
+
+def parseMarkdownLinkDestTitle(s: Stream, start: int) -> Result[tuple[str, str]]:
+    res, i = parseMarkdownLinkWhitespace(s, start).vi
+    if res is None:
         return Result.fail(start)
-    if s[start - 1] == "[":
+
+    TITLE_START_CHARS = ('"', "'", "(")
+
+    dest: str | None = ""
+    title: str | None = ""
+    if s[i] == ")":
+        # Perfectly fine to be empty.
+        return Result(("", ""), i + 1)
+
+    # Parse an optional destination
+    if s[i] == "<":
+        dest, i = parseMarkdownLinkAngleDest(s, i + 1).vi
+        sawDest = True
+    elif s[i] in TITLE_START_CHARS:
+        # This indicates a title, so a skipped dest,
+        # which is totally fine.
+        sawDest = False
+    else:
+        dest, i = parseMarkdownLinkIdentDest(s, i).vi
+        sawDest = True
+    if dest is None:
         return Result.fail(start)
 
-    i = start + 1
-
-    nodes, i = parseUntil(s, i, markdownLinkStopper).vi
-    if nodes is None:
+    ws, i = parseMarkdownLinkWhitespace(s, i).vi
+    if ws is None:
         return Result.fail(start)
-    return Result.fail(start)
+    if s[i] == ")":
+        return Result((dest, ""), i + 1)
+
+    if s[i] in TITLE_START_CHARS:
+        if ws == "" and sawDest:
+            # If you do have a dest, you *must* have whitespace
+            # between it and the title.
+            m.die("Missing required whitespace between markdown link's destination and title", lineNum=s.loc(i))
+            return Result.fail(start)
+
+        title, i = parseMarkdownLinkTitle(s, i + 1, s[i]).vi
+        if title is None:
+            return Result.fail(start)
+    assert title is not None
+
+    ws, i = parseMarkdownLinkWhitespace(s, i).vi
+    if ws is None:
+        return Result.fail(start)
+
+    if s[i] == ")":
+        return Result((dest, title), i + 1)
+    else:
+        m.die(
+            "Tried to parse a markdown link's destination/title, but ran into some unexpected characters",
+            lineNum=s.loc(i),
+        )
+        return Result.fail(start)
 
 
-def markdownLinkStopper(s: Stream, start: int) -> bool:
-    return True
-"""
+def parseMarkdownLinkWhitespace(s: Stream, start: int) -> Result[str]:
+    seenLinebreak = False
+    i = start
+    while isWhitespace(s[i]):
+        if s.eof(i):
+            m.die("Hit EOF while parsing the destination/title of a markdown link", lineNum=s.line(start))
+            return Result.fail(start)
+        if s[i] == "\n":
+            if seenLinebreak:
+                m.die("The destination/title of a markdown link can't contain a blank line.", lineNum=s.line(i))
+                return Result.fail(start)
+            else:
+                seenLinebreak = True
+        i += 1
+    return Result(s[start:i], i)
+
+
+def parseMarkdownLinkAngleDest(s: Stream, start: int) -> Result[str]:
+    i = start
+    while True:
+        if s.eof(i):
+            m.die("Hit EOF while parsing the destination of a markdown link", lineNum=s.loc(start - 1))
+            return Result.fail(start)
+        elif s[i] == "\\" and s[i + 1] in ("\\", ">", "<"):
+            i += 2
+        elif s[i] == ">":
+            break
+        elif s[i] == "<":
+            m.die(
+                "The <>-wrapped destination of a markdown link can't contain further unescaped < characters",
+                lineNum=s.loc(i),
+            )
+            return Result.fail(start)
+        elif s[i] == "\n":
+            m.die("The <>-wrapped destination of a markdown link can't contain a newline", lineNum=s.loc(i))
+            return Result.fail(start)
+        else:
+            i += 1
+    dest = s[start:i]
+    dest = re.sub(r"\\(\\|<|>)", r"\1", dest)
+    return Result(dest, i + 1)
+
+
+def parseMarkdownLinkIdentDest(s: Stream, start: int) -> Result[str]:
+    i = start
+    parenDepth = 0
+    while True:
+        if s.eof(i):
+            m.die("Hit EOF while parsing the destination of a markdown link", lineNum=s.loc(start))
+            return Result.fail(start)
+        elif s[i] == "\\" and s[i + 1] in ("\\", "(", ")"):
+            i += 2
+        elif isControl(s[i]):
+            m.die(
+                f"The destination of a markdown link can't contain ASCII control characters ({hex(ord(s[i]))})",
+                lineNum=s.loc(i),
+            )
+            return Result.fail(start)
+        elif isWhitespace(s[i]):
+            break
+        elif s[i] == "(":
+            parenDepth += 1
+            i += 1
+        elif s[i] == ")":
+            if parenDepth == 0:
+                break
+            else:
+                parenDepth -= 1
+                i += 1
+        else:
+            i += 1
+    dest = s[start:i]
+    dest = re.sub(r"\\(\\|\(|\))", r"\1", dest)
+    return Result(dest, i)
+
+
+def parseMarkdownLinkTitle(s: Stream, start: int, startChar: str) -> Result[str]:
+    i = start
+    if startChar == "'":
+        endChar = "'"
+    elif startChar == '"':
+        endChar = '"'
+    elif startChar == "(":
+        endChar = ")"
+    while True:
+        if s.eof(i):
+            m.die("Hit EOF while parsing the title of a markdown link", lineNum=s.line(start))
+            return Result.fail(start)
+        elif s[i] == "\\" and s[i + 1] in ("\\", startChar, endChar):
+            i += 2
+        elif s[i] == endChar:
+            break
+        elif s[i] == startChar:
+            m.die(
+                f"The title of a markdown link can't contain the starting char ({startChar}) unless it's escaped",
+                lineNum=s.loc(i),
+            )
+            return Result.fail(start)
+        elif isWhitespace(s[i]):
+            ws, i = parseMarkdownLinkWhitespace(s, i).vi
+            if ws is None:
+                return Result.fail(start)
+        else:
+            i += 1
+    title = s[start:i]
+    if startChar == '"':
+        regex = r'\\(\\|")'
+    elif startChar == "'":
+        regex = r"\\(\\|')"
+    elif startChar == "(":
+        regex = r"\\(\\|\(|\))"
+    title = re.sub(regex, r"\1", title)
+    return Result(title, i + 1)

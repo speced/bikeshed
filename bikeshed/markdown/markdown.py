@@ -39,8 +39,7 @@ if t.TYPE_CHECKING:
         features: set[str] | None = None,
         opaqueElements: list[str] | None = None,
         blockElements: list[str] | None = None,
-    ) -> list[str]:
-        ...
+    ) -> list[str]: ...
 
     @t.overload
     def parse(
@@ -49,8 +48,7 @@ if t.TYPE_CHECKING:
         features: set[str] | None = None,
         opaqueElements: list[str] | None = None,
         blockElements: list[str] | None = None,
-    ) -> list[l.Line]:
-        ...
+    ) -> list[l.Line]: ...
 
 
 def parse(
