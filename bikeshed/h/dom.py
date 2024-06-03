@@ -312,11 +312,13 @@ def nextSiblingElement(el: t.ElementT) -> t.ElementT | None:
 
 
 @t.overload
-def appendChild(parent: t.ElementT, *els: t.NodesT, allowEmpty: t.Literal[False] = False) -> t.ElementT: ...
+def appendChild(parent: t.ElementT, *els: t.NodesT, allowEmpty: t.Literal[False] = False) -> t.ElementT:
+    ...
 
 
 @t.overload
-def appendChild(parent: t.ElementT, *els: t.NodesT, allowEmpty: bool) -> t.ElementT | None: ...
+def appendChild(parent: t.ElementT, *els: t.NodesT, allowEmpty: bool) -> t.ElementT | None:
+    ...
 
 
 def appendChild(parent: t.ElementT, *els: t.NodesT, allowEmpty: bool = False) -> t.ElementT | None:
@@ -1006,7 +1008,8 @@ if t.TYPE_CHECKING:
             self,
             attrsOrChild: t.Mapping[str, str | None] | t.NodesT | None = None,
             *children: t.NodesT | None,
-        ) -> t.ElementT: ...
+        ) -> t.ElementT:
+            ...
 
 
 class ElementCreationHelper:

@@ -2286,8 +2286,7 @@ def parseMarkdownLinkAngleDest(s: Stream, start: int) -> Result[str]:
             return Result.fail(start)
         else:
             i += 1
-    dest = s[start:i]
-    dest = re.sub(r"\\(\\|<|>)", r"\1", dest)
+    dest = htmlifyMarkdownEscapes(s[start:i])
     return Result(dest, i + 1)
 
 
@@ -2319,8 +2318,7 @@ def parseMarkdownLinkIdentDest(s: Stream, start: int) -> Result[str]:
                 i += 1
         else:
             i += 1
-    dest = s[start:i]
-    dest = re.sub(r"\\(\\|\(|\))", r"\1", dest)
+    dest = htmlifyMarkdownEscapes(s[start:i])
     return Result(dest, i)
 
 
@@ -2352,12 +2350,53 @@ def parseMarkdownLinkTitle(s: Stream, start: int, startChar: str) -> Result[str]
                 return Result.fail(start)
         else:
             i += 1
-    title = s[start:i]
-    if startChar == '"':
-        regex = r'\\(\\|")'
-    elif startChar == "'":
-        regex = r"\\(\\|')"
-    elif startChar == "(":
-        regex = r"\\(\\|\(|\))"
-    title = re.sub(regex, r"\1", title)
+    title = htmlifyMarkdownEscapes(s[start:i])
     return Result(title, i + 1)
+
+
+def isMarkdownEscape(s: Stream, start: int) -> bool:
+    return s[start] == "\\" and s[start + 1] in (
+        "\\",
+        "!",
+        '"',
+        "#",
+        "$",
+        "%",
+        "&",
+        "'",
+        "(",
+        ")",
+        "*",
+        "+",
+        ",",
+        "-",
+        ".",
+        "/",
+        ":",
+        ";",
+        "<",
+        "=",
+        ">",
+        "?",
+        "@",
+        "[",
+        "]",
+        "^",
+        "_",
+        "`",
+        "{",
+        "|",
+        "}",
+        "~",
+    )
+
+
+MARKDOWN_ESCAPE_RE = re.compile(r"\\([\\!\"#$%&'()*+,./:;<=>?@\[\]^_`{|}~-])")
+
+
+def htmlifyMarkdownEscapes(val: str) -> str:
+    return re.sub(MARKDOWN_ESCAPE_RE, markdownEscapeReplacer, val)
+
+
+def markdownEscapeReplacer(match: re.Match) -> str:
+    return f"&#{ord(match[1])};"

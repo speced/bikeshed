@@ -25,7 +25,8 @@ class DataFileRequester:
         return self._buildPath(segs=segs, fileType=fileType or self.fileType)
 
     @t.overload
-    def fetch(self, *segs: str, str: t.Literal[True], okayToFail: bool = False, fileType: str | None = None) -> str: ...
+    def fetch(self, *segs: str, str: t.Literal[True], okayToFail: bool = False, fileType: str | None = None) -> str:
+        ...
 
     @t.overload
     def fetch(
@@ -34,10 +35,12 @@ class DataFileRequester:
         str: t.Literal[False],
         okayToFail: bool = False,
         fileType: str | None = None,
-    ) -> io.TextIOWrapper: ...
+    ) -> io.TextIOWrapper:
+        ...
 
     @t.overload
-    def fetch(self, *segs: str, okayToFail: bool = False, fileType: str | None = None) -> io.TextIOWrapper: ...
+    def fetch(self, *segs: str, okayToFail: bool = False, fileType: str | None = None) -> io.TextIOWrapper:
+        ...
 
     def fetch(
         self,
@@ -80,13 +83,16 @@ class DataFileRequester:
             return config.scriptPath("spec-data", *segs)
 
     @t.overload
-    def _fail(self, location: str, str: t.Literal[True], okayToFail: bool) -> str: ...
+    def _fail(self, location: str, str: t.Literal[True], okayToFail: bool) -> str:
+        ...
 
     @t.overload
-    def _fail(self, location: str, str: t.Literal[False], okayToFail: bool) -> io.TextIOWrapper: ...
+    def _fail(self, location: str, str: t.Literal[False], okayToFail: bool) -> io.TextIOWrapper:
+        ...
 
     @t.overload
-    def _fail(self, location: str, str: bool, okayToFail: bool) -> str | io.TextIOWrapper: ...
+    def _fail(self, location: str, str: bool, okayToFail: bool) -> str | io.TextIOWrapper:
+        ...
 
     def _fail(self, location: str, str: bool, okayToFail: bool) -> str | io.TextIOWrapper:
         if okayToFail:
