@@ -2166,6 +2166,9 @@ def parseMarkdownLink(s: Stream, start: int) -> Result[ParserNode | list[ParserN
             linkTextEnd = i
             linkDestStart = i + 2
             break
+        if s[i] == "]":
+            s.cancelShorthandOpen(startTag, (startingSigil, endingSigil))
+            return Result.fail(start)
     else:
         return Result.fail(start)
     # Now that we've seen the ](, we're committed.
