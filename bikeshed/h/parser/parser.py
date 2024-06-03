@@ -2169,6 +2169,8 @@ def parseMarkdownLink(s: Stream, start: int) -> Result[ParserNode | list[ParserN
             linkTextEnd = i
             linkDestStart = i + 2
             break
+    else:
+        return Result.fail(start)
     # Now that we've seen the ](, we're committed.
 
     # I'm not doing bracket-checking in the link text,
