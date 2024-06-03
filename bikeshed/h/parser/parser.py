@@ -318,11 +318,8 @@ def parseNode(
         if macroRes.valid:
             return macroRes
     if s.config.markdown and not inOpaque:
-        if first2 == "\\[":
-            node = RawText.fromStream(s, start, start + 2, "[")
-            return Result(node, start + 2)
-        if first2 == "\\]":
-            node = RawText.fromStream(s, start, start + 2, "]")
+        if first1 == "\\" and isMarkdownEscape(s, start):
+            node = RawText.fromStream(s, start, start + 2, htmlifyMarkdownEscapes(s[start : start + 2]))
             return Result(node, start + 2)
         if first1 == "[" and s[start - 1] != "[":
             linkRes = parseMarkdownLink(s, start)
