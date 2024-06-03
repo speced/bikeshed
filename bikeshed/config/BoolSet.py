@@ -61,13 +61,16 @@ class BoolSet(collections.abc.MutableMapping):
         return key in self._internal
 
     @t.overload
-    def update(self, __other: t.SupportsKeysAndGetItem[t.Any, t.Any], **kwargs: bool) -> None: ...
+    def update(self, __other: t.SupportsKeysAndGetItem[t.Any, t.Any], **kwargs: bool) -> None:
+        ...
 
     @t.overload
-    def update(self, __other: t.Iterable[tuple[t.Any, t.Any]], **kwargs: bool) -> None: ...
+    def update(self, __other: t.Iterable[tuple[t.Any, t.Any]], **kwargs: bool) -> None:
+        ...
 
     @t.overload
-    def update(self, **kwargs: bool) -> None: ...
+    def update(self, **kwargs: bool) -> None:
+        ...
 
     def update(self, __other: t.Any = None, **kwargs: bool) -> None:
         # If either defaults to True, the result

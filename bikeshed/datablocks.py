@@ -29,16 +29,19 @@ if t.TYPE_CHECKING:
             firstLine: str,
             lineNum: int | None,
             doc: t.SpecT,
-        ) -> list[str]: ...
+        ) -> list[str]:
+            ...
 
 
 if t.TYPE_CHECKING:
 
     @t.overload
-    def transformDataBlocks(doc: t.SpecT, lines: list[Line]) -> list[Line]: ...
+    def transformDataBlocks(doc: t.SpecT, lines: list[Line]) -> list[Line]:
+        ...
 
     @t.overload
-    def transformDataBlocks(doc: t.Spec, lines: list[str]) -> list[str]: ...
+    def transformDataBlocks(doc: t.Spec, lines: list[str]) -> list[str]:
+        ...
 
 
 def transformDataBlocks(doc: t.SpecT, lines: list[Line] | list[str]) -> list[Line] | list[str]:
