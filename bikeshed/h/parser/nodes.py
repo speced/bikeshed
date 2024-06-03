@@ -345,7 +345,7 @@ class TagStack:
             return
         elif isinstance(node, EndTag):
             self.autoCloseEnd(node.tag)
-            if self.tags and self.tags[-1].startTag.tag == node.tag:
+            if self.tags and self.tags[-1].startTag.tag == node.tag and not isinstance(self.tags[-1], TagStackShorthandEntry):
                 self.tags.pop()
             else:
                 if node.tag in ("html", "head", "body", "main"):
@@ -396,6 +396,7 @@ class TagStack:
                 f"Programming error - tried to close a {shorthand} shorthand, but there's no matching open tag on the stack of open elements. Please report this!",
                 lineNum=startTag.loc,
             )
+            return
         while self.tags and self.tags[-1].startTag != startTag:
             self.tags.pop()
         self.tags.pop()
