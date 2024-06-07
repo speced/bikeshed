@@ -2319,7 +2319,8 @@ def parseMarkdownLinkTitle(s: Stream, start: int, startChar: str) -> Result[str]
     title = htmlifyMarkdownEscapes(s[start:i])
     return Result(title, i + 1)
 
-
+# not escaping * or _ currently, so the slash remains until after HTML parsing,
+# because em/strong aren't parsed until then.
 def isMarkdownEscape(s: Stream, start: int) -> bool:
     return s[start] == "\\" and s[start + 1] in (
         "\\",
@@ -2332,7 +2333,7 @@ def isMarkdownEscape(s: Stream, start: int) -> bool:
         "'",
         "(",
         ")",
-        "*",
+        #"*",
         "+",
         ",",
         "-",
@@ -2348,7 +2349,7 @@ def isMarkdownEscape(s: Stream, start: int) -> bool:
         "[",
         "]",
         "^",
-        "_",
+        #"_",
         "`",
         "{",
         "|",
