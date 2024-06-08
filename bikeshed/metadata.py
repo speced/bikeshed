@@ -748,7 +748,7 @@ def parseMarkupShorthands(key: str, val: str, lineNum: str | int | None) -> conf
     # TODO: Just call parseBoolistList instead
     vals = [v.strip() for v in val.lower().split(",")]
     ret = config.BoolSet(default=False)
-    validCategories = frozenset(["css", "markup", "dfn", "biblio", "http", "idl", "markdown", "algorithm"])
+    validCategories = frozenset(["algorithm", "biblio", "css", "dfn", "http", "idl", "markdown", "markdown-escapes", "markup"])
     for v in vals:
         pieces = v.split()
         if len(pieces) != 2:

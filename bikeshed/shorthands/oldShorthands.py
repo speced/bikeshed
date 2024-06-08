@@ -30,7 +30,7 @@ def transformAutolinkShortcuts(doc: t.SpecT) -> None:
         if "markdown" in doc.md.markupShorthands:
             nodes = config.processTextNodes(nodes, strongRe, strongReplacer)
             nodes = config.processTextNodes(nodes, emRe, emReplacer)
-            # nodes = config.processTextNodes(nodes, escapedRe, escapedReplacer)
+            nodes = config.processTextNodes(nodes, escapedRe, escapedReplacer)
         for node in nodes:
             if h.isElement(node):
                 addedNodes.append(node)

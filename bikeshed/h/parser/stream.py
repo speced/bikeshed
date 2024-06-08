@@ -72,14 +72,15 @@ class Result(t.Generic[ResultT_co]):
 
 @dataclass
 class ParseConfig:
-    markdown: bool = False
+    algorithm: bool = False
+    biblio: bool = False
     css: bool = False
     dfn: bool = False
     header: bool = False
     idl: bool = False
+    markdown: bool = False
+    markdownEscapes: bool = False
     markup: bool = False
-    algorithm: bool = False
-    biblio: bool = False
     macros: dict[str, str] = field(default_factory=dict)
     context: str | None = None
     opaqueElements: set[str] = field(default_factory=lambda: {"pre", "xmp", "script", "style"})
@@ -87,14 +88,15 @@ class ParseConfig:
     @staticmethod
     def fromSpec(doc: t.SpecT, context: str | None = None) -> ParseConfig:
         return ParseConfig(
-            markdown="markdown" in doc.md.markupShorthands,
+            algorithm="algorithm" in doc.md.markupShorthands,
+            biblio="biblio" in doc.md.markupShorthands,
             css="css" in doc.md.markupShorthands,
             dfn="dfn" in doc.md.markupShorthands,
             header="http" in doc.md.markupShorthands,
             idl="idl" in doc.md.markupShorthands,
+            markdown="markdown" in doc.md.markupShorthands,
+            markdownEscapes="markdown-escapes" in doc.md.markupShorthands,
             markup="markup" in doc.md.markupShorthands,
-            algorithm="algorithm" in doc.md.markupShorthands,
-            biblio="biblio" in doc.md.markupShorthands,
             macros=doc.macros,
             context=context,
             opaqueElements=set(doc.md.opaqueElements),
@@ -243,26 +245,22 @@ class Stream:
         # Includes the newline, if present.
         return self[start : self.nextLineStart(start)]
 
-    def observeResult(
-        self,
-        i: int,
-        res: Result[ParserNode | list[ParserNode]],
-    ) -> Result[ParserNode | list[ParserNode]]:
+    def observeResult(self, res: Result[ParserNode | list[ParserNode]]) -> Result[ParserNode | list[ParserNode]]:
         if res.value is None:
             pass
         elif isinstance(res.value, list):
             for node in res.value:
-                self.observeNode(i, node)
+                self.observeNode(node)
         else:
-            self.observeNode(i, res.value)
+            self.observeNode(res.value)
         return res
 
-    def observeNode(self, i: int, node: ParserNode) -> ParserNode:
-        self.openEls.update(i, node)
+    def observeNode(self, node: ParserNode) -> ParserNode:
+        self.openEls.update(node)
         return node
 
-    def observeShorthandOpen(self, i: int, startTag: StartTag, sigils: tuple[str, str]) -> None:
-        self.openEls.updateShorthandOpen(i, startTag, sigils)
+    def observeShorthandOpen(self, startTag: StartTag, sigils: tuple[str, str]) -> None:
+        self.openEls.updateShorthandOpen(startTag, sigils)
 
     def observeShorthandClose(self, loc: str, startTag: StartTag, sigils: tuple[str, str]) -> None:
         self.openEls.updateShorthandClose(loc, startTag, sigils)

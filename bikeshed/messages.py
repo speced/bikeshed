@@ -110,9 +110,13 @@ def p(msg: str | tuple[str, str], sep: str | None = None, end: str | None = None
 
 
 def getLineNum(lineNum: str | int | None = None, el: t.ElementT | None = None) -> str | int | None:
-    if lineNum is not None:
+    if isinstance(lineNum, str):
         return lineNum
-    if el is not None and el.get("bs-line-number"):
+    elif isinstance(lineNum, int):
+        return str(lineNum)
+    elif lineNum is not None:
+        return getLineNum(el=lineNum)
+    elif el is not None and el.get("bs-line-number"):
         s = el.get("bs-line-number", "")
         context = el.get("bs-parse-context", None)
         if context:
@@ -149,7 +153,7 @@ def linkerror(msg: str, el: t.ElementT | None = None, lineNum: str | int | None 
         errorAndExit()
 
 
-def lint(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = None) -> None:
+def lint(msg: str, el: t.ElementT | None = None, lineNum: str | int | t.ElementT | None = None) -> None:
     lineNum = getLineNum(lineNum, el)
     suffix = ""
     if el is not None:

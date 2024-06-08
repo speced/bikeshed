@@ -86,16 +86,33 @@ def generateNodes(s: Stream, start: int) -> t.Generator[ParserNode, None, None]:
             yield nodes
 
 
-def generateResults(s: Stream, start: int) -> t.Generator[Result[ParserNode | list[ParserNode]], None, None]:
+def generateResults(
+    s: Stream,
+    start: int,
+    experimental: bool = False,
+) -> t.Generator[Result[ParserNode | list[ParserNode]], None, None]:
     i = start
     end = len(s)
     while i < end:
-        res = parseAnything(s, i)
+        res = parseAnything(s, i, experimental=experimental)
         if res.valid:
             yield res
             i = res.i
         else:
             return
+
+
+def processResults(s: Stream, results: list[Result[ParserNode | list[ParserNode]]]) -> list[ParserNode]:
+    contents: list[ParserNode] = []
+    for res in results:
+        s.observeResult(res)
+        node, _ = res.vi
+        assert node is not None
+        if isinstance(node, list):
+            contents.extend(node)
+        else:
+            contents.append(node)
+    return contents
 
 
 # This needs to be any character that can start a node,
@@ -107,7 +124,7 @@ def generateResults(s: Stream, start: int) -> t.Generator[Result[ParserNode | li
 POSSIBLE_NODE_START_CHARS = "&<>`'~[]{}()\\—-|=$:"
 
 
-def parseAnything(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
+def parseAnything(s: Stream, start: int, experimental: bool = False) -> Result[ParserNode | list[ParserNode]]:
     """
     Either returns ParserNode(s) a la parseNode(),
     or returns a RawText node up to the next POSSIBLE_NODE_START_CHAR
@@ -121,7 +138,8 @@ def parseAnything(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]
         return Result.fail(start)
     if s[start] in POSSIBLE_NODE_START_CHARS:
         res = parseNode(s, start)
-        s.observeResult(start, res)
+        if not experimental:
+            s.observeResult(res)
         if res.valid:
             return res
     i = start + 1
@@ -176,13 +194,13 @@ def parseNode(
         if el is not None:
             return Result(el, i)
     if s.config.markdown:
+        if first2 == r"\`":
+            node = RawText.fromStream(s, start, start + 2, "`")
+            return Result(node, start + 2)
         if first1 == "`":
             els, i = parseCodeSpan(s, start).vi
             if els is not None:
                 return Result(els, i)
-        if first2 == r"\`":
-            node = RawText.fromStream(s, start, start + 2, "`")
-            return Result(node, start + 2)
     if s.config.css and not inOpaque:
         if first3 == r"\''":
             node = RawText.fromStream(s, start, start + 3, "''")
@@ -309,6 +327,14 @@ def parseNode(
             biblioRes = parseAutolinkBiblioSection(s, start)
             if biblioRes.valid:
                 return biblioRes
+    if s.config.markdown and not inOpaque:
+        if first2 == "\\[":
+            node = RawText.fromStream(s, start, start + 2, "[")
+            return Result(node, start + 2)
+        elif first1 == "[" and s[start - 1] != "[":
+            linkRes = parseMarkdownLink(s, start)
+            if linkRes.valid:
+                return linkRes
     if first2 == "\\[" and isMacroStart(s, start + 2):
         # an escaped macro, so handle it here
         node = RawText.fromStream(s, start, start + 2, "[")
@@ -317,14 +343,10 @@ def parseNode(
         macroRes = parseMacro(s, start)
         if macroRes.valid:
             return macroRes
-    if s.config.markdown and not inOpaque:
+    if s.config.markdownEscapes and not inOpaque:
         if first1 == "\\" and isMarkdownEscape(s, start):
             node = RawText.fromStream(s, start, start + 2, htmlifyMarkdownEscapes(s[start : start + 2]))
             return Result(node, start + 2)
-        if first1 == "[" and s[start - 1] != "[":
-            linkRes = parseMarkdownLink(s, start)
-            if linkRes.valid:
-                return linkRes
     if first2 == "—\n" or first3 == "--\n":
         match, i = s.matchRe(start, emdashRe).vi
         if match is not None:
@@ -1697,7 +1719,7 @@ def parseLinkText(
     endingLength = len(endingSigil)
     startLine = s.line(start)
     content: list[ParserNode] = []
-    s.observeShorthandOpen(start, startTag, (startingSigil, endingSigil))
+    s.observeShorthandOpen(startTag, (startingSigil, endingSigil))
     for res in generateResults(s, start):
         value, i = res.vi
         assert value is not None
@@ -2145,33 +2167,28 @@ def parseMarkdownLink(s: Stream, start: int) -> Result[ParserNode | list[ParserN
     endingSigil = "](...)"
 
     startTag = StartTag.fromStream(s, start, linkTextStart, "a")
-    s.observeShorthandOpen(start, startTag, (startingSigil, endingSigil))
 
     # At this point, we're still not committed to this being
     # an autolink, so it should silently fail.
     startLine = s.line(start)
-    content: list[ParserNode] = []
-    for res in generateResults(s, linkTextStart):
-        value, i = res.vi
-        assert value is not None
-        if isinstance(value, list):
-            content.extend(value)
-        else:
-            content.append(value)
+    results: list[Result[ParserNode | list[ParserNode]]] = []
+    for res in generateResults(s, linkTextStart, experimental=True):
+        results.append(res)
+        i = res.i
         if s.line(i) > startLine + 3:
-            s.cancelShorthandOpen(startTag, (startingSigil, endingSigil))
             return Result.fail(start)
         if s[i : i + 2] == "](":
-            s.observeShorthandClose(s.loc(i), startTag, (startingSigil, endingSigil))
             linkTextEnd = i
             linkDestStart = i + 2
             break
         if s[i] == "]":
-            s.cancelShorthandOpen(startTag, (startingSigil, endingSigil))
             return Result.fail(start)
     else:
         return Result.fail(start)
     # Now that we've seen the ](, we're committed.
+    s.observeShorthandOpen(startTag, (startingSigil, endingSigil))
+    content = processResults(s, results)
+    s.observeShorthandClose(s.loc(linkTextEnd), startTag, (startingSigil, endingSigil))
 
     # I'm not doing bracket-checking in the link text,
     # as CommonMark requires, because I've already lost
@@ -2185,6 +2202,7 @@ def parseMarkdownLink(s: Stream, start: int) -> Result[ParserNode | list[ParserN
         return Result([openingSquare, *content, middleBit], linkDestStart)
     dest, title = result
     startTag.attrs["href"] = dest
+    startTag.attrs["bs-autolink-syntax"] = escapeAttr(s[start:nodeEnd])
     if title:
         startTag.attrs["title"] = title
     endTag = EndTag.fromStream(s, nodeEnd - 1, nodeEnd, startTag)
@@ -2273,7 +2291,7 @@ def parseMarkdownLinkAngleDest(s: Stream, start: int) -> Result[str]:
         if s.eof(i):
             m.die("Hit EOF while parsing the destination of a markdown link", lineNum=s.loc(start - 1))
             return Result.fail(start)
-        elif s[i] == "\\" and s[i + 1] in ("\\", ">", "<"):
+        elif s.config.markdownEscapes and s[i] == "\\" and s[i + 1] in ("\\", ">", "<"):
             i += 2
         elif s[i] == ">":
             break
@@ -2288,7 +2306,9 @@ def parseMarkdownLinkAngleDest(s: Stream, start: int) -> Result[str]:
             return Result.fail(start)
         else:
             i += 1
-    dest = htmlifyMarkdownEscapes(s[start:i])
+    dest = s[start:i]
+    if s.config.markdownEscapes:
+        dest = htmlifyMarkdownEscapes(dest)
     return Result(dest, i + 1)
 
 
@@ -2299,7 +2319,7 @@ def parseMarkdownLinkIdentDest(s: Stream, start: int) -> Result[str]:
         if s.eof(i):
             m.die("Hit EOF while parsing the destination of a markdown link", lineNum=s.loc(start))
             return Result.fail(start)
-        elif s[i] == "\\" and s[i + 1] in ("\\", "(", ")"):
+        elif s.config.markdownEscapes and s[i] == "\\" and s[i + 1] in ("\\", "(", ")"):
             i += 2
         elif isControl(s[i]):
             m.die(
@@ -2320,7 +2340,9 @@ def parseMarkdownLinkIdentDest(s: Stream, start: int) -> Result[str]:
                 i += 1
         else:
             i += 1
-    dest = htmlifyMarkdownEscapes(s[start:i])
+    dest = s[start:i]
+    if s.config.markdownEscapes:
+        dest = htmlifyMarkdownEscapes(dest)
     return Result(dest, i)
 
 
@@ -2336,7 +2358,7 @@ def parseMarkdownLinkTitle(s: Stream, start: int, startChar: str) -> Result[str]
         if s.eof(i):
             m.die("Hit EOF while parsing the title of a markdown link", lineNum=s.line(start))
             return Result.fail(start)
-        elif s[i] == "\\" and s[i + 1] in ("\\", startChar, endChar):
+        elif s.config.markdownEscapes and s[i] == "\\" and s[i + 1] in ("\\", startChar, endChar):
             i += 2
         elif s[i] == endChar:
             break
@@ -2352,8 +2374,11 @@ def parseMarkdownLinkTitle(s: Stream, start: int, startChar: str) -> Result[str]
                 return Result.fail(start)
         else:
             i += 1
-    title = htmlifyMarkdownEscapes(s[start:i])
+    title = s[start:i]
+    if s.config.markdownEscapes:
+        title = htmlifyMarkdownEscapes(title)
     return Result(title, i + 1)
+
 
 # not escaping * or _ currently, so the slash remains until after HTML parsing,
 # because em/strong aren't parsed until then.
@@ -2369,7 +2394,7 @@ def isMarkdownEscape(s: Stream, start: int) -> bool:
         "'",
         "(",
         ")",
-        #"*",
+        # "*",
         "+",
         ",",
         "-",
@@ -2385,7 +2410,7 @@ def isMarkdownEscape(s: Stream, start: int) -> bool:
         "[",
         "]",
         "^",
-        #"_",
+        # "_",
         "`",
         "{",
         "|",
