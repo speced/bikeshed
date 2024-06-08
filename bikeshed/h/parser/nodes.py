@@ -335,17 +335,21 @@ class TagStack:
     def inTagContext(self, tagName: str) -> bool:
         return any(x.startTag.tag == tagName for x in self.tags)
 
-    def update(self, i: int, node: ParserNode) -> None:
+    def update(self, node: ParserNode) -> None:
         # Updates the stack based on the passed node.
         # Start tags add to the stack, close tags pop from it.
         # Auto-closing tags mean start tags can also pop from the stack.
         if isinstance(node, StartTag):
             self.autoCloseStart(node.tag)
-            self.tags.append(TagStackEntry(i, node))
+            self.tags.append(TagStackEntry(node))
             return
         elif isinstance(node, EndTag):
             self.autoCloseEnd(node.tag)
-            if self.tags and self.tags[-1].startTag.tag == node.tag and not isinstance(self.tags[-1], TagStackShorthandEntry):
+            if (
+                self.tags
+                and self.tags[-1].startTag.tag == node.tag
+                and not isinstance(self.tags[-1], TagStackShorthandEntry)
+            ):
                 self.tags.pop()
             else:
                 if node.tag in ("html", "head", "body", "main"):
@@ -365,8 +369,8 @@ class TagStack:
         elif isinstance(node, (SelfClosedTag, RawElement)):
             self.autoCloseStart(node.tag)
 
-    def updateShorthandOpen(self, i: int, startTag: StartTag, sigils: tuple[str, str]) -> None:
-        entry = TagStackShorthandEntry(i, startTag, sigils)
+    def updateShorthandOpen(self, startTag: StartTag, sigils: tuple[str, str]) -> None:
+        entry = TagStackShorthandEntry(startTag, sigils)
         self.tags.append(entry)
 
     def updateShorthandClose(self, loc: str, startTag: StartTag, sigils: tuple[str, str]) -> None:
@@ -573,7 +577,6 @@ class TagStack:
 
 @dataclass
 class TagStackEntry:
-    i: int
     startTag: StartTag
 
     @property
