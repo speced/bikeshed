@@ -202,23 +202,25 @@ def parseNode(
             if els is not None:
                 return Result(els, i)
     if s.config.css and not inOpaque:
-        if first3 == r"\''":
-            node = RawText.fromStream(s, start, start + 3, "''")
-            return Result(node, start + 3)
-        elif first2 == r"\'":
-            node = RawText.fromStream(s, start, start + 2, "'")
-            return Result(node, start + 2)
+        if first2 == r"\'":
+            i = start + 2
+            while s[i] == "'":
+                i += 1
+            node = RawText.fromStream(s, start, i, s[start + 1 : i])
+            return Result(node, i)
         elif first3 == "'''":
+            i = start + 3
+            while s[i] == "'":
+                i += 1
             m.die(
-                "Saw ''' (or more). This is probably a typo intended to be a double apostrophe, starting a CSS maybe autolink; if not, please escape some of the apostrophes.",
+                f"Saw {s[start:i]}. This is probably a typo intended to be a double apostrophe, starting a CSS maybe autolink; if not, please escape some of the apostrophes.",
                 lineNum=s.loc(start),
             )
-            node = RawText.fromStream(s, start, start + 3)
-            return Result(node, start + 3)
-        elif first2 == "''" and s[start - 1] not in ("'", "="):
+            node = RawText.fromStream(s, start, i)
+            return Result(node, i)
+        elif first2 == "''" and s[start - 1] != "=":
             # Temporary check to remove some error cases -
             # some weird HTML cases with an empty attr can trigger,
-            # or there's some bizarre '''' in CSS2.
             maybeRes = parseCSSMaybe(s, start)
             if maybeRes.valid:
                 return maybeRes
