@@ -31,7 +31,6 @@ def brokenLinks(doc: t.SpecT) -> None:
         if href.startswith("mailto:"):
             # Can't check mailto links
             continue
-        print(h.outerHTML(el))
         try:
             res = requests.get(href, timeout=5)
         except requests.exceptions.Timeout:
