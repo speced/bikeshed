@@ -109,7 +109,7 @@ def p(msg: str | tuple[str, str], sep: str | None = None, end: str | None = None
             print(msg.encode("ascii", "xmlcharrefreplace"), sep=sep, end=end, file=state.fh)
 
 
-def getLineNum(lineNum: str | int | None = None, el: t.ElementT | None = None) -> str | int | None:
+def getLineNum(lineNum: str | int | t.ElementT | None = None, el: t.ElementT | None = None) -> str | int | None:
     if isinstance(lineNum, str):
         return lineNum
     elif isinstance(lineNum, int):
