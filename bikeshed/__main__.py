@@ -1,3 +1,3 @@
-from .cli import main
+from bikeshed.cli import main
 
 main()
