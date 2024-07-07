@@ -41,9 +41,6 @@ def transformAutolinkShortcuts(doc: t.SpecT) -> None:
         if h.isElement(node):
             addLineNumber(node)
 
-    for el in h.findAll("var", doc):
-        h.fixSurroundingTypography(el)
-
 
 def transformShorthandElements(doc: t.SpecT) -> None:
     """

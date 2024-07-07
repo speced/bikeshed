@@ -60,6 +60,8 @@ class RawText(Text):
                 self.text = "’" + self.text[1:]
         if "'" in self.text:
             self.text = re.sub(r"(\w)'(\w)", r"\1’\2", self.text)
+        if isinstance(lastNode, EndTag) and lastNode.tag == "var" and re.match(r"'\s", self.text):
+            self.text = "’" + self.text[1:]
         return self
 
     def needsLCCs(self) -> bool:
