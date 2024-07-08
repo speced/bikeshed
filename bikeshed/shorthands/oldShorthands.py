@@ -11,6 +11,9 @@ def transformAutolinkShortcuts(doc: t.SpecT) -> None:
 
     addedNodes = []
 
+    if "markdown" not in doc.md.markupShorthands:
+        return
+
     def transformElement(parentEl: t.ElementT) -> None:
         processContents = h.isElement(parentEl) and not doc.isOpaqueElement(parentEl)
         if not processContents:

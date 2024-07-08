@@ -540,7 +540,7 @@ def ancestorElements(el: t.ElementT, self: bool = False) -> t.Generator[t.Elemen
     yield from el.iterancestors()
 
 
-def childNodes(parentEl: t.ElementishT, clear: bool = False, skipOddNodes: bool = True) -> list[t.NodeT]:
+def childNodes(parentEl: t.ElementishT, clear: bool = False, skipOddNodes: bool = True, mergeText: bool = False) -> list[t.NodeT]:
     """
     This function returns all the nodes in a parent element in the DOM sense,
     mixing text nodes (strings) and other nodes together
@@ -554,7 +554,7 @@ def childNodes(parentEl: t.ElementishT, clear: bool = False, skipOddNodes: bool 
     In other words, the following is a no-op:
 
     ```
-    appendChild(parentEl, *childNodes(parentEl, clear=True), allowEmpty=True)
+    appendChild(parentEl, *childNodes(parentEl, clear=True, skipOddNodes=False), allowEmpty=True)
     ```
 
     Using clear=True is required if you're going to be modifying the element or its children,
@@ -564,20 +564,32 @@ def childNodes(parentEl: t.ElementishT, clear: bool = False, skipOddNodes: bool 
 
     skipOddNodes ensures that the return value will only be text and Element nodes;
     if it's false, there might be comments, PIs, etc.
+
+    mergeText merges adjacent text nodes in the output, even if they weren't adjacent
+    in the source document (such as if a skipped odd node separated them).
     """
     ret: list[t.NodeT] = []
+
+    def append(nodes: list[t.NodeT], node: t.NodeT) -> None:
+        if not mergeText:
+            nodes.append(node)
+            return
+        if isinstance(node, str) and len(nodes) > 0 and isinstance(nodes[-1], str):
+            nodes[-1] += node
+        else:
+            nodes.append(node)
 
     if isinstance(parentEl, list):
         for c in parentEl:
             if isinstance(c, str):
-                ret.append(c)
+                append(ret, c)
                 continue
             if skipOddNodes and isOddNode(c):
                 pass
             else:
-                ret.append(c)
+                append(ret, c)
             if not emptyText(c.tail, wsAllowed=False):
-                ret.append(t.cast(str, c.tail))
+                append(ret, t.cast(str, c.tail))
                 if clear:
                     c.tail = None
         if clear:
@@ -585,16 +597,16 @@ def childNodes(parentEl: t.ElementishT, clear: bool = False, skipOddNodes: bool 
         return ret
 
     if not emptyText(parentEl.text, wsAllowed=False):
-        ret.append(t.cast(str, parentEl.text))
+        append(ret, t.cast(str, parentEl.text))
         if clear:
             parentEl.text = None
     for c in childElements(parentEl, oddNodes=True):
         if skipOddNodes and isOddNode(c):
             pass
         else:
-            ret.append(c)
+            append(ret, c)
         if not emptyText(c.tail, wsAllowed=False):
-            ret.append(t.cast(str, c.tail))
+            append(ret, t.cast(str, c.tail))
             if clear:
                 c.tail = None
     if clear:
