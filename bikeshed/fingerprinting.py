@@ -25,7 +25,7 @@ def addTrackingVector(doc: t.SpecT) -> None:
                     h.E.path(
                         {
                             "id": trackingVectorId,
-                            "stroke": "black",
+                            "stroke": "currentcolor",
                             "stroke-linecap": "round",
                             "stroke-linejoin": "round",
                             "stroke-dasharray": "3,2,35,2,20,2",
@@ -45,6 +45,7 @@ def addTrackingVector(doc: t.SpecT) -> None:
                 {
                     "class": doc.md.trackingVectorClass,
                     "href": "https://infra.spec.whatwg.org/#tracking-vector",
+                    "style": "color: currentcolor",
                 },
                 trackingVectorImage(
                     doc.md.trackingVectorImage,
@@ -67,7 +68,7 @@ def trackingVectorImage(
 ) -> t.ElementT:
     if imageURL is None:
         return h.E.svg(
-            {"width": "46", "height": "64", "role": "img", "aria-label": altText},
+            {"width": "46", "height": "64", "role": "img", "aria-label": altText, "class": "darkmode-aware"},
             h.E.title({}, title),
             h.E.use({"href": "#" + trackingVectorId}),
         )
@@ -78,5 +79,6 @@ def trackingVectorImage(
             "src": imageURL,
             "width": imageWidth,
             "height": imageHeight,
+            "class": "darkmode-aware",
         },
     )
