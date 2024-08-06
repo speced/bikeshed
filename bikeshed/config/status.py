@@ -264,6 +264,7 @@ megaGroups = {
             "wecg",
             "wicg",
             "wintercg",
+            "w3t",
         ],
     ),
     "whatwg": frozenset(["whatwg"]),
