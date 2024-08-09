@@ -109,7 +109,7 @@ class Spec:
         self.widl: widlparser.Parser = idl.getParser()
 
         self.languages: dict[str, language.Language] = fetchLanguages(self.dataFile)
-        self.statuses = status.GroupStatusManager.fromKDLStr(self.dataFile.fetch("statuses.kdl", str=True))
+        self.statuses: status.GroupStatusManager = fetchGroupsStatuses(self.dataFile)
 
         self.extraJC = stylescript.JCManager()
         self.extraJC.addColors()
@@ -554,6 +554,10 @@ def fetchLanguages(dataFile: retrieve.DataFileRequester) -> dict[str, language.L
         k: language.Language(v["name"], v["native-name"])
         for k, v in json.loads(dataFile.fetch("languages.json", str=True)).items()
     }
+
+
+def fetchGroupsStatuses(dataFile: retrieve.DataFileRequester) -> status.GroupStatusManager:
+    return status.GroupStatusManager.fromKdlStr(self.dataFile.fetch("statuses.kdl", str=True))
 
 
 def addDomintroStyles(doc: Spec) -> None:

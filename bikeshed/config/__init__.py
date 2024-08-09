@@ -37,21 +37,6 @@ from .main import (
 )
 from .status import (
     canonicalizeStatus,
-    datedStatuses,
-    deadlineStatuses,
-    implementationStatuses,
     looselyMatch,
-    megaGroups,
-    noEDStatuses,
-    shortToLongStatus,
-    snapshotStatuses,
     splitStatus,
-    unlevelledStatuses,
-    w3cCgs,
-    w3cCommunityStatuses,
-    w3cIgs,
-    w3cIGStatuses,
-    w3cProcessDocumentStatuses,
-    w3cTAGStatuses,
-    w3cWGStatuses,
 )
