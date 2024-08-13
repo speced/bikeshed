@@ -6,6 +6,7 @@ import kdl
 
 from .. import messages as m
 from .. import t
+from . import utils
 
 
 @dataclasses.dataclass
@@ -28,6 +29,36 @@ class GroupStatusManager:
 
         return self
 
+    def getStatuses(name: str) -> list[Status]:
+        statuses = []
+        if name in self.genericStatuses:
+            statuses.append(self.genericStatuses[name])
+        for sb in self.standardsBodies:
+            if name in sb.statuses:
+                statuses.append(sb.statuses[name])
+        return statuses
+
+    def getStatus(sbName: str|None, statusName: str) -> Status|None:
+        # Note that a None sbName does *not* indicate we don't care,
+        # it's specifically statuses *not* restricted to a standards body.
+        if sbName is None:
+            return self.genericStatuses.get(statusName)
+        elif sbName in self.standardsBodies:
+            return self.standardsBodies[sbName].statuses.get(statusName)
+        else:
+            return None
+
+    def getGroup(groupName: str) -> Group|None:
+        for sb in self.standardsBodies:
+            if groupName in sb.groups:
+                return sb.groups[groupName]
+        return None
+
+    def getStandardsBody(sbName: str) -> StandardsBody|None:
+        return self.standardsBodies.get(sbName)
+
+
+
 
 @dataclasses.dataclass
 class StandardsBody:
@@ -40,10 +71,10 @@ class StandardsBody:
         name = t.cast(str, node.args[0])
         self = StandardsBody(name)
         for child in node.getAll("group"):
-            g = Group.fromKdlNode(child, sbName=self.name)
+            g = Group.fromKdlNode(child, sb=self)
             self.groups[g.name] = g
         for child in node.getAll("status"):
-            s = Status.fromKdlNode(child, sbName=self.name)
+            s = Status.fromKdlNode(child, sb=self)
             self.statuses[s.shortName] = s
         return self
 
@@ -52,15 +83,15 @@ class StandardsBody:
 class Group:
     name: str
     privSec: bool
-    sbName: str | None = None
+    sb: StandardsBody | None = None
 
     @staticmethod
-    def fromKdlNode(node: kdl.Node, sbName: str | None = None) -> Group:
-        if sbName == "w3c":
-            return GroupW3C.fromKdlNode(node, sbName)
+    def fromKdlNode(node: kdl.Node, sb: StandardsBody | None = None) -> Group:
+        if sb.name == "w3c":
+            return GroupW3C.fromKdlNode(node, sb)
         name = t.cast(str, node.args[0])
         privSec = node.get("priv-sec") is not None
-        return Group(name, privSec, sbName)
+        return Group(name, privSec, sb)
 
 
 @dataclasses.dataclass
@@ -68,33 +99,33 @@ class GroupW3C(Group):
     type: str | None = None
 
     @staticmethod
-    def fromKdlNode(node: kdl.Node, sbName: str | None = None) -> GroupW3C:
+    def fromKdlNode(node: kdl.Node, sb: StandardsBody | None = None) -> GroupW3C:
         name = t.cast(str, node.args[0])
         privSec = node.get("priv-sec") is not None
         groupType = t.cast("str|None", node.props["type"])
-        return GroupW3C(name, privSec, sbName, groupType)
+        return GroupW3C(name, privSec, sb, groupType)
 
 
 @dataclasses.dataclass
 class Status:
     shortName: str
     longName: str
-    sbName: str | None = None
+    sb: StandardsBody | None = None
     requires: list[str] = dataclasses.field(default_factory=list)
 
     def fullShortname(self) -> str:
-        if self.sbName is None:
+        if self.sb.name is None:
             return self.shortName
         else:
-            return self.sbName + "/" + self.shortName
+            return self.sb.name + "/" + self.shortName
 
     @staticmethod
-    def fromKdlNode(node: kdl.Node, sbName: str | None = None) -> Status:
-        if sbName == "w3c":
-            return StatusW3C.fromKdlNode(node, sbName)
+    def fromKdlNode(node: kdl.Node, sb: StandardsBody | None = None) -> Status:
+        if sb.name == "w3c":
+            return StatusW3C.fromKdlNode(node, sb)
         shortName = t.cast(str, node.args[0])
         longName = t.cast(str, node.args[1])
-        self = Status(shortName, longName, sbName)
+        self = Status(shortName, longName, sb)
         requiresNode = node.get("requires")
         if requiresNode:
             self.requires = t.cast("list[str]", list(node.getArgs((..., str))))
