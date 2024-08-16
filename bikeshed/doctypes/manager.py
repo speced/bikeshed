@@ -125,7 +125,7 @@ class GroupW3C(Group):
     def fromKdlNode(node: kdl.Node, org: Org) -> GroupW3C:
         name = t.cast(str, node.args[0])
         privSec = t.cast(bool, node.props.get("priv-sec", False))
-        groupType = t.cast("str|None", node.props["type"])
+        groupType = t.cast("str|None", node.props.get("type"))
         return GroupW3C(name, privSec, org, [], groupType)
 
 
