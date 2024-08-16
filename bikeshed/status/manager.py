@@ -12,7 +12,7 @@ from . import utils
 @dataclasses.dataclass
 class GroupStatusManager:
     genericStatuses: dict[str, Status] = dataclasses.field(default_factory=dict)
-    standardsBodies: dict[str, StandardsBody] = dataclasses.field(default_factory=dict)
+    orgs: dict[str, Org] = dataclasses.field(default_factory=dict)
 
     @staticmethod
     def fromKdlStr(data: str) -> GroupStatusManager:
@@ -23,58 +23,74 @@ class GroupStatusManager:
             status = Status.fromKdlNode(node)
             self.genericStatuses[status.shortName] = status
 
-        for node in kdlDoc.getAll("standards-body"):
-            sb = StandardsBody.fromKdlNode(node)
-            self.standardsBodies[sb.name] = sb
+        for node in kdlDoc.getAll("org"):
+            org = Org.fromKdlNode(node)
+            self.orgs[org.name] = org
 
         return self
 
-    def getStatuses(name: str) -> list[Status]:
+    def getStatuses(self, name: str) -> list[Status]:
         statuses = []
         if name in self.genericStatuses:
             statuses.append(self.genericStatuses[name])
-        for sb in self.standardsBodies:
-            if name in sb.statuses:
-                statuses.append(sb.statuses[name])
+        for org in self.orgs.values():
+            if name in org.statuses:
+                statuses.append(org.statuses[name])
         return statuses
 
-    def getStatus(sbName: str|None, statusName: str) -> Status|None:
-        # Note that a None sbName does *not* indicate we don't care,
-        # it's specifically statuses *not* restricted to a standards body.
-        if sbName is None:
+    def getStatus(self, orgName: str | None, statusName: str, allowGeneric: bool = False) -> Status | None:
+        # Note that a None orgName does *not* indicate we don't care,
+        # it's specifically statuses *not* restricted to an org.
+        if orgName is None:
             return self.genericStatuses.get(statusName)
-        elif sbName in self.standardsBodies:
-            return self.standardsBodies[sbName].statuses.get(statusName)
+        elif orgName in self.orgs:
+            statusInOrg = self.orgs[orgName].statuses.get(statusName)
+            if statusInOrg:
+                return statusInOrg
+            elif allowGeneric:
+                return self.genericStatuses.get(statusName)
+            else:
+                return None
         else:
             return None
 
-    def getGroup(groupName: str) -> Group|None:
-        for sb in self.standardsBodies:
-            if groupName in sb.groups:
-                return sb.groups[groupName]
-        return None
+    def getGroups(self, orgName: str | None, groupName: str) -> list[Group]:
+        # Unlike Status, if org is None we'll just grab whatever group matches.
+        groups = []
+        for org in self.orgs.values():
+            if orgName is not None and org.name != orgName:
+                continue
+            if groupName in org.groups:
+                groups.append(org.groups[groupName])
+        return groups
 
-    def getStandardsBody(sbName: str) -> StandardsBody|None:
-        return self.standardsBodies.get(sbName)
+    def getGroup(self, orgName: str | None, groupName: str) -> Group | None:
+        # If Org is None, and there are multiple groups with that name, fail to find.
+        groups = self.getGroups(orgName, groupName)
+        if len(groups) == 1:
+            return groups[0]
+        else:
+            return None
 
-
+    def getOrg(self, orgName: str) -> Org | None:
+        return self.orgs.get(orgName)
 
 
 @dataclasses.dataclass
-class StandardsBody:
+class Org:
     name: str
     groups: dict[str, Group] = dataclasses.field(default_factory=dict)
     statuses: dict[str, Status] = dataclasses.field(default_factory=dict)
 
     @staticmethod
-    def fromKdlNode(node: kdl.Node) -> StandardsBody:
+    def fromKdlNode(node: kdl.Node) -> Org:
         name = t.cast(str, node.args[0])
-        self = StandardsBody(name)
+        self = Org(name)
         for child in node.getAll("group"):
-            g = Group.fromKdlNode(child, sb=self)
+            g = Group.fromKdlNode(child, org=self)
             self.groups[g.name] = g
         for child in node.getAll("status"):
-            s = Status.fromKdlNode(child, sb=self)
+            s = Status.fromKdlNode(child, org=self)
             self.statuses[s.shortName] = s
         return self
 
@@ -83,15 +99,15 @@ class StandardsBody:
 class Group:
     name: str
     privSec: bool
-    sb: StandardsBody | None = None
+    org: Org
 
     @staticmethod
-    def fromKdlNode(node: kdl.Node, sb: StandardsBody | None = None) -> Group:
-        if sb.name == "w3c":
-            return GroupW3C.fromKdlNode(node, sb)
+    def fromKdlNode(node: kdl.Node, org: Org) -> Group:
+        if org.name == "w3c":
+            return GroupW3C.fromKdlNode(node, org)
         name = t.cast(str, node.args[0])
         privSec = node.get("priv-sec") is not None
-        return Group(name, privSec, sb)
+        return Group(name, privSec, org)
 
 
 @dataclasses.dataclass
@@ -99,33 +115,33 @@ class GroupW3C(Group):
     type: str | None = None
 
     @staticmethod
-    def fromKdlNode(node: kdl.Node, sb: StandardsBody | None = None) -> GroupW3C:
+    def fromKdlNode(node: kdl.Node, org: Org) -> GroupW3C:
         name = t.cast(str, node.args[0])
         privSec = node.get("priv-sec") is not None
         groupType = t.cast("str|None", node.props["type"])
-        return GroupW3C(name, privSec, sb, groupType)
+        return GroupW3C(name, privSec, org, groupType)
 
 
 @dataclasses.dataclass
 class Status:
     shortName: str
     longName: str
-    sb: StandardsBody | None = None
+    org: Org | None = None
     requires: list[str] = dataclasses.field(default_factory=list)
 
     def fullShortname(self) -> str:
-        if self.sb.name is None:
+        if self.org is None:
             return self.shortName
         else:
-            return self.sb.name + "/" + self.shortName
+            return self.org.name + "/" + self.shortName
 
     @staticmethod
-    def fromKdlNode(node: kdl.Node, sb: StandardsBody | None = None) -> Status:
-        if sb.name == "w3c":
-            return StatusW3C.fromKdlNode(node, sb)
+    def fromKdlNode(node: kdl.Node, org: Org | None = None) -> Status:
+        if org and org.name == "w3c":
+            return StatusW3C.fromKdlNode(node, org)
         shortName = t.cast(str, node.args[0])
         longName = t.cast(str, node.args[1])
-        self = Status(shortName, longName, sb)
+        self = Status(shortName, longName, org)
         requiresNode = node.get("requires")
         if requiresNode:
             self.requires = t.cast("list[str]", list(node.getArgs((..., str))))
@@ -137,10 +153,10 @@ class StatusW3C(Status):
     groupTypes: list[str] = dataclasses.field(default_factory=list)
 
     @staticmethod
-    def fromKdlNode(node: kdl.Node, sbName: str | None = None) -> StatusW3C:
+    def fromKdlNode(node: kdl.Node, org: Org | None = None) -> StatusW3C:
         shortName = t.cast(str, node.args[0])
         longName = t.cast(str, node.args[1])
-        self = StatusW3C(shortName, longName, sbName)
+        self = StatusW3C(shortName, longName, org)
         requiresNode = node.get("requires")
         if requiresNode:
             self.requires = t.cast("list[str]", list(node.getArgs((..., str))))

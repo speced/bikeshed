@@ -13,7 +13,7 @@ from functools import partial
 
 from isodate import Duration, parse_duration
 
-from . import config, constants, datablocks, h, markdown, repository, t
+from . import config, constants, datablocks, h, markdown, repository, status, t
 from . import messages as m
 from .translate import _
 
@@ -49,7 +49,7 @@ class MetadataManager:
         self.level: str | None = None
         self.displayShortname: str | None = None
         self.shortname: str | None = None
-        self.status: str | None = None
+        self.status: self.Status | None = None
         self.rawStatus: str | None = None
 
         # optional metadata
@@ -80,7 +80,8 @@ class MetadataManager:
         self.externalInfotrees: config.BoolSet = config.BoolSet(default=False)
         self.favicon: str | None = None
         self.forceCrossorigin: bool = False
-        self.group: str | None = None
+        self.group: status.Group | None = None
+        self.rawGroup: str | None = None
         self.h1: str | None = None
         self.ignoreCanIUseUrlFailure: list[str] = []
         self.ignoreMDNFailure: list[str] = []
@@ -114,6 +115,8 @@ class MetadataManager:
         self.noEditor: bool = False
         self.noteClass: str = "note"
         self.opaqueElements: list[str] = ["pre", "xmp", "script", "style"]
+        self.org: status.Org | None = None
+        self.rawOrg: str | None = None
         self.prepTR: bool = False
         self.previousEditors: list[dict[str, str | None]] = []
         self.previousVersions: list[dict[str, str]] = []
@@ -195,7 +198,13 @@ class MetadataManager:
             and "repository-issue-tracking" in self.boilerplate
         ):
             self.issues.append(("GitHub", self.repository.formatIssueUrl()))
-        self.status = config.canonicalizeStatus(self.rawStatus, self.group)
+
+        self.org, self.status, self.group = status.canonicalizeOrgStatusGroup(
+            doc.statuses,
+            self.rawOrg,
+            self.rawStatus,
+            self.rawGroup,
+        )
 
         self.expires = canonicalizeExpiryDate(self.date, self.expires)
 
@@ -1369,7 +1378,7 @@ knownKeys = {
     "Favicon": Metadata("Favicon", "favicon", joinValue, parseLiteral),
     "Force Crossorigin": Metadata("Force Crossorigin", "forceCrossorigin", joinValue, parseBoolean),
     "Former Editor": Metadata("Former Editor", "previousEditors", joinList, parseEditor),
-    "Group": Metadata("Group", "group", joinValue, parseLiteral),
+    "Group": Metadata("Group", "rawGroup", joinValue, parseLiteral),
     "H1": Metadata("H1", "h1", joinValue, parseLiteral),
     "Ignore Can I Use Url Failure": Metadata(
         "Ignore Can I Use Url Failure",
@@ -1418,6 +1427,7 @@ knownKeys = {
     "No Editor": Metadata("No Editor", "noEditor", joinValue, parseBoolean),
     "Note Class": Metadata("Note Class", "noteClass", joinValue, parseLiteral),
     "Opaque Elements": Metadata("Opaque Elements", "opaqueElements", joinList, parseCommaSeparated),
+    "Org": Metadata("Org", "rawOrg", joinValue, parseLiteral),
     "Prepare For Tr": Metadata("Prepare For Tr", "prepTR", joinValue, parseBoolean),
     "Previous Version": Metadata("Previous Version", "previousVersions", joinList, parsePreviousVersion),
     "Remove Multiple Links": Metadata("Remove Multiple Links", "removeMultipleLinks", joinValue, parseBoolean),

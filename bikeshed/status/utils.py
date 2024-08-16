@@ -1,169 +1,215 @@
 from __future__ import annotations
 
-from .. import t, messages as m
+from .. import config, t
+from .. import messages as m
 
 if t.TYPE_CHECKING:
-    from . import GroupStatusManager, StandardsBody, Group, Status
+    from . import Group, GroupStatusManager, GroupW3C, Org, Status, StatusW3C
 
 
+def canonicalizeOrgStatusGroup(
+    manager: GroupStatusManager,
+    rawOrg: str | None,
+    rawStatus: str | None,
+    rawGroup: str | None,
+) -> tuple[Org | None, Status | None, Group | None]:
+    # Takes raw Org/Status/Group names (something written in the Org/Status/Group metadata),
+    # and, if possible, converts them into Org/Status/Group objects.
 
-@t.overload
-def canonicalizeStatus(manager: GroupStatusManager, rawStatus: None, group: str | None) -> None: ...
-
-
-@t.overload
-def canonicalizeStatus(manager: GroupStatusManager, rawStatus: str, group: str | None) -> str: ...
-
-
-def canonicalizeStatusShortname(manager: GroupStatusManager, rawStatus: str | None, groupName: str | None) -> Status | None:
-    # Takes a "rawStatus" (something written in the Status metadata) and optionally a Group metadata value,
-    # and, if possible, converts that into a Status value.
-    if rawStatus is None:
-        return None
-
-    sbName: str|None
-    statusName: str
-    if "/" in rawStatus:
-        sbName, _, statusName = rawStatus.partition("/")
-        sbName = sbName.lower()
+    # First, canonicalize the status and group casings, and separate them from
+    # any inline org specifiers.
+    # Then, figure out what the actual org name is.
+    orgFromStatus: str | None
+    statusName: str | None
+    if rawStatus is not None and "/" in rawStatus:
+        orgFromStatus, _, statusName = rawStatus.partition("/")
+        orgFromStatus = orgFromStatus.lower()
     else:
-        sbName = None
+        orgFromStatus = None
         statusName = rawStatus
-    statusName = statusName.upper()
+    statusName = statusName.upper() if statusName is not None else None
 
-    status = manager.getStatus(sbName, statusName)
+    orgFromGroup: str | None
+    groupName: str | None
+    if rawGroup is not None and "/" in rawGroup:
+        orgFromGroup, _, groupName = rawGroup.partition("/")
+        orgFromGroup = orgFromGroup.lower()
+    else:
+        orgFromGroup = None
+        groupName = rawGroup
+    groupName = groupName.lower() if groupName is not None else None
+
+    orgName = reconcileOrgs(rawOrg, orgFromStatus, orgFromGroup)
+
+    if orgName is not None and rawOrg is None:
+        orgInferredFrom = "Org (inferred from "
+        if orgFromStatus is not None:
+            orgInferredFrom += f"Status '{rawStatus}')"
+        else:
+            orgInferredFrom += f"Group '{rawGroup}')"
+    else:
+        orgInferredFrom = "Org"
+
+    # Actually fetch the Org/Status/Group objects
+    if orgName is not None:
+        org = manager.getOrg(orgName)
+        if org is None:
+            m.die(f"Unknown {orgInferredFrom} '{orgName}'. See docs for recognized Org values.")
+    else:
+        org = None
 
     if groupName is not None:
-        group = manager.getGroup(groupName.lower())
+        group = manager.getGroup(orgName, groupName)
+        if group is None:
+            if orgName is None:
+                groups = manager.getGroups(orgName, groupName)
+                if len(groups) > 1:
+                    orgNamesForGroup = config.englishFromList((x.org.name for x in groups), "and")
+                    m.die(
+                        f"Your Group '{groupName}' exists under several Orgs ({orgNamesForGroup}). Specify which org you want in an Org metadata.",
+                    )
+                else:
+                    m.die(f"Unknown Group '{groupName}'. See docs for recognized Group values.")
+            else:
+                groups = manager.getGroups(None, groupName)
+                if len(groups) > 0:
+                    orgNamesForGroup = config.englishFromList((x.org.name for x in groups), "and")
+                    m.die(
+                        f"Your Group '{groupName}' doesn't exist under the {orgFromStatus} '{orgName}', but does exist under {orgNamesForGroup}. Specify the correct Org (or the correct Group).",
+                    )
+                else:
+                    m.die(f"Unknown Group '{rawGroup}'. See docs for recognized Group values.")
     else:
         group = None
 
-    if group and status:
-        # If using a standards-body status, group must match.
-        # (Any group can use a generic status.)
-        if status.sb is not None and status.sb != group.sb:
-            possibleStatusNames = config.englishFromList(group.sb.statuses.keys())
-            m.die(f"Your Group metadata is in the standards-body '{group.sb.name}', but your Status metadata is in the standards-body '{status.sb.name}'. Allowed Status values for '{group.sb.name}' are: {possibleStatusNames}")
-        if group.sb.name == "w3c":
-            # Apply the special w3c rules
-            validateW3CStatus(group, status)
+    # If Org wasn't specified anywhere, default it from Group if possible
+    if org is None and group is not None:
+        org = group.org
 
-    if status:
-        return status
-
-    # Try and figure out why we failed to find the status
-
-    # Does that status just not exist at all?
-    possibleStatuses = manager.getStatuses(statusName)
-    if not possibleStatuses:
-        m.die(f"Unknown Status metadata '{rawStatus}'. Check the docs for valid Status values.")
-        return None
-
-    possibleSbNames = config.englishFromList(x.sb.name if x.sb else "(None)" for x in possibleStatuses)
-    
-    # Okay, it exists, but didn't come up. So you gave the wrong standards-body. Does that standards-body exist?
-    if sbName is not None and manager.getStandardsBody(sbName) is None:
-        m.die(f"Unknown standards-body prefix '{sbName}' on your Status metadata '{rawStatus}'. Recognized standards-body prefixes for that Status are: {possibleSbNames}")
-        return None
-
-    # Standards-body exists, but your status isn't in it.
-
-
-    # If they specified a standards-org prefix and it wasn't found,
-    # that's an error.
-    if megaGroup:
-        # Was the error because the megagroup doesn't exist?
-        if possibleMgs:
-            msg = f"Status '{status}' can't be used with the org '{megaGroup}'."
-            if "" in possibleMgs:
-                if len(possibleMgs) == 1:
-                    msg += f" That status must be used without an org at all, like `Status: {status}`"
-                else:
-                    msg += " That status can only be used with the org{} {}, or without an org at all.".format(
-                        "s" if len(possibleMgs) > 1 else "",
-                        main.englishFromList(f"'{x}'" for x in possibleMgs if x != ""),
-                    )
-            else:
-                if len(possibleMgs) == 1:
-                    msg += f" That status can only be used with the org '{possibleMgs[0]}', like `Status: {possibleMgs[0]}/{status}`"
-                else:
-                    msg += " That status can only be used with the orgs {}.".format(
-                        main.englishFromList(f"'{x}'" for x in possibleMgs),
-                    )
-
+    if statusName is not None:
+        if orgFromStatus is not None:
+            # If status explicitly specified an org, use that
+            status = manager.getStatus(orgFromStatus, statusName)
+        elif org:
+            # Otherwise, if we found an org, look for it there,
+            # but fall back to looking for it in the generic statuses
+            status = manager.getStatus(org.name, statusName, allowGeneric=True)
         else:
-            if megaGroup not in megaGroups:
-                msg = f"Unknown Status metadata '{canonStatus}'. Check the docs for valid Status values."
-            else:
-                msg = f"Status '{status}' can't be used with the org '{megaGroup}'. Check the docs for valid Status values."
-        m.die(msg)
-        return canonStatus
-
-    # Otherwise, they provided a bare status.
-    # See if their group is compatible with any of the prefixed statuses matching the bare status.
-    assert "" not in possibleMgs  # if it was here, the literal "in" test would have caught this bare status
-    for mg in possibleMgs:
-        if group in megaGroups[mg]:
-            canonStatus = mg + "/" + status
-
-            if mg == "w3c":
-                validateW3Cstatus(group, canonStatus, rawStatus)
-
-            return canonStatus
-
-    # Group isn't in any compatible org, so suggest prefixing.
-    if possibleMgs:
-        msg = "You used Status: {}, but that's limited to the {} org{}".format(
-            rawStatus,
-            main.englishFromList(f"'{mg}'" for mg in possibleMgs),
-            "s" if len(possibleMgs) > 1 else "",
-        )
-        if group:
-            msg += ", and your group '{}' isn't recognized as being in {}.".format(
-                group,
-                "any of those orgs" if len(possibleMgs) > 1 else "that org",
-            )
-            msg += " If this is wrong, please file a Bikeshed issue to categorize your group properly, and/or try:\n"
-            msg += "\n".join(f"Status: {mg}/{status}" for mg in possibleMgs)
-        else:
-            msg += ", and you don't have a Group metadata. Please declare your Group, or check the docs for statuses that can be used by anyone."
+            # Otherwise, just look in the generic statuses;
+            # the error stuff later will catch it if that doesn't work.
+            status = manager.getStatus(None, statusName)
     else:
-        msg = f"Unknown Status metadata '{canonStatus}'. Check the docs for valid Status values."
-    m.die(msg)
-    return canonStatus
+        # Just quick exit on this case, nothing we can do.
+        return org, None, group
+
+    # See if your org-specific Status matches your Org
+    if org and status and status.org is not None and status.org != org:
+        m.die(f"Your {orgInferredFrom} is '{org.name}', but your Status is only usable in the '{status.org.name}' Org.")
+
+    if group and status and status.org is not None and status.org != group.org:
+        # If using an org-specific Status, Group must match.
+        # (Any group can use a generic status.)
+        possibleStatusNames = config.englishFromList(f"'{x}'" for x in group.org.statuses)
+        m.die(
+            f"Your Group is in the '{group.org.name}' Org, but your Status is only usable in the '{status.org.name}' Org. Allowed Status values for '{group.org.name}' are: {possibleStatusNames}",
+        )
+
+    if group and status and group.org.name == "w3c":
+        # Apply the special w3c rules
+        validateW3CStatus(group, status)
+
+    # Reconciliation done, return everything if Status exists.
+    if status:
+        return org, status, group
+
+    # Otherwise, try and figure out why we failed to find the status
+
+    possibleStatuses = manager.getStatuses(statusName)
+    if len(possibleStatuses) == 0:
+        m.die(f"Unknown Status metadata '{rawStatus}'. Check the docs for valid Status values.")
+        return org, status, group
+    elif len(possibleStatuses) == 1:
+        possibleStatus = possibleStatuses[0]
+        if possibleStatus.org is None:
+            m.die(
+                f"Your Status '{statusName}' is a generic status, but you explicitly specified '{rawStatus}'. Remove the org prefix from your Status.",
+            )
+        else:
+            m.die(
+                f"Your Status '{statusName}' only exists in the '{possibleStatus.org.name}' Org, but you specified the {orgInferredFrom} '{orgName}'.",
+            )
+    else:
+        statusNames = config.englishFromList((x.org.name for x in possibleStatuses if x.org), "and")
+        includesDefaultStatus = any(x.org is None for x in possibleStatuses)
+        if includesDefaultStatus:
+            msg = f"Your Status '{statusName}' only exists in Org(s) {statusNames}, or is a generic status."
+        else:
+            msg = f"Your Status '{statusName}' only exists in the Orgs {statusNames}."
+        if orgName:
+            if org:
+                msg += f" Your specified {orgInferredFrom} is '{orgName}'."
+            else:
+                msg += f" Your specified {orgInferredFrom} is an unknown value '{orgName}'."
+        else:
+            msg += " Declare one of those Orgs in your Org metadata."
+        m.die(msg)
+
+    return (org, status, group)
 
 
-def validateW3Cstatus(group: str, status: str, rawStatus: str) -> None:
-    if status == "DREAM":
-        m.warn("You used Status: DREAM for a W3C document. Consider UD instead.")
+def reconcileOrgs(fromRaw: str | None, fromStatus: str | None, fromGroup: str | None) -> str | None:
+    # Since there are three potential sources of "org" name,
+    # figure out what the name actually is,
+    # and complain if they disagree.
+    fromRaw = fromRaw.lower() if fromRaw else None
+    fromStatus = fromStatus.lower() if fromStatus else None
+    fromGroup = fromGroup.lower() if fromGroup else None
+
+    orgName: str | None = fromRaw
+
+    if fromStatus is not None:
+        if orgName is None:
+            orgName = fromStatus
+        elif orgName == fromStatus:
+            pass
+        else:
+            m.die(
+                f"Your Org metadata specifies '{fromRaw}', but your Status metadata states an org of '{fromStatus}'. These must agree - either fix them or remove one of them.",
+            )
+
+    if fromGroup is not None:
+        if orgName is None:
+            orgName = fromGroup
+        elif orgName == fromGroup:
+            pass
+        else:
+            m.die(
+                f"Your Org metadata specifies '{fromRaw}', but your Group metadata states an org of '{fromGroup}'. These must agree - either fix them or remove one of them.",
+            )
+
+    return orgName
+
+
+def validateW3CStatus(group: Group, status: Status) -> None:
+    assert isinstance(group, GroupW3C)
+    assert isinstance(status, StatusW3C)
+    if status.org is None and status.shortName == "DREAM":
+        m.warn("You used Status:DREAM for a W3C document. Consider Status:UD instead.")
         return
 
-    if "w3c/" + status in shortToLongStatus:
-        status = "w3c/" + status
-
-    def formatStatusSet(statuses: frozenset[str]) -> str:
-        return ", ".join(sorted({status.split("/")[-1] for status in statuses}))
-
-    if group in w3cIgs and status not in w3cIGStatuses:
-        m.warn(
-            f"You used Status: {rawStatus}, but W3C Interest Groups are limited to these statuses: {formatStatusSet(w3cIGStatuses)}.",
+    if group.type is not None and group.type not in status.groupTypes:
+        if group.type == "ig":
+            longTypeName = "W3C Interest Groups"
+        elif group.type == "tag":
+            longTypeName = "the W3C TAG"
+        elif group.type == "cg":
+            longTypeName = "W3C Community/Business Groups"
+        else:
+            longTypeName = "W3C Working Groups"
+        allowedStatuses = config.englishFromList(
+            x.shortName for x in t.cast("list[StatusW3C]", group.org.statuses.values()) if group.type in x.groupTypes
         )
-
-    if group == "tag" and status not in w3cTAGStatuses:
         m.warn(
-            f"You used Status: {rawStatus}, but the TAG is are limited to these statuses: {formatStatusSet(w3cTAGStatuses)}",
+            f"You used Status:{status.shortName}, but {longTypeName} are limited to these statuses: {allowedStatuses}.",
         )
-
-    if group in w3cCgs and status not in w3cCommunityStatuses:
-        m.warn(
-            f"You used Status: {rawStatus}, but W3C Community and Business Groups are limited to these statuses: {formatStatusSet(w3cCommunityStatuses)}.",
-        )
-
-def megaGroupsForStatus(status: str) -> list[str]:
-    # Returns a list of megagroups that recognize the given status
-    mgs = []
-    for key in shortToLongStatus:
-        mg, _, s = key.partition("/")
-        if s == status:
-            mgs.append(mg)
-    return mgs
+        return
