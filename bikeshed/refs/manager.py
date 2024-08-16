@@ -247,10 +247,11 @@ class ReferenceManager:
     def setSpecData(self, md: t.MetadataManager) -> None:
         if md.defaultRefStatus:
             self.defaultStatus = md.defaultRefStatus
-        elif md.status in config.snapshotStatuses:
-            self.defaultStatus = constants.refStatus.snapshot
-        elif md.status in config.shortToLongStatus:
-            self.defaultStatus = constants.refStatus.current
+        elif md.status:
+            if "TR" in md.status.requires:
+                self.defaultStatus = constants.refStatus.snapshot
+            else:
+                self.defaultStatus = constants.refStatus.current
         self.shortname = md.shortname
         self.specLevel = md.level
         self.spec = md.vshortname

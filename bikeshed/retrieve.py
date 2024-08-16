@@ -8,6 +8,9 @@ import os
 from . import InputSource, config, t
 from . import messages as m
 
+if t.TYPE_CHECKING:
+    from .doctypes import Group, Org, Status
+
 
 class DataFileRequester:
     def __init__(self, fileType: str | None = None, fallback: DataFileRequester | None = None) -> None:
@@ -101,9 +104,10 @@ defaultRequester = DataFileRequester(fileType="latest", fallback=DataFileRequest
 def retrieveBoilerplateFile(
     doc: t.SpecT,
     name: str,
-    group: str | None = None,
-    status: str | None = None,
-    error: bool = True,
+    group: Group | None = None,
+    status: Status | None = None,
+    org: Org | None = None,
+    quiet: bool = False,
     allowLocal: bool = True,
     fileRequester: DataFileRequester | None = None,
 ) -> str:
@@ -116,21 +120,22 @@ def retrieveBoilerplateFile(
     else:
         dataFile = fileRequester
 
-    if group is None and doc.md.group is not None:
-        group = doc.md.group.lower()
+    if group is None:
+        group = doc.md.group
+    groupName = group.name if group else None
     if status is None:
-        if doc.md.status is not None:
-            status = doc.md.status
-        elif doc.md.rawStatus is not None:
-            status = doc.md.rawStatus
-    megaGroup, status = config.splitStatus(status)
+        status = doc.md.status
+    statusName = status.name if status else None
+    if org is None:
+        org = doc.md.org
+    orgName = org.name if org else None
 
     searchLocally = allowLocal and doc.md.localBoilerplate[name]
 
     def boilerplatePath(*segs: str) -> str:
         return dataFile.path("boilerplate", *segs)
 
-    statusFile = f"{name}-{status}.include"
+    statusFile = f"{name}-{statusName}.include"
     genericFile = f"{name}.include"
     sources: list[InputSource.InputSource | None] = []
     if searchLocally:
@@ -146,12 +151,12 @@ def retrieveBoilerplateFile(
                 )
                 # We should remove this after giving specs time to react to the warning:
                 sources.append(doc.inputSource.relative(f))
-    if group:
-        sources.append(InputSource.FileInputSource(boilerplatePath(group, statusFile), chroot=False))
-        sources.append(InputSource.FileInputSource(boilerplatePath(group, genericFile), chroot=False))
-    if megaGroup:
-        sources.append(InputSource.FileInputSource(boilerplatePath(megaGroup, statusFile), chroot=False))
-        sources.append(InputSource.FileInputSource(boilerplatePath(megaGroup, genericFile), chroot=False))
+    if groupName:
+        sources.append(InputSource.FileInputSource(boilerplatePath(groupName, statusFile), chroot=False))
+        sources.append(InputSource.FileInputSource(boilerplatePath(groupName, genericFile), chroot=False))
+    if orgName:
+        sources.append(InputSource.FileInputSource(boilerplatePath(orgName, statusFile), chroot=False))
+        sources.append(InputSource.FileInputSource(boilerplatePath(orgName, genericFile), chroot=False))
     sources.append(InputSource.FileInputSource(boilerplatePath(statusFile), chroot=False))
     sources.append(InputSource.FileInputSource(boilerplatePath(genericFile), chroot=False))
 
@@ -166,8 +171,18 @@ def retrieveBoilerplateFile(
             except OSError:
                 # That input doesn't exist.
                 pass
-    if error:
-        m.die(
-            f"Couldn't find an appropriate include file for the {name} inclusion, given group='{group}' and status='{status}'.",
-        )
+    if not quiet:
+        components = []
+        if orgName:
+            components.append(f"Org '{orgName}'")
+        if groupName:
+            components.append(f"Group '{groupName}'")
+        if statusName:
+            components.append(f"Status '{statusName}'")
+        msg = "Couldn't find an appropriate include file for the {name} inclusion"
+        if components:
+            msg += ", given " + config.englishFromList(components, "and")
+        else:
+            msg += "."
+        m.die(msg)
     return ""

@@ -13,7 +13,7 @@ from functools import partial
 
 from isodate import Duration, parse_duration
 
-from . import config, constants, datablocks, h, markdown, repository, status, t
+from . import config, constants, datablocks, doctypes, h, markdown, repository, t
 from . import messages as m
 from .translate import _
 
@@ -49,7 +49,7 @@ class MetadataManager:
         self.level: str | None = None
         self.displayShortname: str | None = None
         self.shortname: str | None = None
-        self.status: self.Status | None = None
+        self.status: doctypes.Status | None = None
         self.rawStatus: str | None = None
 
         # optional metadata
@@ -80,7 +80,7 @@ class MetadataManager:
         self.externalInfotrees: config.BoolSet = config.BoolSet(default=False)
         self.favicon: str | None = None
         self.forceCrossorigin: bool = False
-        self.group: status.Group | None = None
+        self.group: doctypes.Group | None = None
         self.rawGroup: str | None = None
         self.h1: str | None = None
         self.ignoreCanIUseUrlFailure: list[str] = []
@@ -115,7 +115,7 @@ class MetadataManager:
         self.noEditor: bool = False
         self.noteClass: str = "note"
         self.opaqueElements: list[str] = ["pre", "xmp", "script", "style"]
-        self.org: status.Org | None = None
+        self.org: doctypes.Org | None = None
         self.rawOrg: str | None = None
         self.prepTR: bool = False
         self.previousEditors: list[dict[str, str | None]] = []
@@ -163,11 +163,11 @@ class MetadataManager:
         if key not in ("ED", "TR", "URL"):
             key = key.title()
 
-        if key not in knownKeys:
+        if key not in KNOWN_KEYS:
             m.die(f'Unknown metadata key "{key}". Prefix custom keys with "!".', lineNum=lineNum)
             return self
 
-        md = knownKeys[key]
+        md = KNOWN_KEYS[key]
         try:
             parsedVal = md.parse(key, val, lineNum=lineNum)
         except Exception as e:
@@ -179,7 +179,7 @@ class MetadataManager:
         return self
 
     def addParsedData(self, key: str, val: t.Any) -> MetadataManager:
-        md = knownKeys[key]
+        md = KNOWN_KEYS[key]
         result = md.join(getattr(self, md.attrName), val)
         setattr(self, md.attrName, result)
         self.manuallySetKeys.add(key)
@@ -199,8 +199,8 @@ class MetadataManager:
         ):
             self.issues.append(("GitHub", self.repository.formatIssueUrl()))
 
-        self.org, self.status, self.group = status.canonicalizeOrgStatusGroup(
-            doc.statuses,
+        self.org, self.status, self.group = doctypes.canonicalizeOrgStatusGroup(
+            doc.doctypes,
             self.rawOrg,
             self.rawStatus,
             self.rawGroup,
@@ -229,57 +229,38 @@ class MetadataManager:
             m.die("The document requires at least one <pre class=metadata> block.")
             return False
 
-        if self.status in ("w3c/IG-NOTE", "w3c/WG-NOTE"):
-            m.die(
-                f"Under Process2021, {self.status} is no longer a valid status. Use NOTE (or one of its variants NOTE-ED, NOTE-FPWD, NOTE-WD) instead.",
-            )
+        requiredMd = [
+            KNOWN_KEYS["Status"],
+            KNOWN_KEYS["Shortname"],
+            KNOWN_KEYS["Title"],
+        ]
 
-        # { MetadataManager attr : metadata name (for printing) }
-        requiredSingularKeys = {
-            "status": "Status",
-            "shortname": "Shortname",
-            "title": "Title",
-        }
-        recommendedSingularKeys = {}
-        requiredMultiKeys = {}
+        if self.status:
+            for mdName in self.status.requires:
+                if mdName in KNOWN_KEYS:
+                    requiredMd.append(KNOWN_KEYS[mdName])
+                else:
+                    m.warn(
+                        f"Programming error: your Status '{self.status.fullName()}' claims to require the unknown metadata '{mdName}'. Please report this to the maintainer.",
+                    )
+        if self.group:
+            for mdName in self.group.requires:
+                if mdName in KNOWN_KEYS:
+                    requiredMd.append(KNOWN_KEYS[mdName])
+                else:
+                    m.warn(
+                        f"Programming error: your Group '{self.group.fullName()}' claims to require the unknown metadata '{mdName}'. Please report this to the maintainer.",
+                    )
 
-        if self.status not in config.noEDStatuses:
-            requiredSingularKeys["ED"] = "ED"
-        if self.status in config.deadlineStatuses:
-            requiredSingularKeys["deadline"] = "Deadline"
-        if self.status in config.datedStatuses:
-            recommendedSingularKeys["date"] = "Date"
-        if self.status in config.snapshotStatuses:
-            requiredSingularKeys["TR"] = "TR"
-            requiredMultiKeys["issues"] = "Issue Tracking"
-        if self.status in config.implementationStatuses:
-            requiredSingularKeys["implementationReport"] = "Implementation Report"
-        if self.status not in config.unlevelledStatuses:
-            requiredSingularKeys["level"] = "Level"
-        if self.status not in config.shortToLongStatus:
-            m.die(f"Unknown Status '{self.status}' used.")
         if not self.noEditor:
-            requiredMultiKeys["editors"] = "Editor"
+            requiredMd.append(KNOWN_KEYS["Editor"])
         if not self.noAbstract:
-            requiredMultiKeys["abstract"] = "Abstract"
-        if self.group and self.group.lower() == "csswg":
-            requiredSingularKeys["workStatus"] = "Work Status"
-        if self.group and self.group.lower() == "wg21":
-            requiredSingularKeys["audience"] = "Audience"
+            requiredMd.append(KNOWN_KEYS["Abstract"])
 
         errors = []
-        warnings = []
-        for attrName, name in requiredSingularKeys.items():
-            if getattr(self, attrName) is None:
-                errors.append(f"    Missing a '{name}' entry.")
-        for attrName, name in recommendedSingularKeys.items():
-            if getattr(self, attrName) is None:
-                warnings.append(f"    You probably want to provide a '{name}' entry.")
-        for attrName, name in requiredMultiKeys.items():
-            if len(getattr(self, attrName)) == 0:
-                errors.append(f"    Must provide at least one '{name}' entry.")
-        if warnings:
-            m.warn("Some recommended metadata is missing:\n" + "\n".join(warnings))
+        for md in requiredMd:
+            if getattr(self, md.attrName) is None:
+                errors.append(f"    Missing '{md.humanName}'")
         if errors:
             m.die("Not all required metadata was provided:\n" + "\n".join(errors))
             return False
@@ -307,10 +288,10 @@ class MetadataManager:
         macros["level"] = str(self.level)
         if self.displayVshortname:
             macros["vshortname"] = self.displayVshortname
-        if self.status == "FINDING" and self.group:
-            macros["longstatus"] = f"Finding of the {self.group}"
-        elif self.status in config.shortToLongStatus:
-            macros["longstatus"] = config.shortToLongStatus[self.status]
+        if (self.status and self.status.fullName() == "FINDING") and self.group:
+            macros["longstatus"] = f"Finding of the {self.group.name}"
+        elif self.status:
+            macros["longstatus"] = self.status.longName
         else:
             macros["longstatus"] = ""
         if self.status in ("w3c/LCWD", "w3c/FPWD"):
@@ -353,7 +334,7 @@ class MetadataManager:
         if self.deadline:
             macros["deadline"] = self.deadline.strftime(f"{self.deadline.day} %B %Y")
             macros["isodeadline"] = self.deadline.strftime("%Y-%m-%d")
-        if self.status in config.snapshotStatuses:
+        if self.status and self.status.orgName() == "w3c" and "Date" in self.status.requires:
             macros["version"] = "https://www.w3.org/TR/{year}/{status}-{vshortname}-{cdate}/".format(**macros)
             macros["history"] = f"https://www.w3.org/standards/history/{self.displayVshortname}/"
         elif self.ED:
@@ -1074,7 +1055,7 @@ def parse(lines: t.Sequence[Line]) -> tuple[list[Line], MetadataManager]:
                 assert match is not None
                 key = match[1].strip()
                 val = match[2].strip()
-                if key in knownKeys and knownKeys[key].multiline:
+                if key in KNOWN_KEYS and KNOWN_KEYS[key].multiline:
                     multilineVal = True
                 elif key[0] == "!":
                     multilineVal = True
@@ -1265,7 +1246,7 @@ def join(*sources: MetadataManager | None) -> MetadataManager:
         if mdsource is None:
             continue
         for k in mdsource.manuallySetKeys:
-            mdentry = knownKeys[k]
+            mdentry = KNOWN_KEYS[k]
             md.addParsedData(k, getattr(mdsource, mdentry.attrName))
         for k, v in mdsource.otherMetadata.items():
             md.otherMetadata.setdefault(k, []).extend(v)
@@ -1336,7 +1317,7 @@ def parseLiteralList(key: str, val: str, lineNum: str | int | None) -> list[str]
     return [val]
 
 
-knownKeys = {
+KNOWN_KEYS = {
     "Abstract": Metadata("Abstract", "abstract", joinList, parseLiteralList, multiline=True),
     "Advisement Class": Metadata("Advisement Class", "advisementClass", joinValue, parseLiteral),
     "Assertion Class": Metadata("Assertion Class", "assertionClass", joinValue, parseLiteral),

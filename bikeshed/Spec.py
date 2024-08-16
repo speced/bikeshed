@@ -18,6 +18,7 @@ from . import (
     constants,
     datablocks,
     dfns,
+    doctypes,
     extensions,
     fingerprinting,
     h,
@@ -34,7 +35,6 @@ from . import (
     refs,
     retrieve,
     shorthands,
-    status,
     stylescript,
     t,
     wpt,
@@ -109,7 +109,7 @@ class Spec:
         self.widl: widlparser.Parser = idl.getParser()
 
         self.languages: dict[str, language.Language] = fetchLanguages(self.dataFile)
-        self.statuses: status.GroupStatusManager = fetchGroupsStatuses(self.dataFile)
+        self.doctypes: doctypes.DoctypeManager = fetchDoctypes(self.dataFile)
 
         self.extraJC = stylescript.JCManager()
         self.extraJC.addColors()
@@ -148,7 +148,7 @@ class Spec:
 
         # Using that to determine the Group and Status, load the correct defaults.include boilerplate
         self.mdDefaults = metadata.fromJson(
-            data=retrieve.retrieveBoilerplateFile(self, "defaults", error=True),
+            data=retrieve.retrieveBoilerplateFile(self, "defaults"),
             source="defaults",
         )
         self.md = metadata.join(self.mdBaseline, self.mdDefaults, self.mdDocument, self.mdCommandLine)
@@ -157,7 +157,7 @@ class Spec:
         self.md.fillTextMacros(self.macros, doc=self)
         jsonEscapedMacros = {k: json.dumps(v)[1:-1] for k, v in self.macros.items()}
         computedMdText = h.replaceMacrosTextly(
-            retrieve.retrieveBoilerplateFile(self, "computed-metadata", error=True),
+            retrieve.retrieveBoilerplateFile(self, "computed-metadata"),
             macros=jsonEscapedMacros,
             context="? of computed-metadata.include",
         )
@@ -556,8 +556,8 @@ def fetchLanguages(dataFile: retrieve.DataFileRequester) -> dict[str, language.L
     }
 
 
-def fetchGroupsStatuses(dataFile: retrieve.DataFileRequester) -> status.GroupStatusManager:
-    return status.GroupStatusManager.fromKdlStr(self.dataFile.fetch("statuses.kdl", str=True))
+def fetchDoctypes(dataFile: retrieve.DataFileRequester) -> doctypes.DoctypeManager:
+    return doctypes.DoctypeManager.fromKdlStr(dataFile.fetch("doctypes.kdl", str=True))
 
 
 def addDomintroStyles(doc: Spec) -> None:

@@ -240,7 +240,7 @@ def removeUnwantedBoilerplate(doc: t.SpecT) -> None:
 
 
 def w3cStylesheetInUse(doc: t.SpecT) -> bool:
-    return doc.md.prepTR or doc.md.status in config.snapshotStatuses
+    return doc.md.prepTR or (doc.md.group is not None and doc.md.group.name == "w3c")
 
 
 def addBikeshedBoilerplate(doc: t.SpecT) -> None:
@@ -933,7 +933,7 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
         md.setdefault("This version", []).append(h.E.a({"href": mac["version"], "class": "u-url"}, mac["version"]))
     if doc.md.TR:
         md.setdefault("Latest published version", []).append(h.E.a({"href": doc.md.TR}, doc.md.TR))
-    if doc.md.ED and doc.md.status in config.snapshotStatuses:
+    if doc.md.ED and (doc.md.status and "TR" in doc.md.status.requires):
         md.setdefault("Editor's Draft", []).append(h.E.a({"href": doc.md.ED}, doc.md.ED))
     if doc.md.previousVersions:
         md["Previous Versions"] = [printPreviousVersion(ver) for ver in doc.md.previousVersions]

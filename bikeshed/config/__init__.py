@@ -35,8 +35,3 @@ from .main import (
     simplifyText,
     splitForValues,
 )
-from .status import (
-    canonicalizeStatus,
-    looselyMatch,
-    splitStatus,
-)

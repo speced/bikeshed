@@ -4,11 +4,11 @@ from .. import config, t
 from .. import messages as m
 
 if t.TYPE_CHECKING:
-    from . import Group, GroupStatusManager, GroupW3C, Org, Status, StatusW3C
+    from . import DoctypeManager, Group, GroupW3C, Org, Status, StatusW3C
 
 
 def canonicalizeOrgStatusGroup(
-    manager: GroupStatusManager,
+    manager: DoctypeManager,
     rawOrg: str | None,
     rawStatus: str | None,
     rawGroup: str | None,
@@ -19,24 +19,10 @@ def canonicalizeOrgStatusGroup(
     # First, canonicalize the status and group casings, and separate them from
     # any inline org specifiers.
     # Then, figure out what the actual org name is.
-    orgFromStatus: str | None
-    statusName: str | None
-    if rawStatus is not None and "/" in rawStatus:
-        orgFromStatus, _, statusName = rawStatus.partition("/")
-        orgFromStatus = orgFromStatus.lower()
-    else:
-        orgFromStatus = None
-        statusName = rawStatus
+    orgFromStatus, statusName = splitOrg(rawStatus)
     statusName = statusName.upper() if statusName is not None else None
 
-    orgFromGroup: str | None
-    groupName: str | None
-    if rawGroup is not None and "/" in rawGroup:
-        orgFromGroup, _, groupName = rawGroup.partition("/")
-        orgFromGroup = orgFromGroup.lower()
-    else:
-        orgFromGroup = None
-        groupName = rawGroup
+    orgFromGroup, groupName = splitOrg(rawGroup)
     groupName = groupName.lower() if groupName is not None else None
 
     orgName = reconcileOrgs(rawOrg, orgFromStatus, orgFromGroup)
@@ -157,6 +143,17 @@ def canonicalizeOrgStatusGroup(
     return (org, status, group)
 
 
+def splitOrg(st: str | None) -> tuple[str | None, str | None]:
+    if st is None:
+        return None, None
+
+    if "/" in st:
+        parts = st.partition("/")
+        return parts[0].strip().lower(), parts[2].strip()
+    else:
+        return None, st.strip()
+
+
 def reconcileOrgs(fromRaw: str | None, fromStatus: str | None, fromGroup: str | None) -> str | None:
     # Since there are three potential sources of "org" name,
     # figure out what the name actually is,
@@ -193,9 +190,13 @@ def reconcileOrgs(fromRaw: str | None, fromStatus: str | None, fromGroup: str | 
 def validateW3CStatus(group: Group, status: Status) -> None:
     assert isinstance(group, GroupW3C)
     assert isinstance(status, StatusW3C)
-    if status.org is None and status.shortName == "DREAM":
+    if status.org is None and status.name == "DREAM":
         m.warn("You used Status:DREAM for a W3C document. Consider Status:UD instead.")
-        return
+
+    if status.name in ("IG-NOTE", "WG-NOTE"):
+        m.die(
+            f"Under Process2021, {status.name} is no longer a valid status. Use NOTE (or one of its variants NOTE-ED, NOTE-FPWD, NOTE-WD) instead.",
+        )
 
     if group.type is not None and group.type not in status.groupTypes:
         if group.type == "ig":
@@ -207,9 +208,9 @@ def validateW3CStatus(group: Group, status: Status) -> None:
         else:
             longTypeName = "W3C Working Groups"
         allowedStatuses = config.englishFromList(
-            x.shortName for x in t.cast("list[StatusW3C]", group.org.statuses.values()) if group.type in x.groupTypes
+            x.name for x in t.cast("list[StatusW3C]", group.org.statuses.values()) if group.type in x.groupTypes
         )
         m.warn(
-            f"You used Status:{status.shortName}, but {longTypeName} are limited to these statuses: {allowedStatuses}.",
+            f"You used Status:{status.name}, but {longTypeName} are limited to these statuses: {allowedStatuses}.",
         )
         return

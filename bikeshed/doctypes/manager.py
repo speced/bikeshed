@@ -4,24 +4,23 @@ import dataclasses
 
 import kdl
 
-from .. import messages as m
 from .. import t
 from . import utils
 
 
 @dataclasses.dataclass
-class GroupStatusManager:
+class DoctypeManager:
     genericStatuses: dict[str, Status] = dataclasses.field(default_factory=dict)
     orgs: dict[str, Org] = dataclasses.field(default_factory=dict)
 
     @staticmethod
-    def fromKdlStr(data: str) -> GroupStatusManager:
-        self = GroupStatusManager()
+    def fromKdlStr(data: str) -> DoctypeManager:
+        self = DoctypeManager()
         kdlDoc = kdl.parse(data)
 
         for node in kdlDoc.getAll("status"):
             status = Status.fromKdlNode(node)
-            self.genericStatuses[status.shortName] = status
+            self.genericStatuses[status.name] = status
 
         for node in kdlDoc.getAll("org"):
             org = Org.fromKdlNode(node)
@@ -91,7 +90,7 @@ class Org:
             self.groups[g.name] = g
         for child in node.getAll("status"):
             s = Status.fromKdlNode(child, org=self)
-            self.statuses[s.shortName] = s
+            self.statuses[s.name] = s
         return self
 
 
@@ -100,14 +99,22 @@ class Group:
     name: str
     privSec: bool
     org: Org
+    requires: list[str] = dataclasses.field(default_factory=list)
+
+    def fullName(self) -> str:
+        return self.org.name + "/" + self.name
 
     @staticmethod
     def fromKdlNode(node: kdl.Node, org: Org) -> Group:
         if org.name == "w3c":
             return GroupW3C.fromKdlNode(node, org)
         name = t.cast(str, node.args[0])
-        privSec = node.get("priv-sec") is not None
-        return Group(name, privSec, org)
+        privSec = t.cast(bool, node.props.get("priv-sec", False))
+        requiresNode = node.get("requires")
+        self = Group(name, privSec, org)
+        if requiresNode:
+            self.requires = t.cast("list[str]", list(node.getArgs((..., str))))
+        return self
 
 
 @dataclasses.dataclass
@@ -117,31 +124,45 @@ class GroupW3C(Group):
     @staticmethod
     def fromKdlNode(node: kdl.Node, org: Org) -> GroupW3C:
         name = t.cast(str, node.args[0])
-        privSec = node.get("priv-sec") is not None
+        privSec = t.cast(bool, node.props.get("priv-sec", False))
         groupType = t.cast("str|None", node.props["type"])
-        return GroupW3C(name, privSec, org, groupType)
+        return GroupW3C(name, privSec, org, [], groupType)
 
 
 @dataclasses.dataclass
 class Status:
-    shortName: str
+    name: str
     longName: str
     org: Org | None = None
     requires: list[str] = dataclasses.field(default_factory=list)
 
-    def fullShortname(self) -> str:
+    def fullName(self) -> str:
         if self.org is None:
-            return self.shortName
+            return self.name
         else:
-            return self.org.name + "/" + self.shortName
+            return self.org.name + "/" + self.name
+
+    def orgName(self) -> str | None:
+        if self.org:
+            return self.org.name
+        else:
+            return None
+
+    def looselyMatch(self, rawStatus: str) -> bool:
+        orgName, statusName = utils.splitOrg(rawStatus)
+        if statusName and self.name.upper() != statusName.upper():
+            return False
+        if orgName and self.org and self.orgName() != orgName.lower():
+            return False
+        return True
 
     @staticmethod
     def fromKdlNode(node: kdl.Node, org: Org | None = None) -> Status:
         if org and org.name == "w3c":
             return StatusW3C.fromKdlNode(node, org)
-        shortName = t.cast(str, node.args[0])
+        name = t.cast(str, node.args[0])
         longName = t.cast(str, node.args[1])
-        self = Status(shortName, longName, org)
+        self = Status(name, longName, org)
         requiresNode = node.get("requires")
         if requiresNode:
             self.requires = t.cast("list[str]", list(node.getArgs((..., str))))
@@ -154,9 +175,9 @@ class StatusW3C(Status):
 
     @staticmethod
     def fromKdlNode(node: kdl.Node, org: Org | None = None) -> StatusW3C:
-        shortName = t.cast(str, node.args[0])
+        name = t.cast(str, node.args[0])
         longName = t.cast(str, node.args[1])
-        self = StatusW3C(shortName, longName, org)
+        self = StatusW3C(name, longName, org)
         requiresNode = node.get("requires")
         if requiresNode:
             self.requires = t.cast("list[str]", list(node.getArgs((..., str))))
