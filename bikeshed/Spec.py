@@ -557,7 +557,7 @@ def fetchLanguages(dataFile: retrieve.DataFileRequester) -> dict[str, language.L
 
 
 def fetchDoctypes(dataFile: retrieve.DataFileRequester) -> doctypes.DoctypeManager:
-    return doctypes.DoctypeManager.fromKdlStr(dataFile.fetch("doctypes.kdl", str=True))
+    return doctypes.DoctypeManager.fromKdlStr(dataFile.fetch("boilerplate", "doctypes.kdl", str=True))
 
 
 def addDomintroStyles(doc: Spec) -> None:
