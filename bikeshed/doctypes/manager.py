@@ -113,7 +113,7 @@ class Group:
         requiresNode = node.get("requires")
         self = Group(name, privSec, org)
         if requiresNode:
-            self.requires = t.cast("list[str]", list(node.getArgs((..., str))))
+            self.requires = t.cast("list[str]", list(requiresNode.getArgs((..., str))))
         return self
 
 
@@ -165,7 +165,7 @@ class Status:
         self = Status(name, longName, org)
         requiresNode = node.get("requires")
         if requiresNode:
-            self.requires = t.cast("list[str]", list(node.getArgs((..., str))))
+            self.requires = t.cast("list[str]", list(requiresNode.getArgs((..., str))))
         return self
 
 
@@ -180,8 +180,10 @@ class StatusW3C(Status):
         self = StatusW3C(name, longName, org)
         requiresNode = node.get("requires")
         if requiresNode:
-            self.requires = t.cast("list[str]", list(node.getArgs((..., str))))
+            self.requires = t.cast("list[str]", list(requiresNode.getArgs((..., str))))
         groupTypesNode = node.get("requires")
         if groupTypesNode:
-            self.requires = t.cast("list[str]", list(node.getArgs((..., str))))
+            self.requires = t.cast("list[str]", list(groupTypesNode.getArgs((..., str))))
+        if name == "ED":
+            print(self)
         return self
