@@ -61,7 +61,7 @@ def canonicalizeOrgStatusGroup(
                 if len(groups) > 0:
                     orgNamesForGroup = config.englishFromList((x.org.name for x in groups), "and")
                     m.die(
-                        f"Your Group '{groupName}' doesn't exist under the {orgFromStatus} '{orgName}', but does exist under {orgNamesForGroup}. Specify the correct Org (or the correct Group).",
+                        f"Your Group '{groupName}' doesn't exist under the {orgInferredFrom} '{orgName}', but does exist under {orgNamesForGroup}. Specify the correct Org (or the correct Group).",
                     )
                 else:
                     m.die(f"Unknown Group '{rawGroup}'. See docs for recognized Group values.")
@@ -188,8 +188,9 @@ def reconcileOrgs(fromRaw: str | None, fromStatus: str | None, fromGroup: str | 
 
 
 def validateW3CStatus(group: Group, status: Status) -> None:
-    assert isinstance(group, GroupW3C)
-    assert isinstance(status, StatusW3C)
+    if t.TYPE_CHECKING:
+        assert isinstance(group, GroupW3C)
+        assert isinstance(status, StatusW3C)
     if status.org is None and status.name == "DREAM":
         m.warn("You used Status:DREAM for a W3C document. Consider Status:UD instead.")
 
@@ -207,10 +208,11 @@ def validateW3CStatus(group: Group, status: Status) -> None:
             longTypeName = "W3C Community/Business Groups"
         else:
             longTypeName = "W3C Working Groups"
-        allowedStatuses = config.englishFromList(
-            x.name for x in t.cast("list[StatusW3C]", group.org.statuses.values()) if group.type in x.groupTypes
-        )
-        m.warn(
-            f"You used Status:{status.name}, but {longTypeName} are limited to these statuses: {allowedStatuses}.",
-        )
+        allowedStatuses = [x for x in t.cast("list[StatusW3C]", group.org.statuses.values()) if group.type in x.groupTypes]
+        if allowedStatuses:
+            m.warn(
+                f"You used Status:{status.name}, but {longTypeName} are limited to these statuses: {allowedStatuses}.",
+            )
+        else:
+            m.die(f"PROGRAMMING ERROR: Group '{group.fullName()}' has type '{group.type}', but that isn't present in any of org's Statuses.")
         return

@@ -181,9 +181,7 @@ class StatusW3C(Status):
         requiresNode = node.get("requires")
         if requiresNode:
             self.requires = t.cast("list[str]", list(requiresNode.getArgs((..., str))))
-        groupTypesNode = node.get("requires")
+        groupTypesNode = node.get("group-types")
         if groupTypesNode:
-            self.requires = t.cast("list[str]", list(groupTypesNode.getArgs((..., str))))
-        if name == "ED":
-            print(self)
+            self.groupTypes = t.cast("list[str]", list(groupTypesNode.getArgs((..., str))))
         return self

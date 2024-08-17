@@ -156,6 +156,12 @@ class Spec:
         # Using all of that, load up the text macros so I can sub them into the computed-metadata file.
         self.md.fillTextMacros(self.macros, doc=self)
         jsonEscapedMacros = {k: json.dumps(v)[1:-1] for k, v in self.macros.items()}
+        # TODO: At this point, I have Org/Group/Status metadata, but haven't canonicalized them yet.
+        # TODO: Need to move that canonicalization to its own method (currently part of .validate())
+        # TODO: so I can call it early here.
+        # TODO: (This wasn't an issue before because I previously used the string values, which were
+        # TODO: obtained early. Now I rely on the objects.)
+        # TODO: Maybe actually move those metadatas to doc.doctype?
         computedMdText = h.replaceMacrosTextly(
             retrieve.retrieveBoilerplateFile(self, "computed-metadata"),
             macros=jsonEscapedMacros,
