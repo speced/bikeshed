@@ -81,8 +81,8 @@ class DoctypeManager:
     def getOrg(self, orgName: str) -> Org | None:
         return self.orgs.get(orgName)
 
-    def getDoctype(self, orgName: str | None, statusName: str | None, groupName: str | None) -> Doctype:
-        org, status, group = utils.canonicalize(self, orgName, statusName, groupName)
+    def getDoctype(self, orgName: str | None, groupName: str | None, statusName: str | None) -> Doctype:
+        org, group, status = utils.canonicalize(self, orgName, groupName, statusName)
         return Doctype(org if org else NIL_ORG, group if group else NIL_GROUP, status if status else NIL_STATUS)
 
 

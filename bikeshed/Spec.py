@@ -143,11 +143,11 @@ class Spec:
         #       in a markdown code span or an <xmp> to show off.
         _, self.mdDocument = metadata.parse(lines=inputContent.lines)
 
-        # Combine the data so far...
+        # Combine the data so far, and compute the doctype
+        # (the other md sources need the doctype in order to be found)
         self.md = metadata.join(self.mdBaseline, self.mdDocument, self.mdCommandLine)
         self.doctype = self.doctypes.getDoctype(self.md.rawOrg, self.md.rawGroup, self.md.rawStatus)
 
-        # Using that to determine the Group and Status, load the correct defaults.include boilerplate
         self.mdDefaults = metadata.fromJson(
             data=retrieve.retrieveBoilerplateFile(self, "defaults"),
             source="defaults",

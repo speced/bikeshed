@@ -10,9 +10,9 @@ if t.TYPE_CHECKING:
 def canonicalize(
     manager: DoctypeManager,
     rawOrg: str | None,
-    rawStatus: str | None,
     rawGroup: str | None,
-) -> tuple[Org | None, Status | None, Group | None]:
+    rawStatus: str | None,
+) -> tuple[Org | None, Group | None, Status | None]:
     # Takes raw Org/Status/Group names (something written in the Org/Status/Group metadata),
     # and, if possible, converts them into Org/Status/Group objects.
 
@@ -86,7 +86,7 @@ def canonicalize(
             status = manager.getStatus(None, statusName)
     else:
         # Just quick exit on this case, nothing we can do.
-        return org, None, group
+        return org, group, None
 
     # See if your org-specific Status matches your Org
     if org and status and status.org is not None and status.org != org:
@@ -106,14 +106,14 @@ def canonicalize(
 
     # Reconciliation done, return everything if Status exists.
     if status:
-        return org, status, group
+        return org, group, status
 
     # Otherwise, try and figure out why we failed to find the status
 
     possibleStatuses = manager.getStatuses(statusName)
     if len(possibleStatuses) == 0:
         m.die(f"Unknown Status metadata '{rawStatus}'. Check the docs for valid Status values.")
-        return org, status, group
+        return org, group, status
     elif len(possibleStatuses) == 1:
         possibleStatus = possibleStatuses[0]
         if possibleStatus.org is None:
@@ -140,7 +140,7 @@ def canonicalize(
             msg += " Declare one of those Orgs in your Org metadata."
         m.die(msg)
 
-    return (org, status, group)
+    return org, group, status
 
 
 def splitOrg(st: str | None) -> tuple[str | None, str | None]:
