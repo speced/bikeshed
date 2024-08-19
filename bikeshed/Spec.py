@@ -145,6 +145,7 @@ class Spec:
 
         # Combine the data so far...
         self.md = metadata.join(self.mdBaseline, self.mdDocument, self.mdCommandLine)
+        self.doctype = self.doctypes.getDoctype(self.md.rawOrg, self.md.rawGroup, self.md.rawStatus)
 
         # Using that to determine the Group and Status, load the correct defaults.include boilerplate
         self.mdDefaults = metadata.fromJson(
@@ -156,12 +157,7 @@ class Spec:
         # Using all of that, load up the text macros so I can sub them into the computed-metadata file.
         self.md.fillTextMacros(self.macros, doc=self)
         jsonEscapedMacros = {k: json.dumps(v)[1:-1] for k, v in self.macros.items()}
-        # TODO: At this point, I have Org/Group/Status metadata, but haven't canonicalized them yet.
-        # TODO: Need to move that canonicalization to its own method (currently part of .validate())
-        # TODO: so I can call it early here.
-        # TODO: (This wasn't an issue before because I previously used the string values, which were
-        # TODO: obtained early. Now I rely on the objects.)
-        # TODO: Maybe actually move those metadatas to doc.doctype?
+
         computedMdText = h.replaceMacrosTextly(
             retrieve.retrieveBoilerplateFile(self, "computed-metadata"),
             macros=jsonEscapedMacros,
@@ -181,7 +177,7 @@ class Spec:
         # And compute macros again, in case the preceding steps changed them.
         self.md.fillTextMacros(self.macros, doc=self)
 
-        self.md.validate()
+        self.md.validate(doc=self)
         m.retroactivelyCheckErrorLevel()
 
     def earlyParse(self, inputContent: InputSource.InputContent) -> list[l.Line]:
@@ -239,7 +235,7 @@ class Spec:
             features=markdownFeatures,
         )
 
-        self.refs.setSpecData(self.md)
+        self.refs.setSpecData(self)
 
         # Convert to a single string of html now, for convenience.
         self.html = "".join(x.text for x in self.lines)

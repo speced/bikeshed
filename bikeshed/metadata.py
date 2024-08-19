@@ -13,7 +13,7 @@ from functools import partial
 
 from isodate import Duration, parse_duration
 
-from . import config, constants, datablocks, doctypes, h, markdown, repository, t
+from . import config, constants, datablocks, h, markdown, repository, t
 from . import messages as m
 from .translate import _
 
@@ -49,8 +49,6 @@ class MetadataManager:
         self.level: str | None = None
         self.displayShortname: str | None = None
         self.shortname: str | None = None
-        self.status: doctypes.Status | None = None
-        self.rawStatus: str | None = None
 
         # optional metadata
         self.advisementClass: str = "advisement"
@@ -80,8 +78,6 @@ class MetadataManager:
         self.externalInfotrees: config.BoolSet = config.BoolSet(default=False)
         self.favicon: str | None = None
         self.forceCrossorigin: bool = False
-        self.group: doctypes.Group | None = None
-        self.rawGroup: str | None = None
         self.h1: str | None = None
         self.ignoreCanIUseUrlFailure: list[str] = []
         self.ignoreMDNFailure: list[str] = []
@@ -115,11 +111,12 @@ class MetadataManager:
         self.noEditor: bool = False
         self.noteClass: str = "note"
         self.opaqueElements: list[str] = ["pre", "xmp", "script", "style"]
-        self.org: doctypes.Org | None = None
-        self.rawOrg: str | None = None
         self.prepTR: bool = False
         self.previousEditors: list[dict[str, str | None]] = []
         self.previousVersions: list[dict[str, str]] = []
+        self.rawGroup: str | None = None
+        self.rawOrg: str | None = None
+        self.rawStatus: str | None = None
         self.removeMultipleLinks: bool = False
         self.repository: repository.Repository | None = None
         self.requiredIDs: list[str] = []
@@ -188,7 +185,8 @@ class MetadataManager:
     def computeImplicitMetadata(self, doc: t.SpecT) -> None:
         # Do some "computed metadata", based on the value of other metadata.
         # Only call this when you're sure all metadata sources are parsed.
-        if self.group == "byos":
+
+        if doc.doctype.group.name == "byos":
             self.boilerplate.default = False
         if not self.repository and doc:
             self.repository = getSpecRepository(doc)
@@ -198,13 +196,6 @@ class MetadataManager:
             and "repository-issue-tracking" in self.boilerplate
         ):
             self.issues.append(("GitHub", self.repository.formatIssueUrl()))
-
-        self.org, self.status, self.group = doctypes.canonicalizeOrgStatusGroup(
-            doc.doctypes,
-            self.rawOrg,
-            self.rawStatus,
-            self.rawGroup,
-        )
 
         self.expires = canonicalizeExpiryDate(self.date, self.expires)
 
@@ -221,8 +212,8 @@ class MetadataManager:
         if self.dieOn:
             m.state.dieOn = self.dieOn
 
-    def validate(self) -> bool:
-        if self.group == "byos":
+    def validate(self, doc: t.SpecT) -> bool:
+        if doc.doctype.group.name == "byos":
             return True
 
         if not self.hasMetadata:
@@ -235,21 +226,21 @@ class MetadataManager:
             KNOWN_KEYS["Title"],
         ]
 
-        if self.status:
-            for mdName in self.status.requires:
+        if doc.doctype.status:
+            for mdName in doc.doctype.status.requires:
                 if mdName in KNOWN_KEYS:
                     requiredMd.append(KNOWN_KEYS[mdName])
                 else:
                     m.warn(
-                        f"Programming error: your Status '{self.status.fullName()}' claims to require the unknown metadata '{mdName}'. Please report this to the maintainer.",
+                        f"Programming error: your Status '{doc.doctype.status.fullName()}' claims to require the unknown metadata '{mdName}'. Please report this to the maintainer.",
                     )
-        if self.group:
-            for mdName in self.group.requires:
+        if doc.doctype.group:
+            for mdName in doc.doctype.group.requires:
                 if mdName in KNOWN_KEYS:
                     requiredMd.append(KNOWN_KEYS[mdName])
                 else:
                     m.warn(
-                        f"Programming error: your Group '{self.group.fullName()}' claims to require the unknown metadata '{mdName}'. Please report this to the maintainer.",
+                        f"Programming error: your Group '{doc.doctype.group.fullName()}' claims to require the unknown metadata '{mdName}'. Please report this to the maintainer.",
                     )
 
         if not self.noEditor:
@@ -288,22 +279,25 @@ class MetadataManager:
         macros["level"] = str(self.level)
         if self.displayVshortname:
             macros["vshortname"] = self.displayVshortname
-        if (self.status and self.status.fullName() == "FINDING") and self.group:
-            macros["longstatus"] = f"Finding of the {self.group.name}"
-        elif self.status:
-            macros["longstatus"] = self.status.longName
+        if doc.doctype.status.fullName() == "FINDING" and doc.doctype.group:
+            macros["longstatus"] = f"Finding of the {doc.doctype.group.name}"
+        elif doc.doctype.status:
+            macros["longstatus"] = doc.doctype.status.longName
         else:
             macros["longstatus"] = ""
-        if self.status in ("w3c/LCWD", "w3c/FPWD"):
-            macros["status"] = "WD"
-        elif self.status in ("w3c/NOTE-FPWD", "w3c/NOTE-WD"):
-            macros["status"] = "DNOTE"
-        elif self.status in ("w3c/WG-NOTE", "w3c/IG-NOTE"):
-            macros["status"] = "NOTE"
-        elif self.status == "w3c/NOTE-ED":
-            macros["status"] = "ED"
-        elif self.rawStatus:
-            macros["status"] = self.rawStatus
+        if doc.doctype.group.name == "w3c":
+            if doc.doctype.status.name in ("LCWD", "FPWD"):
+                macros["status"] = "WD"
+            elif doc.doctype.status.name in ("NOTE-FPWD", "NOTE-WD"):
+                macros["status"] = "DNOTE"
+            elif doc.doctype.status.name in ("WG-NOTE", "IG-NOTE"):
+                macros["status"] = "NOTE"
+            elif doc.doctype.status.name == "NOTE-ED":
+                macros["status"] = "ED"
+            elif doc.doctype.status:
+                macros["status"] = doc.doctype.status.name
+        elif doc.doctype.status:
+            macros["status"] = doc.doctype.status.name
         if self.workStatus:
             macros["workstatus"] = self.workStatus
         if self.TR:
@@ -334,8 +328,10 @@ class MetadataManager:
         if self.deadline:
             macros["deadline"] = self.deadline.strftime(f"{self.deadline.day} %B %Y")
             macros["isodeadline"] = self.deadline.strftime("%Y-%m-%d")
-        if self.status and self.status.orgName() == "w3c" and "Date" in self.status.requires:
-            macros["version"] = "https://www.w3.org/TR/{year}/{status}-{vshortname}-{cdate}/".format(**macros)
+        if doc.doctype.org.name == "w3c" and "Date" in doc.doctype.status.requires:
+            macros["version"] = (
+                f"https://www.w3.org/TR/{macros['year']}/{doc.doctype.status.name}-{macros['vshortname']}-{macros['cdate']}/"
+            )
             macros["history"] = f"https://www.w3.org/standards/history/{self.displayVshortname}/"
         elif self.ED:
             macros["version"] = self.ED
@@ -354,30 +350,29 @@ class MetadataManager:
             macros["mailinglist"] = self.mailingList
         if self.mailingListArchives:
             macros["mailinglistarchives"] = self.mailingListArchives
-        if self.status == "w3c/FPWD":
-            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2021/W3C-WD"
-            macros["w3c-status-url"] = "https://www.w3.org/standards/types#FPWD"
-        elif self.status in ("w3c/NOTE-FPWD", "w3c/NOTE-WD"):
-            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2021/W3C-DNOTE"
-            macros["w3c-status-url"] = "https://www.w3.org/standards/types#DNOTE"
-        elif self.status == "FINDING":
-            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2021/W3C-NOTE"
-            macros["w3c-status-url"] = "https://www.w3.org/standards/types#FINDING"
-        elif self.status == "w3c/CG-DRAFT":
-            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2021/cg-draft"
-            macros["w3c-status-url"] = "https://www.w3.org/standards/types#CG-DRAFT"
-        elif self.status == "w3c/CG-FINAL":
-            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2021/cg-final"
-            macros["w3c-status-url"] = "https://www.w3.org/standards/types#CG-FINAL"
-        elif self.status == "w3c/NOTE-ED":
-            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2021/W3C-ED"
-            macros["w3c-status-url"] = "https://www.w3.org/standards/types#ED"
-        else:
-            shortStatus = (
-                self.rawStatus.partition("/")[2] if (self.rawStatus and "/" in str(self.rawStatus)) else self.rawStatus
-            )
-            macros["w3c-stylesheet-url"] = f"https://www.w3.org/StyleSheets/TR/2021/W3C-{shortStatus}"
-            macros["w3c-status-url"] = f"https://www.w3.org/standards/types#{shortStatus}"
+        if doc.doctype.org.name == "w3c":
+            statusName = doc.doctype.status.name
+            if statusName == "FPWD":
+                macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2021/W3C-WD"
+                macros["w3c-status-url"] = "https://www.w3.org/standards/types#FPWD"
+            elif statusName in ("NOTE-FPWD", "NOTE-WD"):
+                macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2021/W3C-DNOTE"
+                macros["w3c-status-url"] = "https://www.w3.org/standards/types#DNOTE"
+            elif statusName == "FINDING":
+                macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2021/W3C-NOTE"
+                macros["w3c-status-url"] = "https://www.w3.org/standards/types#FINDING"
+            elif statusName == "CG-DRAFT":
+                macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2021/cg-draft"
+                macros["w3c-status-url"] = "https://www.w3.org/standards/types#CG-DRAFT"
+            elif statusName == "CG-FINAL":
+                macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2021/cg-final"
+                macros["w3c-status-url"] = "https://www.w3.org/standards/types#CG-FINAL"
+            elif statusName == "NOTE-ED":
+                macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2021/W3C-ED"
+                macros["w3c-status-url"] = "https://www.w3.org/standards/types#ED"
+            else:
+                macros["w3c-stylesheet-url"] = f"https://www.w3.org/StyleSheets/TR/2021/W3C-{statusName}"
+                macros["w3c-status-url"] = f"https://www.w3.org/standards/types#{statusName}"
         if self.customWarningText is not None:
             macros["customwarningtext"] = parsedTextFromRawLines(
                 self.customWarningText,

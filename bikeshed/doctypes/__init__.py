@@ -1,2 +1,1 @@
-from .manager import DoctypeManager, Group, GroupW3C, Org, Status, StatusW3C
-from .utils import canonicalizeOrgStatusGroup
+from .manager import NIL_GROUP, NIL_ORG, NIL_STATUS, DoctypeManager, Group, GroupW3C, Org, Status, StatusW3C

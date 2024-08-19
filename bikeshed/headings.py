@@ -22,7 +22,7 @@ def processHeadings(doc: t.SpecT, scope: str = "doc") -> None:
     addHeadingBonuses(headings)
     for el in headings:
         h.addClass(doc, el, "settled")
-    if scope == "all" and doc.md.group and doc.md.group.privSec:
+    if scope == "all" and doc.doctype.group.privSec:
         checkPrivacySecurityHeadings(h.findAll(".heading", doc))
 
 

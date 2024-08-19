@@ -9,6 +9,13 @@ from . import utils
 
 
 @dataclasses.dataclass
+class Doctype:
+    org: Org
+    group: Group
+    status: Status
+
+
+@dataclasses.dataclass
 class DoctypeManager:
     genericStatuses: dict[str, Status] = dataclasses.field(default_factory=dict)
     orgs: dict[str, Org] = dataclasses.field(default_factory=dict)
@@ -74,6 +81,10 @@ class DoctypeManager:
     def getOrg(self, orgName: str) -> Org | None:
         return self.orgs.get(orgName)
 
+    def getDoctype(self, orgName: str | None, statusName: str | None, groupName: str | None) -> Doctype:
+        org, status, group = utils.canonicalize(self, orgName, statusName, groupName)
+        return Doctype(org if org else NIL_ORG, group if group else NIL_GROUP, status if status else NIL_STATUS)
+
 
 @dataclasses.dataclass
 class Org:
@@ -92,6 +103,12 @@ class Org:
             s = Status.fromKdlNode(child, org=self)
             self.statuses[s.name] = s
         return self
+
+    def __nonzero__(self) -> bool:
+        return self != NIL_ORG
+
+
+NIL_ORG = Org("(not provided)")
 
 
 @dataclasses.dataclass
@@ -116,6 +133,12 @@ class Group:
             self.requires = t.cast("list[str]", list(requiresNode.getArgs((..., str))))
         return self
 
+    def __nonzero__(self) -> bool:
+        return self != NIL_GROUP
+
+
+NIL_GROUP = Group("(not provided)", privSec=False, org=NIL_ORG)
+
 
 @dataclasses.dataclass
 class GroupW3C(Group):
@@ -133,7 +156,7 @@ class GroupW3C(Group):
 class Status:
     name: str
     longName: str
-    org: Org | None = None
+    org: Org
     requires: list[str] = dataclasses.field(default_factory=list)
 
     def fullName(self) -> str:
@@ -142,22 +165,18 @@ class Status:
         else:
             return self.org.name + "/" + self.name
 
-    def orgName(self) -> str | None:
-        if self.org:
-            return self.org.name
-        else:
-            return None
-
     def looselyMatch(self, rawStatus: str) -> bool:
         orgName, statusName = utils.splitOrg(rawStatus)
         if statusName and self.name.upper() != statusName.upper():
             return False
-        if orgName and self.org and self.orgName() != orgName.lower():
+        if orgName and self.org.name != orgName.lower():
             return False
         return True
 
     @staticmethod
     def fromKdlNode(node: kdl.Node, org: Org | None = None) -> Status:
+        if org is None:
+            org = NIL_ORG
         if org and org.name == "w3c":
             return StatusW3C.fromKdlNode(node, org)
         name = t.cast(str, node.args[0])
@@ -168,6 +187,12 @@ class Status:
             self.requires = t.cast("list[str]", list(requiresNode.getArgs((..., str))))
         return self
 
+    def __nonzero__(self) -> bool:
+        return self != NIL_STATUS
+
+
+NIL_STATUS = Status("(not provided)", "", org=NIL_ORG)
+
 
 @dataclasses.dataclass
 class StatusW3C(Status):
@@ -175,6 +200,8 @@ class StatusW3C(Status):
 
     @staticmethod
     def fromKdlNode(node: kdl.Node, org: Org | None = None) -> StatusW3C:
+        if org is None:
+            org = NIL_ORG
         name = t.cast(str, node.args[0])
         longName = t.cast(str, node.args[1])
         self = StatusW3C(name, longName, org)

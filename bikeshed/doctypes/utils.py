@@ -4,10 +4,10 @@ from .. import config, t
 from .. import messages as m
 
 if t.TYPE_CHECKING:
-    from . import DoctypeManager, Group, GroupW3C, Org, Status, StatusW3C
+    from . import DoctypeManager, Group, GroupW3C, Org, Status, StatusW3C  # pylint: disable=cyclic-import
 
 
-def canonicalizeOrgStatusGroup(
+def canonicalize(
     manager: DoctypeManager,
     rawOrg: str | None,
     rawStatus: str | None,
@@ -208,11 +208,15 @@ def validateW3CStatus(group: Group, status: Status) -> None:
             longTypeName = "W3C Community/Business Groups"
         else:
             longTypeName = "W3C Working Groups"
-        allowedStatuses = [x for x in t.cast("list[StatusW3C]", group.org.statuses.values()) if group.type in x.groupTypes]
+        allowedStatuses = [
+            x for x in t.cast("list[StatusW3C]", group.org.statuses.values()) if group.type in x.groupTypes
+        ]
         if allowedStatuses:
             m.warn(
                 f"You used Status:{status.name}, but {longTypeName} are limited to these statuses: {allowedStatuses}.",
             )
         else:
-            m.die(f"PROGRAMMING ERROR: Group '{group.fullName()}' has type '{group.type}', but that isn't present in any of org's Statuses.")
+            m.die(
+                f"PROGRAMMING ERROR: Group '{group.fullName()}' has type '{group.type}', but that isn't present in any of org's Statuses.",
+            )
         return

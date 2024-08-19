@@ -121,13 +121,13 @@ def retrieveBoilerplateFile(
         dataFile = fileRequester
 
     if group is None:
-        group = doc.md.group
+        group = doc.doctype.group
     groupName = group.name if group else None
     if status is None:
-        status = doc.md.status
+        status = doc.doctype.status
     statusName = status.name if status else None
     if org is None:
-        org = doc.md.org
+        org = doc.doctype.org
     orgName = org.name if org else None
 
     searchLocally = allowLocal and doc.md.localBoilerplate[name]
