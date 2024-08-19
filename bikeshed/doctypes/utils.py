@@ -89,10 +89,10 @@ def canonicalize(
         return org, group, None
 
     # See if your org-specific Status matches your Org
-    if org and status and status.org is not None and status.org != org:
+    if org and status and status.org and status.org != org:
         m.die(f"Your {orgInferredFrom} is '{org.name}', but your Status is only usable in the '{status.org.name}' Org.")
 
-    if group and status and status.org is not None and status.org != group.org:
+    if group and status and status.org and status.org != group.org:
         # If using an org-specific Status, Group must match.
         # (Any group can use a generic status.)
         possibleStatusNames = config.englishFromList(f"'{x}'" for x in group.org.statuses)

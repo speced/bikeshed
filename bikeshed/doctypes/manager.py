@@ -14,6 +14,9 @@ class Doctype:
     group: Group
     status: Status
 
+    def __str__(self):
+        return f"Doctype<org={self.org.name}, group={self.group.fullName()}, status={self.status.fullName()}>"
+
 
 @dataclasses.dataclass
 class DoctypeManager:
@@ -104,7 +107,7 @@ class Org:
             self.statuses[s.name] = s
         return self
 
-    def __nonzero__(self) -> bool:
+    def __bool__(self) -> bool:
         return self != NIL_ORG
 
 
@@ -119,7 +122,10 @@ class Group:
     requires: list[str] = dataclasses.field(default_factory=list)
 
     def fullName(self) -> str:
-        return self.org.name + "/" + self.name
+        if self.org:
+            return self.org.name + "/" + self.name
+        else:
+            return self.name
 
     @staticmethod
     def fromKdlNode(node: kdl.Node, org: Org) -> Group:
@@ -133,7 +139,7 @@ class Group:
             self.requires = t.cast("list[str]", list(requiresNode.getArgs((..., str))))
         return self
 
-    def __nonzero__(self) -> bool:
+    def __bool__(self) -> bool:
         return self != NIL_GROUP
 
 
@@ -160,10 +166,10 @@ class Status:
     requires: list[str] = dataclasses.field(default_factory=list)
 
     def fullName(self) -> str:
-        if self.org is None:
-            return self.name
-        else:
+        if self.org:
             return self.org.name + "/" + self.name
+        else:
+            return self.name
 
     def looselyMatch(self, rawStatus: str) -> bool:
         orgName, statusName = utils.splitOrg(rawStatus)
@@ -187,7 +193,7 @@ class Status:
             self.requires = t.cast("list[str]", list(requiresNode.getArgs((..., str))))
         return self
 
-    def __nonzero__(self) -> bool:
+    def __bool__(self) -> bool:
         return self != NIL_STATUS
 
 
