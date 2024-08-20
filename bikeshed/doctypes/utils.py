@@ -102,7 +102,7 @@ def canonicalize(
             f"Your Group ({group.name}) is in the '{group.org.name}' Org, but your Status ({status.name}) is only usable in the '{status.org.name}' Org. Allowed Status values for '{group.org.name}' are {config.englishFromList(sorted(possibleStatusNames))}",
         )
 
-    if group and group.type is not None and status and  status.groupTypes and group.type not in status.groupTypes:
+    if group and group.type is not None and status and status.groupTypes and group.type not in status.groupTypes:
         allowedStatuses = [s.name for s in group.org.statuses.values() if group.type in s.groupTypes]
         if allowedStatuses:
             m.warn(
@@ -115,7 +115,7 @@ def canonicalize(
 
     if group and status and group.org.name == "W3C":
         # Apply the special w3c rules
-        validateW3CStatus(group, status)
+        validateW3CStatus(status)
 
     # Reconciliation done, return everything if Status exists.
     if status:
@@ -200,7 +200,7 @@ def reconcileOrgs(fromRaw: str | None, fromStatus: str | None, fromGroup: str | 
     return orgName
 
 
-def validateW3CStatus(group: Group, status: Status) -> None:
+def validateW3CStatus(status: Status) -> None:
     if status.name == "DREAM":
         m.warn("You used Status:DREAM for a W3C document. Consider Status:UD instead.")
 
@@ -208,5 +208,3 @@ def validateW3CStatus(group: Group, status: Status) -> None:
         m.die(
             f"Under Process2021, {status.name} is no longer a valid status. Use NOTE (or one of its variants NOTE-ED, NOTE-FPWD, NOTE-WD) instead.",
         )
-
-

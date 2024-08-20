@@ -279,8 +279,10 @@ class MetadataManager:
         macros["level"] = str(self.level)
         if self.displayVshortname:
             macros["vshortname"] = self.displayVshortname
-        if doc.doctype.status.fullName() == "FINDING" and doc.doctype.group:
+        if doc.doctype.status.name == "FINDING" and doc.doctype.group:
             macros["longstatus"] = f"Finding of the {doc.doctype.group.name}"
+        elif doc.doctype.status.name == "DRAFT-FINDING" and doc.doctype.group:
+            macros["longstatus"] = f"Draft Finding of the {doc.doctype.group.name}"
         elif doc.doctype.status:
             macros["longstatus"] = doc.doctype.status.longName
         else:

@@ -23,7 +23,7 @@ def processHeadings(doc: t.SpecT, scope: str = "doc") -> None:
     for el in headings:
         h.addClass(doc, el, "settled")
     if scope == "all" and doc.doctype.group.privSec:
-        checkPrivacySecurityHeadings(h.findAll(".heading", doc))
+        checkPrivacySecurityHeadings(doc, h.findAll(".heading", doc))
 
 
 def resetHeadings(headings: list[t.ElementT]) -> None:
@@ -56,7 +56,7 @@ def addHeadingIds(doc: t.SpecT, headings: list[t.ElementT]) -> None:
         )
 
 
-def checkPrivacySecurityHeadings(headings: list[t.ElementT]) -> None:
+def checkPrivacySecurityHeadings(doc: t.SpecT, headings: list[t.ElementT]) -> None:
     security = False
     privacy = False
     for header in headings:
@@ -66,7 +66,7 @@ def checkPrivacySecurityHeadings(headings: list[t.ElementT]) -> None:
             security = True
         if "privacy" in text and "considerations" in text:
             privacy = True
-        if "security" in text and "privacy" in text and "considerations" in text:
+        if "security" in text and "privacy" in text and "considerations" in text and doc.doctype.org.name == "W3C":
             m.warn(
                 "W3C policy requires Privacy Considerations and Security Considerations to be separate sections, but you appear to have them combined into one.",
                 el=header,
