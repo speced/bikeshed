@@ -4,7 +4,7 @@ from .. import config, t
 from .. import messages as m
 
 if t.TYPE_CHECKING:
-    from . import DoctypeManager, Group, GroupW3C, Org, Status, StatusW3C  # pylint: disable=cyclic-import
+    from . import DoctypeManager, Group, Org, Status  # pylint: disable=cyclic-import
 
 
 def canonicalize(
@@ -20,10 +20,12 @@ def canonicalize(
     # any inline org specifiers.
     # Then, figure out what the actual org name is.
     orgFromStatus, statusName = splitOrg(rawStatus)
+    orgFromStatus = orgFromStatus.upper() if orgFromStatus is not None else None
     statusName = statusName.upper() if statusName is not None else None
 
     orgFromGroup, groupName = splitOrg(rawGroup)
-    groupName = groupName.lower() if groupName is not None else None
+    orgFromGroup = orgFromGroup.upper() if orgFromGroup is not None else None
+    groupName = groupName.upper() if groupName is not None else None
 
     orgName = reconcileOrgs(rawOrg, orgFromStatus, orgFromGroup)
 
@@ -95,12 +97,23 @@ def canonicalize(
     if group and status and status.org and status.org != group.org:
         # If using an org-specific Status, Group must match.
         # (Any group can use a generic status.)
-        possibleStatusNames = config.englishFromList(f"'{x}'" for x in group.org.statuses)
+        possibleStatusNames = [x.name for x in group.org.statuses.values()]
         m.die(
-            f"Your Group is in the '{group.org.name}' Org, but your Status is only usable in the '{status.org.name}' Org. Allowed Status values for '{group.org.name}' are: {possibleStatusNames}",
+            f"Your Group ({group.name}) is in the '{group.org.name}' Org, but your Status ({status.name}) is only usable in the '{status.org.name}' Org. Allowed Status values for '{group.org.name}' are {config.englishFromList(sorted(possibleStatusNames))}",
         )
 
-    if group and status and group.org.name == "w3c":
+    if group and group.type is not None and status and  status.groupTypes and group.type not in status.groupTypes:
+        allowedStatuses = [s.name for s in group.org.statuses.values() if group.type in s.groupTypes]
+        if allowedStatuses:
+            m.warn(
+                f"You used Status {status.name}, but your Group ({group.name}) is limited to the statuses {config.englishFromList(sorted(allowedStatuses))}.",
+            )
+        else:
+            m.die(
+                f"PROGRAMMING ERROR: Group '{group.fullName()}' has type '{group.type}', but none of the {group.org.name} Statuses are associated with that type.",
+            )
+
+    if group and status and group.org.name == "W3C":
         # Apply the special w3c rules
         validateW3CStatus(group, status)
 
@@ -158,9 +171,9 @@ def reconcileOrgs(fromRaw: str | None, fromStatus: str | None, fromGroup: str | 
     # Since there are three potential sources of "org" name,
     # figure out what the name actually is,
     # and complain if they disagree.
-    fromRaw = fromRaw.lower() if fromRaw else None
-    fromStatus = fromStatus.lower() if fromStatus else None
-    fromGroup = fromGroup.lower() if fromGroup else None
+    fromRaw = fromRaw.upper() if fromRaw else None
+    fromStatus = fromStatus.upper() if fromStatus else None
+    fromGroup = fromGroup.upper() if fromGroup else None
 
     orgName: str | None = fromRaw
 
@@ -188,10 +201,7 @@ def reconcileOrgs(fromRaw: str | None, fromStatus: str | None, fromGroup: str | 
 
 
 def validateW3CStatus(group: Group, status: Status) -> None:
-    if t.TYPE_CHECKING:
-        assert isinstance(group, GroupW3C)
-        assert isinstance(status, StatusW3C)
-    if status.org is None and status.name == "DREAM":
+    if status.name == "DREAM":
         m.warn("You used Status:DREAM for a W3C document. Consider Status:UD instead.")
 
     if status.name in ("IG-NOTE", "WG-NOTE"):
@@ -199,24 +209,4 @@ def validateW3CStatus(group: Group, status: Status) -> None:
             f"Under Process2021, {status.name} is no longer a valid status. Use NOTE (or one of its variants NOTE-ED, NOTE-FPWD, NOTE-WD) instead.",
         )
 
-    if group.type is not None and group.type not in status.groupTypes:
-        if group.type == "ig":
-            longTypeName = "W3C Interest Groups"
-        elif group.type == "tag":
-            longTypeName = "the W3C TAG"
-        elif group.type == "cg":
-            longTypeName = "W3C Community/Business Groups"
-        else:
-            longTypeName = "W3C Working Groups"
-        allowedStatuses = [
-            x for x in t.cast("list[StatusW3C]", group.org.statuses.values()) if group.type in x.groupTypes
-        ]
-        if allowedStatuses:
-            m.warn(
-                f"You used Status:{status.name}, but {longTypeName} are limited to these statuses: {allowedStatuses}.",
-            )
-        else:
-            m.die(
-                f"PROGRAMMING ERROR: Group '{group.fullName()}' has type '{group.type}', but that isn't present in any of org's Statuses.",
-            )
-        return
+

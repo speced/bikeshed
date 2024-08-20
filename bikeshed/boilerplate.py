@@ -157,7 +157,7 @@ def getFillContainer(tag: str, doc: t.SpecT, default: bool = False) -> t.Element
 
     # Otherwise, append to the end of the document,
     # unless you're in the byos group
-    if doc.doctype.group.name == "byos":
+    if doc.doctype.group.name == "BYOS":
         return None
     if default:
         return doc.body
@@ -240,7 +240,7 @@ def removeUnwantedBoilerplate(doc: t.SpecT) -> None:
 
 
 def w3cStylesheetInUse(doc: t.SpecT) -> bool:
-    return doc.md.prepTR or doc.doctype.group.name == "w3c"
+    return doc.md.prepTR or doc.doctype.group.name == "W3C"
 
 
 def addBikeshedBoilerplate(doc: t.SpecT) -> None:

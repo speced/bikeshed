@@ -14,7 +14,7 @@ class Doctype:
     group: Group
     status: Status
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"Doctype<org={self.org.name}, group={self.group.fullName()}, status={self.status.fullName()}>"
 
 
@@ -97,7 +97,7 @@ class Org:
 
     @staticmethod
     def fromKdlNode(node: kdl.Node) -> Org:
-        name = t.cast(str, node.args[0])
+        name = t.cast(str, node.args[0]).upper()
         self = Org(name)
         for child in node.getAll("group"):
             g = Group.fromKdlNode(child, org=self)
@@ -120,6 +120,7 @@ class Group:
     privSec: bool
     org: Org
     requires: list[str] = dataclasses.field(default_factory=list)
+    type: str | None = None
 
     def fullName(self) -> str:
         if self.org:
@@ -129,14 +130,15 @@ class Group:
 
     @staticmethod
     def fromKdlNode(node: kdl.Node, org: Org) -> Group:
-        if org.name == "w3c":
-            return GroupW3C.fromKdlNode(node, org)
-        name = t.cast(str, node.args[0])
+        name = t.cast(str, node.args[0]).upper()
         privSec = t.cast(bool, node.props.get("priv-sec", False))
-        requiresNode = node.get("requires")
-        self = Group(name, privSec, org)
-        if requiresNode:
-            self.requires = t.cast("list[str]", list(requiresNode.getArgs((..., str))))
+        if "type" in node.props:
+            groupType = str(node.props.get("type")).lower()
+        else:
+            groupType = None
+        self = Group(name, privSec, org, type=groupType)
+        for n in node.getAll("requires"):
+            self.requires.extend(t.cast("list[str]", n.getArgs((..., str))))
         return self
 
     def __bool__(self) -> bool:
@@ -147,23 +149,12 @@ NIL_GROUP = Group("(not provided)", privSec=False, org=NIL_ORG)
 
 
 @dataclasses.dataclass
-class GroupW3C(Group):
-    type: str | None = None
-
-    @staticmethod
-    def fromKdlNode(node: kdl.Node, org: Org) -> GroupW3C:
-        name = t.cast(str, node.args[0])
-        privSec = t.cast(bool, node.props.get("priv-sec", False))
-        groupType = t.cast("str|None", node.props.get("type"))
-        return GroupW3C(name, privSec, org, [], groupType)
-
-
-@dataclasses.dataclass
 class Status:
     name: str
     longName: str
     org: Org
     requires: list[str] = dataclasses.field(default_factory=list)
+    groupTypes: list[str] = dataclasses.field(default_factory=list)
 
     def fullName(self) -> str:
         if self.org:
@@ -183,14 +174,13 @@ class Status:
     def fromKdlNode(node: kdl.Node, org: Org | None = None) -> Status:
         if org is None:
             org = NIL_ORG
-        if org and org.name == "w3c":
-            return StatusW3C.fromKdlNode(node, org)
-        name = t.cast(str, node.args[0])
+        name = t.cast(str, node.args[0]).upper()
         longName = t.cast(str, node.args[1])
         self = Status(name, longName, org)
-        requiresNode = node.get("requires")
-        if requiresNode:
-            self.requires = t.cast("list[str]", list(requiresNode.getArgs((..., str))))
+        for n in node.getAll("requires"):
+            self.requires.extend(t.cast("list[str]", n.getArgs((..., str))))
+        for n in node.getAll("group-types"):
+            self.groupTypes.extend(str(x).lower() for x in n.getArgs((..., str)))
         return self
 
     def __bool__(self) -> bool:
@@ -198,23 +188,3 @@ class Status:
 
 
 NIL_STATUS = Status("(not provided)", "", org=NIL_ORG)
-
-
-@dataclasses.dataclass
-class StatusW3C(Status):
-    groupTypes: list[str] = dataclasses.field(default_factory=list)
-
-    @staticmethod
-    def fromKdlNode(node: kdl.Node, org: Org | None = None) -> StatusW3C:
-        if org is None:
-            org = NIL_ORG
-        name = t.cast(str, node.args[0])
-        longName = t.cast(str, node.args[1])
-        self = StatusW3C(name, longName, org)
-        requiresNode = node.get("requires")
-        if requiresNode:
-            self.requires = t.cast("list[str]", list(requiresNode.getArgs((..., str))))
-        groupTypesNode = node.get("group-types")
-        if groupTypesNode:
-            self.groupTypes = t.cast("list[str]", list(groupTypesNode.getArgs((..., str))))
-        return self

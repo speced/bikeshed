@@ -186,7 +186,7 @@ class MetadataManager:
         # Do some "computed metadata", based on the value of other metadata.
         # Only call this when you're sure all metadata sources are parsed.
 
-        if doc.doctype.group.name == "byos":
+        if doc.doctype.group.name == "BYOS":
             self.boilerplate.default = False
         if not self.repository and doc:
             self.repository = getSpecRepository(doc)
@@ -213,7 +213,7 @@ class MetadataManager:
             m.state.dieOn = self.dieOn
 
     def validate(self, doc: t.SpecT) -> bool:
-        if doc.doctype.group.name == "byos":
+        if doc.doctype.group.name == "BYOS":
             return True
 
         if not self.hasMetadata:
@@ -285,7 +285,7 @@ class MetadataManager:
             macros["longstatus"] = doc.doctype.status.longName
         else:
             macros["longstatus"] = ""
-        if doc.doctype.group.name == "w3c":
+        if doc.doctype.group.name == "W3C":
             if doc.doctype.status.name in ("LCWD", "FPWD"):
                 macros["status"] = "WD"
             elif doc.doctype.status.name in ("NOTE-FPWD", "NOTE-WD"):
@@ -328,7 +328,7 @@ class MetadataManager:
         if self.deadline:
             macros["deadline"] = self.deadline.strftime(f"{self.deadline.day} %B %Y")
             macros["isodeadline"] = self.deadline.strftime("%Y-%m-%d")
-        if doc.doctype.org.name == "w3c" and "Date" in doc.doctype.status.requires:
+        if doc.doctype.org.name == "W3C" and "Date" in doc.doctype.status.requires:
             macros["version"] = (
                 f"https://www.w3.org/TR/{macros['year']}/{doc.doctype.status.name}-{macros['vshortname']}-{macros['cdate']}/"
             )
@@ -350,7 +350,7 @@ class MetadataManager:
             macros["mailinglist"] = self.mailingList
         if self.mailingListArchives:
             macros["mailinglistarchives"] = self.mailingListArchives
-        if doc.doctype.org.name == "w3c":
+        if doc.doctype.org.name == "W3C":
             statusName = doc.doctype.status.name
             if statusName == "FPWD":
                 macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2021/W3C-WD"

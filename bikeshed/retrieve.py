@@ -122,13 +122,13 @@ def retrieveBoilerplateFile(
 
     if group is None:
         group = doc.doctype.group
-    groupName = group.name if group else None
+    groupName = group.name.lower() if group else None
     if status is None:
         status = doc.doctype.status
-    statusName = status.name if status else None
+    statusName = status.name.upper() if status else None
     if org is None:
         org = doc.doctype.org
-    orgName = org.name if org else None
+    orgName = org.name.lower() if org else None
 
     searchLocally = allowLocal and doc.md.localBoilerplate[name]
 
