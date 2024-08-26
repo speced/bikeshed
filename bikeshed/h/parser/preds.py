@@ -235,9 +235,7 @@ def isTagnameChar(ch: str) -> bool:
     if cp == 0xB7:
         return True
     if 0xC0 <= cp <= 0x1FFF:
-        if cp in (0xD7, 0xF7, 0x37E):
-            return False
-        return True
+        return cp not in (0xD7, 0xF7, 0x37E)
     if cp in (0x200C, 0x200D, 0x203F, 0x2040):
         return True
     if 0x2070 <= cp <= 0x218F:
@@ -250,7 +248,7 @@ def isTagnameChar(ch: str) -> bool:
         return True
     if 0xFDF0 <= cp <= 0xFFFD:
         return True
-    if 0x10000 <= cp <= 0xEFFFF:
+    if 0x10000 <= cp <= 0xEFFFF:  # noqa needless-bool
         return True
     return False
 
@@ -258,7 +256,7 @@ def isTagnameChar(ch: str) -> bool:
 def isAttrNameChar(ch: str) -> bool:
     if len(ch) != 1:
         return False
-    if isWhitespace(ch) or ch in "/<>=\"'" or ord(ch) == 0:
+    if isWhitespace(ch) or ch in "/<>=\"'" or ord(ch) == 0:  # noqa needless-bool
         return False
     return True
 

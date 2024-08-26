@@ -182,7 +182,7 @@ class Script(JCResource):
             return False
         if self.data is None:
             return True
-        if self.data[1]:
+        if self.data[1]:  # noqa needless-bool
             return True
         return False
 
@@ -220,9 +220,7 @@ class Style(JCResource):
     script: Script | None = None
 
     def insertable(self, allowList: t.BoolSet) -> bool:
-        if f"style-{self.name}" not in allowList:
-            return False
-        return True
+        return f"style-{self.name}" in allowList
 
     def toElement(self, darkMode: bool = True) -> t.ElementT:
         with self.textPath.open("r", encoding="utf-8") as fh:

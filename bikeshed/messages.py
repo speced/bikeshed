@@ -43,7 +43,6 @@ class MessagesState:
     printOn: str = "everything"
     # Suppress *all* categories, *plus* the final success/fail message
     silent: bool = False
-    #
     printMode: str = "console"
     asciiOnly: bool = False
     fh: io.TextIOWrapper = t.cast("io.TextIOWrapper", sys.stdout)  # noqa: RUF009

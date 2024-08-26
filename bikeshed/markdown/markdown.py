@@ -146,10 +146,9 @@ def tokenizeLines(
         if tagname in inlineElements:
             return True
         assert blockElements is not None
-        if "-" in tagname and tagname not in blockElements:
-            # Assume custom elements are inline by default
-            return True
-        return False
+
+        # Assume custom elements are inline by default
+        return "-" in tagname and tagname not in blockElements
 
     tokens: list[TokenT] = []
     rawStack: list[RawTokenT] = []

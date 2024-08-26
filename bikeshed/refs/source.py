@@ -195,16 +195,16 @@ class RefSource:
 
         def textRefsIterator(texts: list[str]) -> t.Generator[t.RefWrapper, None, None]:
             # Same as above, but only grabs those keyed to a given text
-            for text in texts:
-                yield from self.fetchRefs(text)
+            for x in texts:
+                yield from self.fetchRefs(x)
 
         def forRefsIterator(targetFors: str | list[str]) -> t.Generator[t.RefWrapper, None, None]:
             # Same as above, but only grabs those for certain values
             if isinstance(targetFors, str):
                 targetFors = [targetFors]
             for for_ in targetFors:
-                for text in self.fors[for_]:
-                    yield from self.fetchRefs(text)
+                for x in self.fors[for_]:
+                    yield from self.fetchRefs(x)
 
         # Set up the initial list of refs to query
         if text:

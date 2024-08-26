@@ -66,12 +66,7 @@ def escapeCSSIdent(val: str) -> str:
         ):
             ident += rf"\{code:x} "
         elif (
-            code >= 0x80
-            or code == 0x2D
-            or code == 0x5F
-            or 0x30 <= code <= 0x39
-            or 0x41 <= code <= 0x5A
-            or 0x61 <= code <= 0x7A
+            code >= 0x80 or code in (0x2D, 0x5F) or 0x30 <= code <= 0x39 or 0x41 <= code <= 0x5A or 0x61 <= code <= 0x7A
         ):
             ident += chr(code)
         else:
@@ -94,9 +89,8 @@ def validUrlUnit(char: str) -> bool:
     c = ord(char)
     if c < 0xA0:
         # ASCII range
-        if (
-            c == 0x21
-            or c == 0x24
+        return (
+            c in (0x21, 0x24)
             or 0x26 <= c <= 0x29
             or 0x2A <= c <= 0x3B
             or c == 0x3D
@@ -104,13 +98,11 @@ def validUrlUnit(char: str) -> bool:
             or c == 0x5F
             or 0x61 <= c <= 0x7A
             or c == 0x7E
-        ):
-            return True
-        return False
+        )
     else:
         if 0xD800 <= c <= 0xDFFF or 0xFDD0 <= c <= 0xFDEF:
             return False
-        if (c % 0xFFFF) in [0xFFFE, 0xFFFF]:
+        if (c % 0xFFFF) in [0xFFFE, 0xFFFF]:  # noqa needless-bool
             # Last two bytes are FFFE or FFFF
             return False
         return True
@@ -745,7 +737,7 @@ def isOddNode(node: t.Any) -> bool:
     # Something other than an element node or string.
     if isinstance(node, str):
         return False
-    if isElement(node):
+    if isElement(node):  # noqa needless-bool
         return False
     return True
 
