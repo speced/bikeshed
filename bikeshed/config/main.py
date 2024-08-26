@@ -12,6 +12,7 @@ from .. import messages, t
 def englishFromList(items: t.Iterable[str], conjunction: str = "or") -> str:
     # Format a list of strings into an English list.
     items = list(items)
+    assert len(items) > 0
     if len(items) == 1:
         return items[0]
     if len(items) == 2:

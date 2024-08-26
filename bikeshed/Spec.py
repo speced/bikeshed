@@ -18,6 +18,7 @@ from . import (
     constants,
     datablocks,
     dfns,
+    doctypes,
     extensions,
     fingerprinting,
     h,
@@ -108,6 +109,7 @@ class Spec:
         self.widl: widlparser.Parser = idl.getParser()
 
         self.languages: dict[str, language.Language] = fetchLanguages(self.dataFile)
+        self.doctypes: doctypes.DoctypeManager = fetchDoctypes(self.dataFile)
 
         self.extraJC = stylescript.JCManager()
         self.extraJC.addColors()
@@ -141,21 +143,27 @@ class Spec:
         #       in a markdown code span or an <xmp> to show off.
         _, self.mdDocument = metadata.parse(lines=inputContent.lines)
 
-        # Combine the data so far...
+        # Combine the data so far, and compute the doctype
+        # (the other md sources need the doctype in order to be found)
         self.md = metadata.join(self.mdBaseline, self.mdDocument, self.mdCommandLine)
+        rawDoctype = (self.md.rawOrg, self.md.rawGroup, self.md.rawStatus)
+        self.doctype = self.doctypes.getDoctype(self.md.rawOrg, self.md.rawGroup, self.md.rawStatus)
 
-        # Using that to determine the Group and Status, load the correct defaults.include boilerplate
         self.mdDefaults = metadata.fromJson(
-            data=retrieve.retrieveBoilerplateFile(self, "defaults", error=True),
+            data=retrieve.retrieveBoilerplateFile(self, "defaults"),
             source="defaults",
         )
         self.md = metadata.join(self.mdBaseline, self.mdDefaults, self.mdDocument, self.mdCommandLine)
+        if rawDoctype != (self.md.rawOrg, self.md.rawGroup, self.md.rawStatus):
+            # recompute doctype
+            self.doctype = self.doctypes.getDoctype(self.md.rawOrg, self.md.rawGroup, self.md.rawStatus)
 
         # Using all of that, load up the text macros so I can sub them into the computed-metadata file.
         self.md.fillTextMacros(self.macros, doc=self)
         jsonEscapedMacros = {k: json.dumps(v)[1:-1] for k, v in self.macros.items()}
+
         computedMdText = h.replaceMacrosTextly(
-            retrieve.retrieveBoilerplateFile(self, "computed-metadata", error=True),
+            retrieve.retrieveBoilerplateFile(self, "computed-metadata"),
             macros=jsonEscapedMacros,
             context="? of computed-metadata.include",
         )
@@ -173,7 +181,7 @@ class Spec:
         # And compute macros again, in case the preceding steps changed them.
         self.md.fillTextMacros(self.macros, doc=self)
 
-        self.md.validate()
+        self.md.validate(doc=self)
         m.retroactivelyCheckErrorLevel()
 
     def earlyParse(self, inputContent: InputSource.InputContent) -> list[l.Line]:
@@ -231,7 +239,7 @@ class Spec:
             features=markdownFeatures,
         )
 
-        self.refs.setSpecData(self.md)
+        self.refs.setSpecData(self)
 
         # Convert to a single string of html now, for convenience.
         self.html = "".join(x.text for x in self.lines)
@@ -552,6 +560,10 @@ def fetchLanguages(dataFile: retrieve.DataFileRequester) -> dict[str, language.L
         k: language.Language(v["name"], v["native-name"])
         for k, v in json.loads(dataFile.fetch("languages.json", str=True)).items()
     }
+
+
+def fetchDoctypes(dataFile: retrieve.DataFileRequester) -> doctypes.DoctypeManager:
+    return doctypes.DoctypeManager.fromKdlStr(dataFile.fetch("boilerplate", "doctypes.kdl", str=True))
 
 
 def addDomintroStyles(doc: Spec) -> None:

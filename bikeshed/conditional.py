@@ -3,7 +3,7 @@ from __future__ import annotations
 import dataclasses
 import re
 
-from . import config, h, t
+from . import h, t
 from . import messages as m
 
 # Any element can have an include-if or exclude-if attribute,
@@ -61,7 +61,7 @@ def processConditionals(doc: t.SpecT, container: t.ElementT | None = None) -> No
 def evalConditions(doc: t.SpecT, el: t.ElementT, conditionString: str) -> t.Generator[bool, None, None]:
     for cond in parseConditions(conditionString, el):
         if cond.type == "status":
-            yield config.looselyMatch(cond.value, doc.md.status)
+            yield doc.doctype.status.looselyMatch(cond.value)
         elif cond.type == "text macro":
             for k in doc.macros:
                 if k.upper() == cond.value:
