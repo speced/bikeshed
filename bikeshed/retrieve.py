@@ -135,42 +135,50 @@ def retrieveBoilerplateFile(
     def boilerplatePath(*segs: str) -> str:
         return dataFile.path("boilerplate", *segs)
 
-    statusFile = f"{name}-{statusName}.include"
-    genericFile = f"{name}.include"
-    sources: list[InputSource.InputSource | None] = []
+    filenames = []
+    if statusName:
+        filenames.append(f"{name}-{statusName}.include")
+    filenames.append(f"{name}.include")
+
+    sources: list[InputSource.InputSource] = []
+    # 1: Look locally
     if searchLocally:
-        sources.append(doc.inputSource.relative(statusFile))  # Can be None.
-        sources.append(doc.inputSource.relative(genericFile))
+        for fn in filenames:
+            source = doc.inputSource.relative(fn)
+            if source:
+                sources.append(source)
     else:
-        for f in (statusFile, genericFile):
-            if doc.inputSource.cheaplyExists(f):
+        for fn in filenames:
+            if doc.inputSource.cheaplyExists(fn):
                 m.warn(
-                    f"Found {f} next to the specification without a matching\n"
+                    f"Found {fn} next to the specification without a matching\n"
                     + f"Local Boilerplate: {name} yes\n"
                     + "in the metadata. This include won't be found when building via a URL.",
                 )
                 # We should remove this after giving specs time to react to the warning:
-                sources.append(doc.inputSource.relative(f))
+                source = doc.inputSource.relative(fn)
+                if source:
+                    sources.append(source)
+    # 2: Look in the group's folder
     if groupName:
-        sources.append(InputSource.FileInputSource(boilerplatePath(groupName, statusFile), chroot=False))
-        sources.append(InputSource.FileInputSource(boilerplatePath(groupName, genericFile), chroot=False))
+        sources.extend(InputSource.FileInputSource(boilerplatePath(groupName, fn), chroot=False) for fn in filenames)
+    # 3: Look in the org's folder
     if orgName:
-        sources.append(InputSource.FileInputSource(boilerplatePath(orgName, statusFile), chroot=False))
-        sources.append(InputSource.FileInputSource(boilerplatePath(orgName, genericFile), chroot=False))
-    sources.append(InputSource.FileInputSource(boilerplatePath(statusFile), chroot=False))
-    sources.append(InputSource.FileInputSource(boilerplatePath(genericFile), chroot=False))
+        sources.extend(InputSource.FileInputSource(boilerplatePath(orgName, fn), chroot=False) for fn in filenames)
+    # 4: Look in the generic defaults
+    sources.extend(InputSource.FileInputSource(boilerplatePath(fn), chroot=False) for fn in filenames)
 
     # Watch all the possible sources, not just the one that got used, because if
     # an earlier one appears, we want to rebuild.
-    doc.recordDependencies(*(x for x in sources if x is not None))
+    doc.recordDependencies(*sources)
 
     for source in sources:
-        if source is not None:
-            try:
-                return source.read().content
-            except OSError:
-                # That input doesn't exist.
-                pass
+        try:
+            content = source.read().content
+            return content
+        except OSError:
+            # That input doesn't exist.
+            pass
     if not quiet:
         components = []
         if orgName:
