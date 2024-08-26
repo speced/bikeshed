@@ -8,6 +8,9 @@ import os
 from . import InputSource, config, t
 from . import messages as m
 
+if t.TYPE_CHECKING:
+    from .doctypes import Group, Org, Status
+
 
 class DataFileRequester:
     def __init__(self, fileType: str | None = None, fallback: DataFileRequester | None = None) -> None:
@@ -101,9 +104,10 @@ defaultRequester = DataFileRequester(fileType="latest", fallback=DataFileRequest
 def retrieveBoilerplateFile(
     doc: t.SpecT,
     name: str,
-    group: str | None = None,
-    status: str | None = None,
-    error: bool = True,
+    group: Group | None = None,
+    status: Status | None = None,
+    org: Org | None = None,
+    quiet: bool = False,
     allowLocal: bool = True,
     fileRequester: DataFileRequester | None = None,
 ) -> str:
@@ -116,58 +120,77 @@ def retrieveBoilerplateFile(
     else:
         dataFile = fileRequester
 
-    if group is None and doc.md.group is not None:
-        group = doc.md.group.lower()
+    if group is None:
+        group = doc.doctype.group
+    groupName = group.name.lower() if group else None
     if status is None:
-        if doc.md.status is not None:
-            status = doc.md.status
-        elif doc.md.rawStatus is not None:
-            status = doc.md.rawStatus
-    megaGroup, status = config.splitStatus(status)
+        status = doc.doctype.status
+    statusName = status.name.upper() if status else None
+    if org is None:
+        org = doc.doctype.org
+    orgName = org.name.lower() if org else None
 
     searchLocally = allowLocal and doc.md.localBoilerplate[name]
 
     def boilerplatePath(*segs: str) -> str:
         return dataFile.path("boilerplate", *segs)
 
-    statusFile = f"{name}-{status}.include"
-    genericFile = f"{name}.include"
-    sources: list[InputSource.InputSource | None] = []
+    filenames = []
+    if statusName:
+        filenames.append(f"{name}-{statusName}.include")
+    filenames.append(f"{name}.include")
+
+    sources: list[InputSource.InputSource] = []
+    # 1: Look locally
     if searchLocally:
-        sources.append(doc.inputSource.relative(statusFile))  # Can be None.
-        sources.append(doc.inputSource.relative(genericFile))
+        for fn in filenames:
+            source = doc.inputSource.relative(fn)
+            if source:
+                sources.append(source)
     else:
-        for f in (statusFile, genericFile):
-            if doc.inputSource.cheaplyExists(f):
+        for fn in filenames:
+            if doc.inputSource.cheaplyExists(fn):
                 m.warn(
-                    f"Found {f} next to the specification without a matching\n"
+                    f"Found {fn} next to the specification without a matching\n"
                     + f"Local Boilerplate: {name} yes\n"
                     + "in the metadata. This include won't be found when building via a URL.",
                 )
                 # We should remove this after giving specs time to react to the warning:
-                sources.append(doc.inputSource.relative(f))
-    if group:
-        sources.append(InputSource.FileInputSource(boilerplatePath(group, statusFile), chroot=False))
-        sources.append(InputSource.FileInputSource(boilerplatePath(group, genericFile), chroot=False))
-    if megaGroup:
-        sources.append(InputSource.FileInputSource(boilerplatePath(megaGroup, statusFile), chroot=False))
-        sources.append(InputSource.FileInputSource(boilerplatePath(megaGroup, genericFile), chroot=False))
-    sources.append(InputSource.FileInputSource(boilerplatePath(statusFile), chroot=False))
-    sources.append(InputSource.FileInputSource(boilerplatePath(genericFile), chroot=False))
+                source = doc.inputSource.relative(fn)
+                if source:
+                    sources.append(source)
+    # 2: Look in the group's folder
+    if groupName:
+        sources.extend(InputSource.FileInputSource(boilerplatePath(groupName, fn), chroot=False) for fn in filenames)
+    # 3: Look in the org's folder
+    if orgName:
+        sources.extend(InputSource.FileInputSource(boilerplatePath(orgName, fn), chroot=False) for fn in filenames)
+    # 4: Look in the generic defaults
+    sources.extend(InputSource.FileInputSource(boilerplatePath(fn), chroot=False) for fn in filenames)
 
     # Watch all the possible sources, not just the one that got used, because if
     # an earlier one appears, we want to rebuild.
-    doc.recordDependencies(*(x for x in sources if x is not None))
+    doc.recordDependencies(*sources)
 
     for source in sources:
-        if source is not None:
-            try:
-                return source.read().content
-            except OSError:
-                # That input doesn't exist.
-                pass
-    if error:
-        m.die(
-            f"Couldn't find an appropriate include file for the {name} inclusion, given group='{group}' and status='{status}'.",
-        )
+        try:
+            content = source.read().content
+            return content
+        except OSError:
+            # That input doesn't exist.
+            pass
+    if not quiet:
+        components = []
+        if orgName:
+            components.append(f"Org '{orgName}'")
+        if groupName:
+            components.append(f"Group '{groupName}'")
+        if statusName:
+            components.append(f"Status '{statusName}'")
+        msg = "Couldn't find an appropriate include file for the {name} inclusion"
+        if components:
+            msg += ", given " + config.englishFromList(components, "and")
+        else:
+            msg += "."
+        m.die(msg)
     return ""

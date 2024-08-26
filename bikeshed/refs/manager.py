@@ -244,18 +244,19 @@ class ReferenceManager:
             ),
         )
 
-    def setSpecData(self, md: t.MetadataManager) -> None:
-        if md.defaultRefStatus:
-            self.defaultStatus = md.defaultRefStatus
-        elif md.status in config.snapshotStatuses:
-            self.defaultStatus = constants.refStatus.snapshot
-        elif md.status in config.shortToLongStatus:
-            self.defaultStatus = constants.refStatus.current
-        self.shortname = md.shortname
-        self.specLevel = md.level
-        self.spec = md.vshortname
+    def setSpecData(self, doc: t.SpecT) -> None:
+        if doc.md.defaultRefStatus:
+            self.defaultStatus = doc.md.defaultRefStatus
+        elif doc.doctype.status:
+            if "TR" in doc.doctype.status.requires:
+                self.defaultStatus = constants.refStatus.snapshot
+            else:
+                self.defaultStatus = constants.refStatus.current
+        self.shortname = doc.md.shortname
+        self.specLevel = doc.md.level
+        self.spec = doc.md.vshortname
 
-        for term, defaults in md.linkDefaults.items():
+        for term, defaults in doc.md.linkDefaults.items():
             for default in defaults:
                 self.defaultSpecs[term].append(default)
 
