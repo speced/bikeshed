@@ -91,6 +91,7 @@ def panelsFromData(doc: t.SpecT, data: MdnDataT) -> list[t.ElementT]:
     }
 
     panels = []
+    missingIds = []
     for elementId, features in data.items():
         lessThanTwoEngines = 0
         onlyTwoEngines = 0
@@ -98,7 +99,7 @@ def panelsFromData(doc: t.SpecT, data: MdnDataT) -> list[t.ElementT]:
         featureDivs = []
         targetElement = h.find(f"[id='{elementId}']", doc)
         if targetElement is None and elementId not in doc.md.ignoreMDNFailure:
-            m.warn(f"No '{elementId}' ID found, skipping MDN features that would target it.")
+            missingIds.append(elementId)
             continue
 
         for feature in features:
@@ -149,6 +150,11 @@ def panelsFromData(doc: t.SpecT, data: MdnDataT) -> list[t.ElementT]:
         anno = h.E.details({"class": "mdn-anno unpositioned", "data-anno-for": elementId}, summary, featureDivs)
         panels.append(anno)
         h.appendChild(doc.body, anno)
+
+    if missingIds:
+        msg = "Skipped generating some MDN panels, because the following IDs weren't present in the document:\n"
+        msg += "\n".join("  #"+missingId for missingId in missingIds)
+        m.warn(msg)
 
     return panels
 
