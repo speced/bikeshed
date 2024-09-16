@@ -1016,7 +1016,7 @@ def parseDieWhen(key: str, val: str, lineNum: str | int | None) -> str:
     return "late"
 
 
-def parseIgnoreMdnFailure(key: str, val: str, lineNum: str | int | None) -> str:
+def parseIgnoreMdnFailure(key: str, val: str, lineNum: str | int | None) -> list[str]:
     vals = [x.strip() for x in val.split(",")]
     vals = [x[1:] if x.startswith("#") else x for x in vals]
     return vals
