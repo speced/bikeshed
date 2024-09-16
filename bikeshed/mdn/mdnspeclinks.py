@@ -152,7 +152,7 @@ def panelsFromData(doc: t.SpecT, data: MdnDataT) -> list[t.ElementT]:
         h.appendChild(doc.body, anno)
 
     if missingIds:
-        msg = "Skipped generating some MDN panels, because the following IDs weren't present in the document:\n"
+        msg = "Skipped generating some MDN panels, because the following IDs weren't present in the document. Use `Ignore MDN Failures` if this is expected.\n"
         msg += "\n".join("  #"+missingId for missingId in missingIds)
         m.warn(msg)
 

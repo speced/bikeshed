@@ -1016,6 +1016,12 @@ def parseDieWhen(key: str, val: str, lineNum: str | int | None) -> str:
     return "late"
 
 
+def parseIgnoreMdnFailure(key: str, val: str, lineNum: str | int | None) -> str:
+    vals = [x.strip() for x in val.split(",")]
+    vals = [x[1:] if x.startswith("#") else x for x in vals]
+    return vals
+
+
 def parse(lines: t.Sequence[Line]) -> tuple[list[Line], MetadataManager]:
     # Given HTML document text, in the form of an array of text lines,
     # extracts all <pre class=metadata> lines and parses their contents.
@@ -1364,7 +1370,7 @@ KNOWN_KEYS = {
         joinList,
         parseLiteralList,
     ),
-    "Ignore Mdn Failure": Metadata("Ignore MDN Failure", "ignoreMDNFailure", joinList, parseLiteralList),
+    "Ignore Mdn Failure": Metadata("Ignore MDN Failure", "ignoreMDNFailure", joinList, parseIgnoreMdnFailure),
     "Ignored Terms": Metadata("Ignored Terms", "ignoredTerms", joinList, parseCommaSeparated),
     "Ignored Vars": Metadata("Ignored Vars", "ignoredVars", joinList, parseCommaSeparated),
     "Image Auto Size": Metadata("Image Auto Size", "imgAutoSize", joinValue, parseBoolean),
