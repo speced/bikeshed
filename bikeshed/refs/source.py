@@ -211,7 +211,7 @@ class RefSource:
             if exact:
                 refs = list(textRefsIterator([text]))
             else:
-                textsToSearch = list(utils.linkTextVariations(text, linkType))
+                textsToSearch = list(utils.linkTextVariations(text, linkType, linkFor))
 
                 if any(st.endswith("()") for st in textsToSearch):
                     # Let argless methods (either with () at the end, or no parens at all)
