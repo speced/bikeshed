@@ -212,8 +212,13 @@ class RefSource:
                 refs = list(textRefsIterator([text]))
             else:
                 textsToSearch = list(utils.linkTextVariations(text, linkType))
-                if text.endswith("()") and text in self.methods:
-                    textsToSearch += list(self.methods[text].variants.keys())
+
+                if any(st.endswith("()") for st in textsToSearch):
+                    # Let argless methods (either with () at the end, or no parens at all)
+                    # pull in their argful variants for searching.
+                    for st in textsToSearch[:]:
+                        textsToSearch += getArgfulMethodVariants(st, self)
+
                 if (linkType is None or linkType in config.lowercaseTypes) and text.lower() != text:
                     textsToSearch += [t.lower() for t in textsToSearch]
                 refs = list(textRefsIterator(textsToSearch))
@@ -398,6 +403,12 @@ def decodeAnchors(linesIter: t.Iterator[str]) -> defaultdict[str, list[t.RefWrap
             anchors[key].append(wrapper.RefWrapper(key, a))
     except StopIteration:
         return anchors
+
+
+def getArgfulMethodVariants(maybeMethodSig: str, refs: RefSource) -> list[str]:
+    if maybeMethodSig.endswith("()") and maybeMethodSig in refs.methods:
+        return list(refs.methods[maybeMethodSig].variants.keys())
+    return []
 
 
 @dataclasses.dataclass
