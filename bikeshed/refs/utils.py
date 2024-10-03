@@ -58,9 +58,7 @@ def filterOldVersions(refs: list[t.RefWrapper], status: str | None = None) -> li
     return refs
 
 
-def linkTextVariations(
-    str: str, linkType: str | None, linkFor: str | list[str] | None = None
-) -> t.Generator[str, None, None]:
+def linkTextVariations(str: str, linkType: str | None) -> t.Generator[str, None, None]:
     # Generate intelligent variations of the provided link text,
     # so explicitly adding an lt attr isn't usually necessary.
     str = str.strip()
@@ -174,9 +172,7 @@ def linkTextVariations(
 
         # Let people refer to methods without the parens.
         # Since attrs and methods live in the same namespace, this is safe.
-        # But we want to avoid *other* confusions, like an interface and its constructor,
-        # so qualify it on there being a for value.
-        if linkFor and "(" not in str:
+        if "(" not in str:
             yield str + "()"
 
         # Allow linking to an enum-value with or without quotes
