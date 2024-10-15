@@ -1105,7 +1105,9 @@ def inferIndent(lines: t.Sequence[Line]) -> IndentInfo:
     indentSizes: Counter[int] = Counter()
     info = IndentInfo()
     for line in lines:
-        match = re.match("( +)", line.text)
+        # Purposely require at least two spaces; I don't
+        # auto-detect single-space indents. Get help.
+        match = re.match("( {2,})", line.text)
         if match:
             indentSizes[len(match.group(1))] += 1
             info.spaceLines += 1
@@ -1136,7 +1138,8 @@ def inferIndent(lines: t.Sequence[Line]) -> IndentInfo:
                     evenDivisions[candidateIndent] += lineCount
                 if spaceCount == candidateIndent:
                     evenDivisions[candidateIndent] += lineCount
-        info.size = evenDivisions.most_common(1)[0][0]
+        if evenDivisions:
+            info.size = evenDivisions.most_common(1)[0][0]
     return info
 
 
