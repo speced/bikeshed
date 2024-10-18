@@ -356,25 +356,25 @@ class MetadataManager:
             statusName = doc.doctype.status.name
             if statusName == "FPWD":
                 macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2021/W3C-WD"
-                macros["w3c-status-url"] = "https://www.w3.org/standards/types#FPWD"
+                macros["w3c-status-url"] = "https://www.w3.org/standards/types/#FPWD"
             elif statusName in ("NOTE-FPWD", "NOTE-WD"):
                 macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2021/W3C-DNOTE"
-                macros["w3c-status-url"] = "https://www.w3.org/standards/types#DNOTE"
+                macros["w3c-status-url"] = "https://www.w3.org/standards/types/#DNOTE"
             elif statusName == "FINDING":
                 macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2021/W3C-NOTE"
-                macros["w3c-status-url"] = "https://www.w3.org/standards/types#FINDING"
+                macros["w3c-status-url"] = "https://www.w3.org/standards/types/#FINDING"
             elif statusName == "CG-DRAFT":
                 macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2021/cg-draft"
-                macros["w3c-status-url"] = "https://www.w3.org/standards/types#CG-DRAFT"
+                macros["w3c-status-url"] = "https://www.w3.org/standards/types/#CG-DRAFT"
             elif statusName == "CG-FINAL":
                 macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2021/cg-final"
-                macros["w3c-status-url"] = "https://www.w3.org/standards/types#CG-FINAL"
+                macros["w3c-status-url"] = "https://www.w3.org/standards/types/#CG-FINAL"
             elif statusName == "NOTE-ED":
                 macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2021/W3C-ED"
-                macros["w3c-status-url"] = "https://www.w3.org/standards/types#ED"
+                macros["w3c-status-url"] = "https://www.w3.org/standards/types/#ED"
             else:
                 macros["w3c-stylesheet-url"] = f"https://www.w3.org/StyleSheets/TR/2021/W3C-{statusName}"
-                macros["w3c-status-url"] = f"https://www.w3.org/standards/types#{statusName}"
+                macros["w3c-status-url"] = f"https://www.w3.org/standards/types/#{statusName}"
         if self.customWarningText is not None:
             macros["customwarningtext"] = parsedTextFromRawLines(
                 self.customWarningText,
