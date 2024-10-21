@@ -259,7 +259,7 @@ def formatMessage(type: str, text: str, lineNum: str | int | None = None) -> str
             jsonText = "[\n"
         else:
             jsonText = ""
-        msg = {"lineNum":lineNum, "messageType":type, "text":text}
+        msg = {"lineNum": lineNum, "messageType": type, "text": text}
         jsonText += "  " + json.dumps(msg)
         if type in ("success", "failure"):
             jsonText += "\n]"
