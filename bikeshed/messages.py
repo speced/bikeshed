@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import dataclasses
 import io
+import json
 import sys
 from collections import Counter
 
@@ -253,6 +254,19 @@ def formatMessage(type: str, text: str, lineNum: str | int | None = None) -> str
             return f"<final-success>{text}</final-success>"
         if type == "failure":
             return f"<final-failure>{text}</final-failure>"
+    elif state.printMode == "json":
+        if not state.seenMessages:
+            jsonText = "[\n"
+        else:
+            jsonText = ""
+        msg = {"lineNum":lineNum, "messageType":type, "text":text}
+        jsonText += "  " + json.dumps(msg)
+        if type in ("success", "failure"):
+            jsonText += "\n]"
+        else:
+            jsonText += ", "
+        return jsonText
+
     if type == "message":
         return text
     if type == "success":
