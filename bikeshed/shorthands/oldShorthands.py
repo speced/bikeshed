@@ -28,7 +28,7 @@ def transformProductionPlaceholders(doc: t.SpecT) -> None:
         r"""
         ^(?:(\S*)/)?
         (\S+)
-        \s*\[([^\]]+)\]\s*$
+        \s*\[([^\]]*)\]\s*$
         """,
         re.X,
     )
