@@ -13,6 +13,7 @@ from .nodes import (
     ParserNode,
     RawElement,
     RawText,
+    SafeText,
     SelfClosedTag,
     StartTag,
     escapeAttr,
@@ -704,18 +705,31 @@ def parseCSSProduction(s: Stream, start: int) -> Result[list[ParserNode]]:
     if text is None:
         m.die("Saw the start of a CSS production (like <<foo>>), but couldn't find the end.", lineNum=s.loc(start))
         return Result.fail(start)
-    if "\n" in text:
+    elif "\n" in text:
         m.die(
             "Saw the start of a CSS production (like <<foo>>), but couldn't find the end on the same line.",
             lineNum=s.loc(start),
         )
         return Result.fail(start)
-    if "<" in text or ">" in text:
-        m.die(
-            "It seems like you wrote a CSS production (like <<foo>>), but there's more markup inside of it, or you didn't close it properly.",
-            lineNum=s.loc(start),
-        )
-        return Result.fail(start)
+    elif "<" in text or ">" in text:
+        # Allow <<boolean [<<foo>>]>>
+        if "[" in text:
+            endOfArg = s.skipTo(textEnd, "]").i
+            newTextEnd = s.skipTo(endOfArg, ">>").i
+            if endOfArg == textEnd or newTextEnd == endOfArg:  # noqa: PLR1714
+                m.die(
+                    "It seems like you wrote a CSS production with an argument (like <<foo [<<bar>>]>>), but either included more [] in the argument, or otherwise messed up the syntax.",
+                    lineNum=s.loc(start),
+                )
+                return Result.fail(start)
+            textEnd = newTextEnd
+            text = s[textStart:textEnd]
+        else:
+            m.die(
+                "It seems like you wrote a CSS production (like <<foo>>), but there's more markup inside of it, or you didn't close it properly.",
+                lineNum=s.loc(start),
+            )
+            return Result.fail(start)
     nodeEnd = textEnd + 2
 
     startTag = StartTag(
@@ -724,7 +738,7 @@ def parseCSSProduction(s: Stream, start: int) -> Result[list[ParserNode]]:
         tag="fake-production-placeholder",
         attrs={"bs-autolink-syntax": s[start:nodeEnd], "class": "production", "bs-opaque": ""},
     ).finalize()
-    contents = RawText(
+    contents = SafeText(
         line=s.line(textStart),
         endLine=s.line(textEnd),
         text=text,

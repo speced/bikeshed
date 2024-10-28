@@ -182,7 +182,7 @@ class Script(JCResource):
             return False
         if self.data is None:
             return True
-        if self.data[1]:  # noqa needless-bool
+        if self.data[1]:  # needless-bool
             return True
         return False
 

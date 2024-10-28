@@ -24,11 +24,20 @@ def transformProductionPlaceholders(doc: t.SpecT) -> None:
         """,
         re.X,
     )
+    typeWithArgsRe = re.compile(
+        r"""
+        ^(?:(\S*)/)?
+        (\S+)
+        \s*\[([^\]]+)\]\s*$
+        """,
+        re.X,
+    )
     for el in h.findAll("fake-production-placeholder", doc):
         addLineNumber(el)
         text = h.textContent(el)
         h.clearContents(el)
-        match = propdescRe.match(text)
+        lt = text
+        match = propdescRe.match(lt)
         if match:
             linkFor, lt, linkType = match.groups()
             if linkFor == "":
@@ -55,7 +64,7 @@ def transformProductionPlaceholders(doc: t.SpecT) -> None:
                 el.set("for", linkFor)
             el.text = "<'" + lt + "'>"
             continue
-        match = funcRe.match(text)
+        match = funcRe.match(lt)
         if match:
             el.tag = "a"
             el.set("data-link-type", "function")
@@ -64,7 +73,7 @@ def transformProductionPlaceholders(doc: t.SpecT) -> None:
                 el.set("for", match.group(1))
             el.text = "<" + match.group(2) + ">"
             continue
-        match = atruleRe.match(text)
+        match = atruleRe.match(lt)
         if match:
             el.tag = "a"
             el.set("data-link-type", "at-rule")
@@ -73,7 +82,7 @@ def transformProductionPlaceholders(doc: t.SpecT) -> None:
                 el.set("for", match.group(1))
             el.text = "<" + match.group(2) + ">"
             continue
-        match = typeRe.match(text)
+        match = typeRe.match(lt)
         if match:
             for_, term, rangeStart, rangeEnd = match.groups()
             el.tag = "a"
@@ -97,6 +106,18 @@ def transformProductionPlaceholders(doc: t.SpecT) -> None:
                     el.text = f"<{term} [{formattedStart},{formattedEnd}]>"
             else:
                 el.text = f"<{term}>"
+            continue
+        match = typeWithArgsRe.match(lt)
+        if match:
+            for_, term, arg = match.groups()
+            el.tag = "a"
+            el.set("data-lt", f"<{term}>")
+            el.set("data-link-type", "type")
+            if "<<" in arg:
+                arg = arg.replace("<<", "<").replace(">>", ">")
+            el.text = f"<{term}[{arg}]>"
+            if for_ is not None:
+                el.set("for", for_)
             continue
         m.die(f"Shorthand <<{text}>> does not match any recognized shorthand grammar.", el=el)
         el.tag = "span"

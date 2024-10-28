@@ -102,7 +102,7 @@ def validUrlUnit(char: str) -> bool:
     else:
         if 0xD800 <= c <= 0xDFFF or 0xFDD0 <= c <= 0xFDEF:
             return False
-        if (c % 0xFFFF) in [0xFFFE, 0xFFFF]:  # noqa needless-bool
+        if (c % 0xFFFF) in [0xFFFE, 0xFFFF]:  # needless-bool
             # Last two bytes are FFFE or FFFF
             return False
         return True
@@ -737,7 +737,7 @@ def isOddNode(node: t.Any) -> bool:
     # Something other than an element node or string.
     if isinstance(node, str):
         return False
-    if isElement(node):  # noqa needless-bool
+    if isElement(node):  # needless-bool
         return False
     return True
 
