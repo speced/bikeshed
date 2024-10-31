@@ -187,7 +187,7 @@ class Serializer:
         if el.tag in ["dt", "dd"]:
             if nextEl is None:
                 return False
-            if self.isElement(nextEl) and nextEl.tag in ["dt", "dd"]:  # needless-bool
+            if self.isElement(nextEl) and nextEl.tag in ["dt", "dd"]:  # noqa: SIM103
                 return False
             return True
         return False

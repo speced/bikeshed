@@ -727,13 +727,18 @@ def processAnchors(anchors: InfoTreeT, doc: t.SpecT, lineNum: int | None = None)
                 continue
         else:
             status = "anchor-block"
-        if anchor["type"][0] in config.lowercaseTypes:
-            anchor["text"][0] = anchor["text"][0].lower()
-        doc.refs.anchorBlockRefs.refs[anchor["text"][0]].append(
+        aType = anchor["type"][0].lower()
+        displayText = anchor["text"][0]
+        if aType in config.lowercaseTypes:
+            aText = displayText.lower()
+        else:
+            aText = displayText
+        doc.refs.anchorBlockRefs.refs[aText].append(
             refs.RefWrapper(
-                anchor["text"][0],
+                aText,
+                displayText,
                 {
-                    "type": anchor["type"][0].lower(),
+                    "type": aType,
                     "url": url,
                     "shortname": shortname.lower() if shortname is not None else doc.md.shortname,
                     "level": level if level is not None else doc.md.level,

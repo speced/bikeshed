@@ -1,1 +1,1 @@
-from .translate import _
+from .translate import _t

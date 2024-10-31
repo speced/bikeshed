@@ -5,7 +5,7 @@ from collections import OrderedDict
 
 from .. import h, t
 from .. import messages as m
-from ..translate import _
+from ..translate import _t
 
 if t.TYPE_CHECKING:
 
@@ -130,7 +130,7 @@ def panelsFromData(doc: t.SpecT, data: MdnDataT) -> list[t.ElementT]:
                 h.E.b(
                     {
                         "class": "less-than-two-engines-flag",
-                        "title": _("This feature is in less than two current engines."),
+                        "title": _t("This feature is in less than two current engines."),
                     },
                     "\u26A0",
                 ),
@@ -141,7 +141,7 @@ def panelsFromData(doc: t.SpecT, data: MdnDataT) -> list[t.ElementT]:
                 h.E.b(
                     {
                         "class": "all-engines-flag",
-                        "title": _("This feature is in all current engines."),
+                        "title": _t("This feature is in all current engines."),
                     },
                     "\u2714",
                 ),
@@ -258,11 +258,11 @@ def mdnPanelFor(
         engines = len(feature["engines"])
         enginesPara = None
         if engines == 0:
-            enginesPara = h.E.p({"class": "less-than-two-engines-text"}, _("In no current engines."))
+            enginesPara = h.E.p({"class": "less-than-two-engines-text"}, _t("In no current engines."))
         elif engines == 1:
-            enginesPara = h.E.p({"class": "less-than-two-engines-text"}, _("In only one current engine."))
+            enginesPara = h.E.p({"class": "less-than-two-engines-text"}, _t("In only one current engine."))
         elif engines >= len(browsersProvidingCurrentEngines):
-            enginesPara = h.E.p({"class": "all-engines-text"}, _("In all current engines."))
+            enginesPara = h.E.p({"class": "all-engines-text"}, _t("In all current engines."))
         if enginesPara is not None:
             h.appendChild(featureDiv, enginesPara)
     supportData = h.E.div({"class": "support"})
@@ -298,7 +298,7 @@ def browserCompatSpan(
     flagSymbol = ""
     if needsFlag:
         flagSymbol = "\U0001f530 "
-        minVersionAttributes["title"] = _("Requires setting a user preference or runtime flag.")
+        minVersionAttributes["title"] = _t("Requires setting a user preference or runtime flag.")
     statusClass = {"y": "yes", "n": "no"}[statusCode]
     outer = h.E.span({"class": browserCodeName + " " + statusClass})
     h.appendChild(outer, h.E.span({}, browserFullName))

@@ -300,8 +300,6 @@ def addToAnchors(
     for text in rawAnchor["linkingText"]:
         text = re.sub(r"‘|’", "'", text)
         text = re.sub(r"“|”", '"', text)
-        if anchor["type"] in config.lowercaseTypes:
-            text = text.lower()
         text = re.sub(r"\s+", " ", text)
         anchors[text].append(anchor)
 
@@ -448,7 +446,9 @@ def writeAnchorsFile(anchors: AnchorsT, path: str) -> set[str]:
         with open(p, "w", encoding="utf-8") as fh:
             for key, entries in sorted(group_anchors.items(), key=lambda x: x[0]):
                 for e in sorted(entries, key=lambda x: x["url"]):
+                    key, displayKey = config.adjustKey(key, e.get("type", ""))
                     fh.write(key + "\n")
+                    fh.write(displayKey + "\n")
                     for field in [
                         "type",
                         "spec",

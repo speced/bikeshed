@@ -4,7 +4,7 @@ from collections import OrderedDict
 
 from .. import h, t
 from .. import messages as m
-from ..translate import _
+from ..translate import _t
 
 
 def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
@@ -77,7 +77,7 @@ def addExternalDfnPanel(termEl: t.ElementT, ref: t.RefWrapper, doc: t.SpecT) -> 
     # Group the relevant links according to the section they're in.
     refsFromSection: OrderedDict[str, list[t.ElementT]] = OrderedDict()
     for link in doc.cachedLinksFromHref[ref.url]:
-        section = h.sectionName(doc, link) or _("Unnumbered Section")
+        section = h.sectionName(doc, link) or _t("Unnumbered Section")
         refsFromSection.setdefault(section, []).append(link)
 
     h.addClass(doc, termEl, "dfn-paneled")

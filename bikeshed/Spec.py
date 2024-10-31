@@ -490,7 +490,7 @@ class Spec:
     def isOpaqueElement(self, el: t.ElementT) -> bool:
         if el.tag in self.md.opaqueElements:
             return True
-        if el.get("data-opaque") is not None or el.get("bs-opaque") is not None:  # needless-bool
+        if el.get("data-opaque") is not None or el.get("bs-opaque") is not None:  # noqa: SIM103
             return True
         return False
 

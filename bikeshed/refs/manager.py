@@ -332,8 +332,10 @@ class ReferenceManager:
                         dfnFor.add(match.group(1).strip())
                 # convert back into a list now, for easier JSONing
                 dfnForList = sorted(dfnFor)
+                refKey, displayKey = config.adjustKey(linkText, linkType)
                 ref = wrapper.RefWrapper(
-                    linkText,
+                    refKey,
+                    displayKey,
                     {
                         "type": linkType,
                         "status": "local",

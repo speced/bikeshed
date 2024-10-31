@@ -133,6 +133,36 @@ lowercaseTypes = (
 )
 
 
+def adjustKey(text: str, type: str) -> tuple[str, str]:
+    # For some types, upper/lowercase is just display, not semantic
+    if type in lowercaseTypes:
+        key = text.lower()
+    else:
+        key = text
+    # Heuristically decide if an uppercase display should be preserved or not.
+    # 1. If it's already lowercase, great.
+    # 2. If it's got uppercase letters anywhere but the very first letter, keep the casing.
+    # 3. If it looks non-trivial, keep the casing.
+    # This hopefully removes casing from dfns that just start a sentence,
+    # without removing it from many dfns that need it.
+    # At some point we'll probably add an override for when this is wrong.
+    if re.match(r"[A-Z][^A-Z]+$", text):
+        # only one uppercase letter, right at the beginning.
+        # check if it's "non-trivial"; aka contains something other than
+        # letters, dashes, or whitespace
+        if re.search(r"[^\w\s-]", text):
+            # looks non-trivial, leave it alone
+            displayKey = text
+        else:
+            displayKey = text.lower()
+    else:
+        # Has either 0 or 2+ uppercase letters,
+        # or 1 uppercase in a non-initial position;
+        # leave it alone.
+        displayKey = text
+    return key, displayKey
+
+
 linkTypeToDfnType = {
     "propdesc": frozenset(["property", "descriptor"]),
     "functionish": functionishTypes,

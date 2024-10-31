@@ -27,6 +27,7 @@ class RefWrapper:
     # It also makes all the ref dict keys look like object attributes.
 
     text: str
+    displayText: str
     _ref: RefDataT
 
     @property

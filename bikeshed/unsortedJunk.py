@@ -10,7 +10,7 @@ from PIL import Image
 
 from . import biblio, config, dfnpanels, h, idl, printjson, repository, t
 from . import messages as m
-from .translate import _
+from .translate import _t
 
 if t.TYPE_CHECKING:
     import widlparser  # pylint: disable=unused-import
@@ -822,7 +822,7 @@ def decorateAutolink(doc: t.SpecT, el: t.ElementT, linkType: str, linkText: str,
             typeRefs = doc.refs.queryAllRefs(linkFor=linkText, ignoreObsoletes=True)
             texts = sorted({ref.text for ref in typeRefs})
             if typeRefs:
-                titleText = _("Expands to: ") + " | ".join(texts)
+                titleText = _t("Expands to: ") + " | ".join(texts)
                 assert titleText is not None
                 doc.typeExpansions[linkText] = titleText
         if titleText:
@@ -887,7 +887,7 @@ def processIssuesAndExamples(doc: t.SpecT) -> None:
                 h.appendChild(
                     el,
                     " ",
-                    h.E.a({"href": remoteIssueURL}, _("[Issue #{number}]").format(number=remoteIssueID)),
+                    h.E.a({"href": remoteIssueURL}, _t("[Issue #{number}]").format(number=remoteIssueID)),
                 )
     for el in h.findAll(".example:not([id])", doc):
         el.set("id", h.safeID(doc, "example-" + h.hashContents(el)))
@@ -1370,7 +1370,7 @@ def inlineRemoteIssues(doc: t.SpecT) -> None:
                 el,
                 h.E.a(
                     {"href": href, "class": "marker"},
-                    _("Issue #{number} on GitHub: “{title}”").format(number=data["number"], title=data["title"]),
+                    _t("Issue #{number} on GitHub: “{title}”").format(number=data["number"], title=data["title"]),
                 ),
                 *h.parseHTML(data["body_html"]),
             )
@@ -1391,11 +1391,11 @@ def addNoteHeaders(doc: t.SpecT) -> None:
     for el in h.findAll("[heading]", doc):
         h.addClass(doc, el, "no-marker")
         if h.hasClass(doc, el, "note"):
-            preText = _("NOTE: ")
+            preText = _t("NOTE: ")
         elif h.hasClass(doc, el, "issue"):
-            preText = _("ISSUE: ")
+            preText = _t("ISSUE: ")
         elif h.hasClass(doc, el, "example"):
-            preText = _("EXAMPLE: ")
+            preText = _t("EXAMPLE: ")
         else:
             preText = ""
         h.prependChild(el, h.E.div({"class": "marker"}, preText, *h.parseHTML(el.get("heading", ""))))
