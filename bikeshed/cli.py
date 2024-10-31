@@ -83,10 +83,8 @@ def main() -> None:
     )
     argparser.add_argument(
         "--no-update",
-        dest="updateMode",
-        default=update.UpdateMode.MANIFEST,
-        action="store_const",
-        const=update.UpdateMode.NONE,
+        dest="skipUpdate",
+        action="store_true",
         help="Skips checking if your data files are up-to-date.",
     )
     argparser.add_argument(
@@ -456,7 +454,8 @@ def main() -> None:
     constants.executeCode = options.allowExecute
 
     if options.subparserName in ("spec", "echnida", "watch", "serve", "refs"):
-        update.fixupDataFiles(updateMode=options.updateMode)
+        updateMode = update.UpdateMode.NONE if options.skipUpdate else update.UpdateMode.BOTH
+        update.fixupDataFiles(updateMode=updateMode)
     if options.subparserName == "update":
         handleUpdate(options)
     elif options.subparserName == "spec":
@@ -693,12 +692,12 @@ def handleProfile(options: argparse.Namespace) -> None:
     root = f'--root="{options.root}"' if options.root else ""
     leaf = f'--leaf="{options.leaf}"' if options.leaf else ""
     if options.svgFile:
-        os.system(
-            f"time python -m cProfile -o stat.prof -m bikeshed -f spec && gprof2dot -f pstats --skew=.0001 {root} {leaf} stat.prof | dot -Tsvg -o {options.svgFile} && rm stat.prof",  # noqa: S605
+        os.system(  # noqa: S605
+            f"time python -m cProfile -o stat.prof -m bikeshed -f spec && gprof2dot -f pstats --skew=.0001 {root} {leaf} stat.prof | dot -Tsvg -o {options.svgFile} && rm stat.prof",
         )
     else:
-        os.system(
-            f"time python -m cProfile -o /tmp/stat.prof -m bikeshed -f spec && gprof2dot -f pstats --skew=.0001 {root} {leaf} /tmp/stat.prof | xdot &",  # noqa: S605
+        os.system(  # noqa: S605
+            f"time python -m cProfile -o /tmp/stat.prof -m bikeshed -f spec && gprof2dot -f pstats --skew=.0001 {root} {leaf} /tmp/stat.prof | xdot &",
         )
 
 
