@@ -135,11 +135,11 @@ lowercaseTypes = (
 
 def adjustKey(text: str, type: str) -> tuple[str, str]:
     # For some types, upper/lowercase is just display, not semantic
-    if type in lowercaseTypes:
-        key = text.lower()
-    else:
-        key = text
-    # Heuristically decide if an uppercase display should be preserved or not.
+    if type not in lowercaseTypes:
+        return text, text
+    # For those, use lowercased version for link-resolving...
+    key = text.lower()
+    # ...and heuristically decide if the original casing should be preserved or not.
     # 1. If it's already lowercase, great.
     # 2. If it's got uppercase letters anywhere but the very first letter, keep the casing.
     # 3. If it looks non-trivial, keep the casing.
