@@ -83,6 +83,7 @@ class RefWrapper:
     def __json__(self) -> t.JSONT:
         return {
             "text": self.text,
+            "displayText": self.displayText,
             "type": self.type,
             "spec": self.spec,
             "shortname": self.shortname,
