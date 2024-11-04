@@ -99,13 +99,14 @@ def updateByManifest(path: str, dryRun: bool = False, updateMode: UpdateMode = U
 
     m.say("Fetching remote manifest data...")
     try:
-        remoteManifest = Manifest.fromString(requests.get(ghPrefix + "manifest.txt", timeout=5).text)
+        remoteManifestText = requests.get(ghPrefix + "manifest.txt", timeout=5).text
     except Exception as e:
         m.warn(
             f"Couldn't download remote manifest file, so can't update. Please report this!\n{e}",
         )
-        m.warn("Update manually with `bikeshed update --skip-manifest`.")
+        m.warn("If absolutely necessary, you can update manually with `bikeshed update --skip-manifest`.")
         return None
+    remoteManifest = Manifest.fromString(remoteManifestText)
 
     if remoteManifest is None:
         m.die("Something's gone wrong with the remote data; I can't read its timestamp. Please report this!")
@@ -297,8 +298,10 @@ class Manifest:
         lines = text.split("\n")
         if len(lines) < 10:
             # Something's definitely borked
-            msg = "Manifest is too short to possibly be valid."
-            raise ValueError(msg)
+            m.warn(
+                f"Error when parsing manifest: manifest is {len(lines)} long, which is too short to possibly be valid. Please report this!\nEntire manifest:\n{text}",
+            )
+            return None
         dt = parseDt(lines[0].strip())
         if dt is None:
             return None

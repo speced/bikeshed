@@ -1,5 +1,5 @@
 from .main import fixupDataFiles, update, updateReadonlyDataFiles
-from .manifest import createManifest
+from .manifest import Manifest, createManifest
 from .mode import UpdateMode
 
 __all__ = [
