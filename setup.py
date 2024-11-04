@@ -16,6 +16,7 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/speced/bikeshed/",
     packages=find_packages(),
+    package_data={"bikeshed": ["py.typed"]},
     include_package_data=True,
     install_requires=install_requires,
     python_requires=">=3.9",
