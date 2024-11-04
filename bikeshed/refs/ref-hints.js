@@ -1,11 +1,13 @@
 function mkRefHint(link, ref) {
     const linkText = link.textContent;
     let dfnTextElements = '';
-    if (ref.text != linkText) {
+    if (ref.displayText.toLowerCase() != linkText.toLowerCase()) {
+        // Give the original term if it's being displayed in a different way.
+        // But allow casing differences, they're insignificant.
         dfnTextElements =
             mk.li({},
                 mk.b({}, "Term: "),
-                mk.span({}, ref.text)
+                mk.span({}, ref.displayText)
             );
     }
     const forList = ref.for_;
