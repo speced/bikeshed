@@ -1,21 +1,46 @@
 name: Build Docs
 on:
   workflow_dispatch: {}
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
 jobs:
-  main:
+  build:
     name: Build & Deploy Docs
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     permissions:
       contents: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v3
-      - uses: w3c/spec-prod@v2
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Python
+        uses: actions/setup-python@v2
         with:
-          TOOLCHAIN: bikeshed
-
-          # Modify as appropriate
-          GH_PAGES_BRANCH: main
-
-          # if your doc isn't in the root folder,
-          # or Bikeshed otherwise can't find it:
-          SOURCE: docs/index.bs
+          python-version: 3.7
+      - name: Install Bikeshed
+        run: pip install -e .
+      - name: Build Docs
+        run: bikeshed -f spec docs/index.bs
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # Upload entire repository
+          path: 'docs'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
