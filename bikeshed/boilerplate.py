@@ -14,8 +14,8 @@ from . import refs as r
 from .translate import _t
 
 if t.TYPE_CHECKING:
-    MetadataT: t.TypeAlias = t.Mapping[str, t.Sequence[MetadataValueT]]
     MetadataValueT: t.TypeAlias = str | t.NodesT | None
+    MetadataT: t.TypeAlias = t.Mapping[str, t.Sequence[MetadataValueT]]
 
 
 def boilerplateFromHtml(doc: t.SpecT, htmlString: str, filename: str) -> t.NodesT:

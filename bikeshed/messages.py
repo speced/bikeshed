@@ -293,7 +293,7 @@ def formatMessage(type: str, text: str, lineNum: str | int | None = None) -> str
         color = "light cyan"
     if lineNum is not None:
         headingText = f"LINE {lineNum}"
-    return printColor(headingText + ":", color, "bold") + " " + text
+    return printColor(headingText + ":", color, "bold") + " " + text  # pylint: disable=possibly-used-before-assignment
 
 
 def errorAndExit() -> None:

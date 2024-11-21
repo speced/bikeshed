@@ -14,7 +14,7 @@ else:
     from .. import messages as m
 
 if t.TYPE_CHECKING:
-    Glyphs: t.TypeAlias = dict[str, Glyph]
+    Glyphs: t.TypeAlias = dict[str, "Glyph"]
     T = t.TypeVar("T")
     U = t.TypeVar("U")
     from pathlib import Path

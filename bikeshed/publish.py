@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import contextlib
 import logging
-import os
 import tarfile
 import tempfile
 
@@ -55,28 +54,21 @@ def publishEchidna(
 def prepareTar(doc: t.SpecT, additionalDirectories: list[str] | None = None) -> bytes:
     if additionalDirectories is None:
         additionalDirectories = ["images", "diagrams", "examples"]
-    # Finish the spec
-    specOutput = tempfile.NamedTemporaryFile(delete=False)
-    doc.finish(outputFilename=specOutput.name)
-    # Build the TAR file
-    f = tempfile.NamedTemporaryFile(delete=False)
-    tar = tarfile.open(fileobj=f, mode="w")
-    tar.add(specOutput.name, arcname="Overview.html")
-    # Loaded from .include files
-    additionalFiles = extensions.BSPublishAdditionalFiles(additionalDirectories)  # type: ignore # pylint: disable=no-member
-    for fname in additionalFiles:
-        if isinstance(fname, str):
-            inputPath = str(doc.inputSource.relative(fname))
-            outputPath = fname
-        else:
-            inputPath = str(doc.inputSource.relative(fname[0]))
-            outputPath = fname[1]
-        with contextlib.suppress(OSError):
-            tar.add(inputPath, outputPath)
-    tar.close()
-    specOutput.close()
-    os.remove(specOutput.name)
-    f.seek(0)
-    tarBytes = f.read()
-    f.close()
-    return tarBytes
+    with tempfile.NamedTemporaryFile() as f:
+        with tarfile.open(fileobj=f, mode="w") as tar:
+            with tempfile.NamedTemporaryFile() as specOutput:
+                doc.finish(outputFilename=specOutput.name)
+                tar.add(specOutput.name, arcname="Overview.html")
+            # Loaded from .include files
+            additionalFiles = extensions.BSPublishAdditionalFiles(additionalDirectories)  # type: ignore # pylint: disable=no-member
+            for fname in additionalFiles:
+                if isinstance(fname, str):
+                    inputPath = str(doc.inputSource.relative(fname))
+                    outputPath = fname
+                else:
+                    inputPath = str(doc.inputSource.relative(fname[0]))
+                    outputPath = fname[1]
+                with contextlib.suppress(OSError):
+                    tar.add(inputPath, outputPath)
+        f.seek(0)
+        return f.read()

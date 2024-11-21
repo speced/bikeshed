@@ -33,7 +33,9 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
         m.die(f"Couldn't download boilerplates manifest.\n{e}")
         return None
 
-    newPaths = pathsFromManifest(data)
+    newPaths: list[str] = pathsFromManifest(data)
+    goodPaths: list[str] = []
+    badPaths: list[str] = []
 
     if not dryRun:
         m.say(

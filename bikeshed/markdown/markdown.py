@@ -509,6 +509,7 @@ def parseMultiLineHeading(stream: TokenStream) -> list[l.Line]:
             + stream.currraw()
             + stream.nextraw(),
         )
+        level = 2
     match = re.search(r"(.*?)\s*\{\s*#([^ }]+)\s*\}\s*$", stream.currtext())
     if match:
         text = match.group(1)

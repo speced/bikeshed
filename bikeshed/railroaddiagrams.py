@@ -6,6 +6,8 @@ from __future__ import annotations
 import math as Math
 from typing import TYPE_CHECKING
 
+from . import t
+
 if TYPE_CHECKING:
     from typing import (
         Any,
@@ -22,10 +24,10 @@ if TYPE_CHECKING:
     from typing import Sequence as Seq
 
     T = TypeVar("T")
-    Node = Union[str, DiagramItem]  # pylint: disable=used-before-assignment
-    WriterF = Callable[[str], Any]
-    WalkerF = Callable[[DiagramItem], Any]  # pylint: disable=used-before-assignment
-    AttrsT = Dict[str, Any]
+    Node: t.TypeAlias = str | "DiagramItem"  # pylint: disable=used-before-assignment
+    WriterF: t.TypeAlias = Callable[[str], Any]
+    WalkerF: t.TypeAlias = Callable[["DiagramItem"], Any]  # pylint: disable=used-before-assignment
+    AttrsT: t.TypeAlias = Dict[str, Any]
 
 # Display constants
 DEBUG = False  # if true, writes some debug information into attributes

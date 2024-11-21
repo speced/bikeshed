@@ -172,6 +172,7 @@ def printNodeTree(node: t.NodeT | str) -> str:
 
 
 def linkTextsFromElement(el: t.ElementT) -> list[str]:
+    texts: list[str] = []
     if el.get("data-lt") == "":
         return []
     elif el.get("data-lt"):

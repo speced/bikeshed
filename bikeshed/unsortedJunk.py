@@ -453,7 +453,9 @@ def classifyDfns(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
         # Automatically fill in id if necessary.
         if el.get("id") is None:
             if dfnFor:
-                singleFor = config.splitForValues(dfnFor)[0]
+                singleFor: str | None = config.splitForValues(dfnFor)[0]
+            else:
+                singleFor = None
             if dfnType in config.functionishTypes.intersection(config.idlTypes):
                 match = re.match(r"[^(]*", primaryDfnText)
                 if match:

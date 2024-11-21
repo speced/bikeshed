@@ -13,13 +13,13 @@ from .. import config, t
 from .. import messages as m
 
 if t.TYPE_CHECKING:
-    AnchorsT: t.TypeAlias = defaultdict[str, list[AnchorT]]
-    HeadingGroupT: t.TypeAlias = dict[SpecStatusT, HeadingT]
+    AnchorsT: t.TypeAlias = defaultdict[str, list["AnchorT"]]
+    HeadingGroupT: t.TypeAlias = dict["SpecStatusT", "HeadingT"]
     HeadingKeyT: t.TypeAlias = str
     SpecStatusT: t.TypeAlias = str
     HeadingsT: t.TypeAlias = dict[HeadingKeyT, list[HeadingKeyT] | HeadingGroupT]
     AllHeadingsT: t.TypeAlias = dict[str, HeadingsT]
-    SpecsT: t.TypeAlias = dict[str | None, SpecT]
+    SpecsT: t.TypeAlias = dict[str | None, "SpecT"]
     MethodsT: t.TypeAlias = defaultdict[str, dict[str, t.Any]]
     ForsT: t.TypeAlias = defaultdict[str, list[str]]
 
