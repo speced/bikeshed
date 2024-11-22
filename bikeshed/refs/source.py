@@ -14,15 +14,15 @@ LAZY_LOADED_SOURCES: list[str] = ["foreign"]
 
 class RefSource:
     __slots__ = [
-        "dataFile",
-        "source",
-        "refs",
-        "methods",
-        "fors",
-        "specs",
-        "ignoredSpecs",
-        "replacedSpecs",
         "_loadedAnchorGroups",
+        "dataFile",
+        "fors",
+        "ignoredSpecs",
+        "methods",
+        "refs",
+        "replacedSpecs",
+        "source",
+        "specs",
     ]
 
     # Which sources use lazy-loading; other sources always have all their refs loaded immediately.

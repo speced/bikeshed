@@ -4,9 +4,9 @@ from .mode import UpdateMode
 
 __all__ = [
     "updateBackRefs",
-    "updateCrossRefs",
     "updateBiblio",
     "updateCanIUse",
-    "updateLinkDefaults",
+    "updateCrossRefs",
     "updateLanguages",
+    "updateLinkDefaults",
 ]
