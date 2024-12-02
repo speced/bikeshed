@@ -243,6 +243,8 @@ def transformAutolinkShortcuts(doc: t.SpecT) -> None:
             nodes = config.processTextNodes(nodes, headerRe, headerReplacer)
         if "idl" in doc.md.markupShorthands:
             nodes = config.processTextNodes(nodes, idlRe, idlReplacer)
+        if "cddl" in doc.md.markupShorthands:
+            nodes = config.processTextNodes(nodes, cddlRe, cddlReplacer)
         if "markup" in doc.md.markupShorthands:
             nodes = config.processTextNodes(nodes, elementRe, elementReplacer)
         if "biblio" in doc.md.markupShorthands:
@@ -580,6 +582,50 @@ def idlReplacer(match: re.Match) -> t.NodeT:
             linkText = lt
     return h.E.code(
         {"class": "idl", "nohighlight": ""},
+        h.E.a(
+            {
+                "data-link-type": linkType,
+                "for": linkFor,
+                "lt": lt,
+                "bs-autolink-syntax": match.group(0),
+            },
+            linkText,
+        ),
+    )
+
+
+cddlRe = re.compile(
+    r"""
+                    (\\)?
+                    \{\^
+                    (?:([^\^|]*)/)?
+                    ([^\^/|]+?)
+                    (?:!!([\w-]+))?
+                    (?:\|([^\^]+))?
+                    \^}""",
+    re.X,
+)
+
+
+def cddlReplacer(match: re.Match) -> t.NodeT:
+    escape, linkFor, lt, linkType, linkText = match.groups()
+    if escape:
+        return t.cast(str, match.group(0))[1:]
+    if linkFor == "":
+        linkFor = "/"
+    if linkType is None:
+        linkType = "cddl"
+    elif linkType in config.cddlTypes:
+        pass
+    else:
+        m.die(
+            f"Shorthand {match.group(0)} gives type as '{linkType}', but only CDDL types are allowed.",
+        )
+        return h.E.span(match.group(0))
+    if linkText is None:
+        linkText = lt
+    return h.E.code(
+        {"class": "cddl", "nohighlight": ""},
         h.E.a(
             {
                 "data-link-type": linkType,

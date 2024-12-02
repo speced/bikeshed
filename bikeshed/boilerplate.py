@@ -741,6 +741,62 @@ def addIDLSection(doc: t.SpecT) -> None:
     h.addClass(doc, container, "highlight")
 
 
+def addCDDLSection(doc: t.SpecT) -> None:
+    allCddlBlocks = [x for x in h.findAll("pre.cddl, xmp.cddl", doc) if h.isNormative(doc, x)]
+    if len(allCddlBlocks) == 0:
+        return
+    html = getFillContainer("cddl-index", doc=doc, default=True)
+    if html is None:
+        return
+
+    h.appendChild(
+        html,
+        h.E.h2({"class": "no-num no-ref", "id": h.safeID(doc, "cddl-index")}, _t("CDDL Index")),
+    )
+
+    # Specs such as WebDriver BiDi define two sets of CDDL definitions for
+    # the local and remote ends of the protocol. The convention is that
+    # these modules need to have a dfn with a "data-cddl-module" attribute
+    # that contains the module's shortname (the dfn itself provides the label
+    # for the index). CDDL blocks reference one or more modules through a
+    # "data-cddl-module" attribute.
+    # When modules are defined, CDDL blocks that do not reference a module
+    # are considered to apply to all modules. In particular, they do not create
+    # a "default" module
+    cddlModules = [(x.get("data-cddl-module") or "", x.text or "") for x in h.findAll("dfn[data-cddl-module]", doc)]
+    if len(cddlModules) == 0:
+        cddlModules = [("", "")]
+    for module in cddlModules:
+        cddlBlocks = []
+        for block in allCddlBlocks:
+            forModules = [x.strip() for x in block.get("data-cddl-module", "").split(",")]
+            if (len(forModules) == 1 and forModules[0] == "") or module[0] in forModules:
+                cddlBlocks.append(block)
+        if len(cddlBlocks) == 0:
+            continue
+        if module[0] != "":
+            h.appendChild(
+                html,
+                h.E.h3(
+                    {"class": "no-num no-ref", "id": h.safeID(doc, "cddl-module-" + module[0])},
+                    _t(module[1].capitalize()),
+                ),
+            )
+        container = h.appendChild(html, h.E.pre({"class": "cddl"}))
+        for block in cddlBlocks:
+            if h.hasClass(doc, block, "extract"):
+                continue
+            blockCopy = copy.deepcopy(block)
+            h.appendContents(container, blockCopy)
+            h.appendChild(container, "\n")
+        for el in h.findAll("[id]", container):
+            if el.tag == "dfn":
+                el.tag = "a"
+                el.set("href", "#" + el.get("id", ""))
+            del el.attrib["id"]
+        h.addClass(doc, container, "highlight")
+
+
 def addTOCSection(doc: t.SpecT) -> None:
     toc = getFillContainer("table-of-contents", doc=doc, default=False)
     if toc is None:
