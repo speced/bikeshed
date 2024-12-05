@@ -40,6 +40,17 @@ VOID_ELEMENTS = {
     "wbr",
 }
 
+# Characters used by the [...]-type autolinks, inside of the bracket.
+BRACKET_AUTOLINK_CHARS = "=$:[]"
+
+# This needs to be any character that can start a node,
+# *or anything that can signal the end of a markup shorthand*,
+# since I depend on the ends of markup shorthands being at the
+# start of unconsumed text.
+# (Adding more just means parseAnything will break text into
+#  smaller chunks; it doesn't affect correctness.)
+POSSIBLE_NODE_START_CHARS = "&<>`'~[]{}()\\—-|" + BRACKET_AUTOLINK_CHARS
+
 
 def nodesFromStream(s: Stream, start: int) -> t.Generator[ParserNode, None, None]:
     lastNode: ParserNode | None = None
@@ -113,15 +124,6 @@ def processResults(s: Stream, results: list[Result[ParserNode | list[ParserNode]
         else:
             contents.append(node)
     return contents
-
-
-# This needs to be any character that can start a node,
-# *or anything that can signal the end of a markup shorthand*,
-# since I depend on the ends of markup shorthands being at the
-# start of unconsumed text.
-# (Adding more just means parseAnything will break text into
-#  smaller chunks; it doesn't affect correctness.)
-POSSIBLE_NODE_START_CHARS = "&<>`'~[]{}()\\—-|=$:"
 
 
 def parseAnything(s: Stream, start: int, experimental: bool = False) -> Result[ParserNode | list[ParserNode]]:
@@ -1638,6 +1640,14 @@ def parseShorthandVariable(s: Stream, start: int) -> Result[ParserNode | list[Pa
 def parseAutolinkBiblioSection(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
     if s[start : start + 2] != "[[":
         return Result.fail(start)
+
+    # A bunch of `[...]` autolink syntaxes can masquerade as biblio
+    # when used in code-ish array access segments, like `foo[[=this=]].
+    # So, look for one of the autolink characters, since they can't
+    # be valid biblios anyway, and just fail silently.
+    if s[start+2] in BRACKET_AUTOLINK_CHARS:
+        return Result.fail(start)
+
     # Otherwise we're locked in, this opener is a very strong signal.
     innerStart = start + 2
 
