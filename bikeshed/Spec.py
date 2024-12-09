@@ -14,6 +14,7 @@ from . import (
     biblio,
     boilerplate,
     caniuse,
+    cddl,
     conditional,
     constants,
     datablocks,
@@ -288,6 +289,7 @@ class Spec:
         u.checkVarHygiene(self)
         u.processIssuesAndExamples(self)
         idl.markupIDL(self)
+        cddl.markupCDDL(self)
         u.inlineRemoteIssues(self)
         u.addImageSize(self)
 
@@ -295,6 +297,7 @@ class Spec:
         u.processBiblioLinks(self)
         u.processDfns(self)
         u.processIDL(self)
+        u.processCDDL(self)
         dfns.annotateDfns(self)
         u.formatArgumentdefTables(self)
         u.formatElementdefTables(self)
@@ -307,6 +310,7 @@ class Spec:
         boilerplate.addReferencesSection(self)
         boilerplate.addPropertyIndex(self)
         boilerplate.addIDLSection(self)
+        boilerplate.addCDDLSection(self)
         boilerplate.addIssuesSection(self)
         boilerplate.addCustomBoilerplate(self)
         headings.processHeadings(self, "all")  # again
