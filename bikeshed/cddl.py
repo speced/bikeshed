@@ -14,15 +14,17 @@ class CDDLMarker(cddlparser.ast.Marker):
     so that cross-referencing logic may take place.
     """
 
-    def serializeValue(self, prefix: str, value: str, suffix: str, node: cddlparser.ast.CDDLNode) -> str:
+    def serializeValue(self, prefix: str, value: str, suffix: str, node: cddlparser.ast.Value) -> str:
         name = prefix + value + suffix
         if node.type not in {"text", "bytes"}:
             return name
         parent = node.parentNode
+        assert parent is not None
         if isinstance(parent, cddlparser.ast.Memberkey) and node.type == "text":
             # A literal text string also gives rise to a type
             # see RFC 8610, section 3.5.1:
             # https://datatracker.ietf.org/doc/html/rfc8610#section-3.5.1
+            assert parent.parentNode is not None
             forName = self._getFor(parent.parentNode)
             if forName is None:
                 # Cannot easily link member key back to a definition
@@ -70,6 +72,7 @@ class CDDLMarker(cddlparser.ast.Marker):
                     return name
                 else:
                     return '<a data-link-type="cddl" data-link-for="/">{}</a>'.format(name)
+            assert parent.parentNode is not None
             forName = self._getFor(parent.parentNode)
             if forName is None:
                 # Cannot easily link member key back to a definition
@@ -103,16 +106,17 @@ class CDDLMarker(cddlparser.ast.Marker):
         while parent is not None:
             if isinstance(parent, cddlparser.ast.Rule):
                 # Something defined in a rule
-                return t.cast(str, parent.name.name)
+                return parent.name.name
             elif isinstance(parent, cddlparser.ast.GroupEntry) and parent.key is not None:
                 # A type in a member key definition
+                assert parent.parentNode is not None
                 parentFor = self._getFor(parent.parentNode)
                 if parentFor is None:
                     return parentFor
                 if isinstance(parent.key.type, cddlparser.ast.Value) and parent.key.type.type == "text":
-                    return parentFor + "/" + t.cast(str, parent.key.type.value)
+                    return parentFor + "/" + parent.key.type.value
                 elif isinstance(parent.key.type, cddlparser.ast.Typename):
-                    return parentFor + "/" + t.cast(str, parent.key.type.name)
+                    return parentFor + "/" + parent.key.type.name
                 else:
                     return None
             parent = parent.parentNode
