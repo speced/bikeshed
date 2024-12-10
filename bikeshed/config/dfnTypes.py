@@ -47,13 +47,17 @@ dfnClassToType = {
     "facetdef": "facet",
     "http-headerdef": "http-header",
     "permissiondef": "permission",
+    "cddl-type": "cddl-type",
+    "cddl-key": "cddl-key",
+    "cddl-parameter": "cddl-parameter",
+    "cddl-value": "cddl-value",
 }
-
 
 dfnTypes = frozenset(list(dfnClassToType.values()) + ["dfn"])
 maybeTypes = frozenset(["value", "type", "at-rule", "function", "selector"])
 cssTypes = frozenset(["property", "value", "at-rule", "descriptor", "type", "function", "selector"])
 markupTypes = frozenset(["element", "element-attr", "element-state", "attr-value"])
+cddlTypes = frozenset(["cddl-type", "cddl-key", "cddl-parameter", "cddl-value"])
 idlTypes = frozenset(
     [
         "event",
@@ -83,7 +87,9 @@ idlTypes = frozenset(
 idlNameTypes = frozenset(["interface", "namespace", "dictionary", "enum", "typedef", "callback"])
 functionishTypes = frozenset(["function", "method", "constructor", "stringifier"])
 idlMethodTypes = frozenset(["method", "constructor", "stringifier", "idl", "idl-name"])
-linkTypes = dfnTypes | frozenset(["propdesc", "functionish", "idl", "idl-name", "element-sub", "maybe", "biblio"])
+linkTypes = dfnTypes | frozenset(
+    ["propdesc", "functionish", "idl", "idl-name", "element-sub", "maybe", "biblio", "cddl"],
+)
 typesUsingFor = frozenset(
     [
         "descriptor",
@@ -168,11 +174,12 @@ linkTypeToDfnType = {
     "functionish": functionishTypes,
     "idl": idlTypes,
     "idl-name": idlNameTypes,
+    "cddl": cddlTypes,
     "element-sub": frozenset(["element-attr", "element-state"]),
     "maybe": maybeTypes,
     "dfn": frozenset(["dfn"]),
     "biblio": frozenset(["biblio"]),
-    "codelike": frozenset(["element", "element-attr", "element-state", "attr-value"]) | idlTypes,
+    "codelike": frozenset(["element", "element-attr", "element-state", "attr-value"]) | idlTypes | cddlTypes,
     "all": linkTypes,
 }
 for dfnType in dfnClassToType.values():
