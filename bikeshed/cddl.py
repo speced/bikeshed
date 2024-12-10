@@ -4,14 +4,10 @@ import os
 import sys
 from typing import get_args
 
+import cddlparser
+
 from . import config, h, t
 from . import messages as m
-
-# TODO: Drop once cddlparser gets published as a Pypi package
-basepath = os.path.dirname(os.path.realpath(__file__))
-cddlpath = os.path.abspath(os.path.join(basepath, "..", ".."))
-sys.path.append(cddlpath)
-import cddlparser
 
 
 class CDDLMarker(cddlparser.ast.Marker):
