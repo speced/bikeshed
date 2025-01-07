@@ -361,8 +361,11 @@ class MetadataManager:
                 macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2021/W3C-DNOTE"
                 macros["w3c-status-url"] = "https://www.w3.org/standards/types/#DNOTE"
             elif statusName == "FINDING":
-                macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2021/W3C-NOTE"
-                macros["w3c-status-url"] = "https://www.w3.org/standards/types/#FINDING"
+                macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2021/base.css"
+                macros["w3c-status-url"] = "https://tag.w3.org/findings/"
+            elif statusName == "DRAFT-FINDING":
+                macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2021/base.css"
+                macros["w3c-status-url"] = "https://tag.w3.org/findings/"
             elif statusName == "CG-DRAFT":
                 macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2021/cg-draft"
                 macros["w3c-status-url"] = "https://www.w3.org/standards/types/#CG-DRAFT"
