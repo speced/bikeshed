@@ -1270,7 +1270,10 @@ AUTOLINK_PROPDESC_RE = re.compile(
 
 def parseCSSPropdesc(s: Stream, start: int) -> Result[SafeText | list[ParserNode]]:
     if s[start] != "'":
-        Result.fail(start)
+        return Result.fail(start)
+    if s[start:start+3] == "'-'":
+        return Result.fail(start)
+
     innerStart = start + 1
 
     match, innerEnd = s.matchRe(start + 1, AUTOLINK_PROPDESC_RE).vi
