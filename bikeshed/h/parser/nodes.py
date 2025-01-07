@@ -367,7 +367,8 @@ class TagStack:
                         )
                         break
                 else:
-                    m.die(f"Saw an end tag {node}, but there's no open element corresponding to it.", lineNum=node.line)
+                    openTagsMsg = f"\nOpen tags: {', '.join(self.printOpenTags())}" if self.tags else ""
+                    m.die(f"Saw an end tag {node}, but there's no open element corresponding to it.{openTagsMsg}", lineNum=node.line)
         elif isinstance(node, (SelfClosedTag, RawElement)):
             self.autoCloseStart(node.tag)
 
