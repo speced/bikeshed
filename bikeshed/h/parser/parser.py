@@ -49,10 +49,13 @@ BRACKET_AUTOLINK_CHARS = "=$:[]"
 # start of unconsumed text.
 # (Adding more just means parseAnything will break text into
 #  smaller chunks; it doesn't affect correctness.)
-POSSIBLE_NODE_START_CHARS = "&<>`'~[]{}()\\—-|" + BRACKET_AUTOLINK_CHARS
+POSSIBLE_NODE_START_CHARS = "&<>`'~[]{}()\\—-|" + BRACKET_AUTOLINK_CHARS + constants.bqStart + constants.bqEnd
 
 
 def nodesFromStream(s: Stream, start: int) -> t.Generator[ParserNode, None, None]:
+    # Consumes the stream until eof, yielding ParserNodes.
+    # Massages the results slightly for final consumption,
+    # adding curly quotes and combining adjacent RawText nodes.
     lastNode: ParserNode | None = None
     heldLast = False
     for node in generateNodes(s, start):
@@ -175,6 +178,14 @@ def parseNode(
     inOpaque = s.inOpaqueElement()
     inA = s.inTagContext("a")
     inDfn = s.inTagContext("dfn")
+
+    if first1 == constants.bqStart:
+        nodes = [StartTag.fromStream(s, start, start+1, "blockquote"), RawText.fromStream(s, start, start+1, "\n\n")]
+        return Result(nodes, start+1)
+
+    if first1 == constants.bqEnd:
+        nodes = [RawText.fromStream(s, start, start+1, "\n\n"), EndTag.fromStream(s, start, start+1, "blockquote")]
+        return Result(nodes, start+1)
 
     if first1 == "&":
         ch, i = parseCharRef(s, start, context=CharRefContext.NON_ATTR).vi
