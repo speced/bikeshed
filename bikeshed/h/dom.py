@@ -312,13 +312,11 @@ def nextSiblingElement(el: t.ElementT) -> t.ElementT | None:
 
 
 @t.overload
-def appendChild(parent: t.ElementT, *els: t.NodesT, allowEmpty: t.Literal[False] = False) -> t.ElementT:
-    ...
+def appendChild(parent: t.ElementT, *els: t.NodesT, allowEmpty: t.Literal[False] = False) -> t.ElementT: ...
 
 
 @t.overload
-def appendChild(parent: t.ElementT, *els: t.NodesT, allowEmpty: bool) -> t.ElementT | None:
-    ...
+def appendChild(parent: t.ElementT, *els: t.NodesT, allowEmpty: bool) -> t.ElementT | None: ...
 
 
 def appendChild(parent: t.ElementT, *els: t.NodesT, allowEmpty: bool = False) -> t.ElementT | None:
@@ -540,7 +538,9 @@ def ancestorElements(el: t.ElementT, self: bool = False) -> t.Generator[t.Elemen
     yield from el.iterancestors()
 
 
-def childNodes(parentEl: t.ElementishT, clear: bool = False, skipOddNodes: bool = True, mergeText: bool = False) -> list[t.NodeT]:
+def childNodes(
+    parentEl: t.ElementishT, clear: bool = False, skipOddNodes: bool = True, mergeText: bool = False
+) -> list[t.NodeT]:
     """
     This function returns all the nodes in a parent element in the DOM sense,
     mixing text nodes (strings) and other nodes together
@@ -1020,8 +1020,7 @@ if t.TYPE_CHECKING:
             self,
             attrsOrChild: t.Mapping[str, str | None] | t.NodesT | None = None,
             *children: t.NodesT | None,
-        ) -> t.ElementT:
-            ...
+        ) -> t.ElementT: ...
 
 
 class ElementCreationHelper:

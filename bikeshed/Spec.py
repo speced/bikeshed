@@ -612,14 +612,14 @@ def FIXMEreplaceMarkdownBlockquotes(text: str) -> str:
         if not match:
             i += 1
             continue
-        if i+1 < len(lines) and re.match(r"\s*>\s?", lines[i+1]):
-            lines[i] = constants.bqStart + lines[i][len(match[0]):]
+        if i + 1 < len(lines) and re.match(r"\s*>\s?", lines[i + 1]):
+            lines[i] = constants.bqStart + lines[i][len(match[0]) :]
             i += 1
             while i < len(lines) and re.match(r"\s*>\s?", lines[i]):
                 match = re.match(r"\s*>\s?", lines[i])
-                lines[i] = lines[i][len(match[0]):]
+                lines[i] = lines[i][len(match[0]) :]
                 i += 1
-            lines[i-1] += constants.bqEnd
+            lines[i - 1] += constants.bqEnd
         else:
             i += 1
     return "\n".join(lines)
