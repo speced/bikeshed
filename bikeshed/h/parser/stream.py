@@ -259,6 +259,11 @@ class Stream:
         self.openEls.update(node)
         return node
 
+    def observeNodes(self, nodes: list[ParserNode]) -> list[ParserNode]:
+        for node in nodes:
+            self.openEls.update(node)
+        return nodes
+
     def observeShorthandOpen(self, startTag: StartTag, sigils: tuple[str, str]) -> None:
         self.openEls.updateShorthandOpen(startTag, sigils)
 

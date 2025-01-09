@@ -118,37 +118,24 @@ def generateResults(
         else:
             return
 
-def generateExperimentalResults(s: Stream, start: int, coll: list) -> t.Generator[int, None, None]:
-    '''
-    Does an experimental parse, collecting Results into the passed list.
+
+def generateExperimentalNodes(s: Stream, start: int, coll: list[ParserNode]) -> t.Generator[int, None, None]:
+    """
+    Does an experimental parse, collecting ParserNodes into the passed list.
     Yields the stream index it's up to.
     Intended to be used in a for-loop, where you manually break when you detect the end.
-    '''
+    """
     for res in generateResults(s, start, experimental=True):
-        if res.valid:
-            coll.append(res)
-            yield res.i
+        node, i, err = res.vie
+        if not err:
+            assert node is not None
+            if isinstance(node, list):
+                coll.extend(node)
+            else:
+                coll.append(node)
+            yield i
         else:
             return
-
-
-def processResults(s: Stream, results: list[Result[ParserNode | list[ParserNode]]]) -> list[ParserNode]:
-    contents: list[ParserNode] = []
-    """
-    # Turns a list of Results into a list of ParserNodes.
-    # Also "observes" the parsed nodes on the stream.
-    # Use this to "canonicalize" a set of parse results
-    # that you obtained on a theoretical parse.
-    """
-    for res in results:
-        s.observeResult(res)
-        node, _ = res.vi
-        assert node is not None
-        if isinstance(node, list):
-            contents.extend(node)
-        else:
-            contents.append(node)
-    return contents
 
 
 def parseAnything(s: Stream, start: int, experimental: bool = False) -> Result[ParserNode | list[ParserNode]]:
@@ -205,12 +192,15 @@ def parseNode(
     inDfn = s.inTagContext("dfn")
 
     if first1 == constants.bqStart:
-        nodes = [StartTag.fromStream(s, start, start+1, "blockquote"), RawText.fromStream(s, start, start+1, "\n\n")]
-        return Result(nodes, start+1)
+        nodes = [
+            StartTag.fromStream(s, start, start + 1, "blockquote"),
+            RawText.fromStream(s, start, start + 1, "\n\n"),
+        ]
+        return Result(nodes, start + 1)
 
     if first1 == constants.bqEnd:
-        nodes = [RawText.fromStream(s, start, start+1, "\n\n"), EndTag.fromStream(s, start, start+1, "blockquote")]
-        return Result(nodes, start+1)
+        nodes = [RawText.fromStream(s, start, start + 1, "\n\n"), EndTag.fromStream(s, start, start + 1, "blockquote")]
+        return Result(nodes, start + 1)
 
     if first1 == "&":
         ch, i = parseCharRef(s, start, context=CharRefContext.NON_ATTR).vi
@@ -1102,30 +1092,48 @@ def parseCSSMaybe(s: Stream, start: int) -> Result[list[ParserNode]]:
     if res.valid:
         return res
 
-    startTag = StartTag.fromStream(s, start, start + 2, "span", {"class": "css"}).finalize()
-    rest, nodeEnd = parseLinkText(s, start + 2, "''", "''", startTag).vi
-    if rest:
-        return Result([startTag, *rest], nodeEnd)
-
     return Result.fail(start)
 
 
-MAYBE_DECL_RE = re.compile(r"(@[\w-]+/)?([\w-]+): ")
+MAYBE_DECL_RE = re.compile(r"(@[\w-]+/)?([\w-]+)$")
 
 
 def parseMaybeDecl(s: Stream, textStart: int) -> Result[list[ParserNode]]:
-    match, colonEnd = s.matchRe(textStart, MAYBE_DECL_RE).vi
+    rawText, colonStart = s.skipTo(textStart, ":").vi
+    if not rawText:
+        return Result.fail(textStart)
+    if s.line(textStart) != s.line(colonStart):
+        return Result.fail(textStart)
+    if "'" in rawText:
+        return Result.fail(textStart)
+    if not s[colonStart+1].isspace():
+        return Result.fail(textStart)
+    colonEnd = colonStart + 1
+
+    text = replaceMacrosInText(
+        text=rawText,
+        macros=s.config.macros,
+        s=s,
+        start=textStart,
+        context=f"''{rawText}: ...''",
+    )
+    match = MAYBE_DECL_RE.match(text)
     if not match:
         return Result.fail(textStart)
 
     for_, propdescname = match.groups()
+
+    autolinkSyntax = f"''{rawText}: ...''"
+    if rawText != text:
+        autolinkSyntax += f" (expands to ''{text}: ...'')"
+    
     startTag = StartTag.fromStream(
         s,
         textStart - 2,
         textStart,
         "a",
         {
-            "bs-autolink-syntax": escapeAttr("''" + match[0] + "...''"),
+            "bs-autolink-syntax": escapeAttr(autolinkSyntax),
             "class": "css",
             "data-link-type": "propdesc",
             "data-lt": escapeAttr(propdescname),
@@ -1136,7 +1144,7 @@ def parseMaybeDecl(s: Stream, textStart: int) -> Result[list[ParserNode]]:
         startTag.attrs["data-link-type"] = "descriptor"
     startTag.finalize()
 
-    declStart = RawText.fromStream(s, textStart, colonEnd, propdescname + ": ")
+    declStart = RawText.fromStream(s, textStart, colonEnd, propdescname + ":")
 
     rest, nodeEnd = parseLinkText(s, colonEnd, "''", "''", startTag).vi
     if rest is None:
@@ -1151,38 +1159,44 @@ def parseMaybeValue(s: Stream, textStart: int) -> Result[list[ParserNode]]:
     start = textStart - 2
 
     # Ugh, "maybe" autolinks might be text *or* html; we can't tell until we examine them.
-    # So, manually parse to the next '', holding onto the results.
-    # Do some text analysis, and then only if it looks like we need to,
-    # process the parse results.
+    # So, do a real (but experimental) parse to the next '', holding onto the results.
+    # Do some analysis on the *text* in those bounds,
+    # and then, only if it looks like we need to, process the parse results.
 
     startLine = s.line(start)
-    results: list[Result[ParserNode | list[ParserNode]]] = []
-    for i in generateExperimentalResults(s, textStart, results):
+    nodes: list[ParserNode] = []
+    for i in generateExperimentalNodes(s, textStart, nodes):
         if s.line(i) > startLine + 3:
             m.die(
-            "CSS-maybe autolink (''foo'') was opened, but no closing '' was found within a few lines. Either close your autolink, switch to the <css></css> element if you need the contents to stretch across that many lines, or escape the initial '' as &#39;&#39; if it wasn't intended at all.",
-            lineNum=s.loc(i),
+                "CSS-maybe autolink (''foo'') was opened, but no closing '' was found within a few lines. Either close your autolink, switch to the <css></css> element if you need the contents to stretch across that many lines, or escape the initial '' as &#39;&#39; if it wasn't intended at all.",
+                lineNum=s.loc(i),
             )
             return Result.fail(textStart)
-        if s[i: i+2] == "''":
+        if s[i : i + 2] == "''":
             textEnd = i
-            nodeEnd = i+2
+            nodeEnd = i + 2
             break
-    else:
-        return Result.fail(textStart)
 
-    if results is None:
-        return Result.fail(textStart)
-
+    rawText = s[textStart:textEnd]
+    text = replaceMacrosInText(
+        text=rawText,
+        macros=s.config.macros,
+        s=s,
+        start=start,
+        context=f"''{rawText}''",
+    )
     # Do some text-based analysis of the contents first.
-    text = s[textStart:textEnd]
 
     match = MAYBE_VAL_RE.match(text)
-    if not match:
-        return Result.fail(textStart)
+    if match:
+        for_, valueName, linkType = match.groups()
+        probablyAutolink = (for_ is not None and not for_.endswith("<")) or match[3] is not None
+    else:
+        for_ = None
+        valueName = text
+        linkType = None
+        probablyAutolink = False
 
-    nodes: list[ParserNode]
-    for_, valueName, linkType = match.groups()
     if linkType is None:
         linkType = "maybe"
     elif linkType in config.maybeTypes:
@@ -1191,28 +1205,37 @@ def parseMaybeValue(s: Stream, textStart: int) -> Result[list[ParserNode]]:
         # Looks like a maybe shorthand, just with an illegal type,
         # so format it nicely and leave it alone.
         m.die(
-            f"Shorthand ''{text}'' gives type as '{linkType}', but only “maybe” sub-types are allowed: {config.englishFromList(config.maybeTypes)}.",
+            f"Shorthand ''{rawText}'' gives type as '{linkType}', but only “maybe” sub-types are allowed: {config.englishFromList(config.maybeTypes)}.",
             lineNum=s.loc(start),
         )
-        startTag = StartTag.fromStream(s, start, textStart, "css")
-        nodes = [SafeText.fromStream(s, textStart, textEnd, valueName)]
-        endTag = EndTag.fromStream(s, textEnd, nodeEnd, startTag)
-        return Result([startTag, *nodes, endTag], nodeEnd)
+        return Result(
+            [
+                StartTag.fromStream(s, start, textStart, "css"),
+                SafeText.fromStream(s, textStart, textEnd, valueName),
+                EndTag.fromStream(s, textEnd, nodeEnd, "css"),
+            ],
+            nodeEnd,
+        )
 
-    # Probably a valid link, but *possibly* not.
-    # If it looks *sufficiently like* an autolink,
-    # swap the text out as if it was one
-    # (has a for value and/or a type value, and the for value
-    #  doesn't look like it's an end tag).
-    # Otherwise, reparse the text to obtain its contents,
-    # but set the intended link text if it *does* succeed.
-    probablyAutolink = (for_ is not None and not for_.endswith("<")) or match[3] is not None
-    startTag = StartTag.fromStream(s, start, textStart, "bs-link", {
-        "class": "css",
-        "bs-autolink-syntax": escapeAttr(s[start:nodeEnd]),
-        "data-link-type": linkType,
-        "data-lt": escapeAttr(valueName),
-    })
+    # If the text looked sufficiently like an autolink,
+    # (has a for value (that doesn't look like it's from an end tag) and/or a manual type),
+    # act as if the text was autolinking literal the whole time,
+    # and format it nicely (just give it the valueName as contents).
+    # Otherwise, use the parsed nodes as contents,
+    # but set it up for autolinking based on the text,
+    # and tell it what to replace itself with if it *does* succeed at linking.
+    startTag = StartTag.fromStream(
+        s,
+        start,
+        textStart,
+        "bs-link",
+        {
+            "class": "css",
+            "bs-autolink-syntax": escapeAttr(s[start:nodeEnd]),
+            "data-link-type": linkType,
+            "data-lt": escapeAttr(valueName),
+        },
+    )
     if probablyAutolink:
         if "&lt" in text or "&gt" in text:
             m.die(
@@ -1220,23 +1243,23 @@ def parseMaybeValue(s: Stream, textStart: int) -> Result[list[ParserNode]]:
                 lineNum=s.loc(start),
             )
             m.say("(See https://speced.github.io/bikeshed/#autolink-limits )")
-        elif "<<" in valueName:
+        elif "<<" in text:
             m.die(
                 f"The autolink {s[start:nodeEnd]} is using << in its value; you probably just want to use a single < and >.",
                 lineNum=s.loc(start),
             )
             m.say("(See https://speced.github.io/bikeshed/#autolink-limits )")
-    if for_:
-        startTag.attrs["data-link-for"] = escapeAttr(for_)
+        if for_:
+            startTag.attrs["data-link-for"] = escapeAttr(for_)
     startTag.finalize()
 
     s.observeShorthandOpen(startTag, ("''", "''"))
     if probablyAutolink:
         # Nothing to observe, this is just text.
-        nodes = [SafeText.fromStream(s, textStart, textEnd, safeFromDoubleAngles(valueName))]
+        nodes = [SafeText.fromStream(s, textStart, textEnd, safeFromDoubleAngles(t.cast(str, valueName)))]
     else:
-        startTag.attrs["bs-replace-text-on-link-success"] = escapeAttr(safeFromDoubleAngles(valueName))
-        nodes = processResults(s, results)
+        startTag.attrs["bs-replace-text-on-link-success"] = escapeAttr(safeFromDoubleAngles(text))
+        s.observeNodes(nodes)
     s.observeShorthandClose(s.loc(textEnd), startTag, ("''", "''"))
     endTag = EndTag.fromStream(s, textEnd, nodeEnd, startTag)
 
@@ -1271,7 +1294,7 @@ AUTOLINK_PROPDESC_RE = re.compile(
 def parseCSSPropdesc(s: Stream, start: int) -> Result[SafeText | list[ParserNode]]:
     if s[start] != "'":
         return Result.fail(start)
-    if s[start:start+3] == "'-'":
+    if s[start : start + 3] == "'-'":
         return Result.fail(start)
 
     innerStart = start + 1
@@ -1699,7 +1722,7 @@ def parseAutolinkBiblioSection(s: Stream, start: int) -> Result[ParserNode | lis
     # when used in code-ish array access segments, like `foo[[=this=]].
     # So, look for one of the autolink characters, since they can't
     # be valid biblios anyway, and just fail silently.
-    if s[start+2] in BRACKET_AUTOLINK_CHARS:
+    if s[start + 2] in BRACKET_AUTOLINK_CHARS:
         return Result.fail(start)
 
     # Otherwise we're locked in, this opener is a very strong signal.
@@ -1748,6 +1771,11 @@ def parseLinkInfo(
         start=start,
         context=startSigil + innerText + endSigil,
     )
+
+    if re.search(r"&[\w\d#]+;", lt):
+        m.die(f"Saw an HTML escape in the literal portion of an autolink. Use raw characters, or switch to the HTML syntax.", lineNum=s.loc(start))
+        # Okay to keep going, tho, it'll just fail to link.
+
     linkFor = None
     linkType = None
     if "/" in lt:
@@ -1868,11 +1896,8 @@ def parseBiblioInner(s: Stream, innerStart: int) -> Result[tuple[StartTag, str]]
                     )
                     return failureResult
             else:
-                m.die(
-                    f"Biblio shorthand [{lt} ...] has an unknown/invalid keyword ({modifier}). Allowed keywords are {config.englishFromList(AUTOLINK_BIBLIO_KEYWORDS)}. If this isn't meant to be a biblio autolink at all, escape the initial [ as &#91;",
-                    lineNum=s.loc(nodeStart),
-                )
-                return failureResult
+                # Unknown modifier, that's just a failure.
+                return Result.fail(innerStart)
 
     startTag = StartTag.fromStream(s, nodeStart, innerStart, "a", attrs).finalize()
     return Result(
@@ -2237,8 +2262,8 @@ def parseMarkdownLink(s: Stream, start: int) -> Result[ParserNode | list[ParserN
     # At this point, we're still not committed to this being
     # an autolink, so it should silently fail.
     startLine = s.line(start)
-    results: list[Result[ParserNode | list[ParserNode]]] = []
-    for i in generateExperimentalResults(s, linkTextStart, results):
+    nodes: list[ParserNode] = []
+    for i in generateExperimentalNodes(s, linkTextStart, nodes):
         if s.line(i) > startLine + 3:
             return Result.fail(start)
         if s[i : i + 2] == "](":
@@ -2251,7 +2276,7 @@ def parseMarkdownLink(s: Stream, start: int) -> Result[ParserNode | list[ParserN
         return Result.fail(start)
     # Now that we've seen the ](, we're committed.
     s.observeShorthandOpen(startTag, (startingSigil, endingSigil))
-    content = processResults(s, results)
+    s.observeNodes(nodes)
     s.observeShorthandClose(s.loc(linkTextEnd), startTag, (startingSigil, endingSigil))
 
     # I'm not doing bracket-checking in the link text,
@@ -2263,14 +2288,14 @@ def parseMarkdownLink(s: Stream, start: int) -> Result[ParserNode | list[ParserN
         # chars turned back into text.
         openingSquare = RawText.fromStream(s, start, start + 1)
         middleBit = RawText.fromStream(s, linkTextEnd, linkDestStart)
-        return Result([openingSquare, *content, middleBit], linkDestStart)
+        return Result([openingSquare, *nodes, middleBit], linkDestStart)
     dest, title = result
     startTag.attrs["href"] = dest
     startTag.attrs["bs-autolink-syntax"] = escapeAttr(s[start:nodeEnd])
     if title:
         startTag.attrs["title"] = title
     endTag = EndTag.fromStream(s, nodeEnd - 1, nodeEnd, startTag)
-    return Result([startTag, *content, endTag], nodeEnd)
+    return Result([startTag, *nodes, endTag], nodeEnd)
 
 
 def parseMarkdownLinkDestTitle(s: Stream, start: int) -> Result[tuple[str, str]]:
