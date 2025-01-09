@@ -328,6 +328,10 @@ def parseNode(
         if first3 == "\\<{":
             node = RawText.fromStream(s, start, start + 3, "<{")
             return Result(node, start + 3)
+        if s.config.idl and first3 == "<{{":
+            # Catch things like `{{Promise}}<{{Foo}}>` from being parsed as element links
+            node = SafeText.fromStream(s, start, start + 1)
+            return Result(node, start + 1)
         if first2 == "<{":
             elementRes = parseAutolinkElement(s, start)
             if elementRes.valid:
