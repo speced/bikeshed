@@ -1096,14 +1096,19 @@ class IndentInfo:
     char: str | None = None
     spaceLines: int = 0
     tabLines: int = 0
-    totalLines: int = 0
+    neitherLines: int = 0
+
+    def tooShort(self) -> bool:
+        return (self.spaceLines + self.tabLines) < 20
 
 
 def inferIndent(lines: t.Sequence[Line]) -> IndentInfo:
+    # Infer what indent character the document is using.
     # If the document uses space indentation,
     # infer what the indent size is by seeing what % of indents
     # are divisible by various values.
-    # (If it uses tabs, or no indents at all, returns None.)
+    # A sufficiently short document, or one with too few indented lines,
+    # will fail to infer anything.
     indentSizes: Counter[int] = Counter()
     info = IndentInfo()
     for line in lines:
@@ -1115,9 +1120,10 @@ def inferIndent(lines: t.Sequence[Line]) -> IndentInfo:
             info.spaceLines += 1
         elif line.text[0:1] == "\t":
             info.tabLines += 1
-        info.totalLines += 1
+        else:
+            info.neitherLines += 1
     # If very few lines are indented at all, just bail
-    if (info.spaceLines + info.tabLines) < info.totalLines / 20:
+    if info.tooShort():
         return info
     # If tab indents predominate, assume tab-indent.
     if info.spaceLines < info.tabLines:
