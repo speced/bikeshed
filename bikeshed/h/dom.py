@@ -539,7 +539,10 @@ def ancestorElements(el: t.ElementT, self: bool = False) -> t.Generator[t.Elemen
 
 
 def childNodes(
-    parentEl: t.ElementishT, clear: bool = False, skipOddNodes: bool = True, mergeText: bool = False
+    parentEl: t.ElementishT,
+    clear: bool = False,
+    skipOddNodes: bool = True,
+    mergeText: bool = False,
 ) -> list[t.NodeT]:
     """
     This function returns all the nodes in a parent element in the DOM sense,

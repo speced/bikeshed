@@ -42,7 +42,7 @@ class RawText(Text):
         return self.text
 
     @classmethod
-    def fromStream(cls, s: Stream, start: int, end: int, text: str | None = None) -> t.Self:  # noqa: ANN102
+    def fromStream(cls, s: Stream, start: int, end: int, text: str | None = None) -> t.Self:
         return cls(
             line=s.line(start),
             endLine=s.line(end),
@@ -80,7 +80,7 @@ class SafeText(Text):
         return escapeHTML(self.text)
 
     @classmethod
-    def fromStream(cls, s: Stream, start: int, end: int, text: str | None = None) -> t.Self:  # noqa: ANN102
+    def fromStream(cls, s: Stream, start: int, end: int, text: str | None = None) -> t.Self:
         return cls(
             line=s.line(start),
             endLine=s.line(end),
@@ -99,7 +99,7 @@ class Doctype(ParserNode):
         return self.data
 
     @classmethod
-    def fromStream(cls, s: Stream, start: int, end: int, data: str) -> t.Self:  # noqa: ANN102
+    def fromStream(cls, s: Stream, start: int, end: int, data: str) -> t.Self:
         return cls(
             line=s.line(start),
             endLine=s.line(end),
@@ -118,7 +118,7 @@ class StartTag(ParserNode):
 
     @classmethod
     def fromStream(
-        cls,  # noqa: ANN102
+        cls,
         s: Stream,
         start: int,
         end: int,
@@ -172,7 +172,7 @@ class SelfClosedTag(ParserNode):
 
     @classmethod
     def fromStream(
-        cls,  # noqa: ANN102
+        cls,
         s: Stream,
         start: int,
         end: int,
@@ -192,7 +192,7 @@ class SelfClosedTag(ParserNode):
         )
 
     @classmethod
-    def fromStartTag(cls, tag: StartTag) -> t.Self:  # noqa: ANN102
+    def fromStartTag(cls, tag: StartTag) -> t.Self:
         return cls(
             line=tag.line,
             endLine=tag.endLine,
@@ -253,7 +253,7 @@ class EndTag(ParserNode):
     tag: str
 
     @classmethod
-    def fromStream(cls, s: Stream, start: int, end: int, tag: str | StartTag) -> t.Self:  # noqa: ANN102
+    def fromStream(cls, s: Stream, start: int, end: int, tag: str | StartTag) -> t.Self:
         return cls(
             line=s.line(start),
             endLine=s.line(end),
@@ -272,7 +272,7 @@ class Comment(ParserNode):
     data: str
 
     @classmethod
-    def fromStream(cls, s: Stream, start: int, end: int, data: str) -> t.Self:  # noqa: ANN102
+    def fromStream(cls, s: Stream, start: int, end: int, data: str) -> t.Self:
         return cls(
             line=s.line(start),
             endLine=s.line(end),
@@ -297,7 +297,7 @@ class RawElement(ParserNode):
     data: str
 
     @classmethod
-    def fromStream(cls, s: Stream, start: int, end: int, startTag: StartTag, data: str) -> t.Self:  # noqa: ANN102
+    def fromStream(cls, s: Stream, start: int, end: int, startTag: StartTag, data: str) -> t.Self:
         return cls(
             line=s.line(start),
             endLine=s.line(end),

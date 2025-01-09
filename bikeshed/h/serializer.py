@@ -110,17 +110,18 @@ class Serializer:
             return n.partition("}")[2]
         return n
 
-    def groupIntoBlocks(self, nodes: t.Iterable[t.NodeT]) -> list[Nodes]:
+    def groupIntoBlocks(self, nodes: t.Iterable[t.NodeT]) -> Blocks:
         # Turns the iterable into a list of block elements and inline "spans"
         # (a list of text and inline elements).
-        blocks = []
+        blocks: Blocks = []
         for node in nodes:
             if self.isElement(node) and self.isBlockElement(node.tag):
                 blocks.append(node)
             else:
                 if len(blocks) == 0 or not isinstance(blocks[-1], list):
                     blocks.append([])
-                blocks[-1].append(node)
+                lastBlock = t.cast("list[str | t.ElementT]", blocks[-1])
+                lastBlock.append(node)
         return blocks
 
     def fixWS(self, text: str) -> str:

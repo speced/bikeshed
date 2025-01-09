@@ -1029,17 +1029,17 @@ def parseCSSProduction(s: Stream, start: int) -> Result[ParserNode | list[Parser
                 text = f"<{term}>"
             break
 
-            match = TYPEWITHARGS_RE.match(text)
-            if match:
-                for_, term, arg = match.groups()
-                attrs["data-lt"] = f"<{term}>"
-                attrs["data-link-type"] = "type"
-                if for_ is not None:
-                    attrs["data-link-for"] = for_
-                if "<<" in arg:
-                    arg = arg.replace("<<", "<").replace(">>", ">")
-                text = f"<{term}[{arg}]>"
-                break
+        match = TYPEWITHARGS_RE.match(text)
+        if match:
+            for_, term, arg = match.groups()
+            attrs["data-lt"] = f"<{term}>"
+            attrs["data-link-type"] = "type"
+            if for_ is not None:
+                attrs["data-link-for"] = for_
+            if "<<" in arg:
+                arg = arg.replace("<<", "<").replace(">>", ">")
+            text = f"<{term}[{arg}]>"
+            break
 
     else:
         m.die(f"Shorthand <<{text}>> does not match any recognized shorthand grammar.", lineNum=s.loc(start))
@@ -1106,7 +1106,7 @@ def parseMaybeDecl(s: Stream, textStart: int) -> Result[list[ParserNode]]:
         return Result.fail(textStart)
     if "'" in rawText:
         return Result.fail(textStart)
-    if not s[colonStart+1].isspace():
+    if not s[colonStart + 1].isspace():
         return Result.fail(textStart)
     colonEnd = colonStart + 1
 
@@ -1126,7 +1126,7 @@ def parseMaybeDecl(s: Stream, textStart: int) -> Result[list[ParserNode]]:
     autolinkSyntax = f"''{rawText}: ...''"
     if rawText != text:
         autolinkSyntax += f" (expands to ''{text}: ...'')"
-    
+
     startTag = StartTag.fromStream(
         s,
         textStart - 2,
@@ -1773,7 +1773,10 @@ def parseLinkInfo(
     )
 
     if re.search(r"&[\w\d#]+;", lt):
-        m.die(f"Saw an HTML escape in the literal portion of an autolink. Use raw characters, or switch to the HTML syntax.", lineNum=s.loc(start))
+        m.die(
+            "Saw an HTML escape in the literal portion of an autolink. Use raw characters, or switch to the HTML syntax.",
+            lineNum=s.loc(start),
+        )
         # Okay to keep going, tho, it'll just fail to link.
 
     linkFor = None
@@ -2443,6 +2446,8 @@ def parseMarkdownLinkTitle(s: Stream, start: int, startChar: str) -> Result[str]
         endChar = '"'
     elif startChar == "(":
         endChar = ")"
+    else:
+        assert False
     while True:
         if s.eof(i):
             m.die("Hit EOF while parsing the title of a markdown link", lineNum=s.line(start))

@@ -604,7 +604,6 @@ def FIXMEreplaceMarkdownBlockquotes(text: str) -> str:
 
     lines = text.split("\n")
     i = 0
-    prefix = None
     while True:
         if i >= len(lines):
             break
@@ -617,6 +616,7 @@ def FIXMEreplaceMarkdownBlockquotes(text: str) -> str:
             i += 1
             while i < len(lines) and re.match(r"\s*>\s?", lines[i]):
                 match = re.match(r"\s*>\s?", lines[i])
+                assert match is not None
                 lines[i] = lines[i][len(match[0]) :]
                 i += 1
             lines[i - 1] += constants.bqEnd
