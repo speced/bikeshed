@@ -208,3 +208,7 @@ def validateW3CStatus(status: Status) -> None:
         m.die(
             f"Under Process2021, {status.name} is no longer a valid status. Use NOTE (or one of its variants NOTE-ED, NOTE-FPWD, NOTE-WD) instead.",
         )
+    if status.name == "NOTE-FPWD":
+        m.die(
+            "Under Process2021, Notes no longer have a 'first public' draft stage. Use NOTE-WD instead.",
+        )
