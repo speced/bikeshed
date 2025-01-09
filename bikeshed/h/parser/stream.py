@@ -6,6 +6,10 @@ import re
 from dataclasses import dataclass, field
 
 from ... import t
+from .nodes import TagStack
+
+if t.TYPE_CHECKING:
+    from .nodes import ParserNode, StartTag
 
 
 @dataclass
@@ -68,21 +72,38 @@ class Result(t.Generic[ResultT_co]):
 
 @dataclass
 class ParseConfig:
-    markdown: bool = False
+    algorithm: bool = False
+    biblio: bool = False
     css: bool = False
+    dfn: bool = False
+    header: bool = False
+    idl: bool = False
+    markdown: bool = False
+    markdownEscapes: bool = False
+    markup: bool = False
     macros: dict[str, str] = field(default_factory=dict)
     context: str | None = None
+    opaqueElements: set[str] = field(default_factory=lambda: {"pre", "xmp", "script", "style"})
 
     @staticmethod
     def fromSpec(doc: t.SpecT, context: str | None = None) -> ParseConfig:
         return ParseConfig(
-            markdown="markdown" in doc.md.markupShorthands,
+            algorithm="algorithm" in doc.md.markupShorthands,
+            biblio="biblio" in doc.md.markupShorthands,
             css="css" in doc.md.markupShorthands,
+            dfn="dfn" in doc.md.markupShorthands,
+            header="http" in doc.md.markupShorthands,
+            idl="idl" in doc.md.markupShorthands,
+            markdown="markdown" in doc.md.markupShorthands,
+            markdownEscapes="markdown-escapes" in doc.md.markupShorthands,
+            markup="markup" in doc.md.markupShorthands,
             macros=doc.macros,
             context=context,
+            opaqueElements=set(doc.md.opaqueElements),
         )
 
 
+@dataclass
 class Stream:
     _chars: str
     _len: int
@@ -90,6 +111,7 @@ class Stream:
     startLine: int
     config: ParseConfig
     depth: int = 1
+    openEls: TagStack = field(default_factory=TagStack)
 
     def __init__(self, chars: str, config: ParseConfig, startLine: int = 1, depth: int = 1) -> None:
         if depth > 10:
@@ -101,6 +123,7 @@ class Stream:
         self.startLine = startLine
         self.config = config
         self.depth = depth
+        self.openEls = TagStack()
         for i, char in enumerate(chars):
             if char == "\n":
                 self._lineBreaks.append(i)
@@ -110,6 +133,14 @@ class Stream:
         return Stream(chars, config=newConfig, startLine=startLine, depth=self.depth + 1)
 
     def __getitem__(self, key: int | slice) -> str:
+        if isinstance(key, int):
+            if key < 0:
+                return ""
+        else:
+            if key.start < 0:
+                key = slice(0, key.stop, key.step)
+            if key.stop < 0:
+                key = slice(key.start, 0, key.step)
         try:
             return self._chars[key]
         except IndexError:
@@ -120,6 +151,10 @@ class Stream:
 
     def __len__(self) -> int:
         return self._len
+
+    @property
+    def context(self) -> str | None:
+        return self.config.context
 
     def line(self, index: int) -> int:
         # Zero-based line index
@@ -209,3 +244,37 @@ class Stream:
         # The text on the current line from the start point on.
         # Includes the newline, if present.
         return self[start : self.nextLineStart(start)]
+
+    def observeResult(self, res: Result[ParserNode | list[ParserNode]]) -> Result[ParserNode | list[ParserNode]]:
+        if res.value is None:
+            pass
+        elif isinstance(res.value, list):
+            for node in res.value:
+                self.observeNode(node)
+        else:
+            self.observeNode(res.value)
+        return res
+
+    def observeNode(self, node: ParserNode) -> ParserNode:
+        self.openEls.update(node)
+        return node
+
+    def observeNodes(self, nodes: list[ParserNode]) -> list[ParserNode]:
+        for node in nodes:
+            self.openEls.update(node)
+        return nodes
+
+    def observeShorthandOpen(self, startTag: StartTag, sigils: tuple[str, str]) -> None:
+        self.openEls.updateShorthandOpen(startTag, sigils)
+
+    def observeShorthandClose(self, loc: str, startTag: StartTag, sigils: tuple[str, str]) -> None:
+        self.openEls.updateShorthandClose(loc, startTag, sigils)
+
+    def cancelShorthandOpen(self, startTag: StartTag, sigils: tuple[str, str]) -> None:
+        self.openEls.cancelShorthandOpen(startTag, sigils)
+
+    def inOpaqueElement(self) -> bool:
+        return self.openEls.inOpaqueElement(self.config.opaqueElements)
+
+    def inTagContext(self, tagName: str) -> bool:
+        return self.openEls.inTagContext(tagName)

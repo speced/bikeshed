@@ -13,6 +13,7 @@ if TYPE_CHECKING:
         AnyStr,
         Awaitable,
         Callable,
+        Collection,
         DefaultDict,
         Deque,
         FrozenSet,
@@ -34,11 +35,12 @@ if TYPE_CHECKING:
         TypeGuard,
     )
 
-    from _typeshed import Self, SupportsKeysAndGetItem
+    from _typeshed import SupportsKeysAndGetItem
     from lxml import etree
     from typing_extensions import (
         NotRequired,
         Required,
+        Self,
     )
 
     ElementT: TypeAlias = etree._Element

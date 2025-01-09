@@ -687,12 +687,14 @@ def processAutolinks(doc: t.SpecT) -> None:
     # An <a> without an href is an autolink.
     # <i> is a legacy syntax for term autolinks. If it links up, we change it into an <a>.
     # We exclude bibliographical links, as those are processed in `processBiblioLinks`.
-    query = "a:not([href]):not([data-link-type='biblio'])"
+    query = "a:not([href]):not([data-link-type='biblio']), bs-link"
     if doc.md.useIAutolinks:
         m.warn("Use <i> Autolinks is deprecated and will be removed. Please switch to using <a> elements.")
         query += ", i"
     autolinks = h.findAll(query, doc)
     for el in autolinks:
+        if el.tag == "bs-link":
+            el.tag = "a"
         # Explicitly empty linking text indicates this shouldn't be an autolink.
         if el.get("data-lt") == "":
             continue
@@ -1400,7 +1402,10 @@ def addNoteHeaders(doc: t.SpecT) -> None:
             preText = _t("EXAMPLE: ")
         else:
             preText = ""
-        h.prependChild(el, h.E.div({"class": "marker"}, preText, *h.parseHTML(el.get("heading", ""))))
+        lineNum = int(el.get("bs-line-number", "1"))
+        parseConfig = h.ParseConfig.fromSpec(doc=doc, context="heading='' attribute")
+        parsedHeading = h.parseHTML(h.parseText(el.get("heading", ""), parseConfig, startLine=lineNum))
+        h.prependChild(el, h.E.div({"class": "marker"}, preText, *parsedHeading))
         h.removeAttr(el, "heading")
 
 

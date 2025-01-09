@@ -192,3 +192,14 @@ def doEvery(s: float, action: t.Callable, lastTime: float | None = None) -> floa
         action()
         return newTime
     return lastTime
+
+
+if t.TYPE_CHECKING:
+    SafeIndexDefaultT = t.TypeVar("SafeIndexDefaultT")
+
+
+def safeIndex(coll: t.Sequence, needle: t.Any, default: SafeIndexDefaultT = None) -> int | SafeIndexDefaultT:  # type: ignore[assignment]
+    try:
+        return coll.index(needle)
+    except ValueError:
+        return default
