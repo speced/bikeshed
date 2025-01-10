@@ -225,7 +225,12 @@ def serializeTag(el: t.ElementT) -> str:
     # Use when you want to output the HTML,
     # but it might be a container with a lot of content.
     tag = "<" + el.tag
-    for n, v in el.attrib.items():
+    for n, v in sorted(el.attrib.items()):
+        # Don't output the bs-* attributes, they're added by BS
+        # and don't show up in the source, so it's confusing to
+        # print them.
+        if t.cast(str, n).startswith("bs-"):
+            continue
         tag += ' {n}="{v}"'.format(n=str(n), v=escapeAttr(str(v)))
     tag += ">"
     return tag
@@ -392,6 +397,10 @@ def insertAfter(target: t.ElementT, *els: t.NodesT) -> t.ElementT:
 
 
 def removeNode(node: t.ElementT) -> t.ElementT:
+    # Kills the node *and* its children.
+    # If you just want to remove the node itself, and lift
+    # the contents up into its place, you wanna call
+    # replaceWithContents()
     parent = node.getparent()
     if parent is None:
         return node
@@ -529,7 +538,12 @@ def ancestorElements(el: t.ElementT, self: bool = False) -> t.Generator[t.Elemen
     yield from el.iterancestors()
 
 
-def childNodes(parentEl: t.ElementishT, clear: bool = False, skipOddNodes: bool = True) -> list[t.NodeT]:
+def childNodes(
+    parentEl: t.ElementishT,
+    clear: bool = False,
+    skipOddNodes: bool = True,
+    mergeText: bool = False,
+) -> list[t.NodeT]:
     """
     This function returns all the nodes in a parent element in the DOM sense,
     mixing text nodes (strings) and other nodes together
@@ -543,7 +557,7 @@ def childNodes(parentEl: t.ElementishT, clear: bool = False, skipOddNodes: bool 
     In other words, the following is a no-op:
 
     ```
-    appendChild(parentEl, *childNodes(parentEl, clear=True), allowEmpty=True)
+    appendChild(parentEl, *childNodes(parentEl, clear=True, skipOddNodes=False), allowEmpty=True)
     ```
 
     Using clear=True is required if you're going to be modifying the element or its children,
@@ -553,20 +567,32 @@ def childNodes(parentEl: t.ElementishT, clear: bool = False, skipOddNodes: bool 
 
     skipOddNodes ensures that the return value will only be text and Element nodes;
     if it's false, there might be comments, PIs, etc.
+
+    mergeText merges adjacent text nodes in the output, even if they weren't adjacent
+    in the source document (such as if a skipped odd node separated them).
     """
     ret: list[t.NodeT] = []
+
+    def append(nodes: list[t.NodeT], node: t.NodeT) -> None:
+        if not mergeText:
+            nodes.append(node)
+            return
+        if isinstance(node, str) and len(nodes) > 0 and isinstance(nodes[-1], str):
+            nodes[-1] += node
+        else:
+            nodes.append(node)
 
     if isinstance(parentEl, list):
         for c in parentEl:
             if isinstance(c, str):
-                ret.append(c)
+                append(ret, c)
                 continue
             if skipOddNodes and isOddNode(c):
                 pass
             else:
-                ret.append(c)
+                append(ret, c)
             if not emptyText(c.tail, wsAllowed=False):
-                ret.append(t.cast(str, c.tail))
+                append(ret, t.cast(str, c.tail))
                 if clear:
                     c.tail = None
         if clear:
@@ -574,16 +600,16 @@ def childNodes(parentEl: t.ElementishT, clear: bool = False, skipOddNodes: bool 
         return ret
 
     if not emptyText(parentEl.text, wsAllowed=False):
-        ret.append(t.cast(str, parentEl.text))
+        append(ret, t.cast(str, parentEl.text))
         if clear:
             parentEl.text = None
     for c in childElements(parentEl, oddNodes=True):
         if skipOddNodes and isOddNode(c):
             pass
         else:
-            ret.append(c)
+            append(ret, c)
         if not emptyText(c.tail, wsAllowed=False):
-            ret.append(t.cast(str, c.tail))
+            append(ret, t.cast(str, c.tail))
             if clear:
                 c.tail = None
     if clear:
@@ -910,8 +936,6 @@ def addOldIDs(els: t.Iterable[t.ElementT]) -> None:
 
 
 def dedupIDs(doc: t.SpecT) -> None:
-    import itertools as iter
-
     ids: OrderedDict[str, list[t.ElementT]] = OrderedDict()
     for el in findAll("[id]", doc):
         ids.setdefault(t.cast(str, el.get("id")), []).append(el)
@@ -923,32 +947,37 @@ def dedupIDs(doc: t.SpecT) -> None:
         if re.match(r"issue-[0-9a-fA-F]{8}$", dupeId):
             # Don't warn about issues, it's okay if they have the same ID because they're identical text.
             warnAboutDupes = False
-        ints = iter.count(1)
+        if dupeId.startswith("ref-for-"):
+            warnAboutDupes = False
+        complaintEls = []
+        if warnAboutDupes:
+            for el in els:
+                if el.get("data-silently-dedup") is not None:
+                    continue
+                complaintEls.append(el)
+        # Now dedup everything left in the list after the first one.
+        dedupIndex = 1
         for el in els[1:]:
-            # If I registered an alternate ID, try to use that.
             if el.get("data-alternate-id"):
                 altId = el.get("data-alternate-id")
                 assert altId is not None
                 if altId not in ids:
                     el.set("id", safeID(doc, altId))
-                    ids.setdefault(altId, []).append(el)
+                    ids[altId] = [el]
+                    complaintEls.remove(el)
                     continue
-            if el.get("data-silently-dedup") is not None:
-                warnAboutDupes = False
-            if dupeId.startswith("ref-for-"):
-                warnAboutDupes = False
-            # Try to de-dup the id by appending an integer after it.
-            if warnAboutDupes:
-                warn(
-                    f"Multiple elements have the same ID '{dupeId}'.\nDeduping, but this ID may not be stable across revisions.",
-                    el=el,
-                )
-            for x in ints:
-                altId = "{}{}".format(dupeId, circledDigits(x))
-                if altId not in ids:
-                    el.set("id", safeID(doc, altId))
-                    ids.setdefault(altId, []).append(el)
-                    break
+            altId = f"{dupeId}{circledDigits(dedupIndex)}"
+            while altId in ids:
+                dedupIndex += 1
+                altId = f"{dupeId}{circledDigits(dedupIndex)}"
+            el.set("id", safeID(doc, altId))
+            ids[altId] = [el]
+
+        if len(complaintEls) > 1:
+            complaintDetails = [f"<{el.tag}> on line {approximateLineNumber(el)}" for el in complaintEls]
+            warn(
+                f"Multiple elements have the same id '{dupeId}':\n  {', '.join(complaintDetails)}\nDeduping, but this ID may not be stable across revisions.",
+            )
 
 
 def approximateLineNumber(el: t.ElementT, setIntermediate: bool = True) -> str | None:
@@ -956,8 +985,6 @@ def approximateLineNumber(el: t.ElementT, setIntermediate: bool = True) -> str |
         return el.get("bs-line-number")
     parent = parentElement(el)
     if not isElement(parent):
-        if el.tag == "html":
-            return None
         return None
     approx = approximateLineNumber(parent, setIntermediate=setIntermediate)
     if approx is None:

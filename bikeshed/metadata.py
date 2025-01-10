@@ -331,8 +331,11 @@ class MetadataManager:
             macros["deadline"] = self.deadline.strftime(f"{self.deadline.day} %B %Y")
             macros["isodeadline"] = self.deadline.strftime("%Y-%m-%d")
         if doc.doctype.org.name == "W3C" and "Date" in doc.doctype.status.requires:
+            status_name = doc.doctype.status.name
+            if status_name == "NOTE-WD":
+                status_name = "DNOTE"
             macros["version"] = (
-                f"https://www.w3.org/TR/{macros['year']}/{doc.doctype.status.name}-{macros['vshortname']}-{macros['cdate']}/"
+                f"https://www.w3.org/TR/{macros['year']}/{status_name}-{macros['vshortname']}-{macros['cdate']}/"
             )
             macros["history"] = f"https://www.w3.org/standards/history/{self.displayVshortname}/"
         elif self.ED:
@@ -750,7 +753,9 @@ def parseMarkupShorthands(key: str, val: str, lineNum: str | int | None) -> conf
     # TODO: Just call parseBoolistList instead
     vals = [v.strip() for v in val.lower().split(",")]
     ret = config.BoolSet(default=False)
-    validCategories = frozenset(["css", "markup", "dfn", "biblio", "http", "idl", "markdown", "algorithm"])
+    validCategories = frozenset(
+        ["algorithm", "biblio", "css", "dfn", "http", "idl", "markdown", "markdown-escapes", "markup"],
+    )
     for v in vals:
         pieces = v.split()
         if len(pieces) != 2:
@@ -1097,14 +1102,19 @@ class IndentInfo:
     char: str | None = None
     spaceLines: int = 0
     tabLines: int = 0
-    totalLines: int = 0
+    neitherLines: int = 0
+
+    def tooShort(self) -> bool:
+        return (self.spaceLines + self.tabLines) < 20
 
 
 def inferIndent(lines: t.Sequence[Line]) -> IndentInfo:
+    # Infer what indent character the document is using.
     # If the document uses space indentation,
     # infer what the indent size is by seeing what % of indents
     # are divisible by various values.
-    # (If it uses tabs, or no indents at all, returns None.)
+    # A sufficiently short document, or one with too few indented lines,
+    # will fail to infer anything.
     indentSizes: Counter[int] = Counter()
     info = IndentInfo()
     for line in lines:
@@ -1116,9 +1126,10 @@ def inferIndent(lines: t.Sequence[Line]) -> IndentInfo:
             info.spaceLines += 1
         elif line.text[0:1] == "\t":
             info.tabLines += 1
-        info.totalLines += 1
+        else:
+            info.neitherLines += 1
     # If very few lines are indented at all, just bail
-    if (info.spaceLines + info.tabLines) < info.totalLines / 20:
+    if info.tooShort():
         return info
     # If tab indents predominate, assume tab-indent.
     if info.spaceLines < info.tabLines:

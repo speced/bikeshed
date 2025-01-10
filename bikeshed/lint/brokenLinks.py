@@ -34,11 +34,11 @@ def brokenLinks(doc: t.SpecT) -> None:
         try:
             res = requests.get(href, timeout=5)
         except requests.exceptions.Timeout:
-            m.lint(f"Checking the following link timed out:\n{h.outerHTML(el)}", el=el)
+            m.lint(f"Checking the following link timed out:\n{href}", lineNum=el)
             continue
         except:  # pylint: disable=bare-except
-            m.lint(f"The following link caused an error when I tried to request it:\n{h.outerHTML(el)}", el=el)
+            m.lint(f"The following link caused an error when I tried to request it:\n{href}", lineNum=el)
             continue
         if res.status_code >= 400:
-            m.lint(f"Got a {res.status_code} status when fetching the link for:\n{h.outerHTML(el)}", el=el)
+            m.lint(f"Got a {res.status_code} status when fetching the link for:\n{href}", lineNum=el)
     m.say("Done checking links!")

@@ -53,7 +53,7 @@ dfnClassToType = {
 dfnTypes = frozenset(list(dfnClassToType.values()) + ["dfn"])
 maybeTypes = frozenset(["value", "type", "at-rule", "function", "selector"])
 cssTypes = frozenset(["property", "value", "at-rule", "descriptor", "type", "function", "selector"])
-markupTypes = frozenset(["element", "element-attr", "element-state", "attr-value"])
+markupTypes = frozenset(["element", "element-attr", "element-state", "attr-value", "element-sub"])
 idlTypes = frozenset(
     [
         "event",
