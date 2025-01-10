@@ -331,8 +331,11 @@ class MetadataManager:
             macros["deadline"] = self.deadline.strftime(f"{self.deadline.day} %B %Y")
             macros["isodeadline"] = self.deadline.strftime("%Y-%m-%d")
         if doc.doctype.org.name == "W3C" and "Date" in doc.doctype.status.requires:
+            status_name = doc.doctype.status.name
+            if status_name == "NOTE-WD":
+                status_name = "DNOTE"
             macros["version"] = (
-                f"https://www.w3.org/TR/{macros['year']}/{doc.doctype.status.name}-{macros['vshortname']}-{macros['cdate']}/"
+                f"https://www.w3.org/TR/{macros['year']}/{status_name}-{macros['vshortname']}-{macros['cdate']}/"
             )
             macros["history"] = f"https://www.w3.org/standards/history/{self.displayVshortname}/"
         elif self.ED:
