@@ -34,10 +34,10 @@ class DataFileRequester:
         str: t.Literal[False],
         okayToFail: bool = False,
         fileType: str | None = None,
-    ) -> io.TextIOWrapper: ...
+    ) -> t.TextIO: ...
 
     @t.overload
-    def fetch(self, *segs: str, okayToFail: bool = False, fileType: str | None = None) -> io.TextIOWrapper: ...
+    def fetch(self, *segs: str, okayToFail: bool = False, fileType: str | None = None) -> t.TextIO: ...
 
     def fetch(
         self,
@@ -45,7 +45,7 @@ class DataFileRequester:
         str: bool = False,
         okayToFail: bool = False,
         fileType: str | None = None,
-    ) -> str | io.TextIOWrapper:
+    ) -> str | t.TextIO:
         location = self._buildPath(segs=segs, fileType=fileType or self.fileType)
         try:
             if str:
@@ -83,12 +83,12 @@ class DataFileRequester:
     def _fail(self, location: str, str: t.Literal[True], okayToFail: bool) -> str: ...
 
     @t.overload
-    def _fail(self, location: str, str: t.Literal[False], okayToFail: bool) -> io.TextIOWrapper: ...
+    def _fail(self, location: str, str: t.Literal[False], okayToFail: bool) -> t.TextIO: ...
 
     @t.overload
-    def _fail(self, location: str, str: bool, okayToFail: bool) -> str | io.TextIOWrapper: ...
+    def _fail(self, location: str, str: bool, okayToFail: bool) -> str | t.TextIO: ...
 
-    def _fail(self, location: str, str: bool, okayToFail: bool) -> str | io.TextIOWrapper:
+    def _fail(self, location: str, str: bool, okayToFail: bool) -> str | t.TextIO:
         if okayToFail:
             if str:
                 return ""

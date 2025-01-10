@@ -46,7 +46,7 @@ class MessagesState:
     silent: bool = False
     printMode: str = "console"
     asciiOnly: bool = False
-    fh: io.TextIOWrapper = t.cast("io.TextIOWrapper", sys.stdout)  # noqa: RUF009
+    fh: t.TextIO = sys.stdout
     seenMessages: set[str | tuple[str, str]] = dataclasses.field(default_factory=set)
     categoryCounts: Counter[str] = dataclasses.field(default_factory=Counter)
 
@@ -311,9 +311,9 @@ def errorAndExit() -> None:
 
 @contextlib.contextmanager
 def withMessageState(
-    fh: str | io.TextIOWrapper,
+    fh: str | t.TextIO,
     **kwargs: t.Any,
-) -> t.Generator[io.TextIOWrapper, None, None]:
+) -> t.Generator[t.TextIO, None, None]:
     if isinstance(fh, str):
         fhIsTemporary = True
         fh = open(fh, "w", encoding="utf-8")
@@ -332,7 +332,7 @@ def withMessageState(
 
 
 @contextlib.contextmanager
-def messagesSilent() -> t.Generator[io.TextIOWrapper, None, None]:
+def messagesSilent() -> t.Generator[t.TextIO, None, None]:
     import os
 
     fh = open(os.devnull, "w", encoding="utf-8")
