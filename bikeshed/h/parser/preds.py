@@ -317,7 +317,7 @@ def isControl(ch: str | int) -> bool:
         cp = ord(ch)
     else:
         cp = ch
-    return (0 <= cp <= 0x1F) or (0x7F <= cp <= 0x9F)
+    return (0 <= cp <= 0x08) or (cp == 0x0B) or (0x0D <= cp <= 0x1F) or (0x7F <= cp <= 0x9F)
 
 
 def isNoncharacter(ch: str | int) -> bool:

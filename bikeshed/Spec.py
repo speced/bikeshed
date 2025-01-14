@@ -186,7 +186,11 @@ class Spec:
         m.retroactivelyCheckErrorLevel()
 
     def earlyParse(self, inputContent: InputSource.InputContent) -> list[l.Line]:
-        text = h.strFromNodes(h.initialDocumentParse(inputContent.content, h.ParseConfig.fromSpec(self)), withIlcc=True)
+        text = FIXMEreplaceMarkdownBlockquotes(inputContent.content)
+        nodes = h.initialDocumentParse(text, h.ParseConfig.fromSpec(self))
+        if self.debug:
+            h.debugNodes(nodes)
+        text = h.strFromNodes(nodes, withIlcc=True)
         inputContent.rawLines = [x + "\n" for x in text.split("\n")]
         return inputContent.lines
 
@@ -219,14 +223,6 @@ class Spec:
         if "mixed-indents" in self.md.complainAbout:
             if self.md.indentInfo and self.md.indentInfo.char:
                 checkForMixedIndents(self.lines, self.md.indentInfo)
-            elif len(self.lines) > 50:
-                # Only complain about a failed inference if it's long
-                # enough that I could reasonably infer something.
-                m.warn(
-                    "`Complain About: mixed-indents yes` is active, but I couldn't infer the document's indentation. Be more consistent, or turn this lint off.",
-                )
-            else:
-                pass
 
         # Deal with further <pre> blocks, and markdown
         self.lines = datablocks.transformDataBlocks(self, self.lines)
@@ -591,3 +587,35 @@ def checkForMixedIndents(lines: t.Sequence[l.Line], info: metadata.IndentInfo) -
                 m.lint(f"Your document appears to use tabs to indent, but line {line.i} starts with spaces.")
         if re.match(r"(\t+ +\t)|( +\t)", line.text):
             m.lint(f"Line {line.i}'s indent contains tabs after spaces.")
+
+
+def FIXMEreplaceMarkdownBlockquotes(text: str) -> str:
+    # Temporary hack to make the early HTML pass not be broken
+    # by Markdown blockquotes.
+    # * finds sequences of lines that share a ws + angle bracket prefix
+    # * replaces first such > with a blockquote-open PUA
+    # * replaces subsequent > with a space
+    # * adds a blockquote-close PUA to the end of last line
+    # * the HTML parser recognizes those PUAs and emits the correct start/end tags.
+
+    lines = text.split("\n")
+    i = 0
+    while True:
+        if i >= len(lines):
+            break
+        match = re.match(r"\s*>\s?", lines[i])
+        if not match:
+            i += 1
+            continue
+        if i + 1 < len(lines) and re.match(r"\s*>\s?", lines[i + 1]):
+            lines[i] = constants.bqStart + lines[i][len(match[0]) :]
+            i += 1
+            while i < len(lines) and re.match(r"\s*>\s?", lines[i]):
+                match = re.match(r"\s*>\s?", lines[i])
+                assert match is not None
+                lines[i] = lines[i][len(match[0]) :]
+                i += 1
+            lines[i - 1] += constants.bqEnd
+        else:
+            i += 1
+    return "\n".join(lines)

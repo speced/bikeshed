@@ -6,217 +6,13 @@ from .. import config, h, t
 from .. import messages as m
 
 
-def transformProductionPlaceholders(doc: t.SpecT) -> None:
-    propdescRe = re.compile(r"^'(?:(\S*)/)?([\w*-]+)(?:!!([\w-]+))?'$")  # pylint: disable=redefined-outer-name
-    funcRe = re.compile(r"^(?:(\S*)/)?([\w*-]+\(\))$")
-    atruleRe = re.compile(r"^(?:(\S*)/)?(@[\w*-]+)$")
-    typeRe = re.compile(
-        r"""
-        ^(?:(\S*)/)?
-        (\S+)
-        (?:\s+
-            \[\s*
-            (-?(?:\d+[\w-]*|∞|[Ii]nfinity|&infin;))\s*
-            ,\s*
-            (-?(?:\d+[\w-]*|∞|[Ii]nfinity|&infin;))\s*
-            \]\s*
-        )?$
-        """,
-        re.X,
-    )
-    typeWithArgsRe = re.compile(
-        r"""
-        ^(?:(\S*)/)?
-        (\S+)
-        \s*\[([^\]]*)\]\s*$
-        """,
-        re.X,
-    )
-    for el in h.findAll("fake-production-placeholder", doc):
-        addLineNumber(el)
-        text = h.textContent(el)
-        h.clearContents(el)
-        lt = text
-        match = propdescRe.match(lt)
-        if match:
-            linkFor, lt, linkType = match.groups()
-            if linkFor == "":
-                linkFor = "/"
-            if linkType is None:
-                if linkFor is None:
-                    linkType = "property"
-                else:
-                    linkType = "propdesc"
-            elif linkType in ("property", "descriptor"):
-                pass
-            else:
-                m.die(
-                    f"Shorthand <<{match.group(0)}>> gives type as '{match.group(3)}', but only 'property' and 'descriptor' are allowed.",
-                    el=el,
-                )
-                el.tag = "span"
-                el.text = "<‘" + text[1:-1] + "’>"
-                continue
-            el.tag = "a"
-            el.set("data-link-type", linkType)
-            el.set("data-lt", lt)
-            if linkFor is not None:
-                el.set("for", linkFor)
-            el.text = "<'" + lt + "'>"
-            continue
-        match = funcRe.match(lt)
-        if match:
-            el.tag = "a"
-            el.set("data-link-type", "function")
-            el.set("data-lt", match.group(2))
-            if match.group(1) is not None:
-                el.set("for", match.group(1))
-            el.text = "<" + match.group(2) + ">"
-            continue
-        match = atruleRe.match(lt)
-        if match:
-            el.tag = "a"
-            el.set("data-link-type", "at-rule")
-            el.set("data-lt", match.group(2))
-            if match.group(1) is not None:
-                el.set("for", match.group(1))
-            el.text = "<" + match.group(2) + ">"
-            continue
-        match = typeRe.match(lt)
-        if match:
-            for_, term, rangeStart, rangeEnd = match.groups()
-            el.tag = "a"
-            el.set("data-lt", f"<{term}>")
-            el.set("data-link-type", "type")
-            if for_ is not None:
-                el.set("for", for_)
-            if rangeStart is not None:
-                formattedStart, numStart = parseRangeComponent(rangeStart)
-                formattedEnd, numEnd = parseRangeComponent(rangeEnd)
-                if formattedStart is None or formattedEnd is None:
-                    m.die(f"Shorthand <<{text}>> has an invalid range.", el=el)
-                    el.text = f"<{match.group(0)}>"
-                elif numStart >= numEnd:
-                    m.die(
-                        f"Shorthand <<{text}>> has a range whose start is not less than its end.",
-                        el=el,
-                    )
-                    el.text = f"<{term} [{formattedStart},{formattedEnd}]>"
-                else:
-                    el.text = f"<{term} [{formattedStart},{formattedEnd}]>"
-            else:
-                el.text = f"<{term}>"
-            continue
-        match = typeWithArgsRe.match(lt)
-        if match:
-            for_, term, arg = match.groups()
-            el.tag = "a"
-            el.set("data-lt", f"<{term}>")
-            el.set("data-link-type", "type")
-            if "<<" in arg:
-                arg = arg.replace("<<", "<").replace(">>", ">")
-            el.text = f"<{term}[{arg}]>"
-            if for_ is not None:
-                el.set("for", for_)
-            continue
-        m.die(f"Shorthand <<{text}>> does not match any recognized shorthand grammar.", el=el)
-        el.tag = "span"
-        el.text = el.get("bs-autolink-syntax")
-        continue
-
-
-def parseRangeComponent(val: str) -> tuple[str | None, float | int]:
-    sign = ""
-    signVal = 1
-    num: float | int
-    val = val.strip()
-    if val[0] in ["-", "−"]:
-        sign = "-"
-        signVal = -1
-        val = val[1:]
-
-    if val.lower() == "infinity":
-        val = "∞"
-    if val.lower() == "&infin;":
-        val = "∞"
-    if val == "∞":
-        return sign + val, signVal * float("inf")
-
-    match = re.match(r"(\d+)([\w-]*)", val)
-    if match is None:
-        return None, 0
-    (digits, unit) = match.groups()
-    num = int(digits) * signVal
-    val = str(num)
-
-    return val + unit, num
-
-
-def transformMaybePlaceholders(doc: t.SpecT) -> None:
-    propRe = re.compile(r"^([\w-]+): .+")
-    valRe = re.compile(r"^(?:(\S*)/)?(\S[^!]*)(?:!!([\w-]+))?$")
-    for el in h.findAll("fake-maybe-placeholder", doc):
-        text = el.get("bs-original-contents")
-        assert text is not None
-        match = propRe.match(text)
-        if match:
-            el.tag = "a"
-            el.set("class", "css")
-            el.set("data-link-type", "propdesc")
-            el.set("data-lt", match.group(1))
-            continue
-        match = valRe.match(text)
-        if match:
-            if match.group(3) is None:
-                linkType = "maybe"
-            elif match.group(3) in config.maybeTypes:
-                linkType = match.group(3)
-            else:
-                m.die(
-                    f"Shorthand ''{match.group(0)}'' gives type as '{match.group(3)}', but only “maybe” types are allowed.",
-                    el=el,
-                )
-                el.tag = "css"
-                continue
-            el.tag = "a"
-            el.set("class", "css")
-            el.set("data-link-type", linkType)
-            el.set("data-lt", match.group(2))
-            # Three cases to worry about:
-            # 1. ''foo/valid-value'' (successful link)
-            # 2. ''foo/invalid-value'' (intended link, but unsuccessful)
-            # 3. ''foo&0x2f;bar'' (not a link, just wants a slash in text)
-            #
-            # Handling (1) is easy - on successful link, I'll swap the text
-            # for the reffed value.
-            # Distinguish (2) from (3) is hard, and they need to be treated
-            # differently - (3) should be left alone, while (2) needs to
-            # have its text swapped to "invalid-value".
-            #
-            # Compromise: if it looks *sufficiently close* to a link
-            # I'll swap the text ahead of time, to remove any metadata
-            # that shouldn't display for a link.
-            # Otherwise I'll leave it alone, but if it successfully links
-            # based on literal text, it'll swap its text out.
-            #
-            # "Sufficiently close" means it has a for or type value,
-            # and *doesn't* contain what looks like a close tag
-            # (which would otherwise look like a for value due to the slash).
-            if (match.group(1) is not None or match.group(3) is not None) and "</" not in text:
-                h.clearContents(el)
-                el.text = match.group(2)
-            else:
-                el.set("bs-replace-text-on-link-success", match.group(2))
-            if match.group(1) is not None:
-                el.set("for", match.group(1))
-            continue
-        el.tag = "css"
-
-
 def transformAutolinkShortcuts(doc: t.SpecT) -> None:
     # Do the remaining textual replacements
 
     addedNodes = []
+
+    if "markdown" not in doc.md.markupShorthands:
+        return
 
     def transformElement(parentEl: t.ElementT) -> None:
         processContents = h.isElement(parentEl) and not doc.isOpaqueElement(parentEl)
@@ -234,26 +30,7 @@ def transformAutolinkShortcuts(doc: t.SpecT) -> None:
 
     def transformText(text: str) -> list[t.NodeT]:
         nodes: list[t.NodeT] = [text]
-        if "css" in doc.md.markupShorthands:
-            nodes = config.processTextNodes(nodes, propdescRe, propdescReplacer)
-        if "dfn" in doc.md.markupShorthands:
-            nodes = config.processTextNodes(nodes, dfnRe, dfnReplacer)
-            nodes = config.processTextNodes(nodes, abstractRe, abstractReplacer)
-        if "http" in doc.md.markupShorthands:
-            nodes = config.processTextNodes(nodes, headerRe, headerReplacer)
-        if "idl" in doc.md.markupShorthands:
-            nodes = config.processTextNodes(nodes, idlRe, idlReplacer)
-        if "cddl" in doc.md.markupShorthands:
-            nodes = config.processTextNodes(nodes, cddlRe, cddlReplacer)
-        if "markup" in doc.md.markupShorthands:
-            nodes = config.processTextNodes(nodes, elementRe, elementReplacer)
-        if "biblio" in doc.md.markupShorthands:
-            nodes = config.processTextNodes(nodes, biblioRe, biblioReplacer)
-            nodes = config.processTextNodes(nodes, sectionRe, sectionReplacer)
-        if "algorithm" in doc.md.markupShorthands:
-            nodes = config.processTextNodes(nodes, varRe, varReplacer)
         if "markdown" in doc.md.markupShorthands:
-            nodes = config.processTextNodes(nodes, inlineLinkRe, inlineLinkReplacer)
             nodes = config.processTextNodes(nodes, strongRe, strongReplacer)
             nodes = config.processTextNodes(nodes, emRe, emReplacer)
             nodes = config.processTextNodes(nodes, escapedRe, escapedReplacer)
@@ -266,9 +43,6 @@ def transformAutolinkShortcuts(doc: t.SpecT) -> None:
     for node in addedNodes:
         if h.isElement(node):
             addLineNumber(node)
-
-    for el in h.findAll("var", doc):
-        h.fixSurroundingTypography(el)
 
 
 def transformShorthandElements(doc: t.SpecT) -> None:
@@ -297,12 +71,13 @@ def transformShorthandElements(doc: t.SpecT) -> None:
         return False
 
     for el in h.findAll("l", doc):
-        # Autolinks that aren't HTML-parsing-compatible
-        # are already specially handled by fixAwkwardCSSShorthands().
-        child = h.hasOnlyChild(el)
-        if child is not None and child.get("bs-autolink-syntax") is not None:
-            h.replaceNode(el, child)
-            h.transferAttributes(el, child)
+        # The shorthands that get handled in the parser just need
+        # their attributes moved over. (Eventually this'll be all
+        # of them).
+        alreadyDone = h.find("[bs-autolink-syntax]", el)
+        if alreadyDone is not None:
+            h.transferAttributes(el, alreadyDone)
+            h.replaceWithContents(el)
             continue
 
         text = h.textContent(el)
@@ -311,6 +86,8 @@ def transformShorthandElements(doc: t.SpecT) -> None:
         if replacer(dfnRe, dfnReplacer, el, text):
             continue
         if replacer(idlRe, idlReplacer, el, text):
+            continue
+        if replacer(cddlRe, cddlReplacer, el, text):
             continue
         if replacer(elementRe, elementReplacer, el, text):
             continue

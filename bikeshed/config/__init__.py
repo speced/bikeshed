@@ -33,6 +33,7 @@ from .main import (
     intersperse,
     processTextNodes,
     reSubObject,
+    safeIndex,
     scriptPath,
     simplifyText,
     splitForValues,

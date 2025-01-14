@@ -110,19 +110,19 @@ class Serializer:
             return n.partition("}")[2]
         return n
 
-    def groupIntoBlocks(self, nodes: t.Iterable[t.NodeT]) -> t.Generator[Nodes, None, None]:
-        nonBlockNodes: list[str | t.ElementT] = []
+    def groupIntoBlocks(self, nodes: t.Iterable[t.NodeT]) -> Blocks:
+        # Turns the iterable into a list of block elements and inline "spans"
+        # (a list of text and inline elements).
+        blocks: Blocks = []
         for node in nodes:
             if self.isElement(node) and self.isBlockElement(node.tag):
-                if nonBlockNodes:
-                    yield nonBlockNodes
-                    nonBlockNodes = []
-                yield node
-                continue
+                blocks.append(node)
             else:
-                nonBlockNodes.append(node)
-        if nonBlockNodes:
-            yield nonBlockNodes
+                if len(blocks) == 0 or not isinstance(blocks[-1], list):
+                    blocks.append([])
+                lastBlock = t.cast("list[str | t.ElementT]", blocks[-1])
+                lastBlock.append(node)
+        return blocks
 
     def fixWS(self, text: str) -> str:
         import string
@@ -212,7 +212,7 @@ class Serializer:
         # Otherwise, dedent completely, since I don't know if indenting
         # is significant for the element.
         self.startTag(tag, el, write)
-        for node in dom.childNodes(el):
+        for node in dom.childNodes(el, mergeText=True):
             if self.isElement(node):
                 msg = f"Somehow a CDATA element got an element child:\n{dom.outerHTML(el)}"
                 raise Exception(msg)
@@ -223,7 +223,7 @@ class Serializer:
 
     def _writeOpaqueElement(self, tag: str, el: t.ElementT, write: WriterFn, indent: int) -> None:
         self.startTag(tag, el, write)
-        for node in dom.childNodes(el):
+        for node in dom.childNodes(el, mergeText=True):
             if self.isElement(node):
                 self._serializeEl(node, write, indent=indent, pre=True)
             else:
@@ -233,7 +233,7 @@ class Serializer:
 
     def _writeInlineElement(self, tag: str, el: Nodes, write: WriterFn, inline: bool) -> None:
         self.startTag(tag, el, write)
-        for node in dom.childNodes(el):
+        for node in dom.childNodes(el, mergeText=True):
             if self.isElement(node):
                 self._serializeEl(node, write, inline=inline)
             else:
@@ -249,12 +249,24 @@ class Serializer:
         Figure out what sort of contents the block has,
         so we know what serialization strategy to use.
         """
+
+        # Early exit for a totally empty element (including just ws)
+        # This will fail if there are odd nodes, even tho they're not serialized.
         if self.isElement(el) and len(el) == 0 and dom.emptyText(el.text):
             return "empty", None
-        children = dom.childNodes(el, clear=True)
+
+        # See if there are any block children
+        children = dom.childNodes(el, clear=True, mergeText=True)
         for child in children:
             if self.isElement(child) and self.isBlockElement(child.tag):
                 return "blocks", self._blocksFromChildren(children)
+
+        # See if it's an empty element *when ignoring odd nodes*,
+        # which childNodes() does by default
+        if all(isinstance(x, str) and dom.emptyText(x) for x in children):
+            return "empty", None
+
+        # Otherwise, it's all inline content.
         return "inlines", children
 
     def _writeBlockElement(self, tag: str, el: t.ElementT, write: WriterFn, indent: int, nextEl: Nodes | None) -> None:

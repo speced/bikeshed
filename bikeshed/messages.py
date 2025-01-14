@@ -46,7 +46,7 @@ class MessagesState:
     silent: bool = False
     printMode: str = "console"
     asciiOnly: bool = False
-    fh: io.TextIOWrapper = t.cast("io.TextIOWrapper", sys.stdout)  # noqa: RUF009
+    fh: t.TextIO = sys.stdout
     seenMessages: set[str | tuple[str, str]] = dataclasses.field(default_factory=set)
     categoryCounts: Counter[str] = dataclasses.field(default_factory=Counter)
 
@@ -109,11 +109,19 @@ def p(msg: str | tuple[str, str], sep: str | None = None, end: str | None = None
             print(msg.encode("ascii", "xmlcharrefreplace"), sep=sep, end=end, file=state.fh)
 
 
-def getLineNum(lineNum: str | int | None = None, el: t.ElementT | None = None) -> str | int | None:
-    if lineNum is not None:
+def getLineNum(lineNum: str | int | t.ElementT | None = None, el: t.ElementT | None = None) -> str | int | None:
+    if isinstance(lineNum, str):
         return lineNum
-    if el is not None and el.get("bs-line-number"):
-        return el.get("bs-line-number", "")
+    elif isinstance(lineNum, int):
+        return str(lineNum)
+    elif lineNum is not None:
+        return getLineNum(el=lineNum)
+    elif el is not None and el.get("bs-line-number"):
+        s = el.get("bs-line-number", "")
+        context = el.get("bs-parse-context", None)
+        if context:
+            s += " of " + context
+        return s
     return None
 
 
@@ -145,7 +153,7 @@ def linkerror(msg: str, el: t.ElementT | None = None, lineNum: str | int | None 
         errorAndExit()
 
 
-def lint(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = None) -> None:
+def lint(msg: str, el: t.ElementT | None = None, lineNum: str | int | t.ElementT | None = None) -> None:
     lineNum = getLineNum(lineNum, el)
     suffix = ""
     if el is not None:
@@ -303,9 +311,9 @@ def errorAndExit() -> None:
 
 @contextlib.contextmanager
 def withMessageState(
-    fh: str | io.TextIOWrapper,
+    fh: str | t.TextIO,
     **kwargs: t.Any,
-) -> t.Generator[io.TextIOWrapper, None, None]:
+) -> t.Generator[t.TextIO, None, None]:
     if isinstance(fh, str):
         fhIsTemporary = True
         fh = open(fh, "w", encoding="utf-8")
@@ -324,7 +332,7 @@ def withMessageState(
 
 
 @contextlib.contextmanager
-def messagesSilent() -> t.Generator[io.TextIOWrapper, None, None]:
+def messagesSilent() -> t.Generator[t.TextIO, None, None]:
     import os
 
     fh = open(os.devnull, "w", encoding="utf-8")
