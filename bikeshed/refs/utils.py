@@ -181,6 +181,13 @@ def linkTextVariations(str: str, linkType: str | None) -> t.Generator[str, None,
         if str[0] != '"':
             yield '"' + str + '"'
 
+    if config.linkTypeIn(linkType, ["cddl-key", "cddl-value"]):
+        # Allow linking to a cddl-key or cddl-value with or without quotes
+        if str[0] == '"':
+            yield str[1:-1]
+        if str[0] != '"':
+            yield '"' + str + '"'
+
 
 if t.TYPE_CHECKING:
     U = t.TypeVar("U", bound="t.MutableMapping|t.MutableSequence")
