@@ -174,7 +174,9 @@ linkTypeToDfnType = {
     "functionish": functionishTypes,
     "idl": idlTypes,
     "idl-name": idlNameTypes,
-    "cddl": cddlTypes,
+    # Generic parameters in CDDL may create duplicates and should not need to
+    # be referenced in practice, prevent generic "cddl" links to them
+    "cddl": frozenset([type for type in cddlTypes if type != "cddl-parameter"]),
     "element-sub": frozenset(["element-attr", "element-state"]),
     "maybe": maybeTypes,
     "dfn": frozenset(["dfn"]),

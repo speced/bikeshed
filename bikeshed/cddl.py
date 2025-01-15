@@ -14,6 +14,9 @@ class CDDLMarker(cddlparser.ast.Marker):
     so that cross-referencing logic may take place.
     """
 
+    currentRule: cddlparser.ast.Rule
+    currentParameters: list[str]
+
     def serializeValue(self, prefix: str, value: str, suffix: str, node: cddlparser.ast.Value) -> str:
         name = prefix + value + suffix
         if node.type not in {"text", "bytes"}:
@@ -58,6 +61,13 @@ class CDDLMarker(cddlparser.ast.Marker):
         parent = node.parentNode
         if isinstance(parent, cddlparser.ast.Rule):
             # Rule definition
+            # Keep a pointer to the rule not to have to look for it again
+            # when the function is called on the rule's children
+            self.currentRule = parent
+            self.currentParameters = []
+            if parent.name.parameters is not None:
+                assert isinstance(parent.name.parameters, cddlparser.ast.GenericParameters)
+                self.currentParameters = [p.name for p in parent.name.parameters.parameters]
             if parent.assign.type in {cddlparser.Tokens.TCHOICEALT, cddlparser.Tokens.GCHOICEALT}:
                 # The definition extends a base definition
                 return '<a data-link-type="cddl" data-link-for="/">{}</a>'.format(name)
@@ -95,6 +105,12 @@ class CDDLMarker(cddlparser.ast.Marker):
             # Do not link types that come from the CDDL prelude
             # defined in RFC 8610
             return name
+        elif name in self.currentParameters:
+            # Name is a reference to a generic parameter
+            return '<a data-link-type="cddl-parameter" data-link-for="{}">{}</a>'.format(
+                h.escapeAttr(self.currentRule.name.name),
+                name,
+            )
         else:
             return '<a data-link-type="cddl" data-link-for="/">{}</a>'.format(name)
 
