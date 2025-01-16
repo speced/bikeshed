@@ -374,7 +374,7 @@ def parseNode(
         node = RawText.fromStream(s, start, start + 2, "[")
         return Result(node, start + 2)
     if first1 == "[" and s[start - 1] != "[" and isMacroStart(s, start + 1):
-        macroRes = parseMacro(s, start)
+        macroRes = parseMacroToNodes(s, start)
         if macroRes.valid:
             return macroRes
     if s.config.markdownEscapes and not inOpaque:
@@ -482,7 +482,7 @@ def parseStartTag(s: Stream, start: int) -> Result[StartTag | SelfClosedTag]:
     # After this point we're committed to a start tag,
     # so failure will really be a parse error.
 
-    attrs, i = parseAttributeList(s, i, tagname).vi
+    attrs, i = parseAttributeList(s, i).vi
     if attrs is None:
         return Result.fail(start)
 
@@ -542,7 +542,7 @@ def parseTagName(s: Stream, start: int) -> Result[str]:
     return Result(s[start:end], end)
 
 
-def parseAttributeList(s: Stream, start: int, tagname: str) -> Result[dict[str, str]]:
+def parseAttributeList(s: Stream, start: int) -> Result[dict[str, str]]:
     i = start
     attr = None
     attrs: dict[str, str] = {}
@@ -551,17 +551,20 @@ def parseAttributeList(s: Stream, start: int, tagname: str) -> Result[dict[str, 
         if ws is None:
             if attr and s[i] not in ("/", ">"):
                 m.die(
-                    f"No whitespace after the end of an attribute in <{tagname}>. (Saw {attr[0]}={s[i-1]}{attr[1]}{s[i-1]}.) Did you forget to escape your quote character?",
+                    f"No whitespace after the end of an attribute. (Saw {attr[0]}={s[i-1]}{attr[1]}{s[i-1]}{s[i:i+5]}...)",
                     lineNum=s.loc(i),
                 )
             break
         startAttr = i
+
+        # Macros are allowed in attr list context, *if* they expand to an attribute list.
+
         attr, i = parseAttribute(s, i).vi
         if attr is None:
             break
         attrName, attrValue = attr
         if attrName in attrs:
-            m.die(f"Attribute {attrName} appears twice in <{tagname}>.", lineNum=s.loc(startAttr))
+            m.die(f"Attribute '{attrName}' appears twice in the tag.", lineNum=s.loc(startAttr))
             return Result.fail(start)
         if "[" in attrValue:
             attrValue = replaceMacrosInText(
@@ -569,7 +572,7 @@ def parseAttributeList(s: Stream, start: int, tagname: str) -> Result[dict[str, 
                 macros=s.config.macros,
                 s=s,
                 start=i,
-                context=f"<{tagname} {attrName}='...'>",
+                context=f"attribute {attrName}='...'",
             )
         attrs[attrName] = attrValue
     return Result(attrs, i)
@@ -2106,7 +2109,17 @@ def parseFencedCodeBlock(s: Stream, start: int) -> Result[RawElement]:
 MACRO_RE = re.compile(r"([A-Z\d-]*[A-Z][A-Z\d-]*)(\??)\]")
 
 
-def parseMacro(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
+class MacroContext(Enum):
+    Nodes = "Nodes"
+    AttrList = "AttrList"
+    Text = "Text"
+
+
+def parseMacro(
+    s: Stream,
+    start: int,
+    context: MacroContext,
+) -> Result[ParserNode | list[ParserNode] | dict[str, str] | str]:
     # Macros all look like `[FOO]` or `[FOO?]`:
     # uppercase ASCII, possibly with a ? suffix,
     # tightly wrapped by square brackets.
@@ -2120,31 +2133,78 @@ def parseMacro(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
     optional = match[2] == "?"
     if macroName not in s.config.macros:
         if optional:
-            return Result([], i)
+            if context is MacroContext.Nodes:
+                return Result([], i)
+            elif context is MacroContext.AttrList:
+                return Result({}, i)
+            elif context is MacroContext.Text:
+                return Result("", i)
+            else:
+                t.assert_never(context)
         else:
             m.die(
                 f"Found unmatched text macro {s[start:i]}. Correct the macro, or escape it by replacing the opening [ with &#91;",
                 lineNum=s.loc(i),
             )
-            return Result(
-                RawText.fromStream(s, start, i),
-                i,
-            )
+            if context is MacroContext.Nodes:
+                return Result(
+                    RawText.fromStream(s, start, i),
+                    i,
+                )
+            elif context is MacroContext.AttrList:
+                return Result({}, i)
+            elif context is MacroContext.Text:
+                return Result(s[start:i], i)
+            else:
+                t.assert_never(context)
     macroText = s.config.macros[macroName]
-    context = f"macro {s[start:i]}"
+    streamContext = f"macro {s[start:i]}"
     try:
-        newStream = s.subStream(context=context, chars=macroText)
+        newStream = s.subStream(context=streamContext, chars=macroText)
     except RecursionError:
         m.die(
             f"Macro replacement for {s[start:i]} recursed more than {s.depth} levels deep; probably your text macros are accidentally recursive.",
             lineNum=s.loc(start),
         )
-        return Result(
-            RawText.fromStream(s, start, i),
-            i,
-        )
-    nodes = list(nodesFromStream(newStream, 0))
-    return Result(nodes, i)
+        if context is MacroContext.Nodes:
+            return Result(
+                RawText.fromStream(s, start, i),
+                i,
+            )
+        elif context is MacroContext.AttrList:
+            return Result({}, i)
+        elif context is MacroContext.Text:
+            return Result(s[start:i], i)
+        else:
+            t.assert_never(context)
+
+    if context is MacroContext.Nodes:
+        return Result(list(nodesFromStream(newStream, 0)), i)
+    elif context is MacroContext.AttrList:
+        res = parseAttributeList(newStream, 0)
+        if not newStream.eof(res.i):
+            m.die(
+                f"While parsing {streamContext} as an attribute list (in {s.loc(start)}), found content that's not an attribute list.",
+                lineNum=newStream.loc(res.i),
+            )
+        return res
+    elif context is MacroContext.Text:
+        macroText = replaceMacrosInText(macroText, newStream.config.macros, newStream, 0, streamContext)
+        return Result(macroText, i)
+    else:
+        t.assert_never(context)
+
+
+def parseMacroToNodes(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
+    return t.cast("Result[ParserNode | list[ParserNode]]", parseMacro(s, start, MacroContext.Nodes))
+
+
+def parseMacroToAttrs(s: Stream, start: int) -> Result[dict[str, str]]:
+    return t.cast("Result[dict[str, str]]", parseMacro(s, start, MacroContext.AttrList))
+
+
+def parseMacroToText(s: Stream, start: int) -> Result[str]:
+    return t.cast("Result[str]", parseMacro(s, start, MacroContext.Text))
 
 
 # Treat [ as an escape character, too, so [[RFC2119]]/etc won't
