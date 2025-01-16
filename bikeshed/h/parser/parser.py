@@ -203,7 +203,7 @@ def parseNode(
         return Result(nodes, start + 1)
 
     if first1 == "&":
-        ch, i = parseCharRef(s, start, context=CharRefContext.NON_ATTR).vi
+        ch, i = parseCharRef(s, start, context=CharRefContext.NonAttr).vi
         if ch is not None:
             node = RawText.fromStream(s, start, i, f"&#{ord(ch)};")
             return Result(node, i)
@@ -625,7 +625,7 @@ def parseQuotedAttrValue(s: Stream, start: int) -> Result[str]:
             return Result.fail(start)
         if s[i] == "&":
             startRef = i
-            ch, i = parseCharRef(s, i, context=CharRefContext.ATTR).vi
+            ch, i = parseCharRef(s, i, context=CharRefContext.Attr).vi
             if ch is None:
                 i += 1
                 continue
@@ -652,7 +652,7 @@ def parseUnquotedAttrValue(s: Stream, start: int) -> Result[str]:
             return Result.fail(start)
         if s[i] == "&":
             startRef = i
-            ch, i = parseCharRef(s, i, context=CharRefContext.ATTR).vi
+            ch, i = parseCharRef(s, i, context=CharRefContext.Attr).vi
             if ch is None:
                 i += 1
                 continue
@@ -679,8 +679,8 @@ def printChAsHexRef(ch: str) -> str:
 
 
 class CharRefContext(Enum):
-    ATTR = "attr"
-    NON_ATTR = "non-attr"
+    Attr = "Attr"
+    NonAttr = "NonAttr"
 
 
 def parseCharRef(s: Stream, start: int, context: CharRefContext) -> Result[str]:
@@ -692,11 +692,16 @@ def parseCharRef(s: Stream, start: int, context: CharRefContext) -> Result[str]:
         i += 1
         while preds.isASCIIAlphanum(s[i]):
             i += 1
-        if s[i] == "=" and context == CharRefContext.ATTR:
-            # HTML allows you to write <a href="?foo&bar=baz">
-            # without escaping the ampersand, even if it matches
-            # a named charRef so long as there's an `=` after it.
-            return Result.fail(start)
+        if s[i] == "=":
+            if context is CharRefContext.Attr:
+                # HTML allows you to write <a href="?foo&bar=baz">
+                # without escaping the ampersand, even if it matches
+                # a named charRef so long as there's an `=` after it.
+                return Result.fail(start)
+            elif context is CharRefContext.NonAttr:
+                pass
+            else:
+                t.assert_never(context)
         if s[i] != ";":
             m.die(f"Character reference '{s[start:i]}' didn't end in ;.", lineNum=s.loc(start))
             return Result.fail(start)

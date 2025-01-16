@@ -2,9 +2,17 @@
 # Module for holding types, for easy importing into the rest of the codebase
 from __future__ import annotations
 
-# The only three things that should be available during runtime.
-# ...except I need these too, to declare a generic class.
+import sys
+
+# The only things that should be available during runtime.
 from typing import TYPE_CHECKING, Generic, TypeVar, cast, overload
+
+# Only available in 3.11, so stub them out for earlier versions
+if sys.version_info >= (3, 11):
+    from typing import assert_never, assert_type
+else:
+    from typing_extensions import assert_never, assert_type
+
 
 if TYPE_CHECKING:
     from typing import (
