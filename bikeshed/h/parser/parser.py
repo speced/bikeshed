@@ -482,34 +482,9 @@ def parseStartTag(s: Stream, start: int) -> Result[StartTag | SelfClosedTag]:
     # After this point we're committed to a start tag,
     # so failure will really be a parse error.
 
-    attr = None
-    attrs: dict[str, str] = {}
-    while True:
-        ws, i = parseWhitespace(s, i).vi
-        if ws is None:
-            if attr and s[i] not in ("/", ">"):
-                m.die(
-                    f"No whitespace after the end of an attribute in <{tagname}>. (Saw {attr[0]}={s[i-1]}{attr[1]}{s[i-1]}.) Did you forget to escape your quote character?",
-                    lineNum=s.loc(i),
-                )
-            break
-        startAttr = i
-        attr, i = parseAttribute(s, i).vi
-        if attr is None:
-            break
-        attrName, attrValue = attr
-        if attrName in attrs:
-            m.die(f"Attribute {attrName} appears twice in <{tagname}>.", lineNum=s.loc(startAttr))
-            return Result.fail(start)
-        if "[" in attrValue:
-            attrValue = replaceMacrosInText(
-                text=attrValue,
-                macros=s.config.macros,
-                s=s,
-                start=i,
-                context=f"<{tagname} {attrName}='...'>",
-            )
-        attrs[attrName] = attrValue
+    attrs, i = parseAttributeList(s, i, tagname).vi
+    if attrs is None:
+        return Result.fail(start)
 
     i = parseWhitespace(s, i).i
 
@@ -565,6 +540,39 @@ def parseTagName(s: Stream, start: int) -> Result[str]:
     while preds.isTagnameChar(s[end]):
         end += 1
     return Result(s[start:end], end)
+
+
+def parseAttributeList(s: Stream, start: int, tagname: str) -> Result[dict[str, str]]:
+    i = start
+    attr = None
+    attrs: dict[str, str] = {}
+    while True:
+        ws, i = parseWhitespace(s, i).vi
+        if ws is None:
+            if attr and s[i] not in ("/", ">"):
+                m.die(
+                    f"No whitespace after the end of an attribute in <{tagname}>. (Saw {attr[0]}={s[i-1]}{attr[1]}{s[i-1]}.) Did you forget to escape your quote character?",
+                    lineNum=s.loc(i),
+                )
+            break
+        startAttr = i
+        attr, i = parseAttribute(s, i).vi
+        if attr is None:
+            break
+        attrName, attrValue = attr
+        if attrName in attrs:
+            m.die(f"Attribute {attrName} appears twice in <{tagname}>.", lineNum=s.loc(startAttr))
+            return Result.fail(start)
+        if "[" in attrValue:
+            attrValue = replaceMacrosInText(
+                text=attrValue,
+                macros=s.config.macros,
+                s=s,
+                start=i,
+                context=f"<{tagname} {attrName}='...'>",
+            )
+        attrs[attrName] = attrValue
+    return Result(attrs, i)
 
 
 def parseAttribute(s: Stream, start: int) -> Result[tuple[str, str]]:
