@@ -755,31 +755,32 @@ def addCDDLSection(doc: t.SpecT) -> None:
     )
 
     # Specs such as WebDriver BiDi define two sets of CDDL definitions for
-    # the local and remote ends of the protocol. The convention is that
-    # these modules need to have a dfn with a "data-cddl-module" attribute
-    # that contains the module's shortname (the dfn itself provides the label
-    # for the index). CDDL blocks reference one or more modules through a
-    # "data-cddl-module" attribute.
+    # the local and remote ends of the protocol. These modules need to be
+    # defined with a dfn of type "cddl-module". CDDL blocks can then reference
+    # one or more modules through a "data-cddl-module" attribute.
     # When modules are defined, CDDL blocks that do not reference a module
     # are considered to apply to all modules. In particular, they do not create
     # a "default" module
-    cddlModules = [(x.get("data-cddl-module") or "", x.text or "") for x in h.findAll("dfn[data-cddl-module]", doc)]
+    cddlModules = [
+        (x.get("id", ""), x.get("data-lt", x.text or "").split("|"))
+        for x in h.findAll("dfn[data-dfn-type=cddl-module]", doc)
+    ]
     if len(cddlModules) == 0:
-        cddlModules = [("", "")]
+        cddlModules = [("", [""])]
     for module in cddlModules:
         cddlBlocks = []
         for block in allCddlBlocks:
             forModules = [x.strip() for x in block.get("data-cddl-module", "").split(",")]
-            if (len(forModules) == 1 and forModules[0] == "") or module[0] in forModules:
+            if (len(forModules) == 1 and forModules[0] == "") or any(name in forModules for name in module[1]):
                 cddlBlocks.append(block)
         if len(cddlBlocks) == 0:
             continue
-        if module[0] != "":
+        if module[1][0] != "":
             h.appendChild(
                 html,
                 h.E.h3(
-                    {"class": "no-num no-ref", "id": h.safeID(doc, "cddl-module-" + module[0])},
-                    _t(module[1].capitalize()),
+                    {"class": "no-num no-ref", "id": h.safeID(doc, "cddl-index-" + module[0])},
+                    _t(module[1][0].capitalize()),
                 ),
             )
         container = h.appendChild(html, h.E.pre({"class": "cddl"}))

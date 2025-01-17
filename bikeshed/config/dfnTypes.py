@@ -47,6 +47,7 @@ dfnClassToType = {
     "facetdef": "facet",
     "http-headerdef": "http-header",
     "permissiondef": "permission",
+    "cddl-module": "cddl-module",
     "cddl-type": "cddl-type",
     "cddl-key": "cddl-key",
     "cddl-parameter": "cddl-parameter",
@@ -57,7 +58,7 @@ dfnTypes = frozenset(list(dfnClassToType.values()) + ["dfn"])
 maybeTypes = frozenset(["value", "type", "at-rule", "function", "selector"])
 cssTypes = frozenset(["property", "value", "at-rule", "descriptor", "type", "function", "selector"])
 markupTypes = frozenset(["element", "element-attr", "element-state", "attr-value", "element-sub"])
-cddlTypes = frozenset(["cddl-type", "cddl-key", "cddl-parameter", "cddl-value"])
+cddlTypes = frozenset(["cddl-module", "cddl-type", "cddl-key", "cddl-parameter", "cddl-value"])
 idlTypes = frozenset(
     [
         "event",
@@ -176,12 +177,14 @@ linkTypeToDfnType = {
     "idl-name": idlNameTypes,
     # Generic parameters in CDDL may create duplicates and should not need to
     # be referenced in practice, prevent generic "cddl" links to them
-    "cddl": frozenset([type for type in cddlTypes if type != "cddl-parameter"]),
+    "cddl": frozenset([type for type in cddlTypes if type not in "cddl-parameter"]),
     "element-sub": frozenset(["element-attr", "element-state"]),
     "maybe": maybeTypes,
     "dfn": frozenset(["dfn"]),
     "biblio": frozenset(["biblio"]),
-    "codelike": frozenset(["element", "element-attr", "element-state", "attr-value"]) | idlTypes | cddlTypes,
+    "codelike": frozenset(["element", "element-attr", "element-state", "attr-value"])
+    | idlTypes
+    | frozenset([type for type in cddlTypes if type != "cddl-module"]),
     "all": linkTypes,
 }
 for dfnType in dfnClassToType.values():
