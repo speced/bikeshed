@@ -543,38 +543,63 @@ def parseTagName(s: Stream, start: int) -> Result[str]:
 
 
 def parseAttributeList(s: Stream, start: int) -> Result[dict[str, str]]:
-    i = start
+    i = parseWhitespace(s, start).i
     attr = None
     attrs: dict[str, str] = {}
     while True:
-        ws, i = parseWhitespace(s, i).vi
-        if ws is None:
-            if attr and s[i] not in ("/", ">"):
-                m.die(
-                    f"No whitespace after the end of an attribute. (Saw {attr[0]}={s[i-1]}{attr[1]}{s[i-1]}{s[i:i+5]}...)",
-                    lineNum=s.loc(i),
-                )
+        if s.eof(i):
             break
         startAttr = i
 
         # Macros are allowed in attr list context, *if* they expand to an attribute list.
-
-        attr, i = parseAttribute(s, i).vi
-        if attr is None:
+        if s[i] == "[":
+            macroAttrs, i = parseMacroToAttrs(s, i).vi
+            if macroAttrs is None:
+                break
+            macroName = s[startAttr:i]
+            for k, v in macroAttrs.items():
+                if k in attrs:
+                    m.die(
+                        f"Attribute '{k}', coming from the {macroName} macro, already exists on the element.",
+                        lineNum=s.loc(startAttr),
+                    )
+                    continue
+                attrs[k] = v
+        elif preds.isAttrNameChar(s[i]):
+            attr, i = parseAttribute(s, i).vi
+            if attr is None:
+                break
+            attrName, attrValue = attr
+            if attrName in attrs:
+                m.die(f"Attribute '{attrName}' appears twice in the tag.", lineNum=s.loc(startAttr))
+                return Result.fail(start)
+            if "[" in attrValue:
+                attrValue = replaceMacrosInText(
+                    text=attrValue,
+                    macros=s.config.macros,
+                    s=s,
+                    start=i,
+                    context=f"attribute {attrName}='...'",
+                )
+            attrs[attrName] = attrValue
+        else:
             break
-        attrName, attrValue = attr
-        if attrName in attrs:
-            m.die(f"Attribute '{attrName}' appears twice in the tag.", lineNum=s.loc(startAttr))
-            return Result.fail(start)
-        if "[" in attrValue:
-            attrValue = replaceMacrosInText(
-                text=attrValue,
-                macros=s.config.macros,
-                s=s,
-                start=i,
-                context=f"attribute {attrName}='...'",
+
+        ws, i = parseWhitespace(s, i).vi
+        if ws is None:
+            # We're definitely done, just see if it should be an error nor not.
+            if s.eof(i):
+                # At the end of a macro, most likely
+                # (or the doc ended with an unclosed tag, so I'll catch that later)
+                break
+            if s[i] in ("/", ">"):
+                # End of a tag
+                break
+            m.die(
+                f"Expected whitespace between attributes. ({s[startAttr:i+5]}...)",
+                lineNum=s.loc(i),
             )
-        attrs[attrName] = attrValue
+            break
     return Result(attrs, i)
 
 
@@ -2157,13 +2182,14 @@ def parseMacro(
                 return Result(s[start:i], i)
             else:
                 t.assert_never(context)
+    macroDisplay = s[start:i]
     macroText = s.config.macros[macroName]
-    streamContext = f"macro {s[start:i]}"
+    streamContext = f"macro {macroDisplay}"
     try:
         newStream = s.subStream(context=streamContext, chars=macroText)
     except RecursionError:
         m.die(
-            f"Macro replacement for {s[start:i]} recursed more than {s.depth} levels deep; probably your text macros are accidentally recursive.",
+            f"Macro replacement for {macroDisplay} recursed more than {s.depth} levels deep; probably your text macros are accidentally recursive.",
             lineNum=s.loc(start),
         )
         if context is MacroContext.Nodes:
@@ -2181,13 +2207,14 @@ def parseMacro(
     if context is MacroContext.Nodes:
         return Result(list(nodesFromStream(newStream, 0)), i)
     elif context is MacroContext.AttrList:
-        res = parseAttributeList(newStream, 0)
-        if not newStream.eof(res.i):
+        attrs, attrsEnd = parseAttributeList(newStream, 0).vi
+        _, wsEnd = parseWhitespace(newStream, attrsEnd).vi
+        if not newStream.eof(wsEnd):
             m.die(
-                f"While parsing {streamContext} as an attribute list (in {s.loc(start)}), found content that's not an attribute list.",
-                lineNum=newStream.loc(res.i),
+                f"While parsing {macroDisplay} (on {s.loc(start)}) as an attribute list, found non-attribute content: {newStream[attrsEnd:attrsEnd+10]}...",
+                lineNum=newStream.loc(attrsEnd),
             )
-        return res
+        return Result(attrs, i)
     elif context is MacroContext.Text:
         macroText = replaceMacrosInText(macroText, newStream.config.macros, newStream, 0, streamContext)
         return Result(macroText, i)
