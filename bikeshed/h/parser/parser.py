@@ -418,24 +418,32 @@ def parseAngleStart(s: Stream, start: int) -> Result[ParserNode | list[ParserNod
                 text, i = parseRawPreToEnd(s, i).vi
                 if text is None:
                     return Result.fail(start)
+                if "bs-macros" in startTag.attrs:
+                    text = replaceMacrosInText(text, s.config.macros, s, start, context="<pre> contents")
                 el = RawElement.fromStream(s, start, i, startTag, text)
                 return Result(el, i)
         if startTag.tag == "script":
             text, i = parseScriptToEnd(s, i).vi
             if text is None:
                 return Result.fail(start)
+            if "bs-macros" in startTag.attrs:
+                text = replaceMacrosInText(text, s.config.macros, s, start, context="<script> contents")
             el = RawElement.fromStream(s, start, i, startTag, text)
             return Result(el, i)
         elif startTag.tag == "style":
             text, i = parseStyleToEnd(s, i).vi
             if text is None:
                 return Result.fail(start)
+            if "bs-macros" in startTag.attrs:
+                text = replaceMacrosInText(text, s.config.macros, s, start, context="<style> contents")
             el = RawElement.fromStream(s, start, i, startTag, text)
             return Result(el, i)
         elif startTag.tag == "xmp":
             text, i = parseXmpToEnd(s, i).vi
             if text is None:
                 return Result.fail(start)
+            if "bs-macros" in startTag.attrs:
+                text = replaceMacrosInText(text, s.config.macros, s, start, context="<xmp> contents")
             el = RawElement.fromStream(s, start, i, startTag, text)
             return Result(el, i)
         else:
