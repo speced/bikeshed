@@ -14,8 +14,38 @@ class CDDLMarker(cddlparser.ast.Marker):
     so that cross-referencing logic may take place.
     """
 
-    currentRule: cddlparser.ast.Rule
+    # Keep pointers on the current rule context to track generic parameters
+    # that are scoped to it
+    currentRule: cddlparser.ast.Rule | None
     currentParameters: list[str]
+
+    # List of all CDDL terms defined so far to track and report duplicates
+    defined: list
+
+    def __init__(self) -> None:
+        self.currentRule = None
+        self.currentParameters = []
+        self.defined = []
+
+    def _recordDefinition(self, type: str, name: str, dfnFor: str | None = None) -> bool:
+        for term in self.defined:
+            if term["type"] == type and term["name"] == name and term["dfnFor"] == dfnFor:
+                forText = "" if dfnFor is None else f' defined in type "{dfnFor}"'
+                m.die(
+                    f"CDDL {type} {name}{forText} creates a duplicate and cannot be referenced.\nPlease create additional CDDL types to disambiguate.",
+                )
+                return False
+        if type != "parameter":
+            for term in self.defined:
+                if term["type"] != "parameter" and term["name"] == name and term["dfnFor"] == dfnFor:
+                    forText = "" if dfnFor is None else f' defined in type "{dfnFor}"'
+                    m.warn(
+                        f"CDDL {type} {name}{forText} creates a duplicate with a CDDL {term['type']}.\nLink type needs to be specified to reference the term.\nConsider creating additional CDDL types to disambiguate.",
+                    )
+                    break
+        term = {"type": type, "name": name, "dfnFor": dfnFor}
+        self.defined.append(term)
+        return True
 
     def serializeValue(self, prefix: str, value: str, suffix: str, node: cddlparser.ast.Value) -> str:
         name = prefix + value + suffix
@@ -32,7 +62,7 @@ class CDDLMarker(cddlparser.ast.Marker):
             if forName is None:
                 # Cannot easily link member key back to a definition
                 return name
-            else:
+            elif self._recordDefinition("key", value, forName):
                 # Create a key with and without quotes as linking text
                 lts = [value, name]
                 return '<cddl data-cddl-type="key" data-cddl-for="{}" data-lt="{}">{}</cddl>'.format(
@@ -40,6 +70,9 @@ class CDDLMarker(cddlparser.ast.Marker):
                     h.escapeAttr("|".join(lts)),
                     name,
                 )
+            else:
+                # Duplicate found, don't create a dfn
+                return name
         elif isinstance(parent, cddlparser.ast.Operator) and parent.controller == node:
             # Probably a ".default" value. It may be possible to link the value
             # back to an enumeration but it's equally possible that this is just
@@ -49,13 +82,16 @@ class CDDLMarker(cddlparser.ast.Marker):
             forName = self._getFor(node)
             if forName is None:
                 return name
-            else:
+            elif self._recordDefinition("value", value, forName):
                 lts = [value, name]
                 return '<cddl data-cddl-type="value" data-cddl-for="{}" data-lt="{}">{}</cddl>'.format(
                     h.escapeAttr(forName),
                     h.escapeAttr("|".join(lts)),
                     name,
                 )
+            else:
+                # Duplicate found, don't create a dfn
+                return name
 
     def serializeName(self, name: str, node: cddlparser.ast.CDDLNode) -> str:
         # The node is a Typename. Such a node may appear in a Rule, a Type,
@@ -73,8 +109,11 @@ class CDDLMarker(cddlparser.ast.Marker):
             if parent.assign.type in {cddlparser.Tokens.TCHOICEALT, cddlparser.Tokens.GCHOICEALT}:
                 # The definition extends a base definition
                 return '<a data-link-type="cddl" data-link-for="/">{}</a>'.format(name)
-            else:
+            elif self._recordDefinition("type", name):
                 return '<cddl data-cddl-type="type" data-lt="{}">{}</cddl>'.format(h.escapeAttr(name), name)
+            else:
+                # Duplicate found, don't create a dfn
+                return name
         elif isinstance(parent, cddlparser.ast.Memberkey):
             # Member definition
             if not parent.hasColon:
@@ -95,25 +134,34 @@ class CDDLMarker(cddlparser.ast.Marker):
                     lts = [name[1:-1], name]
                 else:
                     lts = [name, '"' + name + '"']
-                return '<cddl data-cddl-type="key" data-cddl-for="{}" data-lt="{}">{}</cddl>'.format(
-                    h.escapeAttr(forName),
-                    h.escapeAttr("|".join(lts)),
-                    name,
-                )
+                if self._recordDefinition("key", lts[0], forName):
+                    return '<cddl data-cddl-type="key" data-cddl-for="{}" data-lt="{}">{}</cddl>'.format(
+                        h.escapeAttr(forName),
+                        h.escapeAttr("|".join(lts)),
+                        name,
+                    )
+                else:
+                    # Duplicate found, don't create a dfn
+                    return name
         elif isinstance(parent, cddlparser.ast.GenericParameters):
             typename = parent.parentNode
             assert isinstance(typename, cddlparser.ast.Typename)
-            return '<cddl data-cddl-type="parameter" data-cddl-for="{}" data-lt="{}">{}</cddl>'.format(
-                h.escapeAttr(typename.name),
-                h.escapeAttr(name),
-                name,
-            )
+            if self._recordDefinition("parameter", name, typename.name):
+                return '<cddl data-cddl-type="parameter" data-cddl-for="{}" data-lt="{}">{}</cddl>'.format(
+                    h.escapeAttr(typename.name),
+                    h.escapeAttr(name),
+                    name,
+                )
+            else:
+                # Duplicate found, don't create a dfn
+                return name
         elif name in get_args(cddlparser.ast.PreludeType):
             # Do not link types that come from the CDDL prelude
             # defined in RFC 8610
             return name
         elif name in self.currentParameters:
             # Name is a reference to a generic parameter
+            assert self.currentRule is not None
             return '<a data-link-type="cddl-parameter" data-link-for="{}">{}</a>'.format(
                 h.escapeAttr(self.currentRule.name.name),
                 name,
@@ -170,39 +218,6 @@ def markupCDDLBlock(pre: t.ElementT, doc: t.SpecT) -> set[t.ElementT]:
     """
     localDfns = set()
 
-    # A CDDL definition may create duplicates, e.g. argh = [ "dupl", "dupl" ]
-    # To detect these duplicates, let's maintain a list of actual definitions
-    # contained in CDDL blocks.
-    cddlDfns = set()
-
-    def recordDfns(el: t.ElementT) -> bool:
-        cddlType = "cddl-" + (el.get("data-cddl-type") or "")
-        for cddlText in (el.get("data-lt") or "").split("|"):
-            linkFors = t.cast("list[str|None]", config.splitForValues(el.get("data-cddl-for", ""))) or [None]
-            for linkFor in linkFors:
-                dfnText = cddlType + ">" + (linkFor or "") + "/" + cddlText
-                if dfnText in cddlDfns:
-                    forText = "" if linkFor is None else f' defined in type "{linkFor}"'
-                    m.die(
-                        f"CDDL {cddlType[5:]} {cddlText}{forText} creates a duplicate and cannot be referenced.\nPlease create additional CDDL types to disambiguate.",
-                    )
-                    return False
-                cddlDfns.add(dfnText)
-        if cddlType != "cddl-parameter":
-            warned = False
-            for cddlText in (el.get("data-lt") or "").split("|"):
-                linkFors = t.cast("list[str|None]", config.splitForValues(el.get("data-cddl-for", ""))) or [None]
-                for linkFor in linkFors:
-                    dfnText = (linkFor or "") + "/" + cddlText
-                    if dfnText in cddlDfns and not warned:
-                        warned = True
-                        forText = "" if linkFor is None else f' defined in type "{linkFor}"'
-                        m.warn(
-                            f"CDDL {cddlType[5:]} {cddlText}{forText} creates a duplicate with another CDDL definition.\nLink type needs to be specified to reference the term.\nConsider creating additional CDDL types to disambiguate.",
-                        )
-                    cddlDfns.add(dfnText)
-        return True
-
     for el in h.findAll("cddl", pre):
         # Prefix CDDL types with "cddl-" to avoid confusion with other
         # types (notably CSS ones such as "value")
@@ -211,54 +226,49 @@ def markupCDDLBlock(pre: t.ElementT, doc: t.SpecT) -> set[t.ElementT]:
         url = None
         ref = None
         cddlText = None
-        # Record the dfns that the term would create and check whether
-        # it creates a duplicate. If it does, let's not link the term.
-        if not recordDfns(el):
-            el.tag = "span"
-        else:
-            for cddlText in (el.get("data-lt") or "").split("|"):
-                linkFors = t.cast("list[str|None]", config.splitForValues(el.get("data-cddl-for", ""))) or [None]
-                for linkFor in linkFors:
-                    ref = doc.refs.getRef(
-                        cddlType,
-                        cddlText,
-                        linkFor=linkFor,
-                        status="local",
-                        el=el,
-                        error=True,
-                    )
-                    if ref:
-                        url = ref.url
-                        break
+        for cddlText in (el.get("data-lt") or "").split("|"):
+            linkFors = t.cast("list[str|None]", config.splitForValues(el.get("data-cddl-for", ""))) or [None]
+            for linkFor in linkFors:
+                ref = doc.refs.getRef(
+                    cddlType,
+                    cddlText,
+                    linkFor=linkFor,
+                    status="local",
+                    el=el,
+                    error=True,
+                )
                 if ref:
+                    url = ref.url
                     break
-            if url is None:
-                el.tag = "dfn"
-                el.set("data-dfn-type", cddlType)
-                del el.attrib["data-cddl-type"]
-                if el.get("data-cddl-for"):
-                    el.set("data-dfn-for", el.get("data-cddl-for") or "")
-                    del el.attrib["data-cddl-for"]
-            else:
-                # Copy over the auto-generated linking text to the manual dfn.
-                dfn = h.find(url, doc)
-                # How in the hell does this work, the url is not a selector???
-                assert dfn is not None
-                lts = combineCDDLLinkingTexts(el.get("data-lt"), dfn.get("data-lt"))
-                dfn.set("data-lt", lts)
-                localDfns.add(dfn)
+            if ref:
+                break
+        if url is None:
+            el.tag = "dfn"
+            el.set("data-dfn-type", cddlType)
+            del el.attrib["data-cddl-type"]
+            if el.get("data-cddl-for"):
+                el.set("data-dfn-for", el.get("data-cddl-for") or "")
+                del el.attrib["data-cddl-for"]
+        else:
+            # Copy over the auto-generated linking text to the manual dfn.
+            dfn = h.find(url, doc)
+            # How in the hell does this work, the url is not a selector???
+            assert dfn is not None
+            lts = combineCDDLLinkingTexts(el.get("data-lt"), dfn.get("data-lt"))
+            dfn.set("data-lt", lts)
+            localDfns.add(dfn)
 
-                # Reset the <cddl> element to be a link to the manual dfn.
-                el.tag = "a"
-                el.set("data-link-type", cddlType)
-                el.set("data-lt", cddlText)
-                del el.attrib["data-cddl-type"]
-                if el.get("data-cddl-for"):
-                    el.set("data-link-for", el.get("data-cddl-for") or "")
-                    del el.attrib["data-cddl-for"]
-                if el.get("id"):
-                    # ID was defensively added by the Marker.
-                    del el.attrib["id"]
+            # Reset the <cddl> element to be a link to the manual dfn.
+            el.tag = "a"
+            el.set("data-link-type", cddlType)
+            el.set("data-lt", cddlText)
+            del el.attrib["data-cddl-type"]
+            if el.get("data-cddl-for"):
+                el.set("data-link-for", el.get("data-cddl-for") or "")
+                del el.attrib["data-cddl-for"]
+            if el.get("id"):
+                # ID was defensively added by the Marker.
+                del el.attrib["id"]
     return localDfns
 
 
