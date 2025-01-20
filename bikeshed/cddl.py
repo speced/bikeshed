@@ -249,8 +249,9 @@ def markupCDDLBlock(pre: t.ElementT, doc: t.SpecT) -> set[t.ElementT]:
                 del el.attrib["data-cddl-for"]
         else:
             # Copy over the auto-generated linking text to the manual dfn.
+            # Note: "url" is not an absolute URL but rather a fragment ref. It
+            # can thus be used as an ID selector to find the underlying dfn
             dfn = h.find(url, doc)
-            # How in the hell does this work, the url is not a selector???
             assert dfn is not None
             lts = combineCDDLLinkingTexts(el.get("data-lt"), dfn.get("data-lt"))
             dfn.set("data-lt", lts)
