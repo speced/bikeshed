@@ -119,7 +119,9 @@ class CDDLMarker(cddlparser.ast.Marker):
             if not parent.hasColon:
                 # The key is actually a reference to a type
                 if name in get_args(cddlparser.ast.PreludeType):
-                    return '<a data-link-type="cddl-type" data-link-for="/" data-link-spec="rfc8610">{}</a>'.format(name)
+                    return '<a data-link-type="cddl-type" data-link-for="/" data-link-spec="rfc8610">{}</a>'.format(
+                        name,
+                    )
                 else:
                     return '<a data-link-type="cddl-type" data-link-for="/">{}</a>'.format(name)
             assert parent.parentNode is not None
