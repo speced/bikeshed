@@ -108,7 +108,7 @@ class CDDLMarker(cddlparser.ast.Marker):
                 self.currentParameters = [p.name for p in parent.name.parameters.parameters]
             if parent.assign.type in {cddlparser.Tokens.TCHOICEALT, cddlparser.Tokens.GCHOICEALT}:
                 # The definition extends a base definition
-                return '<a data-link-type="cddl" data-link-for="/">{}</a>'.format(name)
+                return '<a data-link-type="cddl-type" data-link-for="/">{}</a>'.format(name)
             elif self._recordDefinition("type", name):
                 return '<cddl data-cddl-type="type" data-lt="{}">{}</cddl>'.format(h.escapeAttr(name), name)
             else:
@@ -119,10 +119,9 @@ class CDDLMarker(cddlparser.ast.Marker):
             if not parent.hasColon:
                 # The key is actually a reference to a type
                 if name in get_args(cddlparser.ast.PreludeType):
-                    # From the CDDL prelude, nothing to link to
-                    return name
+                    return '<a data-link-type="cddl-type" data-link-for="/" data-link-spec="rfc8610">{}</a>'.format(name)
                 else:
-                    return '<a data-link-type="cddl" data-link-for="/">{}</a>'.format(name)
+                    return '<a data-link-type="cddl-type" data-link-for="/">{}</a>'.format(name)
             assert parent.parentNode is not None
             forName = self._getFor(parent.parentNode)
             if forName is None:
@@ -156,9 +155,8 @@ class CDDLMarker(cddlparser.ast.Marker):
                 # Duplicate found, don't create a dfn
                 return name
         elif name in get_args(cddlparser.ast.PreludeType):
-            # Do not link types that come from the CDDL prelude
-            # defined in RFC 8610
-            return name
+            # Link types that come from the CDDL prelude in RFC 8610
+            return '<a data-link-type="cddl-type" data-link-for="/" data-link-spec="rfc8610">{}</a>'.format(name)
         elif name in self.currentParameters:
             # Name is a reference to a generic parameter
             assert self.currentRule is not None
