@@ -1402,11 +1402,27 @@ def addNoteHeaders(doc: t.SpecT) -> None:
             preText = _t("EXAMPLE: ")
         else:
             preText = ""
-        lineNum = int(el.get("bs-line-number", "1"))
+        lineNum = lineNumberFromBsLineNumber(el.get("bs-line-number"))
         parseConfig = h.ParseConfig.fromSpec(doc=doc, context="heading='' attribute")
         parsedHeading = h.parseHTML(h.parseText(el.get("heading", ""), parseConfig, startLine=lineNum))
         h.prependChild(el, h.E.div({"class": "marker"}, preText, *parsedHeading))
         h.removeAttr(el, "heading")
+
+
+def lineNumberFromBsLineNumber(value: str | None) -> int:
+    if value is None:
+        return 1
+    try:
+        return int(value)
+    except:
+        pass
+    try:
+        # If it's a 'loc' value: line:col + maybe other context
+        num, _, _ = value.partition(":")
+        return int(num)
+    except:
+        pass
+    return 1
 
 
 def locateFillContainers(doc: t.SpecT) -> t.FillContainersT:

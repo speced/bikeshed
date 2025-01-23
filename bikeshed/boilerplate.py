@@ -18,8 +18,8 @@ if t.TYPE_CHECKING:
     MetadataT: t.TypeAlias = t.Mapping[str, t.Sequence[MetadataValueT]]
 
 
-def boilerplateFromHtml(doc: t.SpecT, htmlString: str, filename: str) -> t.NodesT:
-    htmlString = h.parseText(htmlString, h.ParseConfig.fromSpec(doc, context=filename))
+def boilerplateFromHtml(doc: t.SpecT, htmlString: str, context: str) -> t.NodesT:
+    htmlString = h.parseText(htmlString, h.ParseConfig.fromSpec(doc, context=context))
     bp = h.E.div({}, h.parseHTML(htmlString))
     conditional.processConditionals(doc, bp)
     return h.childNodes(bp, clear=True)
@@ -29,7 +29,7 @@ def loadBoilerplate(doc: t.SpecT, filename: str, bpname: str | None = None) -> N
     if bpname is None:
         bpname = filename
     html = retrieve.retrieveBoilerplateFile(doc, filename)
-    el = boilerplateFromHtml(doc, html, filename)
+    el = boilerplateFromHtml(doc, html, context=f"{filename} boilerplate")
     fillWith(bpname, el, doc=doc)
 
 
