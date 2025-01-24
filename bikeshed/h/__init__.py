@@ -13,6 +13,7 @@ from .dom import (
     clearContents,
     closestAncestor,
     closestAttr,
+    collectAutolinks,
     collectIds,
     createElement,
     dedupIDs,

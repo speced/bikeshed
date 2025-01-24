@@ -1032,6 +1032,18 @@ def collectIds(el: t.ElementT, ids: dict[str, t.ElementT] | None = None) -> dict
     return ids
 
 
+def collectAutolinks(el: t.ElementT, links: list[t.ElementT] | None = None) -> list[t.ElementT]:
+    if links is None:
+        links = []
+    if tagName(el) == "a" and not hasAttr(el, "href") and el.get("data-link-type", "") != "biblio":
+        links.append(el)
+    elif tagName(el) == "bs-link":
+        links.append(el)
+    for child in childElements(el):
+        collectAutolinks(child, links)
+    return links
+
+
 def createElement(tag: str, attrs: t.Mapping[str, str | None] | None = None, *children: t.NodesT | None) -> t.ElementT:
     if attrs is None:
         attrs = {}

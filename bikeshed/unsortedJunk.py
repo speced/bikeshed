@@ -695,12 +695,7 @@ def processAutolinks(doc: t.SpecT) -> None:
     # An <a> without an href is an autolink.
     # <i> is a legacy syntax for term autolinks. If it links up, we change it into an <a>.
     # We exclude bibliographical links, as those are processed in `processBiblioLinks`.
-    query = "a:not([href]):not([data-link-type='biblio']), bs-link"
-    if doc.md.useIAutolinks:
-        m.warn("Use <i> Autolinks is deprecated and will be removed. Please switch to using <a> elements.")
-        query += ", i"
-    autolinks = h.findAll(query, doc)
-    for el in autolinks:
+    for el in h.collectAutolinks(doc.body):
         if el.tag == "bs-link":
             el.tag = "a"
         # Explicitly empty linking text indicates this shouldn't be an autolink.
