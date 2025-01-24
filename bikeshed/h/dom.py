@@ -322,15 +322,17 @@ def appendChild(parent: t.ElementT, *els: t.NodesT, allowEmpty: bool) -> t.Eleme
 def appendChild(parent: t.ElementT, *els: t.NodesT, allowEmpty: bool = False) -> t.ElementT | None:
     # Appends either text or an element.
     child: t.NodeT | None = None
+    parentLen = len(parent)
     for child in flatten(els):
         assert child is not None
         if isinstance(child, str):
-            if len(parent) > 0:
+            if parentLen > 0:
                 parent[-1].tail = (parent[-1].tail or "") + child
             else:
                 parent.text = (parent.text or "") + child
         else:
-            if len(parent) == 0 and parent.text is not None:
+            parentLen += 1
+            if parentLen == 0 and parent.text is not None:
                 # LXML "helpfully" assumes you meant to insert it before the text,
                 # and so moves the text into the element's tail when you append.
                 text, parent.text = parent.text, None
