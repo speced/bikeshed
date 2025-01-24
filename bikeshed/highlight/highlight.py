@@ -292,12 +292,14 @@ def mergeHighlighting(el: t.ElementT, coloredText: t.Sequence[ColoredText]) -> N
         return h.createElement("c-", {color: ""}, text)
 
     def colorizeEl(el: t.ElementT, coloredText: t.Deque[ColoredText]) -> t.ElementT:
+        newChildren: list[str | t.ElementT] = []
         for node in h.childNodes(el, clear=True):
             if h.isElement(node):
-                h.appendChild(el, colorizeEl(node, coloredText))
+                newChildren.append(colorizeEl(node, coloredText))
             else:
                 assert isinstance(node, str)
-                h.appendChild(el, *colorizeText(node, coloredText), allowEmpty=True)
+                newChildren.extend(colorizeText(node, coloredText))
+        h.appendChild(el, newChildren)
         return el
 
     def colorizeText(text: str, coloredText: t.Deque[ColoredText]) -> list[t.NodeT]:
