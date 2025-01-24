@@ -277,7 +277,7 @@ class Spec:
         boilerplate.removeUnwantedBoilerplate(self)
         shorthands.run(self)
         inlineTags.processTags(self)
-        u.canonicalizeShortcuts(self)
+        u.canonicalizeShortcuts(self.body)
         u.addImplicitAlgorithms(self)
         u.fixManualDefTables(self)
         headings.processHeadings(self)

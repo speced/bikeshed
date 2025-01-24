@@ -51,60 +51,68 @@ def fixManualDefTables(doc: t.SpecT) -> None:
         h.replaceContents(cell, newContents)
 
 
-def canonicalizeShortcuts(doc: t.SpecT) -> None:
+def canonicalizeShortcuts(el: t.ElementT) -> None:
     # Take all the invalid-HTML shortcuts and fix them.
+    h.renameAttr(el, "export", "data-export")
+    h.renameAttr(el, "noexport", "data-noexport")
+    h.renameAttr(el, "link-spec", "data-link-spec")
+    h.renameAttr(el, "spec", "data-link-spec")
+    h.renameAttr(el, "link-status", "data-link-status")
+    h.renameAttr(el, "status", "data-link-status")
+    h.renameAttr(el, "dfn-for", "data-dfn-for")
+    h.renameAttr(el, "link-for", "data-link-for")
+    h.renameAttr(el, "link-for-hint", "data-link-for-hint")
+    h.renameAttr(el, "dfn-type", "data-dfn-type")
+    h.renameAttr(el, "link-type", "data-link-type")
+    h.renameAttr(el, "dfn-force", "data-dfn-force")
+    h.renameAttr(el, "force", "data-dfn-force")
+    h.renameAttr(el, "section", "data-section")
+    h.renameAttr(el, "attribute-info", "data-attribute-info")
+    h.renameAttr(el, "dict-member-info", "data-dict-member-info")
+    h.renameAttr(el, "lt", "data-lt")
+    h.renameAttr(el, "local-lt", "data-local-lt")
+    h.renameAttr(el, "algorithm", "data-algorithm")
+    h.renameAttr(el, "ignore", "data-var-ignore")
 
-    attrFixup = {
-        "export": "data-export",
-        "noexport": "data-noexport",
-        "link-spec": "data-link-spec",
-        "spec": "data-link-spec",
-        "link-status": "data-link-status",
-        "status": "data-link-status",
-        "dfn-for": "data-dfn-for",
-        "link-for": "data-link-for",
-        "link-for-hint": "data-link-for-hint",
-        "dfn-type": "data-dfn-type",
-        "link-type": "data-link-type",
-        "dfn-force": "data-dfn-force",
-        "force": "data-dfn-force",
-        "section": "data-section",
-        "attribute-info": "data-attribute-info",
-        "dict-member-info": "data-dict-member-info",
-        "lt": "data-lt",
-        "local-lt": "data-local-lt",
-        "algorithm": "data-algorithm",
-        "ignore": "data-var-ignore",
-    }
-    for el in h.findAll(",".join(f"[{attr}]" for attr in attrFixup), doc):
-        for attr, fixedAttr in attrFixup.items():
-            if el.get(attr) is not None:
-                el.set(fixedAttr, t.cast(str, el.get(attr)))
-                del el.attrib[attr]
-
-    # The next two aren't in the above dict because some of the words conflict with existing attributes on some elements.
+    # Some of these attrs conflict with existing real attributes on some elements.
     # Instead, limit the search/transforms to the relevant elements.
-    for el in h.findAll("dfn, h2, h3, h4, h5, h6", doc):
+    tag = h.tagName(el)
+    if tag in ("dfn", "h2", "h3", "h4", "h5", "h6"):
         for dfnType in config.dfnTypes:
-            if el.get(dfnType) == "":
-                del el.attrib[dfnType]
-                el.set("data-dfn-type", dfnType)
-                break
-    for el in h.findAll("a", doc):
+            if h.hasAttr(el, dfnType):
+                if el.get(dfnType) == "":
+                    h.removeAttr(el, dfnType)
+                    el.set("data-dfn-type", dfnType)
+                    break
+                elif dfnType == "type" and el.get(dfnType) in config.dfnTypes:
+                    realDfnType = el.get(dfnType)
+                    m.die(
+                        f"You used type={realDfnType}, which isn't valid. Instead use just {realDfnType} as a boolean attribute, or dfn-type={realDfnType}.",
+                        el=el,
+                    )
+                    h.removeAttr(el, "type")
+                    break
+
+    if tag == "a":
         for linkType in config.linkTypes:
-            if el.get(linkType) is not None:
-                del el.attrib[linkType]
+            if h.hasAttr(el, linkType):
+                h.removeAttr(el, linkType)
                 el.set("data-link-type", linkType)
                 break
-    for el in h.findAll(config.dfnElementsSelector + ", a", doc):
-        if el.get("for") is None:
-            continue
-        _for = t.cast(str, el.get("for"))
-        del el.attrib["for"]
-        if el.tag == "a":
-            el.set("data-link-for", _for)
-        else:
-            el.set("data-dfn-for", _for)
+
+    if (
+        tag == "a"
+        or (tag == "dfn" and not h.hasAttr(el, "data-var-ignore"))
+        or (tag in ("h2", "h3", "h4", "h5", "h6") and h.hasAttr(el, "data-dfn-type"))
+    ):
+        if h.hasAttr(el, "for"):
+            if el.tag == "a":
+                h.renameAttr(el, "for", "data-link-for")
+            else:
+                h.renameAttr(el, "for", "data-dfn-for")
+
+    for child in h.childElements(el):
+        canonicalizeShortcuts(child)
 
 
 def addImplicitAlgorithms(doc: t.SpecT) -> None:

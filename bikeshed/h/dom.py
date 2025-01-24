@@ -696,9 +696,23 @@ def removeAttr(el: t.ElementT, *attrNames: str) -> t.ElementT:
     return el
 
 
-def hasAttr(el: t.ElementT, *attrNames: str) -> bool:
+def renameAttr(el: t.ElementT, oldAttr: str, newAttr: str) -> t.ElementT:
+    # If oldAttr exists on the element, moves its value to newAttr
+    # and deletes oldAttr. Silently does nothing if oldAttr doesn't exist.
+    val = el.get(oldAttr)
+    if val is not None:
+        el.set(newAttr, val)
+        removeAttr(el, oldAttr)
+    return el
+
+
+def hasAnyAttr(el: t.ElementT, *attrNames: str) -> bool:
     # Returns True if the element has at least one of the named attributes
     return any(attrName in el.attrib for attrName in attrNames)
+
+
+def hasAttr(el: t.ElementT, attrName: str) -> bool:
+    return attrName in el.attrib
 
 
 def hasAttrs(el: t.ElementT) -> bool:
