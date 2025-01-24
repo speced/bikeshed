@@ -405,7 +405,6 @@ def markupIDLBlock(pre: t.ElementT, doc: t.SpecT) -> set[t.ElementT]:
     for el in h.findAll("idl", pre):
         idlType = el.get("data-idl-type")
         assert isinstance(idlType, str)
-        url = None
         forceDfn = False
         ref = None
         idlText = None
@@ -423,11 +422,10 @@ def markupIDLBlock(pre: t.ElementT, doc: t.SpecT) -> set[t.ElementT]:
                     error=False,
                 )
                 if ref:
-                    url = ref.url
                     break
             if ref:
                 break
-        if url is None or forceDfn:
+        if ref is None or forceDfn:
             el.tag = "dfn"
             el.set("data-dfn-type", idlType)
             del el.attrib["data-idl-type"]
@@ -436,7 +434,7 @@ def markupIDLBlock(pre: t.ElementT, doc: t.SpecT) -> set[t.ElementT]:
                 del el.attrib["data-idl-for"]
         else:
             # Copy over the auto-generated linking text to the manual dfn.
-            dfn = h.find(url, doc)
+            dfn = ref.el
             # How in the hell does this work, the url is not a selector???
             assert dfn is not None
             lts = combineIdlLinkingTexts(el.get("data-lt"), dfn.get("data-lt"))

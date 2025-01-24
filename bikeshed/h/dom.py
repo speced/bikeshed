@@ -1007,7 +1007,7 @@ def circledDigits(num: int) -> str:
     return result
 
 
-def collectIds(el: t.ElementT, ids: dict[str, t.ElementT]|None = None) -> dict[str, t.ElementT]:
+def collectIds(el: t.ElementT, ids: dict[str, t.ElementT] | None = None) -> dict[str, t.ElementT]:
     if ids is None:
         ids: dict[str, t.ElementT] = {}
     id = el.get("id", "")
