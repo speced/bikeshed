@@ -1046,6 +1046,16 @@ def collectAutolinks(el: t.ElementT, links: list[t.ElementT] | None = None) -> l
     return links
 
 
+def collectSyntaxHighlightables(el: t.ElementT, els: list[t.ElementT] | None = None) -> list[t.ElementT]:
+    if els is None:
+        els = []
+    if tagName(el) in ("xmp", "pre", "code"):
+        els.append(el)
+    for child in childElements(el):
+        collectSyntaxHighlightables(child, els)
+    return els
+
+
 def createElement(tag: str, attrs: t.Mapping[str, str | None] | None = None, *children: t.NodesT | None) -> t.ElementT:
     if attrs is None:
         attrs = {}
