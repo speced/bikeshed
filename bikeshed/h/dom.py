@@ -1009,7 +1009,7 @@ def circledDigits(num: int) -> str:
 
 def collectIds(el: t.ElementT, ids: dict[str, t.ElementT] | None = None) -> dict[str, t.ElementT]:
     if ids is None:
-        ids: dict[str, t.ElementT] = {}
+        ids = {}
     id = el.get("id", "")
     if id and id not in ids:
         ids[id] = el
