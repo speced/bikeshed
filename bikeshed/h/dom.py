@@ -1007,6 +1007,17 @@ def circledDigits(num: int) -> str:
     return result
 
 
+def collectIds(el: t.ElementT, ids: dict[str, t.ElementT]|None = None) -> dict[str, t.ElementT]:
+    if ids is None:
+        ids: dict[str, t.ElementT] = {}
+    id = el.get("id", "")
+    if id and id not in ids:
+        ids[id] = el
+    for child in childElements(el):
+        collectIds(child, ids)
+    return ids
+
+
 def createElement(tag: str, attrs: t.Mapping[str, str | None] | None = None, *children: t.NodesT | None) -> t.ElementT:
     if attrs is None:
         attrs = {}
