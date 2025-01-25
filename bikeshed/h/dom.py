@@ -495,6 +495,31 @@ def sectionName(doc: t.SpecT, el: t.ElementT) -> str | None:
     return textContent(h)
 
 
+def collectLinksWithSectionNames(
+    doc: t.SpecT,
+    root: t.ElementT | None = None,
+    links: dict[t.ElementT, str | None] | None = None,
+    name: str | None = "Unnamed section",
+) -> dict[t.ElementT, str | None]:
+    # Tree-walk to collect all links, and compute their section names
+    # along the way.
+    if links is None:
+        links = {}
+    if root is None:
+        root = doc.body
+    for child in childElements(root):
+        if tagName(child) == "a":
+            links[child] = name
+            continue
+        if tagName(child) in ("h1", "h2", "h3", "h4", "h5", "h6"):
+            if hasClass(doc, child, "no-ref"):
+                name = None
+            else:
+                name = textContent(child)
+        collectLinksWithSectionNames(doc, child, links, name)
+    return links
+
+
 def scopingElements(startEl: t.ElementT, tags: list[str]) -> t.Generator[t.ElementT, None, None]:
     # Elements that could form a "scope" for the startEl
     # Ancestors, and preceding siblings of ancestors.
@@ -524,8 +549,6 @@ def previousElements(startEl: t.ElementT, tag: str | None = None, *tags: str) ->
 
 
 def childElements(parentEl: t.ElementT, oddNodes: bool = False) -> t.Generator[t.ElementT, None, None]:
-    if len(parentEl) == 0:
-        return
     tag = None if oddNodes else "*"
     yield from parentEl.iterchildren(tag)
 

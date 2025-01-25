@@ -10,14 +10,15 @@ from ..translate import _t
 def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
     # Constructs "dfn panels" which show all the local references to a term
     # Gather all the <a href>s together
-    allRefs: OrderedDict[str, list[t.ElementT]] = OrderedDict()
-    for a in h.findAll("a", doc):
+    linksFromTargetId: OrderedDict[str, list[t.ElementT]] = OrderedDict()
+    sectionNameFromLink = h.collectLinksWithSectionNames(doc)
+    for a in sectionNameFromLink:
         href = a.get("href")
         if href is None:
             continue
         if not href.startswith("#"):
             continue
-        allRefs.setdefault(href[1:], []).append(a)
+        linksFromTargetId.setdefault(href[1:], []).append(a)
     panelsJSON = doc.extraJC.addDfnPanels()
     for dfn in dfns:
         id = dfn.get("id")
@@ -26,10 +27,10 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
             # Something went wrong, bail.
             continue
         refsFromSection: OrderedDict[str, list[t.ElementT]] = OrderedDict()
-        for link in allRefs.get(id, []):
-            section = h.sectionName(doc, link)
-            if section is not None:
-                refsFromSection.setdefault(section, []).append(link)
+        for link in linksFromTargetId.get(id, []):
+            sectionName = sectionNameFromLink.get(link)
+            if sectionName is not None:
+                refsFromSection.setdefault(sectionName, []).append(link)
         h.addClass(doc, dfn, "dfn-paneled")
         sectionsJson = []
         for text, els in refsFromSection.items():

@@ -15,6 +15,7 @@ from .dom import (
     closestAttr,
     collectAutolinks,
     collectIds,
+    collectLinksWithSectionNames,
     collectSyntaxHighlightables,
     createElement,
     dedupIDs,
