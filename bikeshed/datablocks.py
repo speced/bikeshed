@@ -525,6 +525,11 @@ def transformArgumentdef(
     if lineNum is not None:
         lineNumAttr = f" bs-line-number={lineNum}"
     attrs = parseDefBlock(lines, "argumentdef", doc=doc, capitalizeKeys=False, lineNum=lineNum)
+    for param,desc in list(attrs.items()):
+        # fix var params, since they're not caught by the parser
+        if param.startswith("|") and param.endswith("|"):
+            del attrs[param]
+            attrs["<var>"+param[1:-1]+"</var>"] = desc
     el = h.parseHTML(firstLine + "</pre>")[0]
     if h.hasAttr(el, "for"):
         forValue = t.cast(str, el.get("for"))
