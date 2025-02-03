@@ -394,6 +394,80 @@ def parseNode(
 emdashRe = re.compile(r"(?:(?<!-)(—|--))\n\s*(?=\S)")
 
 
+def parseLToEnd(s: Stream, start: int, lTag: StartTag) -> Result[ParserNode | list[ParserNode]]:
+    """
+    Parses the contents of an <l>, which should be a bikeshed inline shorthand of some kind.
+    This is done without checking for opaqueness (as it's an explicit request)
+    and without even checking which autolink syntaxes are turned on
+    (again, it's an explicit request, so there's no possibility of accidents).
+
+    Call with s[i] after the opening <l> tag.
+    Returns with s[i] after the </l> tag,
+    with the shorthand element in the Result.
+    """
+    if s.eof(start):
+        return Result.fail(start)
+
+    first1 = s[start]
+    first2 = s[start : start + 2]
+
+    # First, parse an autolink
+    nodes: ParserNode | list[ParserNode] | None
+    if first2 == "''":
+        nodes, i = parseCSSMaybe(s, start).vi
+    elif first1 == "'":
+        nodes, i = parseCSSPropdesc(s, start).vi
+    elif first2 == "<<":
+        nodes, i = parseCSSProduction(s, start).vi
+    elif first2 == "[=":
+        nodes, i = parseAutolinkDfn(s, start).vi
+    elif first2 == "[$":
+        nodes, i = parseAutolinkAbstract(s, start).vi
+    elif first2 == "[:":
+        nodes, i = parseAutolinkHeader(s, start).vi
+    elif first2 == "{{":
+        nodes, i = parseAutolinkIdl(s, start).vi
+    elif first2 == "<{":
+        nodes, i = parseAutolinkElement(s, start).vi
+    elif first2 == "[[":
+        nodes, i = parseAutolinkBiblioSection(s, start).vi
+    else:
+        # No recognized syntax
+        nodes, i = None, start
+    if nodes is None:
+        m.die("<l> element didn't contain a recognized autolink syntax", lineNum=s.loc(start))
+        return Result.fail(start)
+    assert isinstance(nodes, list)
+
+    # Then, parse a </l>
+    endTag, i = parseEndTag(s, i).vi
+    if endTag is None:
+        m.die("<l> element had unrecognized syntax after the autolink", lineNum=s.loc(i))
+        return Result.fail(start)
+    elif endTag.tag != "l":
+        m.die("<l> element wasn't closed by a </l>", lineNum=s.loc(i))
+        return Result.fail(start)
+
+    # Find the <a> start tag in the results
+    for node in nodes:
+        if isinstance(node, StartTag) and node.tag in ("a", "bs-link"):
+            realStart = node
+            break
+    else:
+        m.die(
+            "Programming error - successfully parsed an autolink, but couldn't find the <a> in the parsed results. Please report this!",
+            lineNum=s.loc(start),
+        )
+        return Result.fail(start)
+
+    # Transfer any <l> attributes to the autolink start tag
+    for k, v in lTag.attrs.items():
+        realStart.attrs[k] = v
+
+    # Now just return the autolink, but with cursor set past the </l>
+    return Result(nodes, i)
+
+
 def parseAngleStart(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
     # Assuming the stream starts with an <
     i = start + 1
@@ -410,6 +484,12 @@ def parseAngleStart(s: Stream, start: int) -> Result[ParserNode | list[ParserNod
     if startTag is not None:
         if isinstance(startTag, SelfClosedTag):
             return Result(startTag, i)
+        if startTag.tag == "l":
+            nodes, i = parseLToEnd(s, i, startTag).vi
+            if nodes is not None:
+                return Result(nodes, i)
+            else:
+                startTag.tag = "span"
         if startTag.tag == "pre":
             el, endI = parseMetadataBlock(s, start).vi
             if el is not None:
@@ -451,6 +531,10 @@ def parseAngleStart(s: Stream, start: int) -> Result[ParserNode | list[ParserNod
 
     endTag, i = parseEndTag(s, start).vi
     if endTag is not None:
+        if endTag.tag == "l":
+            # Should have been caught by parseLToEnd().
+            # Since it wasn't, that means there was a parse error.
+            endTag.tag = "span"
         return Result(endTag, i)
 
     return Result.fail(start)
