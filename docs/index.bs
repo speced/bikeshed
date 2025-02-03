@@ -1764,6 +1764,129 @@ More of Markdown will be supported in the future,
 as I get closer to adhering to the CommonMark specification.
 
 
+Text Macros {#text-macros}
+-----------
+
+Bikeshed supports the ability to use "text macros",
+spelled like `[FOO]`
+(a single uppercase word, surrounded by square brackets),
+which expand into other text.
+
+Macros can be used in several places,
+which dictate how they're parsed:
+
+* in place of ordinary text/markup, like `<p>It's [YEAR] right now`, 
+	where their contents are parsed as HTML
+* in HTML attributes, like `<a href=[LATEST]>`,
+	where their contents are parsed as HTML attribute value
+	(and safely escaped, no need to worry about spaces or quotes)
+* directly within an HTML tag, like `<div [ATTRS]>`,
+	where their contents are parsed as an HTML attribute list
+* in the `computed-metadata.include` file,
+	where their contents are just used as text
+	and substituted into the JSON with no escaping.
+
+Macros are *not* substituted, by default,
+in the "link data" portion of [=autolinks=],
+but this can be allowed by setting [=Markup Shorthands|`Markup Shorthands: macros-in-autolinks yes`=].
+With this, you can define a common long term in a macro,
+then use it in an autolink like `[=[LONGTERM]=]`.
+(Alternately, you can just put the autolink *itself* into a macro,
+like `Text Macro: FOO [=foo=]`,
+and then `[FOO]` will expand to the autolink
+without having to adjust [=Markup Shorthands=].)
+
+Macros are also *not* substituted, by default,
+in the contents of <{style}>, <{script}>, <{xmp}>, or [=datablocks=],
+as CSS/JS/etc are too likely to contain things that accidentally look like the macro syntax,
+and mixing another escaping syntax into those languages is more trouble than it's worth.
+You can turn on macro substitution on an element-by-element basis
+by adding the `bs-macros` attribute,
+like `<style bs-macros>html::before { content: "[TITLE]"; }</style>`.
+This will substitute them as unparsed plain text,
+so beware if there is any markup in the macro.
+
+Macros can contain more macros, which are substituted recursively,
+even when the macros aren't otherwise parsed
+(like in attribute values).
+
+It's normally a fatal error to use a macro that isn't defined,
+but you can loosen that restriction by putting a ? at the end,
+like `[UNKNOWN?]`,
+which will cause the macro to substitute with the empty string
+if it's not defined.
+
+Macros can be escaped in several ways,
+if you need to write something that looks like `[FOO]`
+in your source:
+
+* using standard HTML escapes to escape the `[`, like `&#91;FOO]`
+* using a Bikeshed escape to escape the `[`, like `&bs[;FOO]`
+* If `Markup Shorthands: markdown-escapes` is on (it is by default),
+	using a leading `\` to escape it, like `\[FOO]`.
+
+<h4 id=custom-macros>
+Custom Macro Names</h4>
+
+You can define your own macros via the [=Text Macros=] metadata,
+if you have some long term you'd like to avoid having to repeatedly type.
+
+Macros are one of the possible tests you can use for [[#conditional]],
+so defining a custom text macro can be useful
+even if it doesn't have a meaningful value.
+
+<h4 id=predefined-macros>
+Predefined Macro Names</h4>
+
+
+Additionally, Bikeshed supports a number of macros automatically,
+computed from your spec's metadata.
+Mostly, these are just used by your boilerplate file
+and won't be seen in the actual document source.
+
+<ul dfn-type=dfn dfn-for=macro export>
+	* <dfn>`[TITLE]`</dfn> gives the spec's full title, as extracted from either the H1 or the spec metadata. It's formatted appropriately for use in the 
+	* <dfn>`[H1]`</dfn> gives the desired document heading, in case the in-page title is supposed to be different from the `<title>` element value.
+	* <dfn>`[SHORTNAME]`</dfn> gives the document's shortname, like "css-cascade".
+	* <dfn>`[VSHORTNAME]`</dfn> gives the "versioned" shortname, like "css-cascade-3".
+	* <dfn>`[STATUS]`</dfn> gives the spec's status.
+	* <dfn>`[LONGSTATUS]`</dfn> gives a long form of the spec's status, so "ED" becomes "Editor's Draft", for example.
+	* <dfn>`[STATUSTEXT]`</dfn> gives an additional status text snippet.
+	* <dfn>`[LATEST]`</dfn> gives the link to the undated /TR link, if it exists.
+	* <dfn>`[VERSION]`</dfn> gives the link to the ED, if the spec is an ED, and otherwise constructs a dated /TR link from today's date.
+	* <dfn>`[ABSTRACT]`</dfn> gives the document's abstract.
+	* <dfn>`[ABSTRACTATTR]`</dfn> gives the document's abstract, correctly escaped to be an attribute value.
+	* <dfn>`[YEAR]`</dfn> gives the current year.
+	* <dfn>`[DATE]`</dfn> or <dfn>`[DATE-DMMY]`</dfn> gives a human-readable date like "30 January 2000".
+	* <dfn>`[DATE-MY]`</dfn> gives a partial date like "Jan 2000"
+	* <dfn>`[DATE-MMY]`</dfn> gives a partial date like "January 2000"
+	* <dfn>`[CDATE]`</dfn> gives a compact date in the format "YYYYMMDD", like "20000130"
+	* <dfn>`[ISODATE]`</dfn> gives a compact date in iso format "YYYY-MM-DD", like "2000-01-30"
+	* <dfn>`[DEADLINE]`</dfn> gives a human-readable version of the deadline date (formatted like [=[DATE]=]), if one was specified.
+	* <dfn>`[LOGO]`</dfn> gives the url of the spec's logo.
+	* <dfn>`[REPOSITORY]`</dfn> gives the name of the VCS repository the spec is located in;
+		this is currently only filled when the spec source is in a GitHub repository.
+		(Patches welcome for more repo-extraction code!)
+</ul>
+
+As these are substituted at the text level, not the higher HTML level, you can use them *anywhere*, including in attribute values.
+
+You can mark a macro as "optional" by appending a `?` to its name,
+like `[DATE?]`.
+This will cause Bikeshed to just remove it
+(replace it with the empty string)
+if it can't find a definition,
+rather than throwing an error.
+
+Like most other markup shorthands,
+text macros can be "escaped" by prepending a backslash,
+like `\[TITLE]`.
+When Bikeshed sees this,
+it will remove the slash and leave the text alone.
+This is sometimes necessary when code examples in your doc (such as a regex)
+accidentally look like text macros.
+
+
 Notes, Issues, Examples, Advisements {#notes-etc}
 -------------------------------------------------
 
@@ -4159,57 +4282,6 @@ use the singular version in either of these metadatas.
 	If you wanted to make sure that editors were listed before anything else,
 	you could set `Metadata Order: Editor, *, !*`.
 </div>
-
-
-Text Macros {#text-macros}
------------
-
-Several text "macros" are defined by the spec's metadata,
-and can be used anywhere in the spec to substitute in the spec they stand for by using the syntax `[FOO]`.
-Note that this is similar to the syntax for bibliography references, but it has only a single set of `[]` characters, and the text must be uppercase.
-The following macros are defined:
-
-<ul dfn-type=dfn dfn-for=macro export>
-	* <dfn>`[TITLE]`</dfn> gives the spec's full title, as extracted from either the H1 or the spec metadata.
-	* <dfn>`[H1]`</dfn> gives the desired document heading, in case the in-page title is supposed to be different from the `<title>` element value.
-	* <dfn>`[SHORTNAME]`</dfn> gives the document's shortname, like "css-cascade".
-	* <dfn>`[VSHORTNAME]`</dfn> gives the "versioned" shortname, like "css-cascade-3".
-	* <dfn>`[STATUS]`</dfn> gives the spec's status.
-	* <dfn>`[LONGSTATUS]`</dfn> gives a long form of the spec's status, so "ED" becomes "Editor's Draft", for example.
-	* <dfn>`[STATUSTEXT]`</dfn> gives an additional status text snippet.
-	* <dfn>`[LATEST]`</dfn> gives the link to the undated /TR link, if it exists.
-	* <dfn>`[VERSION]`</dfn> gives the link to the ED, if the spec is an ED, and otherwise constructs a dated /TR link from today's date.
-	* <dfn>`[ABSTRACT]`</dfn> gives the document's abstract.
-	* <dfn>`[ABSTRACTATTR]`</dfn> gives the document's abstract, correctly escaped to be an attribute value.
-	* <dfn>`[YEAR]`</dfn> gives the current year.
-	* <dfn>`[DATE]`</dfn> or <dfn>`[DATE-DMMY]`</dfn> gives a human-readable date like "30 January 2000".
-	* <dfn>`[DATE-MY]`</dfn> gives a partial date like "Jan 2000"
-	* <dfn>`[DATE-MMY]`</dfn> gives a partial date like "January 2000"
-	* <dfn>`[CDATE]`</dfn> gives a compact date in the format "YYYYMMDD", like "20000130"
-	* <dfn>`[ISODATE]`</dfn> gives a compact date in iso format "YYYY-MM-DD", like "2000-01-30"
-	* <dfn>`[DEADLINE]`</dfn> gives a human-readable version of the deadline date (formatted like [=[DATE]=]), if one was specified.
-	* <dfn>`[LOGO]`</dfn> gives the url of the spec's logo.
-	* <dfn>`[REPOSITORY]`</dfn> gives the name of the VCS repository the spec is located in;
-		this is currently only filled when the spec source is in a GitHub repository.
-		(Patches welcome for more repo-extraction code!)
-</ul>
-
-As these are substituted at the text level, not the higher HTML level, you can use them *anywhere*, including in attribute values.
-
-You can mark a macro as "optional" by appending a `?` to its name,
-like `[DATE?]`.
-This will cause Bikeshed to just remove it
-(replace it with the empty string)
-if it can't find a definition,
-rather than throwing an error.
-
-Like most other markup shorthands,
-text macros can be "escaped" by prepending a backslash,
-like `\[TITLE]`.
-When Bikeshed sees this,
-it will remove the slash and leave the text alone.
-This is sometimes necessary when code examples in your doc (such as a regex)
-accidentally look like text macros.
 
 
 Conditional Inclusion {#conditional}
