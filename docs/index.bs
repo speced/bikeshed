@@ -2001,14 +2001,12 @@ but works anywhere in your document.
 Extra bonus: it will recognize *all* the autolinking syntaxes,
 even if you have some turned off with the [=Markup Shorthands=] metadata.
 
-Note: Currently the CSS value autolinking syntax (`''foo''`) does not work.
-
 The <{l}> element itself is removed from the document and replaced by the autolink,
 but if you specify any attributes on the <{l}>,
 they'll be transferred to the generated <{a}>.
-In particular, this is useful for specifying linking attributes that can't be specified by the shorthand,
-like the spec to search for,
-that would otherwise require converting all the way to a manual <{a}> autolink.
+This is especially useful for autolinking attributes that can't be specified in the autolink shorthand,
+like the spec to search for when disambiguating a one-off term: `<l spec=foo>[=term that exists in multiple specs=]</l>`.
+Without this, you'd have to convert the autolink fully to HTML, like `<a dfn data-dfn-spec=foo>term that exists in multiple specs</a>`
 
 
 <{var}> and Algorithms {#var-and-algorithms}
@@ -2895,7 +2893,7 @@ There are three types of autolink syntaxes you might see/use:
 	See [[#autolink-manual]] for details.
 
 You may also see an <{l}> element,
-which is used to help augment [=dfn autolinks=],
+which is used to help augment [=dfn autolinks=] or [=biblio autolinks=],
 and can avoid the need to use an <{a}> in many cases.
 See [[#l-element]] for details.
 
@@ -2919,7 +2917,7 @@ The characters used to wrap an autolink determine what type of definition
 you're trying to link to.
 They're arranged into categories that can be individually turned on or off,
 if you don't think you'll use a particular type of autolink,
-and want to avoid possibly triggering an autolink accidentally:
+and want to avoid possibly triggering an autolink accidentally.
 
 The **Dfn** varieties (controlled by `Markup Shorthands: dfn yes`):
 
@@ -2943,7 +2941,7 @@ The **markup (HTML/SVG/etc)** varieties (controlled by `Markup Shorthands: marku
 The **CSS** varieties (controlled by `Markup Shorthands: css yes`):
 
 * `'foo'` (apostrophes/straight quotes) is an autolink to a property or descriptor named "foo". If there is both a property and a descriptor of a given name, this defaults to linking to the property if used in its bare (`'foo'`) form.
-* `''foo''` (double apostrophes) is an autolink to any of the CSS definition types except property and descriptor
+* `''foo''` (double apostrophes) is an autolink to any of the CSS definition types (but see the special syntax notes in [[#autolink-special]])
 * `<<foo>>` is an autolink to a type/production named "&lt;foo>"
 	* Bikeshed supports [the numeric-range restriction](https://drafts.csswg.org/css-values/#numeric-ranges) on type autolinks, such as `<<length [0,10px]>>`. Infinities in the range can be written as a literal `∞` character, an `&infin;` HTML character reference, or the literal string `Infinity`.
 * `<<'foo'>>` is an autolink to the the property or descriptor named "foo" (used in grammars, where you need `<foo>` for non-terminals).
@@ -2951,6 +2949,19 @@ The **CSS** varieties (controlled by `Markup Shorthands: css yes`):
 * `<<@foo>>` is an autolink to the at-rule named "@foo" (used in grammars)
 
 ### Inside Syntax ### {#autolink-inside}
+
+The inside of an autolink contains <strong>literal text</strong>.
+It is *not* parsed as HTML,
+and there is *no way* to escape characters within it.
+(If this is necessary, use a [=manual autolink=] instead.)
+This means that, for example,
+if you are trying to link to the term `a < b`,
+you write that literally within the autolink,
+like `[=a < b=]`.
+(On the other hand, 
+the definition is likely written normally, as `<dfn>a &lt; b</dfn>`.)
+
+The inside syntax contains 1-4 segments, separated by certain characters:
 
 * Put the text you're trying to link to inside the autolink.
 
@@ -2990,50 +3001,73 @@ The **CSS** varieties (controlled by `Markup Shorthands: css yes`):
 	<p class=example>`[=do foo|when foo is done=]` will link to a `<dfn dfn>do foo</dfn>`,
 		but will display "when foo is done" as the visible text of the link.
 
+	Unlike the rest of the autolink's insides, 
+	the visible text *is* parsed as normal Bikeshed text,
+	and can use any of the ordinary HTML/Markdown/Bikeshed constructs,
+	like `[=do foo|when <b>foo</b> is done=]`,
+	but is also subject to their parsing constraints
+	(such as literal `<` characters indicating the start of an HTML tag).
+	This segment is ended when the wrapper's ending characters are encountered literally;
+	you can use HTML escapes or [=Bikeshed escapes=]
+	to use those characters in your visible text. 
+
 	Note: Many variations on the linking text are automatically handled by Bikeshed
-	and don't need manual adjustment like this;
+	and don't need manual adjustment via the visible text;
 	see [[#conjugating]] for details.
 
----------
+All of these can be used together,
+like `{{Foo/bar!!attribute|the bar attribute}}`,
+which is equivalent to `<a attribute for=Foo lt=bar>the bar attribute</a>`.
+The separating characters between segments (`/`, `!`, and `|`)
+aren't otherwise usable within the "literal text" portion of the syntax;
+use a [=manual autolink=] if your term contains one of these characters.
 
-All together, the order of pieces is:
+By default, [=text macros=] can be used in the "visible text" portion,
+but no other part,
+so `[=[FOO]=]` is an autolink to the term `[FOO]`.
+[=Markup Shorthands|`Markup Shorthands: macros-in-autolinks yes`=] changes this,
+so `[=[FOO]=]` instead first has the `[FOO]` macro substituted,
+and then it's parsed as normal.
+Macros can't cross parsing boundaries, however--
+a macro can supply the "literal text" portion (any or all of the three literal segments)
+or the "visible text" portion,
+but not both.
 
-1. `for` value
-2. linking text
-3. link type
-4. visible text
 
-like `{{Document/ready!!attribute|the Document.ready attribute}}`.
+### `''foo''` Special Syntax ### {#autolink-special}
 
-### Syntax Limitations ### {#autolink-limits}
+The CSS "maybe" autolink syntax,
+indicated by the double-single-quotes `''foo''` wrapper,
+uses a slightly different internal syntax
+for legacy reasons.
+It comes in three forms:
 
-When using the shorthand link syntaxes
-(like `[=foo=]`)
-rather than HTML elements
-(like `<a dfn>foo</a>`),
-you should use plain text only,
-including in the "visible text" portion of the syntax.
-The special "linking" portions of the syntax all work on literal text,
-so there's no need to escape anything,
-including `<`.
-For example, to link to a value `foo` that's for the type `<bar>`,
-you should simply write `''<bar>/foo''`,
-with literal single angle brackets.
+1. The standard autolink inside syntax *almost* works,
+	just without the ability to specify different "visible text".
+	That is, `''foo/bar!!value''` works as normal,
+	but `''foo|the foo value''` does not.
+	This syntax creates a "maybe" CSS autolink,
+	which can link to most CSS types,
+	but will fail silently if the linking fails
+	and instead act like case 3, below.
 
-There are some exceptions, for legacy purposes.
-In particular, "maybe" autolinks can use markup in some ways.
+2. A syntax that resembles a CSS property, like `''foo: bar baz''`.
+	This creates a "propery" CSS autolink,
+	linking to the `foo` property.
+	Alternately, `''@foo/bar: value value''`
+	creates a "descriptor" CSS autolink,
+	linking to the "bar" descriptor of the "@foo" at-rule.
 
-In general, however, if you need to use any HTML markup,
-you should use the HTML syntax to write the autolink as well.
+	In either case, the part after the `:` up to the next literal `''`
+	is parsed as normal Bikeshed text,
+	so it can contain HTML, markdown, or Bikeshed-specific syntax.
 
-Alternately, if you're using the "maybe" autolink syntax
-just to format some text as "CSS text",
-like `the grammar is ''<<length>> | <<number>>''`
-consider instead using the `<css>` element,
-like `the grammar is <css><<length>> | <<number>></css>`.
-This will avoid trying to autolink its contents,
-and has no special parsing rules;
-the `<css>` element just turns into a `<span class=css>` in the output.
+3. If the contents of the autolink don't *look* like either of the above two cases,
+	it's just formatted as "CSS text":
+	the contents are parsed as normal Bikeshed text,
+	and the whole thing is wrapped in `<span class=css>`,
+	which triggers a particular styling in W3C specs.
+
 
 Spec/Section Autolinks {#autolink-biblio}
 ----------------------
