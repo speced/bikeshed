@@ -188,6 +188,17 @@ class Stream:
         else:
             return Result.fail(start)
 
+    def skipToSameLine(self, start: int, text: str) -> Result[str]:
+        # Skips forward, but no further than the end of the current line.
+        # Produces the text encounted before this point.
+        i = start
+        textLen = len(text)
+        while not self.eof(i) and self[i] != "\n":
+            if self[i : i + textLen] == text:
+                return Result(self[start:i], i)
+            i += 1
+        return Result.fail(start)
+
     def matchRe(self, start: int, pattern: re.Pattern) -> Result[re.Match]:
         match = pattern.match(self._chars, start)
         if match:
