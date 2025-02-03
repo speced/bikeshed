@@ -808,7 +808,30 @@ def parseCharRef(s: Stream, start: int, context: CharRefContext) -> Result[str]:
         return Result.fail(start)
     i = start + 1
 
-    if preds.isASCIIAlphanum(s[i]):
+    if s[i : i + 2] == "bs":
+        bsEscape, i = s.skipToSameLine(i, ";").vi
+        i += 1
+        if bsEscape is None:
+            m.die(
+                "Saw the start of an &bs...; escape, but couldn't find the ending semicolon. If this wasn't intended, escape the & with &amp;",
+                lineNum=s.loc(start),
+            )
+            return Result.fail(start)
+        if len(bsEscape) == 3 and bsEscape[2] in "`~!@#$%^&*()-_=+[]{}\\|;:'\"<>,./?":
+            return Result(bsEscape[2], i)
+        elif bsEscape == "bs<<":
+            return Result("«", i)
+        elif bsEscape == "bs>>":
+            return Result("»", i)
+        elif bsEscape == "bs->":
+            return Result("→", i)
+        else:
+            m.die(
+                f"&{bsEscape}; isn't a valid Bikeshed character reference. See <https://speced.github.io/bikeshed/#bs-charref>.",
+                lineNum=s.loc(start),
+            )
+            return Result.fail(start)
+    elif preds.isASCIIAlphanum(s[i]):
         i += 1
         while preds.isASCIIAlphanum(s[i]):
             i += 1
