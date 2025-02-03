@@ -78,6 +78,7 @@ class ParseConfig:
     dfn: bool = False
     header: bool = False
     idl: bool = False
+    macrosInAutolinks: bool = False
     markdown: bool = False
     markdownEscapes: bool = False
     markup: bool = False
@@ -94,6 +95,7 @@ class ParseConfig:
             dfn="dfn" in doc.md.markupShorthands,
             header="http" in doc.md.markupShorthands,
             idl="idl" in doc.md.markupShorthands,
+            macrosInAutolinks="macros-in-autolinks" in doc.md.markupShorthands,
             markdown="markdown" in doc.md.markupShorthands,
             markdownEscapes="markdown-escapes" in doc.md.markupShorthands,
             markup="markup" in doc.md.markupShorthands,

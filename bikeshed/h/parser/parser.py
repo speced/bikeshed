@@ -1270,13 +1270,16 @@ def parseMaybeDecl(s: Stream, textStart: int) -> Result[list[ParserNode]]:
         return Result.fail(textStart)
     colonEnd = colonStart + 1
 
-    text = replaceMacrosInText(
-        text=rawText,
-        macros=s.config.macros,
-        s=s,
-        start=textStart,
-        context=f"''{rawText}: ...''",
-    )
+    if s.config.macrosInAutolinks:
+        text = replaceMacrosInText(
+            text=rawText,
+            macros=s.config.macros,
+            s=s,
+            start=textStart,
+            context=f"''{rawText}: ...''",
+        )
+    else:
+        text = rawText
     match = MAYBE_DECL_RE.match(text)
     if not match:
         return Result.fail(textStart)
@@ -1338,13 +1341,16 @@ def parseMaybeValue(s: Stream, textStart: int) -> Result[list[ParserNode]]:
             break
 
     rawText = s[textStart:textEnd]
-    text = replaceMacrosInText(
-        text=rawText,
-        macros=s.config.macros,
-        s=s,
-        start=start,
-        context=f"''{rawText}''",
-    )
+    if s.config.macrosInAutolinks:
+        text = replaceMacrosInText(
+            text=rawText,
+            macros=s.config.macros,
+            s=s,
+            start=textStart,
+            context=f"''{rawText}''",
+        )
+    else:
+        text = rawText
     # Do some text-based analysis of the contents first.
 
     match = MAYBE_VAL_RE.match(text)
@@ -1443,9 +1449,9 @@ def safeFromDoubleAngles(text: str) -> str:
 
 AUTOLINK_PROPDESC_RE = re.compile(
     r"""
-    (?:(@[\w-]+|)/)?
-    ([\w*-]+)
-    (?:!!([\w-]+))?
+    (?:(@[\w\[\]-]+|)/)?
+    ([\w*\[\]-]+)
+    (?:!!([\w\[\]-]+))?
     """,
     flags=re.X,
 )
@@ -1463,7 +1469,25 @@ def parseCSSPropdesc(s: Stream, start: int) -> Result[SafeText | list[ParserNode
     if match is None:
         return Result.fail(start)
 
-    innerText = match[0]
+    if s.config.macrosInAutolinks and "[" in match[0]:
+        innerText = replaceMacrosInText(
+            text=match[0],
+            macros=s.config.macros,
+            s=s,
+            start=innerStart,
+            context=f"'{match[0]}'",
+        )
+        match = AUTOLINK_PROPDESC_RE.match(innerText)
+        if match:
+            innerText = match[0]
+        else:
+            m.die(
+                f"After macro replacement, couldn't parse a CSS property/descriptor autolink.\n  Original: '{s[innerStart:innerEnd]}'\n  After macros: '{innerText}'",
+                lineNum=s.loc(start),
+            )
+            return Result.fail(start)
+    else:
+        innerText = match[0]
     linkFor, lt, linkType = match.groups()
 
     if s[innerEnd] != "'":
@@ -1924,13 +1948,16 @@ def parseLinkInfo(
     startSigil: str,
     endSigil: str,
 ) -> tuple[str, str | None, str | None]:
-    lt = replaceMacrosInText(
-        text=innerText,
-        macros=s.config.macros,
-        s=s,
-        start=start,
-        context=startSigil + innerText + endSigil,
-    )
+    if s.config.macrosInAutolinks:
+        lt = replaceMacrosInText(
+            text=innerText,
+            macros=s.config.macros,
+            s=s,
+            start=start,
+            context=startSigil + innerText + endSigil,
+        )
+    else:
+        lt = innerText
 
     if re.search(r"&[\w\d#]+;", lt):
         m.die(
