@@ -817,8 +817,11 @@ def parseCharRef(s: Stream, start: int, context: CharRefContext) -> Result[str]:
                 lineNum=s.loc(start),
             )
             return Result.fail(start)
-        if len(bsEscape) == 3 and bsEscape[2] in "`~!@#$%^&*()-_=+[]{}\\|;:'\"<>,./?":
+        if len(bsEscape) == 3 and bsEscape[2] in "`~!@#$%^&*()-_=+[]{}\\|:'\"<>,./?":
             return Result(bsEscape[2], i)
+        elif len(bsEscape) == 2 and s[start : start + 5] == "&bs;;":
+            # handling &bs;; to escape a semicolon...
+            return Result(";", i + 1)
         elif bsEscape == "bs<<":
             return Result("«", i)
         elif bsEscape == "bs>>":
