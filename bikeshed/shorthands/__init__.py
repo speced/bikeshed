@@ -5,6 +5,5 @@ from . import oldShorthands
 
 
 def run(doc: t.SpecT) -> None:
-    oldShorthands.transformShorthandElements(doc)
-    oldShorthands.transformAutolinkShortcuts(doc)
+    oldShorthands.transformMarkdownIB(doc)
     oldShorthands.transformProductionGrammars(doc)

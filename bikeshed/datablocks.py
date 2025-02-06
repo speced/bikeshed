@@ -525,8 +525,13 @@ def transformArgumentdef(
     if lineNum is not None:
         lineNumAttr = f" bs-line-number={lineNum}"
     attrs = parseDefBlock(lines, "argumentdef", doc=doc, capitalizeKeys=False, lineNum=lineNum)
+    for param, desc in list(attrs.items()):
+        # fix var params, since they're not caught by the parser
+        if param.startswith("|") and param.endswith("|"):
+            del attrs[param]
+            attrs["<var>" + param[1:-1] + "</var>"] = desc
     el = h.parseHTML(firstLine + "</pre>")[0]
-    if "for" in el.attrib:
+    if h.hasAttr(el, "for"):
         forValue = t.cast(str, el.get("for"))
         el.set("data-dfn-for", forValue)
         if "/" in forValue:
@@ -541,8 +546,8 @@ def transformArgumentdef(
     h.addClass(doc, el, "data")
     rootAttrs = " ".join(f"{k!s}='{h.escapeAttr(str(v))}'" for k, v in el.attrib.items())
     text = (
-        """
-<table {attrs}{lineNumAttr}>
+        f"""
+<table {rootAttrs}{lineNumAttr}>
 <caption>Arguments for the <a idl lt='{method}' for='{interface}'{lineNumAttr}>{interface}.{method}</a> method.</caption>
 <thead>
 <tr>
@@ -551,25 +556,16 @@ def transformArgumentdef(
 <th style="text-align:center">Nullable
 <th style="text-align:center">Optional
 <th>Description
-<tbody>""".format(
-            attrs=rootAttrs,
-            interface=interface,
-            method=method,
-            lineNumAttr=lineNumAttr,
-        )
+<tbody>"""
         + "\n".join(
             [
-                """
+                f"""
 <tr>
-<td><dfn argument{lineNumAttr}>{0}</dfn>
+<td><dfn argument{lineNumAttr}>{param}</dfn>
 <td>
 <td style="text-align:center">
 <td style="text-align:center">
-<td>{1}""".format(
-                    param,
-                    desc,
-                    lineNumAttr=lineNumAttr,
-                )
+<td>{desc}"""
                 for param, desc in attrs.items()
             ],
         )

@@ -28,7 +28,7 @@ from . import messages as m
 
 def processConditionals(doc: t.SpecT, container: t.ElementT | None = None) -> None:
     for el in h.findAll("[include-if], [exclude-if], if-wrapper", container if container is not None else doc):
-        if el.tag == "if-wrapper" and not h.hasAttr(el, "include-if", "exclude-if"):
+        if el.tag == "if-wrapper" and not h.hasAnyAttr(el, "include-if", "exclude-if"):
             m.die(
                 "<if-wrapper> elements must have an include-if and/or exclude-if attribute.",
                 el=el,

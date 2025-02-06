@@ -39,7 +39,7 @@ def addSyntaxHighlighting(doc: t.SpecT) -> None:
         return
     normalizeHighlightMarkers(doc)
 
-    for el in h.findAll("xmp, pre, code", doc):
+    for el in h.collectSyntaxHighlightables(doc.body):
         # Find whether to highlight, and what the lang is
         lang = determineHighlightLang(doc, el)
         if lang is False:
@@ -292,12 +292,15 @@ def mergeHighlighting(el: t.ElementT, coloredText: t.Sequence[ColoredText]) -> N
         return h.createElement("c-", {color: ""}, text)
 
     def colorizeEl(el: t.ElementT, coloredText: t.Deque[ColoredText]) -> t.ElementT:
+        newChildren: list[str | t.ElementT] = []
         for node in h.childNodes(el, clear=True):
             if h.isElement(node):
-                h.appendChild(el, colorizeEl(node, coloredText))
+                newChildren.append(colorizeEl(node, coloredText))
             else:
                 assert isinstance(node, str)
-                h.appendChild(el, *colorizeText(node, coloredText), allowEmpty=True)
+                newChildren.extend(colorizeText(node, coloredText))
+        if newChildren:
+            h.appendChild(el, newChildren)
         return el
 
     def colorizeText(text: str, coloredText: t.Deque[ColoredText]) -> list[t.NodeT]:

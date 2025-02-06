@@ -79,6 +79,7 @@ class ParseConfig:
     dfn: bool = False
     header: bool = False
     idl: bool = False
+    macrosInAutolinks: bool = False
     markdown: bool = False
     markdownEscapes: bool = False
     markup: bool = False
@@ -96,6 +97,7 @@ class ParseConfig:
             dfn="dfn" in doc.md.markupShorthands,
             header="http" in doc.md.markupShorthands,
             idl="idl" in doc.md.markupShorthands,
+            macrosInAutolinks="macros-in-autolinks" in doc.md.markupShorthands,
             markdown="markdown" in doc.md.markupShorthands,
             markdownEscapes="markdown-escapes" in doc.md.markupShorthands,
             markup="markup" in doc.md.markupShorthands,
@@ -189,6 +191,17 @@ class Stream:
             return Result(self[start:i], i)
         else:
             return Result.fail(start)
+
+    def skipToSameLine(self, start: int, text: str) -> Result[str]:
+        # Skips forward, but no further than the end of the current line.
+        # Produces the text encounted before this point.
+        i = start
+        textLen = len(text)
+        while not self.eof(i) and self[i] != "\n":
+            if self[i : i + textLen] == text:
+                return Result(self[start:i], i)
+            i += 1
+        return Result.fail(start)
 
     def matchRe(self, start: int, pattern: re.Pattern) -> Result[re.Match]:
         match = pattern.match(self._chars, start)

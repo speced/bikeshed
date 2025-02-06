@@ -10,6 +10,7 @@ Repository: speced/bikeshed
 Abstract: Bikeshed is a spec-generating tool that takes in lightly-decorated Markdown and spits out a full spec, with cross-spec autolinking, automatic generation of indexes/ToC/etc, and many other features.
 Markup Shorthands: css no, markdown yes
 Ignored Terms: h1, h2, h3, h4, h5, h6, xmp
+Default Highlight: html
 </pre>
 
 <pre class=link-defaults>
@@ -571,19 +572,21 @@ so they're specified before the individual commands:
 	like `bikeshed spec -h`
 	to show the help text for that command in particular.
 
-: `--die-on = [ nothing | fatal | link-error | warning | everything ]`
+: `--die-on = [ nothing | fatal | link-error | warning | lint | message | everything ]`
 :: Bikeshed categorizes errors into several categories,
 	depending on their severity:
 	clear mistakes are "fatal",
 	errors in resolving autolinks are "link-error",
-	and things that look a little questionable but are totally okay to generate a document with are "warning".
+	things that look a little questionable but are totally okay to generate a document with are "warning",
+	and things that just violate one of the opt-in lint checks are "lint".
+	(The "message" level is for non-errors, like informing you that it's updating its datafiles.) 
 
 	The `--die-on` flag controls which sorts of errors
 	cause Bikeshed to fail to produce output
 	and exit with a non-0 status
 	(indicating the command failed).
 
-	Possible values are "nothing", "fatal", "link-error", "warning", and "everything",
+	Possible values are "nothing", "fatal", "link-error", "warning", "lint", "message", and "everything",
 	with each level including all previous levels.
 	Defaults to "fatal".
 
@@ -599,9 +602,6 @@ so they're specified before the individual commands:
 	a CI build fails when link errors creep into your document,
 	or if you just generally want to ensure that your document builds "cleanly",
 	without any warnings at all.
-	"everything" is equivalent to "warning",
-	but is guaranteed to always die on *all* error messages,
-	even if more levels are added in the future.
 
 	Note that this can also be controlled from within your document
 	(or your group's metadata)
@@ -1766,6 +1766,192 @@ More of Markdown will be supported in the future,
 as I get closer to adhering to the CommonMark specification.
 
 
+Bikeshed-Specific Character References {#bs-charref}
+--------------------------------------
+
+In addition to the standard HTML character reference syntaxes
+(named refs like `&copy;` or numeric refs like `&#1234;` or `&#x1a2b;`),
+Bikeshed supports a few <dfn lt="bikeshed escapes|custom character references">custom character references</dfn> to address some common needs.
+All of these look like `&bs...;`:
+
+: "bs" + any single ASCII punctuation character
+:: This is an escape for that punctuation character.
+	For example, `&bs[;` is an escape for the `[` character,
+	allowing you to escape an autolink
+	without having to remember the codepoint of the character:
+	`&bs[;=foo=]`.
+
+	(Yes, semicolon works too, and still needs to be ended by a semicolon: `&bs;;` to produce &bs;;.)
+
+: `&bs<<;`
+: `&bs>>;`
+: `&bs->;`
+:: These are escapes for the [[INFRA]] syntax for [=/lists=] and [=/maps=]:
+	&bs<<;1, 2, 3&bs>>; or &bs<<;a&bs->;b, c&bs->;d &bs>>;.
+
+More of these will likely be added in the future.
+
+
+Text Macros {#text-macros}
+-----------
+
+Bikeshed supports the ability to use "text macros",
+spelled like `[FOO]`
+(a single uppercase word, surrounded by square brackets),
+which expand into other text.
+
+Macros can be used in several places,
+which dictate how they're parsed:
+
+* in place of ordinary text/markup, like `<p>It's [YEAR] right now`, 
+	where their contents are parsed as HTML
+* in HTML attributes, like `<a href=[LATEST]>`,
+	where their contents are parsed as HTML attribute value
+	(and safely escaped, no need to worry about spaces or quotes)
+* directly within an HTML tag, like `<div [ATTRS]>`,
+	where their contents are parsed as an HTML attribute list
+* in the `computed-metadata.include` file,
+	where their contents are just used as text
+	and substituted into the JSON with no escaping.
+
+Macros are *not* substituted, by default,
+in the "link data" portion of [=autolinks=],
+but this can be allowed by setting [=Markup Shorthands|`Markup Shorthands: macros-in-autolinks yes`=].
+With this, you can define a common long term in a macro,
+then use it in an autolink like `[=[LONGTERM]=]`.
+(Alternately, you can just put the autolink *itself* into a macro,
+like `Text Macro: FOO [=foo=]`,
+and then `[FOO]` will expand to the autolink
+without having to adjust [=Markup Shorthands=].)
+
+Macros are also *not* substituted, by default,
+in the contents of <{style}>, <{script}>, <{xmp}>, or [=datablocks=],
+as CSS/JS/etc are too likely to contain things that accidentally look like the macro syntax,
+and mixing another escaping syntax into those languages is more trouble than it's worth.
+You can turn on macro substitution on an element-by-element basis
+by adding the `bs-macros` attribute,
+like `<style bs-macros>html::before { content: "[TITLE]"; }</style>`.
+This will substitute them as unparsed plain text,
+so beware if there is any markup in the macro.
+
+Macros can contain more macros, which are substituted recursively,
+even when the macros aren't otherwise parsed
+(like in attribute values).
+
+It's normally a fatal error to use a macro that isn't defined,
+but you can loosen that restriction by putting a ? at the end,
+like `[UNKNOWN?]`,
+which will cause the macro to substitute with the empty string
+if it's not defined.
+
+Macros can be escaped in several ways,
+if you need to write something that looks like `[FOO]`
+in your source:
+
+* using standard HTML escapes to escape the `[`, like `&#91;FOO]`
+* using a Bikeshed escape to escape the `[`, like `&bs[;FOO]`
+* If `Markup Shorthands: markdown-escapes` is on (it is by default),
+	using a leading `\` to escape it, like `\[FOO]`.
+
+<h4 id=custom-macros>
+Custom Macro Names</h4>
+
+You can define your own macros via the [=Text Macros=] metadata,
+if you have some long term you'd like to avoid having to repeatedly type.
+
+Macros are one of the possible tests you can use for [[#conditional]],
+so defining a custom text macro can be useful
+even if it doesn't have a meaningful value.
+
+<h4 id=predefined-macros>
+Predefined Macro Names</h4>
+
+
+Additionally, Bikeshed supports a number of macros automatically,
+computed from your spec's metadata.
+Mostly, these are just used by your boilerplate file
+and won't be seen in the actual document source.
+
+<ul dfn-type=dfn dfn-for=macro export>
+	* <dfn>`[TITLE]`</dfn> is the spec's title 
+		(taken from [=Title=]), 
+		formatted appropriately for the <{title}> element.
+	* <dfn>`[SPECTITLE]`</dfn> is the spec's title 
+		(taken from [=H1=], if set; otherwise from [=Title=]), 
+		formatted as normal HTML.
+	* <dfn>`[SHORTNAME]`</dfn> gives the document's shortname, like "css-cascade"
+		(taken from [=Shortname=]).
+	* <dfn>`[LEVEL]`</dfn> gives the document's level
+		(taken from [=metadata/Level=]).
+	* <dfn>`[VSHORTNAME]`</dfn> gives the "versioned" shortname, like "css-cascade-3"
+		(taken from [=Shortname=] + [=metadata/Level=]).
+	* <dfn>`[STATUS]`</dfn> gives the short version of the spec's status
+		(taken from [=metadata/Status=]),
+		like "ED".
+	* <dfn>`[LONGSTATUS]`</dfn> gives the long form of the spec's status
+		(taken from [=metadata/Status=]),
+		like "Editor's Draft".
+	* <dfn>`[STATUSTEXT]`</dfn> gives a custom message about the spec's status
+		(taken from [=metadata/Status Text=]).
+	* <dfn>`[WORKSTATUS]`</dfn> gives the spec's current work status
+		(taken from [=Work Status=]).
+	* <dfn>`[LATEST]`</dfn> gives the link to the latest /TR version of the spec
+		(taken from [=TR=]).
+	* <dfn>`[VERSION]`</dfn> gives the link to the ED, if the spec is an ED, and otherwise constructs a dated /TR link from today's date
+		(taken from [=metadata/ED=], or [=Shortname=] + [=metadata/Level=] + [=Date=] + [=metadata/Status=]).
+	* <dfn>`[ABSTRACT]`</dfn> gives the document's abstract,
+		(taken from [=Abstract=]).
+	* <dfn>`[YEAR]`</dfn> gives the current year.
+	* <dfn>`[DATE]`</dfn> gives a human-readable date like "30 January 2000"
+		(taken from [=Date=], or today's date if that's not set)
+		* <dfn>`[DATE-MY]`</dfn> gives a partial date like "Jan 2000"
+		* <dfn>`[DATE-MMY]`</dfn> gives a partial date like "January 2000"
+		* <dfn>`[DATE-DMMY]`</dfn> is identical to [=[DATE]=].
+		* <dfn>`[CDATE]`</dfn> gives a compact date in the format "YYYYMMDD", like "20000130"
+		* <dfn>`[ISODATE]`</dfn> gives a compact date in iso format "YYYY-MM-DD", like "2000-01-30"
+	* <dfn>`[DEADLINE]`</dfn> gives a human-readable version of the deadline date
+		(taken from [=Deadline=])
+		* <dfn>`[ISODEADLINE]`</dfn> gives the deadline data in iso format.
+	* <dfn>`[EXPIRES]`</dfn> gives the expiration date for the draft
+		(taken from [=Expires=])
+		* <dfn>`[EXPIRES-MY]`</dfn>, <dfn>`[EXPIRES-MMY]`</dfn>, <dfn>`[EXPIRES-DMMY]`</dfn>, <dfn>`[CEXPIRES]`</dfn>, and <dfn>`[ISOEXPIRES]`</dfn> give the expiration data in the specified format, like the [=[DATE]=] variants.
+	* <dfn>`[HISTORY]`</dfn> gives a link to the W3C spec history page
+		(taken from [=Shortname=] + [=metadata/Level=], if your spec is in the W3C [=Org=]).
+	* <dfn>`[REPLACEDBY]`</dfn>, <dfn>`[SNAPSHOTID]`</dfn>, and <dfn>`[SNAPSHOTURL]`</dfn>
+		give the corresponding components of the "Warning" metadata
+		(taken from [=Warning=])
+		* <dfn>`[CUSTOMWARNINGTEXT]`</dfn> and <dfn>`[CUSTOMWARNINGTITLE]`</dfn> give the text and title of custom warnings
+			(taken from [=Custom Warning Text=] and [=Custom Warning Title=], + [=Warning=] to indicate a custom warning)
+	* <dfn>`[LOGO]`</dfn> gives the url of the spec's logo
+		(taken from [=Logo=]).
+	* <dfn>`[REPOSITORY]`</dfn> gives the name of the VCS repository the spec is located in,
+		(taken from [=Repository=], or auto-detected from the source file's local repo if possible)
+		* <dfn>`[REPOSITORYURL]`</dfn> gives the URL of the repository
+			(auto-computed from [=Repository=])
+	* <dfn>`[MAILINGLIST]`</dfn> and <dfn>`[MAILINGLISTARCHIVES]`</dfn> give the URLs of the mailing list and archives
+		(taken from [=Mailing List=] and [=Mailing List Archives=])
+	* <dfn>`[W3C-STYLESHEET-URL]`</dfn> and <dfn>`[W3C-STATUS-URL]`</dfn> give URLs to the correct W3C stylesheet and status description, if you're in the W3C [=Org=].
+		(taken from [=metadata/Status=])
+</ul>
+
+As these are substituted at the text level, not the higher HTML level, you can use them *anywhere*, including in attribute values.
+
+You can mark a macro as "optional" by appending a `?` to its name,
+like `[DATE?]`.
+This will cause Bikeshed to just remove it
+(replace it with the empty string)
+if it can't find a definition,
+rather than throwing an error.
+
+Like most other markup shorthands,
+text macros can be "escaped" by prepending a backslash,
+like `\[TITLE]`.
+When Bikeshed sees this,
+it will remove the slash and leave the text alone.
+This is sometimes necessary when code examples in your doc (such as a regex)
+accidentally look like text macros.
+
+
 Notes, Issues, Examples, Advisements {#notes-etc}
 -------------------------------------------------
 
@@ -1817,10 +2003,42 @@ Bikeshed will automatically handle a few typographic niceties for you, ones that
 * Ending a line with `--` will turn it into an em dash (`—`) and pull the following line upwards so there's no space between the surrounding words and the dash.
 
 
-Autolink Shortcuts {#autolink-shortcuts}
+
+Datablocks {#datablocks}
+----------
+
+Bikeshed supports embedding a number of custom DSLs into your document,
+known as <dfn lt=datablock>datablocks</dfn>.
+These are done by including a `<pre>` (or `<xmp>` or `<script>`) with a particular class.
+These are used for several types of [[#def-blocks|definition tables]],
+[[#railroad|railroad diagrams]],
+[[#including|file includes]],
+and [[#bikeshed-data|bikeshed data sources]].
+
+Datablocks are specially parsed: 
+initially, the parser just jumps straight to the closing tag
+without interpreting anything inside of them,
+so there's no risk of Bikeshed-isms or inline Markdown
+accidentally being parsed.
+(Within a `<pre>` datablock, standard HTML is still parsed,
+so use `<xmp>` or `<script>` if you want to include `<` and `&` without escaping.)
+Even [=text macros=] aren't parsed by default;
+put a `bs-macros` boolean attribute on the start tag if you want them.
+
+The DSL will handle the actual parsing of the datablock contents,
+and might invoke Bikeshed's full parser on parts of that text
+where it makes sense.
+It will also determine what to replace the datablock with;
+data sources simply disappear,
+while railroad diagrams become <{svg}>s,
+and definition tables become <{table}>s.
+
+
+
+Autolinks {#autolink-shortcuts}
 ------------------
 
-There are several autolink shortcuts that make autolinks much shorter to write,
+There are several <dfn>autolink</dfn> shortcuts that make autolinks much shorter to write,
 such as `'foo'` to link to a CSS property or descriptor,
 or `{{foo}}` to link to an IDL construct.
 These are documented in [[#autolinking]].
@@ -1848,14 +2066,12 @@ but works anywhere in your document.
 Extra bonus: it will recognize *all* the autolinking syntaxes,
 even if you have some turned off with the [=Markup Shorthands=] metadata.
 
-Note: Currently the CSS value autolinking syntax (`''foo''`) does not work.
-
 The <{l}> element itself is removed from the document and replaced by the autolink,
 but if you specify any attributes on the <{l}>,
 they'll be transferred to the generated <{a}>.
-In particular, this is useful for specifying linking attributes that can't be specified by the shorthand,
-like the spec to search for,
-that would otherwise require converting all the way to a manual <{a}> autolink.
+This is especially useful for autolinking attributes that can't be specified in the autolink shorthand,
+like the spec to search for when disambiguating a one-off term: `<l spec=foo>[=term that exists in multiple specs=]</l>`.
+Without this, you'd have to convert the autolink fully to HTML, like `<a dfn data-dfn-spec=foo>term that exists in multiple specs</a>`
 
 
 <{var}> and Algorithms {#var-and-algorithms}
@@ -2752,7 +2968,7 @@ There are three types of autolink syntaxes you might see/use:
 	See [[#autolink-manual]] for details.
 
 You may also see an <{l}> element,
-which is used to help augment [=dfn autolinks=],
+which is used to help augment [=dfn autolinks=] or [=biblio autolinks=],
 and can avoid the need to use an <{a}> in many cases.
 See [[#l-element]] for details.
 
@@ -2776,7 +2992,7 @@ The characters used to wrap an autolink determine what type of definition
 you're trying to link to.
 They're arranged into categories that can be individually turned on or off,
 if you don't think you'll use a particular type of autolink,
-and want to avoid possibly triggering an autolink accidentally:
+and want to avoid possibly triggering an autolink accidentally.
 
 The **Dfn** varieties (controlled by `Markup Shorthands: dfn yes`):
 
@@ -2805,7 +3021,7 @@ The **markup (HTML/SVG/etc)** varieties (controlled by `Markup Shorthands: marku
 The **CSS** varieties (controlled by `Markup Shorthands: css yes`):
 
 * `'foo'` (apostrophes/straight quotes) is an autolink to a property or descriptor named "foo". If there is both a property and a descriptor of a given name, this defaults to linking to the property if used in its bare (`'foo'`) form.
-* `''foo''` (double apostrophes) is an autolink to any of the CSS definition types except property and descriptor
+* `''foo''` (double apostrophes) is an autolink to any of the CSS definition types (but see the special syntax notes in [[#autolink-special]])
 * `<<foo>>` is an autolink to a type/production named "&lt;foo>"
 	* Bikeshed supports [the numeric-range restriction](https://drafts.csswg.org/css-values/#numeric-ranges) on type autolinks, such as `<<length [0,10px]>>`. Infinities in the range can be written as a literal `∞` character, an `&infin;` HTML character reference, or the literal string `Infinity`.
 * `<<'foo'>>` is an autolink to the the property or descriptor named "foo" (used in grammars, where you need `<foo>` for non-terminals).
@@ -2814,6 +3030,19 @@ The **CSS** varieties (controlled by `Markup Shorthands: css yes`):
 
 
 ### Inside Syntax ### {#autolink-inside}
+
+The inside of an autolink contains <strong>literal text</strong>.
+It is *not* parsed as HTML,
+and there is *no way* to escape characters within it.
+(If this is necessary, use a [=manual autolink=] instead.)
+This means that, for example,
+if you are trying to link to the term `a < b`,
+you write that literally within the autolink,
+like `[=a < b=]`.
+(On the other hand, 
+the definition is likely written normally, as `<dfn>a &lt; b</dfn>`.)
+
+The inside syntax contains 1-4 segments, separated by certain characters:
 
 * Put the text you're trying to link to inside the autolink.
 
@@ -2853,50 +3082,73 @@ The **CSS** varieties (controlled by `Markup Shorthands: css yes`):
 	<p class=example>`[=do foo|when foo is done=]` will link to a `<dfn dfn>do foo</dfn>`,
 		but will display "when foo is done" as the visible text of the link.
 
+	Unlike the rest of the autolink's insides, 
+	the visible text *is* parsed as normal Bikeshed text,
+	and can use any of the ordinary HTML/Markdown/Bikeshed constructs,
+	like `[=do foo|when <b>foo</b> is done=]`,
+	but is also subject to their parsing constraints
+	(such as literal `<` characters indicating the start of an HTML tag).
+	This segment is ended when the wrapper's ending characters are encountered literally;
+	you can use HTML escapes or [=Bikeshed escapes=]
+	to use those characters in your visible text. 
+
 	Note: Many variations on the linking text are automatically handled by Bikeshed
-	and don't need manual adjustment like this;
+	and don't need manual adjustment via the visible text;
 	see [[#conjugating]] for details.
 
----------
+All of these can be used together,
+like `{{Foo/bar!!attribute|the bar attribute}}`,
+which is equivalent to `<a attribute for=Foo lt=bar>the bar attribute</a>`.
+The separating characters between segments (`/`, `!`, and `|`)
+aren't otherwise usable within the "literal text" portion of the syntax;
+use a [=manual autolink=] if your term contains one of these characters.
 
-All together, the order of pieces is:
+By default, [=text macros=] can be used in the "visible text" portion,
+but no other part,
+so `[=[FOO]=]` is an autolink to the term `[FOO]`.
+[=Markup Shorthands|`Markup Shorthands: macros-in-autolinks yes`=] changes this,
+so `[=[FOO]=]` instead first has the `[FOO]` macro substituted,
+and then it's parsed as normal.
+Macros can't cross parsing boundaries, however--
+a macro can supply the "literal text" portion (any or all of the three literal segments)
+or the "visible text" portion,
+but not both.
 
-1. `for` value
-2. linking text
-3. link type
-4. visible text
 
-like `{{Document/ready!!attribute|the Document.ready attribute}}`.
+### `''foo''` Special Syntax ### {#autolink-special}
 
-### Syntax Limitations ### {#autolink-limits}
+The CSS "maybe" autolink syntax,
+indicated by the double-single-quotes `''foo''` wrapper,
+uses a slightly different internal syntax
+for legacy reasons.
+It comes in three forms:
 
-When using the shorthand link syntaxes
-(like `[=foo=]`)
-rather than HTML elements
-(like `<a dfn>foo</a>`),
-you should use plain text only,
-including in the "visible text" portion of the syntax.
-The special "linking" portions of the syntax all work on literal text,
-so there's no need to escape anything,
-including `<`.
-For example, to link to a value `foo` that's for the type `<bar>`,
-you should simply write `''<bar>/foo''`,
-with literal single angle brackets.
+1. The standard autolink inside syntax *almost* works,
+	just without the ability to specify different "visible text".
+	That is, `''foo/bar!!value''` works as normal,
+	but `''foo|the foo value''` does not.
+	This syntax creates a "maybe" CSS autolink,
+	which can link to most CSS types,
+	but will fail silently if the linking fails
+	and instead act like case 3, below.
 
-There are some exceptions, for legacy purposes.
-In particular, "maybe" autolinks can use markup in some ways.
+2. A syntax that resembles a CSS property, like `''foo: bar baz''`.
+	This creates a "propery" CSS autolink,
+	linking to the `foo` property.
+	Alternately, `''@foo/bar: value value''`
+	creates a "descriptor" CSS autolink,
+	linking to the "bar" descriptor of the "@foo" at-rule.
 
-In general, however, if you need to use any HTML markup,
-you should use the HTML syntax to write the autolink as well.
+	In either case, the part after the `:` up to the next literal `''`
+	is parsed as normal Bikeshed text,
+	so it can contain HTML, markdown, or Bikeshed-specific syntax.
 
-Alternately, if you're using the "maybe" autolink syntax
-just to format some text as "CSS text",
-like `the grammar is ''<<length>> | <<number>>''`
-consider instead using the `<css>` element,
-like `the grammar is <css><<length>> | <<number>></css>`.
-This will avoid trying to autolink its contents,
-and has no special parsing rules;
-the `<css>` element just turns into a `<span class=css>` in the output.
+3. If the contents of the autolink don't *look* like either of the above two cases,
+	it's just formatted as "CSS text":
+	the contents are parsed as normal Bikeshed text,
+	and the whole thing is wrapped in `<span class=css>`,
+	which triggers a particular styling in W3C specs.
+
 
 Spec/Section Autolinks {#autolink-biblio}
 ----------------------
@@ -3742,10 +3994,10 @@ interface Foo {
 ```
 
 To have Bikeshed recognize a definition for the `bar()` method placed elsewhere,
-it must look something like `<dfn method for=Foo title="bar(baz, qux)">bar(DOMString baz, optional long qux)</dfn>`.
+it must look something like `<dfn method for=Foo lt="bar(baz, qux)">bar(DOMString baz, optional long qux)</dfn>`.
 
 Additionally, it *should* define alternate linking texts for omittable arguments,
-like `<dfn method for=Foo title="bar(baz, qux)|bar(baz)">bar(DOMString baz, optional long qux)</dfn>`.
+like `<dfn method for=Foo lt="bar(baz, qux)|bar(baz)">bar(DOMString baz, optional long qux)</dfn>`.
 This way any valid call signature can be used to autolink.
 Note that arguments are omittable if they're marked with `optional`, or are variadic (like `long... qux`), or have a default value.
 Nullable arguments (like `long? qux`) are not omittable.
@@ -4294,57 +4546,6 @@ use the singular version in either of these metadatas.
 </div>
 
 
-Text Macros {#text-macros}
------------
-
-Several text "macros" are defined by the spec's metadata,
-and can be used anywhere in the spec to substitute in the spec they stand for by using the syntax `[FOO]`.
-Note that this is similar to the syntax for bibliography references, but it has only a single set of `[]` characters, and the text must be uppercase.
-The following macros are defined:
-
-<ul dfn-type=dfn dfn-for=macro export>
-	* <dfn>`[TITLE]`</dfn> gives the spec's full title, as extracted from either the H1 or the spec metadata.
-	* <dfn>`[H1]`</dfn> gives the desired document heading, in case the in-page title is supposed to be different from the `<title>` element value.
-	* <dfn>`[SHORTNAME]`</dfn> gives the document's shortname, like "css-cascade".
-	* <dfn>`[VSHORTNAME]`</dfn> gives the "versioned" shortname, like "css-cascade-3".
-	* <dfn>`[STATUS]`</dfn> gives the spec's status.
-	* <dfn>`[LONGSTATUS]`</dfn> gives a long form of the spec's status, so "ED" becomes "Editor's Draft", for example.
-	* <dfn>`[STATUSTEXT]`</dfn> gives an additional status text snippet.
-	* <dfn>`[LATEST]`</dfn> gives the link to the undated /TR link, if it exists.
-	* <dfn>`[VERSION]`</dfn> gives the link to the ED, if the spec is an ED, and otherwise constructs a dated /TR link from today's date.
-	* <dfn>`[ABSTRACT]`</dfn> gives the document's abstract.
-	* <dfn>`[ABSTRACTATTR]`</dfn> gives the document's abstract, correctly escaped to be an attribute value.
-	* <dfn>`[YEAR]`</dfn> gives the current year.
-	* <dfn>`[DATE]`</dfn> or <dfn>`[DATE-DMMY]`</dfn> gives a human-readable date like "30 January 2000".
-	* <dfn>`[DATE-MY]`</dfn> gives a partial date like "Jan 2000"
-	* <dfn>`[DATE-MMY]`</dfn> gives a partial date like "January 2000"
-	* <dfn>`[CDATE]`</dfn> gives a compact date in the format "YYYYMMDD", like "20000130"
-	* <dfn>`[ISODATE]`</dfn> gives a compact date in iso format "YYYY-MM-DD", like "2000-01-30"
-	* <dfn>`[DEADLINE]`</dfn> gives a human-readable version of the deadline date (formatted like [=\[DATE]=]), if one was specified.
-	* <dfn>`[LOGO]`</dfn> gives the url of the spec's logo.
-	* <dfn>`[REPOSITORY]`</dfn> gives the name of the VCS repository the spec is located in;
-		this is currently only filled when the spec source is in a GitHub repository.
-		(Patches welcome for more repo-extraction code!)
-</ul>
-
-As these are substituted at the text level, not the higher HTML level, you can use them *anywhere*, including in attribute values.
-
-You can mark a macro as "optional" by appending a `?` to its name,
-like `[DATE?]`.
-This will cause Bikeshed to just remove it
-(replace it with the empty string)
-if it can't find a definition,
-rather than throwing an error.
-
-Like most other markup shorthands,
-text macros can be "escaped" by prepending a backslash,
-like `\[TITLE]`.
-When Bikeshed sees this,
-it will remove the slash and leave the text alone.
-This is sometimes necessary when code examples in your doc (such as a regex)
-accidentally look like text macros.
-
-
 Conditional Inclusion {#conditional}
 ---------------------
 
@@ -4825,3 +5026,9 @@ as it might be important.
 
 Additional semicolons are silently ignored;
 in other words, empty entries get dropped, so you can put a final semicolon at the end of the line or not, as you prefer.
+
+
+Appendix B: Bikeshed's Data Sources {#bikeshed-data}
+===================================
+
+Issue: fill in

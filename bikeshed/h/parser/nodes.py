@@ -138,7 +138,7 @@ class StartTag(ParserNode):
         )
 
     def __str__(self) -> str:
-        s = f"<{self.tag} bs-line-number={self.line}"
+        s = f'<{self.tag} bs-line-number="{escapeAttr(self.loc)}"'
         if self.context:
             s += f' bs-parse-context="{escapeAttr(self.context)}"'
         for k, v in sorted(self.attrs.items()):
@@ -205,7 +205,7 @@ class SelfClosedTag(ParserNode):
         )
 
     def __str__(self) -> str:
-        s = f"<{self.tag} bs-line-number={self.line}"
+        s = f'<{self.tag} bs-line-number="{escapeAttr(self.loc)}"'
         if self.context:
             s += f' bs-parse-context="{escapeAttr(self.context)}"'
         for k, v in sorted(self.attrs.items()):
@@ -362,15 +362,15 @@ class TagStack:
                 for entry in reversed(self.tags):
                     if entry.startTag.tag == node.tag:
                         m.die(
-                            f"Saw an end tag {node}, but there were unclosed elements remaining before the nearest matching start tag (on line {entry.startTag.line}).\nOpen tags: {', '.join(self.printOpenTags())}",
-                            lineNum=node.line,
+                            f"Saw an end tag {node}, but there were unclosed elements remaining before the nearest matching start tag (at {entry.startTag.loc}).\nOpen tags: {', '.join(self.printOpenTags())}",
+                            lineNum=node.loc,
                         )
                         break
                 else:
                     openTagsMsg = f"\nOpen tags: {', '.join(self.printOpenTags())}" if self.tags else ""
                     m.die(
                         f"Saw an end tag {node}, but there's no open element corresponding to it.{openTagsMsg}",
-                        lineNum=node.line,
+                        lineNum=node.loc,
                     )
         elif isinstance(node, (SelfClosedTag, RawElement)):
             self.autoCloseStart(node.tag)

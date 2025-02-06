@@ -322,15 +322,17 @@ def appendChild(parent: t.ElementT, *els: t.NodesT, allowEmpty: bool) -> t.Eleme
 def appendChild(parent: t.ElementT, *els: t.NodesT, allowEmpty: bool = False) -> t.ElementT | None:
     # Appends either text or an element.
     child: t.NodeT | None = None
+    parentLen = len(parent)
     for child in flatten(els):
         assert child is not None
         if isinstance(child, str):
-            if len(parent) > 0:
+            if parentLen > 0:
                 parent[-1].tail = (parent[-1].tail or "") + child
             else:
                 parent.text = (parent.text or "") + child
         else:
-            if len(parent) == 0 and parent.text is not None:
+            parentLen += 1
+            if parentLen == 0 and parent.text is not None:
                 # LXML "helpfully" assumes you meant to insert it before the text,
                 # and so moves the text into the element's tail when you append.
                 text, parent.text = parent.text, None
@@ -493,6 +495,31 @@ def sectionName(doc: t.SpecT, el: t.ElementT) -> str | None:
     return textContent(h)
 
 
+def collectLinksWithSectionNames(
+    doc: t.SpecT,
+    root: t.ElementT | None = None,
+    links: dict[t.ElementT, str | None] | None = None,
+    name: str | None = "Unnamed section",
+) -> dict[t.ElementT, str | None]:
+    # Tree-walk to collect all links, and compute their section names
+    # along the way.
+    if links is None:
+        links = {}
+    if root is None:
+        root = doc.body
+    for child in childElements(root):
+        if tagName(child) == "a":
+            links[child] = name
+            continue
+        if tagName(child) in ("h1", "h2", "h3", "h4", "h5", "h6"):
+            if hasClass(doc, child, "no-ref"):
+                name = None
+            else:
+                name = textContent(child)
+        collectLinksWithSectionNames(doc, child, links, name)
+    return links
+
+
 def scopingElements(startEl: t.ElementT, tags: list[str]) -> t.Generator[t.ElementT, None, None]:
     # Elements that could form a "scope" for the startEl
     # Ancestors, and preceding siblings of ancestors.
@@ -522,8 +549,6 @@ def previousElements(startEl: t.ElementT, tag: str | None = None, *tags: str) ->
 
 
 def childElements(parentEl: t.ElementT, oddNodes: bool = False) -> t.Generator[t.ElementT, None, None]:
-    if len(parentEl) == 0:
-        return
     tag = None if oddNodes else "*"
     yield from parentEl.iterchildren(tag)
 
@@ -696,9 +721,23 @@ def removeAttr(el: t.ElementT, *attrNames: str) -> t.ElementT:
     return el
 
 
-def hasAttr(el: t.ElementT, *attrNames: str) -> bool:
+def renameAttr(el: t.ElementT, oldAttr: str, newAttr: str) -> t.ElementT:
+    # If oldAttr exists on the element, moves its value to newAttr
+    # and deletes oldAttr. Silently does nothing if oldAttr doesn't exist.
+    val = el.get(oldAttr)
+    if val is not None:
+        el.set(newAttr, val)
+        removeAttr(el, oldAttr)
+    return el
+
+
+def hasAnyAttr(el: t.ElementT, *attrNames: str) -> bool:
     # Returns True if the element has at least one of the named attributes
     return any(attrName in el.attrib for attrName in attrNames)
+
+
+def hasAttr(el: t.ElementT, attrName: str) -> bool:
+    return attrName in el.attrib
 
 
 def hasAttrs(el: t.ElementT) -> bool:
@@ -1005,6 +1044,39 @@ def circledDigits(num: int) -> str:
     digits = ["⓪", "①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨"]
     result = "".join(digits[int(d)] for d in str(num))
     return result
+
+
+def collectIds(el: t.ElementT, ids: dict[str, t.ElementT] | None = None) -> dict[str, t.ElementT]:
+    if ids is None:
+        ids = {}
+    id = el.get("id", "")
+    if id and id not in ids:
+        ids[id] = el
+    for child in childElements(el):
+        collectIds(child, ids)
+    return ids
+
+
+def collectAutolinks(el: t.ElementT, links: list[t.ElementT] | None = None) -> list[t.ElementT]:
+    if links is None:
+        links = []
+    if tagName(el) == "a" and not hasAttr(el, "href") and el.get("data-link-type", "") != "biblio":
+        links.append(el)
+    elif tagName(el) == "bs-link":
+        links.append(el)
+    for child in childElements(el):
+        collectAutolinks(child, links)
+    return links
+
+
+def collectSyntaxHighlightables(el: t.ElementT, els: list[t.ElementT] | None = None) -> list[t.ElementT]:
+    if els is None:
+        els = []
+    if tagName(el) in ("xmp", "pre", "code"):
+        els.append(el)
+    for child in childElements(el):
+        collectSyntaxHighlightables(child, els)
+    return els
 
 
 def createElement(tag: str, attrs: t.Mapping[str, str | None] | None = None, *children: t.NodesT | None) -> t.ElementT:

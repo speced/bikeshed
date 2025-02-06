@@ -203,7 +203,7 @@ def parseNode(
         return Result(nodes, start + 1)
 
     if first1 == "&":
-        ch, i = parseCharRef(s, start, context=CharRefContext.NON_ATTR).vi
+        ch, i = parseCharRef(s, start, context=CharRefContext.NonAttr).vi
         if ch is not None:
             node = RawText.fromStream(s, start, i, f"&#{ord(ch)};")
             return Result(node, i)
@@ -387,7 +387,7 @@ def parseNode(
         node = RawText.fromStream(s, start, start + 2, "[")
         return Result(node, start + 2)
     if first1 == "[" and s[start - 1] != "[" and isMacroStart(s, start + 1):
-        macroRes = parseMacro(s, start)
+        macroRes = parseMacroToNodes(s, start)
         if macroRes.valid:
             return macroRes
     if s.config.markdownEscapes and not inOpaque:
@@ -407,6 +407,80 @@ def parseNode(
 emdashRe = re.compile(r"(?:(?<!-)(—|--))\n\s*(?=\S)")
 
 
+def parseLToEnd(s: Stream, start: int, lTag: StartTag) -> Result[ParserNode | list[ParserNode]]:
+    """
+    Parses the contents of an <l>, which should be a bikeshed inline shorthand of some kind.
+    This is done without checking for opaqueness (as it's an explicit request)
+    and without even checking which autolink syntaxes are turned on
+    (again, it's an explicit request, so there's no possibility of accidents).
+
+    Call with s[i] after the opening <l> tag.
+    Returns with s[i] after the </l> tag,
+    with the shorthand element in the Result.
+    """
+    if s.eof(start):
+        return Result.fail(start)
+
+    first1 = s[start]
+    first2 = s[start : start + 2]
+
+    # First, parse an autolink
+    nodes: ParserNode | list[ParserNode] | None
+    if first2 == "''":
+        nodes, i = parseCSSMaybe(s, start).vi
+    elif first1 == "'":
+        nodes, i = parseCSSPropdesc(s, start).vi
+    elif first2 == "<<":
+        nodes, i = parseCSSProduction(s, start).vi
+    elif first2 == "[=":
+        nodes, i = parseAutolinkDfn(s, start).vi
+    elif first2 == "[$":
+        nodes, i = parseAutolinkAbstract(s, start).vi
+    elif first2 == "[:":
+        nodes, i = parseAutolinkHeader(s, start).vi
+    elif first2 == "{{":
+        nodes, i = parseAutolinkIdl(s, start).vi
+    elif first2 == "<{":
+        nodes, i = parseAutolinkElement(s, start).vi
+    elif first2 == "[[":
+        nodes, i = parseAutolinkBiblioSection(s, start).vi
+    else:
+        # No recognized syntax
+        nodes, i = None, start
+    if nodes is None:
+        m.die("<l> element didn't contain a recognized autolink syntax", lineNum=s.loc(start))
+        return Result.fail(start)
+    assert isinstance(nodes, list)
+
+    # Then, parse a </l>
+    endTag, i = parseEndTag(s, i).vi
+    if endTag is None:
+        m.die("<l> element had unrecognized syntax after the autolink", lineNum=s.loc(i))
+        return Result.fail(start)
+    elif endTag.tag != "l":
+        m.die("<l> element wasn't closed by a </l>", lineNum=s.loc(i))
+        return Result.fail(start)
+
+    # Find the <a> start tag in the results
+    for node in nodes:
+        if isinstance(node, StartTag) and node.tag in ("a", "bs-link"):
+            realStart = node
+            break
+    else:
+        m.die(
+            "Programming error - successfully parsed an autolink, but couldn't find the <a> in the parsed results. Please report this!",
+            lineNum=s.loc(start),
+        )
+        return Result.fail(start)
+
+    # Transfer any <l> attributes to the autolink start tag
+    for k, v in lTag.attrs.items():
+        realStart.attrs[k] = v
+
+    # Now just return the autolink, but with cursor set past the </l>
+    return Result(nodes, i)
+
+
 def parseAngleStart(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
     # Assuming the stream starts with an <
     i = start + 1
@@ -423,6 +497,12 @@ def parseAngleStart(s: Stream, start: int) -> Result[ParserNode | list[ParserNod
     if startTag is not None:
         if isinstance(startTag, SelfClosedTag):
             return Result(startTag, i)
+        if startTag.tag == "l":
+            nodes, i = parseLToEnd(s, i, startTag).vi
+            if nodes is not None:
+                return Result(nodes, i)
+            else:
+                startTag.tag = "span"
         if startTag.tag == "pre":
             el, endI = parseMetadataBlock(s, start).vi
             if el is not None:
@@ -431,24 +511,32 @@ def parseAngleStart(s: Stream, start: int) -> Result[ParserNode | list[ParserNod
                 text, i = parseRawPreToEnd(s, i).vi
                 if text is None:
                     return Result.fail(start)
+                if "bs-macros" in startTag.attrs:
+                    text = replaceMacrosInText(text, s.config.macros, s, start, context="<pre> contents")
                 el = RawElement.fromStream(s, start, i, startTag, text)
                 return Result(el, i)
         if startTag.tag == "script":
             text, i = parseScriptToEnd(s, i).vi
             if text is None:
                 return Result.fail(start)
+            if "bs-macros" in startTag.attrs:
+                text = replaceMacrosInText(text, s.config.macros, s, start, context="<script> contents")
             el = RawElement.fromStream(s, start, i, startTag, text)
             return Result(el, i)
         elif startTag.tag == "style":
             text, i = parseStyleToEnd(s, i).vi
             if text is None:
                 return Result.fail(start)
+            if "bs-macros" in startTag.attrs:
+                text = replaceMacrosInText(text, s.config.macros, s, start, context="<style> contents")
             el = RawElement.fromStream(s, start, i, startTag, text)
             return Result(el, i)
         elif startTag.tag == "xmp":
             text, i = parseXmpToEnd(s, i).vi
             if text is None:
                 return Result.fail(start)
+            if "bs-macros" in startTag.attrs:
+                text = replaceMacrosInText(text, s.config.macros, s, start, context="<xmp> contents")
             el = RawElement.fromStream(s, start, i, startTag, text)
             return Result(el, i)
         else:
@@ -456,6 +544,10 @@ def parseAngleStart(s: Stream, start: int) -> Result[ParserNode | list[ParserNod
 
     endTag, i = parseEndTag(s, start).vi
     if endTag is not None:
+        if endTag.tag == "l":
+            # Should have been caught by parseLToEnd().
+            # Since it wasn't, that means there was a parse error.
+            endTag.tag = "span"
         return Result(endTag, i)
 
     return Result.fail(start)
@@ -495,34 +587,9 @@ def parseStartTag(s: Stream, start: int) -> Result[StartTag | SelfClosedTag]:
     # After this point we're committed to a start tag,
     # so failure will really be a parse error.
 
-    attr = None
-    attrs: dict[str, str] = {}
-    while True:
-        ws, i = parseWhitespace(s, i).vi
-        if ws is None:
-            if attr and s[i] not in ("/", ">"):
-                m.die(
-                    f"No whitespace after the end of an attribute in <{tagname}>. (Saw {attr[0]}={s[i-1]}{attr[1]}{s[i-1]}.) Did you forget to escape your quote character?",
-                    lineNum=s.loc(i),
-                )
-            break
-        startAttr = i
-        attr, i = parseAttribute(s, i).vi
-        if attr is None:
-            break
-        attrName, attrValue = attr
-        if attrName in attrs:
-            m.die(f"Attribute {attrName} appears twice in <{tagname}>.", lineNum=s.loc(startAttr))
-            return Result.fail(start)
-        if "[" in attrValue:
-            attrValue = replaceMacrosInText(
-                text=attrValue,
-                macros=s.config.macros,
-                s=s,
-                start=i,
-                context=f"<{tagname} {attrName}='...'>",
-            )
-        attrs[attrName] = attrValue
+    attrs, i = parseAttributeList(s, i).vi
+    if attrs is None:
+        return Result.fail(start)
 
     i = parseWhitespace(s, i).i
 
@@ -580,6 +647,67 @@ def parseTagName(s: Stream, start: int) -> Result[str]:
     return Result(s[start:end], end)
 
 
+def parseAttributeList(s: Stream, start: int) -> Result[dict[str, str]]:
+    i = parseWhitespace(s, start).i
+    attr = None
+    attrs: dict[str, str] = {}
+    while True:
+        if s.eof(i):
+            break
+        startAttr = i
+
+        # Macros are allowed in attr list context, *if* they expand to an attribute list.
+        if s[i] == "[":
+            macroAttrs, i = parseMacroToAttrs(s, i).vi
+            if macroAttrs is None:
+                break
+            macroName = s[startAttr:i]
+            for k, v in macroAttrs.items():
+                if k in attrs:
+                    m.die(
+                        f"Attribute '{k}', coming from the {macroName} macro, already exists on the element.",
+                        lineNum=s.loc(startAttr),
+                    )
+                    continue
+                attrs[k] = v
+        elif preds.isAttrNameChar(s[i]):
+            attr, i = parseAttribute(s, i).vi
+            if attr is None:
+                break
+            attrName, attrValue = attr
+            if attrName in attrs:
+                m.die(f"Attribute '{attrName}' appears twice in the tag.", lineNum=s.loc(startAttr))
+                return Result.fail(start)
+            if "[" in attrValue:
+                attrValue = replaceMacrosInText(
+                    text=attrValue,
+                    macros=s.config.macros,
+                    s=s,
+                    start=i,
+                    context=f"attribute {attrName}='...'",
+                )
+            attrs[attrName] = attrValue
+        else:
+            break
+
+        ws, i = parseWhitespace(s, i).vi
+        if ws is None:
+            # We're definitely done, just see if it should be an error nor not.
+            if s.eof(i):
+                # At the end of a macro, most likely
+                # (or the doc ended with an unclosed tag, so I'll catch that later)
+                break
+            if s[i] in ("/", ">"):
+                # End of a tag
+                break
+            m.die(
+                f"Expected whitespace between attributes. ({s[startAttr:i+5]}...)",
+                lineNum=s.loc(i),
+            )
+            break
+    return Result(attrs, i)
+
+
 def parseAttribute(s: Stream, start: int) -> Result[tuple[str, str]]:
     i = start
     while preds.isAttrNameChar(s[i]):
@@ -630,7 +758,7 @@ def parseQuotedAttrValue(s: Stream, start: int) -> Result[str]:
             return Result.fail(start)
         if s[i] == "&":
             startRef = i
-            ch, i = parseCharRef(s, i, context=CharRefContext.ATTR).vi
+            ch, i = parseCharRef(s, i, context=CharRefContext.Attr).vi
             if ch is None:
                 i += 1
                 continue
@@ -657,7 +785,7 @@ def parseUnquotedAttrValue(s: Stream, start: int) -> Result[str]:
             return Result.fail(start)
         if s[i] == "&":
             startRef = i
-            ch, i = parseCharRef(s, i, context=CharRefContext.ATTR).vi
+            ch, i = parseCharRef(s, i, context=CharRefContext.Attr).vi
             if ch is None:
                 i += 1
                 continue
@@ -684,8 +812,8 @@ def printChAsHexRef(ch: str) -> str:
 
 
 class CharRefContext(Enum):
-    ATTR = "attr"
-    NON_ATTR = "non-attr"
+    Attr = "Attr"
+    NonAttr = "NonAttr"
 
 
 def parseCharRef(s: Stream, start: int, context: CharRefContext) -> Result[str]:
@@ -693,15 +821,46 @@ def parseCharRef(s: Stream, start: int, context: CharRefContext) -> Result[str]:
         return Result.fail(start)
     i = start + 1
 
-    if preds.isASCIIAlphanum(s[i]):
+    if s[i : i + 2] == "bs":
+        bsEscape, i = s.skipToSameLine(i, ";").vi
+        i += 1
+        if bsEscape is None:
+            m.die(
+                "Saw the start of an &bs...; escape, but couldn't find the ending semicolon. If this wasn't intended, escape the & with &amp;",
+                lineNum=s.loc(start),
+            )
+            return Result.fail(start)
+        if len(bsEscape) == 3 and bsEscape[2] in "`~!@#$%^&*()-_=+[]{}\\|:'\"<>,./?":
+            return Result(bsEscape[2], i)
+        elif len(bsEscape) == 2 and s[start : start + 5] == "&bs;;":
+            # handling &bs;; to escape a semicolon...
+            return Result(";", i + 1)
+        elif bsEscape == "bs<<":
+            return Result("«", i)
+        elif bsEscape == "bs>>":
+            return Result("»", i)
+        elif bsEscape == "bs->":
+            return Result("→", i)
+        else:
+            m.die(
+                f"&{bsEscape}; isn't a valid Bikeshed character reference. See <https://speced.github.io/bikeshed/#bs-charref>.",
+                lineNum=s.loc(start),
+            )
+            return Result.fail(start)
+    elif preds.isASCIIAlphanum(s[i]):
         i += 1
         while preds.isASCIIAlphanum(s[i]):
             i += 1
-        if s[i] == "=" and context == CharRefContext.ATTR:
-            # HTML allows you to write <a href="?foo&bar=baz">
-            # without escaping the ampersand, even if it matches
-            # a named charRef so long as there's an `=` after it.
-            return Result.fail(start)
+        if s[i] == "=":
+            if context is CharRefContext.Attr:
+                # HTML allows you to write <a href="?foo&bar=baz">
+                # without escaping the ampersand, even if it matches
+                # a named charRef so long as there's an `=` after it.
+                return Result.fail(start)
+            elif context is CharRefContext.NonAttr:
+                pass
+            else:
+                t.assert_never(context)
         if s[i] != ";":
             m.die(f"Character reference '{s[start:i]}' didn't end in ;.", lineNum=s.loc(start))
             return Result.fail(start)
@@ -1127,13 +1286,16 @@ def parseMaybeDecl(s: Stream, textStart: int) -> Result[list[ParserNode]]:
         return Result.fail(textStart)
     colonEnd = colonStart + 1
 
-    text = replaceMacrosInText(
-        text=rawText,
-        macros=s.config.macros,
-        s=s,
-        start=textStart,
-        context=f"''{rawText}: ...''",
-    )
+    if s.config.macrosInAutolinks:
+        text = replaceMacrosInText(
+            text=rawText,
+            macros=s.config.macros,
+            s=s,
+            start=textStart,
+            context=f"''{rawText}: ...''",
+        )
+    else:
+        text = rawText
     match = MAYBE_DECL_RE.match(text)
     if not match:
         return Result.fail(textStart)
@@ -1195,13 +1357,16 @@ def parseMaybeValue(s: Stream, textStart: int) -> Result[list[ParserNode]]:
             break
 
     rawText = s[textStart:textEnd]
-    text = replaceMacrosInText(
-        text=rawText,
-        macros=s.config.macros,
-        s=s,
-        start=start,
-        context=f"''{rawText}''",
-    )
+    if s.config.macrosInAutolinks:
+        text = replaceMacrosInText(
+            text=rawText,
+            macros=s.config.macros,
+            s=s,
+            start=textStart,
+            context=f"''{rawText}''",
+        )
+    else:
+        text = rawText
     # Do some text-based analysis of the contents first.
 
     match = MAYBE_VAL_RE.match(text)
@@ -1300,9 +1465,9 @@ def safeFromDoubleAngles(text: str) -> str:
 
 AUTOLINK_PROPDESC_RE = re.compile(
     r"""
-    (?:(@[\w-]+|)/)?
-    ([\w*-]+)
-    (?:!!([\w-]+))?
+    (?:(@[\w\[\]-]+|)/)?
+    ([\w*\[\]-]+)
+    (?:!!([\w\[\]-]+))?
     """,
     flags=re.X,
 )
@@ -1320,7 +1485,25 @@ def parseCSSPropdesc(s: Stream, start: int) -> Result[SafeText | list[ParserNode
     if match is None:
         return Result.fail(start)
 
-    innerText = match[0]
+    if s.config.macrosInAutolinks and "[" in match[0]:
+        innerText = replaceMacrosInText(
+            text=match[0],
+            macros=s.config.macros,
+            s=s,
+            start=innerStart,
+            context=f"'{match[0]}'",
+        )
+        match = AUTOLINK_PROPDESC_RE.match(innerText)
+        if match:
+            innerText = match[0]
+        else:
+            m.die(
+                f"After macro replacement, couldn't parse a CSS property/descriptor autolink.\n  Original: '{s[innerStart:innerEnd]}'\n  After macros: '{innerText}'",
+                lineNum=s.loc(start),
+            )
+            return Result.fail(start)
+    else:
+        innerText = match[0]
     linkFor, lt, linkType = match.groups()
 
     if s[innerEnd] != "'":
@@ -1851,13 +2034,16 @@ def parseLinkInfo(
     startSigil: str,
     endSigil: str,
 ) -> tuple[str, str | None, str | None]:
-    lt = replaceMacrosInText(
-        text=innerText,
-        macros=s.config.macros,
-        s=s,
-        start=start,
-        context=startSigil + innerText + endSigil,
-    )
+    if s.config.macrosInAutolinks:
+        lt = replaceMacrosInText(
+            text=innerText,
+            macros=s.config.macros,
+            s=s,
+            start=start,
+            context=startSigil + innerText + endSigil,
+        )
+    else:
+        lt = innerText
 
     if re.search(r"&[\w\d#]+;", lt):
         m.die(
@@ -2176,7 +2362,17 @@ def parseFencedCodeBlock(s: Stream, start: int) -> Result[RawElement]:
 MACRO_RE = re.compile(r"([A-Z\d-]*[A-Z][A-Z\d-]*)(\??)\]")
 
 
-def parseMacro(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
+class MacroContext(Enum):
+    Nodes = "Nodes"
+    AttrList = "AttrList"
+    Text = "Text"
+
+
+def parseMacro(
+    s: Stream,
+    start: int,
+    context: MacroContext,
+) -> Result[ParserNode | list[ParserNode] | dict[str, str] | str]:
     # Macros all look like `[FOO]` or `[FOO?]`:
     # uppercase ASCII, possibly with a ? suffix,
     # tightly wrapped by square brackets.
@@ -2190,31 +2386,80 @@ def parseMacro(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
     optional = match[2] == "?"
     if macroName not in s.config.macros:
         if optional:
-            return Result([], i)
+            if context is MacroContext.Nodes:
+                return Result([], i)
+            elif context is MacroContext.AttrList:
+                return Result({}, i)
+            elif context is MacroContext.Text:
+                return Result("", i)
+            else:
+                t.assert_never(context)
         else:
             m.die(
                 f"Found unmatched text macro {s[start:i]}. Correct the macro, or escape it by replacing the opening [ with &#91;",
                 lineNum=s.loc(i),
             )
+            if context is MacroContext.Nodes:
+                return Result(
+                    RawText.fromStream(s, start, i),
+                    i,
+                )
+            elif context is MacroContext.AttrList:
+                return Result({}, i)
+            elif context is MacroContext.Text:
+                return Result(s[start:i], i)
+            else:
+                t.assert_never(context)
+    macroDisplay = s[start:i]
+    macroText = s.config.macros[macroName]
+    streamContext = f"macro {macroDisplay}"
+    try:
+        newStream = s.subStream(context=streamContext, chars=macroText)
+    except RecursionError:
+        m.die(
+            f"Macro replacement for {macroDisplay} recursed more than {s.depth} levels deep; probably your text macros are accidentally recursive.",
+            lineNum=s.loc(start),
+        )
+        if context is MacroContext.Nodes:
             return Result(
                 RawText.fromStream(s, start, i),
                 i,
             )
-    macroText = s.config.macros[macroName]
-    context = f"macro {s[start:i]}"
-    try:
-        newStream = s.subStream(context=context, chars=macroText)
-    except RecursionError:
-        m.die(
-            f"Macro replacement for {s[start:i]} recursed more than {s.depth} levels deep; probably your text macros are accidentally recursive.",
-            lineNum=s.loc(start),
-        )
-        return Result(
-            RawText.fromStream(s, start, i),
-            i,
-        )
-    nodes = list(nodesFromStream(newStream, 0))
-    return Result(nodes, i)
+        elif context is MacroContext.AttrList:
+            return Result({}, i)
+        elif context is MacroContext.Text:
+            return Result(s[start:i], i)
+        else:
+            t.assert_never(context)
+
+    if context is MacroContext.Nodes:
+        return Result(list(nodesFromStream(newStream, 0)), i)
+    elif context is MacroContext.AttrList:
+        attrs, attrsEnd = parseAttributeList(newStream, 0).vi
+        _, wsEnd = parseWhitespace(newStream, attrsEnd).vi
+        if not newStream.eof(wsEnd):
+            m.die(
+                f"While parsing {macroDisplay} (on {s.loc(start)}) as an attribute list, found non-attribute content: {newStream[attrsEnd:attrsEnd+10]}...",
+                lineNum=newStream.loc(attrsEnd),
+            )
+        return Result(attrs, i)
+    elif context is MacroContext.Text:
+        macroText = replaceMacrosInText(macroText, newStream.config.macros, newStream, 0, streamContext)
+        return Result(macroText, i)
+    else:
+        t.assert_never(context)
+
+
+def parseMacroToNodes(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
+    return t.cast("Result[ParserNode | list[ParserNode]]", parseMacro(s, start, MacroContext.Nodes))
+
+
+def parseMacroToAttrs(s: Stream, start: int) -> Result[dict[str, str]]:
+    return t.cast("Result[dict[str, str]]", parseMacro(s, start, MacroContext.AttrList))
+
+
+def parseMacroToText(s: Stream, start: int) -> Result[str]:
+    return t.cast("Result[str]", parseMacro(s, start, MacroContext.Text))
 
 
 # Treat [ as an escape character, too, so [[RFC2119]]/etc won't

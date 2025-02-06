@@ -754,7 +754,19 @@ def parseMarkupShorthands(key: str, val: str, lineNum: str | int | None) -> conf
     vals = [v.strip() for v in val.lower().split(",")]
     ret = config.BoolSet(default=False)
     validCategories = frozenset(
-        ["algorithm", "biblio", "cddl", "css", "dfn", "http", "idl", "markdown", "markdown-escapes", "markup"],
+        [
+            "algorithm",
+            "biblio",
+            "cddl",
+            "css",
+            "dfn",
+            "http",
+            "idl",
+            "macros-in-autolinks",
+            "markdown",
+            "markdown-escapes",
+            "markup",
+        ],
     )
     for v in vals:
         pieces = v.split()

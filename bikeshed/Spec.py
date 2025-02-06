@@ -278,7 +278,7 @@ class Spec:
         boilerplate.removeUnwantedBoilerplate(self)
         shorthands.run(self)
         inlineTags.processTags(self)
-        u.canonicalizeShortcuts(self)
+        u.canonicalizeShortcuts(self.body)
         u.addImplicitAlgorithms(self)
         u.fixManualDefTables(self)
         headings.processHeadings(self)
@@ -439,7 +439,7 @@ class Spec:
             socketserver.TCPServer.allow_reuse_address = True
             server = socketserver.TCPServer(("localhost" if localhost else "", port), SilentServer)
 
-            print(f"Serving at port {port}")  # noqa: T201
+            print(f"Serving at http://localhost:{port}/")  # noqa: T201
             thread = threading.Thread(target=server.serve_forever)
             thread.daemon = True
             thread.start()

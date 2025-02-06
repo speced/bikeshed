@@ -92,12 +92,13 @@ def panelsFromData(doc: t.SpecT, data: MdnDataT) -> list[t.ElementT]:
 
     panels = []
     missingIds = []
+    docIds = h.collectIds(doc.body)
     for elementId, features in data.items():
         lessThanTwoEngines = 0
         onlyTwoEngines = 0
         allEngines = 0
         featureDivs = []
-        targetElement = h.find(f"[id='{elementId}']", doc)
+        targetElement = docIds.get(elementId)
         if targetElement is None and elementId not in doc.md.ignoreMDNFailure:
             missingIds.append(elementId)
             continue
