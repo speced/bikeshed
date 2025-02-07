@@ -41,7 +41,7 @@ VOID_ELEMENTS = {
 }
 
 # Characters used by the [...]-type autolinks, inside of the bracket.
-BRACKET_AUTOLINK_CHARS = "=$:[]"
+BRACKET_AUTOLINK_CHARS = "=$:[]^"
 
 # This needs to be any character that can start a node,
 # *or anything that can signal the end of a markup shorthand*,
@@ -324,6 +324,19 @@ def parseNode(
                         lineNum=s.loc(start),
                     )
                 return idlRes
+    if s.config.cddl and not inOpaque:
+        if first3 == "\\{^":
+            node = RawText.fromStream(s, start, start + 3, "{^")
+            return Result(node, start + 3)
+        if first2 == "{^":
+            cddlRes = parseAutolinkCddl(s, start)
+            if cddlRes.valid:
+                if inA:
+                    m.die(
+                        "Parsed a CDDL autolink ({^...^}) inside of an <a>. Either close the <a> properly, or escape the autolink.",
+                        lineNum=s.loc(start),
+                    )
+                return cddlRes
     if s.config.markup and not inOpaque:
         if first3 == "\\<{":
             node = RawText.fromStream(s, start, start + 3, "<{")
@@ -1801,6 +1814,76 @@ def parseAutolinkIdl(s: Stream, start: int) -> Result[ParserNode | list[ParserNo
 
     if s[innerEnd] == "|":
         rest, nodeEnd = parseLinkText(s, innerEnd + 1, "{{", "}}", startTag).vi
+        if rest is not None:
+            endCode = EndTag.fromStream(s, nodeEnd, nodeEnd, startCode)
+            return Result([startCode, startTag, *rest, endCode], nodeEnd)
+        else:
+            nodeEnd = innerEnd + 1
+    else:
+        nodeEnd = innerEnd + 2
+    middleText = RawText.fromStream(s, innerStart, innerEnd, visibleText)
+    endTag = EndTag.fromStream(s, innerEnd, nodeEnd, startTag)
+    endCode = EndTag.fromStream(s, nodeEnd, nodeEnd, startCode)
+    return Result([startCode, startTag, middleText, endTag, endCode], nodeEnd)
+
+
+AUTOLINK_CDDL_RE = re.compile(r".*?(?=\||\^})", flags=re.DOTALL)
+
+
+def parseAutolinkCddl(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
+    if s[start : start + 2] != "{^":
+        return Result.fail(start)
+    innerStart = start + 2
+
+    # Otherwise we're locked in, this opener is a very strong signal.
+    match, innerEnd = s.searchRe(innerStart, AUTOLINK_CDDL_RE).vi
+    if match is None:
+        m.die(
+            "CDDL autolink was opened, but no closing ^} was found. Either close your autolink, or escape the initial { as &#123;",
+            lineNum=s.loc(start),
+        )
+        return Result.fail(start)
+
+    innerText = match[0]
+    lt, linkFor, linkType = parseLinkInfo(s, innerStart, innerText, "{^", "^}")
+    if linkType in config.cddlTypes:
+        pass
+    elif linkType is None:
+        linkType = "cddl"
+    else:
+        m.die(
+            f"CDDL autolink {{{{{s[start+1:innerEnd]}}}}} gave its type as '{linkType}', but only CDDL types are allowed.",
+            lineNum=s.loc(start),
+        )
+        linkType = "cddl"
+
+    visibleText = lt
+
+    startTag = StartTag.fromStream(
+        s,
+        start,
+        start + 1,
+        "a",
+        {
+            "data-link-type": linkType,
+            "data-lt": escapeAttr(lt),
+            "bs-autolink-syntax": escapeAttr(s[start : innerEnd + 2]),
+        },
+    )
+    if linkFor is not None:
+        startTag.attrs["data-link-for"] = escapeAttr(linkFor)
+    startTag = startTag.finalize()
+
+    startCode = StartTag.fromStream(
+        s,
+        start + 1,
+        start + 1,
+        "code",
+        {"class": "cddl", "nohighlight": ""},
+    ).finalize()
+
+    if s[innerEnd] == "|":
+        rest, nodeEnd = parseLinkText(s, innerEnd + 1, "{^", "^}", startTag).vi
         if rest is not None:
             endCode = EndTag.fromStream(s, nodeEnd, nodeEnd, startCode)
             return Result([startCode, startTag, *rest, endCode], nodeEnd)
