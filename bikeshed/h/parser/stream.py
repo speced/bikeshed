@@ -139,9 +139,9 @@ class Stream:
             if key < 0:
                 return ""
         else:
-            if key.start < 0:
+            if key.start and key.start < 0:
                 key = slice(0, key.stop, key.step)
-            if key.stop < 0:
+            if key.stop and key.stop < 0:
                 key = slice(key.start, 0, key.step)
         try:
             return self._chars[key]
