@@ -19,6 +19,7 @@ def publishEchidna(
     additionalDirectories: list[str] | None = None,
     cc: str | None = None,
     editorial: bool = False,
+    timeout: float = 3,
 ) -> None:
     import requests
 
@@ -32,13 +33,19 @@ def publishEchidna(
         data["cc"] = cc
     if editorial:
         data["editorial"] = "true"
-    r = requests.post(
-        "https://labs.w3.org/echidna/api/request",
-        auth=(username, password),
-        data=data,
-        files={"tar": tarBytes},
-        timeout=10,
-    )
+    try:
+        r = requests.post(
+            "https://labs.w3.org/echidna/api/request",
+            auth=(username, password),
+            data=data,
+            files={"tar": tarBytes},
+            timeout=timeout,
+        )
+    except requests.exceptions.ReadTimeout:
+        m.die(
+            f"The publication endpoint (https://labs.w3.org/echidna/api/request) didn't respond within {timeout} seconds."
+        )
+        return
 
     if r.status_code == 202:
         m.say("Successfully pushed to Echidna!")

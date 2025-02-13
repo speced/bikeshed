@@ -146,20 +146,29 @@ def main() -> None:
         help="Process a spec source file into a valid output file and publish it according to certain automatic protocols.",
     )
     echidnaParser.add_argument("infile", nargs="?", default=None, help="Path to the source file.")
-    echidnaParser.add_argument(
-        "--gh-token",
-        dest="ghToken",
-        nargs="?",
-        help="GitHub access token. Useful to avoid API rate limits. Generate tokens: https://github.com/settings/tokens.",
-    )
     echidnaParser.add_argument("--u", dest="un", metavar="USERNAME", required=False, help="W3C username.")
     echidnaParser.add_argument("--p", dest="pw", metavar="PASSWORD", required=False, help="W3C password.")
     echidnaParser.add_argument(
         "--decision",
         dest="decision",
-        metavar="DECISION_URL",
+        metavar="URL",
         required=False,
         help="URL recording the decision to publish.",
+    )
+    echidnaParser.add_argument(
+        "--gh-token",
+        dest="ghToken",
+        required=False,
+        help="GitHub access token. Useful to avoid API rate limits. Generate tokens: https://github.com/settings/tokens.",
+    )
+    echidnaParser.add_argument(
+        "--timeout",
+        dest="timeout",
+        metavar="SECONDS",
+        required=False,
+        default=3,
+        type=float,
+        help="The timeout for contacting the publication service (default 3s).",
     )
     echidnaParser.add_argument(
         "--editorial",
@@ -548,6 +557,7 @@ def handleEchidna(options: argparse.Namespace, extras: list[str]) -> None:
             additionalDirectories=addDirs,
             cc=options.cc,
             editorial=options.editorial,
+            timeout=options.timeout,
         )
 
 
