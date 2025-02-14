@@ -43,7 +43,7 @@ def publishEchidna(
         )
     except requests.exceptions.ReadTimeout:
         m.die(
-            f"The publication endpoint (https://labs.w3.org/echidna/api/request) didn't respond within {timeout} seconds."
+            f"The publication endpoint (https://labs.w3.org/echidna/api/request) didn't respond within {timeout} seconds.",
         )
         return
 
