@@ -1335,7 +1335,7 @@ def parseMaybeValue(s: Stream, textStart: int) -> Result[list[ParserNode]]:
     for i in generateExperimentalNodes(s, textStart, nodes):
         if s.line(i) > startLine + 3:
             m.die(
-                "CSS-maybe autolink (''foo'') was opened, but no closing '' was found within a few lines. Either close your autolink, switch to the <css></css> element if you need the contents to stretch across that many lines, or escape the initial '' as &#39;&#39; if it wasn't intended at all.",
+                "CSS-maybe autolink (''foo'') was opened, but no closing '' was found within a few lines. Either close your autolink, switch to the <css></css> element if you need the contents to stretch across that many lines, or escape the initial '' as &bs';&bs'; if it wasn't intended at all.",
                 lineNum=s.loc(i),
             )
             return Result.fail(textStart)
@@ -1898,7 +1898,7 @@ def parseAutolinkBiblioSection(s: Stream, start: int) -> Result[ParserNode | lis
         innerResult = parseSectionInner(s, innerStart)
         if not innerResult.valid:
             m.die(
-                "Saw a [[ opening a biblio or section autolink, but couldn't parse the following contents. If you didn't intend this to be a biblio autolink, escape the initial [ as &#91;",
+                "Saw a [[ opening a biblio or section autolink, but couldn't parse the following contents. If you didn't intend this to be a biblio autolink, escape the initial [ as &bs[;",
                 lineNum=s.loc(start),
             )
             return Result(
@@ -2308,7 +2308,7 @@ def parseMacro(
                 t.assert_never(context)
         else:
             m.die(
-                f"Found unmatched text macro {s[start:i]}. Correct the macro, or escape it by replacing the opening [ with &#91;",
+                f"Found unmatched text macro {s[start:i]}. Correct the macro, or escape it by replacing the opening [ with &bs[;",
                 lineNum=s.loc(i),
             )
             if context is MacroContext.Nodes:
@@ -2407,7 +2407,7 @@ def replaceMacrosInText(text: str, macros: dict[str, str], s: Stream, start: int
         if optional:
             return msc + mec
         m.die(
-            f"Found unmatched text macro {match[0]} in {context}. Correct the macro, or escape it by replacing the opening [ with &#91;.",
+            f"Found unmatched text macro {match[0]} in {context}. Correct the macro, or escape it by replacing the opening [ with &bs[;.",
             lineNum=s.loc(start),
         )
         return msc + "&#91;" + t.cast("str", match[0][1:-1]) + "&#93;" + mec
