@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import re
 from enum import Enum
 
@@ -1565,17 +1566,12 @@ def parseAutolinkDfn(s: Stream, start: int) -> Result[SafeText | list[ParserNode
         return Result.fail(start)
     innerStart = start + 2
 
-    # Otherwise we're locked in, this opener is a very strong signal.
-    match, innerEnd = s.searchRe(innerStart, AUTOLINK_DFN_RE).vi
-    if match is None:
-        m.die(
-            "Dfn autolink was opened, but no closing =] was found. Either close your autolink, or escape the initial [ as &#91;",
-            lineNum=s.loc(start),
-        )
+    data, innerEnd = parseLinkInfo(s, innerStart, "[=", "=]", AUTOLINK_DFN_RE).vi
+    innerText = s[innerStart:innerEnd]
+    if data is None:
         return Result.fail(start)
 
-    innerText = match[0]
-    lt, linkFor, linkType = parseLinkInfo(s, innerStart, innerText, "[=", "=]")
+    lt, linkFor, linkType = dataclasses.astuple(data)
     if linkType == "dfn":
         pass
     elif linkType is None:
@@ -1622,17 +1618,13 @@ def parseAutolinkAbstract(s: Stream, start: int) -> Result[SafeText | list[Parse
     if s[start : start + 2] != "[$":
         return Result.fail(start)
     innerStart = start + 2
-    # Otherwise we're locked in, this opener is a very strong signal.
-    match, innerEnd = s.searchRe(innerStart, AUTOLINK_ABSTRACT_RE).vi
-    if match is None:
-        m.die(
-            "Abstract-op autolink was opened, but no closing $] was found. Either close your autolink, or escape the initial [ as &#91;",
-            lineNum=s.loc(start),
-        )
-        return Result.fail(start)
 
-    innerText = match[0]
-    lt, linkFor, linkType = parseLinkInfo(s, innerStart, innerText, "[$", "$]")
+    data, innerEnd = parseLinkInfo(s, innerStart, "[$", "$]", AUTOLINK_ABSTRACT_RE).vi
+    innerText = s[innerStart:innerEnd]
+    if data is None:
+        return Result.fail(start)
+    lt, linkFor, linkType = dataclasses.astuple(data)
+
     if linkType == "abstract-op":
         pass
     elif linkType is None:
@@ -1679,17 +1671,13 @@ def parseAutolinkHeader(s: Stream, start: int) -> Result[SafeText | list[ParserN
     if s[start : start + 2] != "[:":
         return Result.fail(start)
     innerStart = start + 2
-    # Otherwise we're locked in, this opener is a very strong signal.
-    match, innerEnd = s.searchRe(innerStart, AUTOLINK_HEADER_RE).vi
-    if match is None:
-        m.die(
-            "HTTP Header autolink was opened, but no closing :] was found. Either close your autolink, or escape the initial [ as &#91;",
-            lineNum=s.loc(start),
-        )
-        return Result.fail(start)
 
-    innerText = match[0]
-    lt, linkFor, linkType = parseLinkInfo(s, innerStart, innerText, "[:", ":]")
+    data, innerEnd = parseLinkInfo(s, innerStart, "[:", ":]", AUTOLINK_HEADER_RE).vi
+    innerText = s[innerStart:innerEnd]
+    if data is None:
+        return Result.fail(start)
+    lt, linkFor, linkType = dataclasses.astuple(data)
+
     if linkType == "http-header":
         pass
     elif linkType is None:
@@ -1744,24 +1732,19 @@ def parseAutolinkIdl(s: Stream, start: int) -> Result[ParserNode | list[ParserNo
         return Result.fail(start)
     innerStart = start + 2
 
-    # Otherwise we're locked in, this opener is a very strong signal.
-    match, innerEnd = s.searchRe(innerStart, AUTOLINK_IDL_RE).vi
-    if match is None:
-        m.die(
-            "IDL autolink was opened, but no closing }} was found. Either close your autolink, or escape the initial { as &#123;",
-            lineNum=s.loc(start),
-        )
+    data, innerEnd = parseLinkInfo(s, innerStart, "{{", "}}", AUTOLINK_IDL_RE).vi
+    innerText = s[innerStart:innerEnd]
+    if data is None:
         return Result.fail(start)
+    lt, linkFor, linkType = dataclasses.astuple(data)
 
-    innerText = match[0]
-    lt, linkFor, linkType = parseLinkInfo(s, innerStart, innerText, "{{", "}}")
     if linkType in config.idlTypes:
         pass
     elif linkType is None:
         linkType = "idl"
     else:
         m.die(
-            f"IDL autolink {{{{{s[start+1:innerEnd]}}}}} gave its type as '{linkType}', but only IDL types are allowed.",
+            f"IDL autolink {{{{{innerText}}}}} gave its type as '{linkType}', but only IDL types are allowed.",
             lineNum=s.loc(start),
         )
         linkType = "idl"
@@ -1822,17 +1805,12 @@ def parseAutolinkElement(s: Stream, start: int) -> Result[ParserNode | list[Pars
         return Result.fail(start)
     innerStart = start + 2
 
-    # Otherwise we're locked in, this opener is a very strong signal.
-    match, innerEnd = s.searchRe(innerStart, AUTOLINK_ELEMENT_RE).vi
-    if match is None:
-        m.die(
-            "Markup autolink was opened, but no closing }> was found. Either close your autolink, or escape the initial < as &lt;",
-            lineNum=s.loc(start),
-        )
+    data, innerEnd = parseLinkInfo(s, innerStart, "<{", "}>", AUTOLINK_ELEMENT_RE).vi
+    innerText = s[innerStart:innerEnd]
+    if data is None:
         return Result.fail(start)
+    lt, linkFor, linkType = dataclasses.astuple(data)
 
-    innerText = match[0]
-    lt, linkFor, linkType = parseLinkInfo(s, innerStart, innerText, "<{", "}>")
     if linkType is None:
         if linkFor is None:
             linkType = "element"
@@ -1944,19 +1922,36 @@ def parseAutolinkBiblioSection(s: Stream, start: int) -> Result[ParserNode | lis
     return Result([startTag, middleText, endTag], nodeEnd)
 
 
+@dataclasses.dataclass
+class LinkData:
+    lt: str
+    lfor: str | None = None
+    ltype: str | None = None
+
+
 def parseLinkInfo(
     s: Stream,
-    start: int,
-    innerText: str,
+    innerStart: int,
     startSigil: str,
     endSigil: str,
-) -> tuple[str, str | None, str | None]:
+    infoRe: re.Pattern,
+) -> Result[LinkData]:
+    start = innerStart - len(startSigil)
+    match, innerEnd = s.searchRe(innerStart, infoRe).vi
+    if match is None or s.line(innerEnd) > (s.line(innerStart) + 1):
+        m.die(
+            f"{startSigil}...{endSigil} autolink was opened, but couldn't find {endSigil} or | on the same or next line. Either close your autolink, or escape the initial {startSigil[0]} as &bs{startSigil[0]};",
+            lineNum=s.loc(start),
+        )
+        return Result.fail(innerStart)
+
+    innerText = match[0]
     if s.config.macrosInAutolinks:
         lt = replaceMacrosInText(
             text=innerText,
             macros=s.config.macros,
             s=s,
-            start=start,
+            start=innerStart,
             context=startSigil + innerText + endSigil,
         )
     else:
@@ -1964,7 +1959,7 @@ def parseLinkInfo(
 
     if re.search(r"&[\w\d#]+;", lt):
         m.die(
-            "Saw an HTML escape in the literal portion of an autolink. Use raw characters, or switch to the HTML syntax.",
+            "Saw an HTML escape in the link-data portion of an autolink. Use raw characters, or switch to the HTML syntax.",
             lineNum=s.loc(start),
         )
         # Okay to keep going, tho, it'll just fail to link.
@@ -1993,7 +1988,7 @@ def parseLinkInfo(
     if lt and lt.startswith("\\[["):
         lt = lt[1:]
 
-    return lt, linkFor, linkType
+    return Result(LinkData(lt, linkFor, linkType), innerEnd)
 
 
 def parseLinkText(
@@ -2038,11 +2033,11 @@ AUTOLINK_BIBLIO_KEYWORDS = ["current", "snapshot", "inline", "index", "direct", 
 
 
 def parseBiblioInner(s: Stream, innerStart: int) -> Result[tuple[StartTag, str]]:
-    nodeStart = innerStart - 2
     match, innerEnd = s.matchRe(innerStart, AUTOLINK_BIBLIO_RE).vi
     if not match:
-        return Result.fail(nodeStart)
+        return Result.fail(innerStart)
 
+    nodeStart = innerStart - 2
     normative = match[1] == "!"
     lt = match[2]
     modifierSequence = match[3].strip()
