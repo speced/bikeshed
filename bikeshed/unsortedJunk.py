@@ -776,7 +776,7 @@ def processAutolinks(doc: t.SpecT) -> None:
             decorateAutolink(doc, el, linkType=linkType, linkText=linkText, ref=ref)
 
             if ref.url not in refsJSON:
-                refsJSON[ref.url] = ref.__json__()
+                refsJSON[ref.url] = ref
         else:
             if linkType == "maybe":
                 el.tag = "css"

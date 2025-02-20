@@ -175,7 +175,7 @@ class Script(JCResource):
     path: Path
     libraries: dict[str, Library] = dataclasses.field(default_factory=dict)
     style: Style | None = None
-    data: tuple[str, t.JSONT] | None = None
+    data: tuple[str, t.Any] | None = None
 
     def insertable(self, allowList: t.BoolSet) -> bool:
         if f"script-{self.name}" not in allowList:
@@ -191,7 +191,11 @@ class Script(JCResource):
         if self.data:
             text += f"let {self.data[0]} = {{\n"
             for key, val in sorted(self.data[1].items()):
-                text += f'"{key}": {json.dumps(val, sort_keys=True, separators=(",",":"))},\n'
+                try:
+                    jsonVal = val.__json__()
+                except:
+                    jsonVal = val
+                text += f'"{key}": {json.dumps(jsonVal, sort_keys=True, separators=(",",":"))},\n'
             text += "};\n\n"
         with self.path.open("r", encoding="utf-8") as fh:
             text += fh.read()
