@@ -754,6 +754,9 @@ def processAnchors(anchors: InfoTreeT, doc: t.SpecT, lineNum: int | None = None)
             "normative": True,
             "status": status,
             "spec": spec.lower() if spec is not None else "",
+            # anchor-block refs sometimes share URLs between different refs
+            # (for example, just linking them all to an ID-less PDF)
+            # so add a uniquifier other code can rely on to tell them apart.
             "uniquifier": h.uniqueID(url, *anchor["text"], *anchor["for"]),
         }
         for displayText in anchor["text"]:
