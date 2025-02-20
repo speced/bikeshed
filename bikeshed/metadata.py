@@ -24,6 +24,12 @@ if t.TYPE_CHECKING:
         pass
 
 
+@dataclasses.dataclass
+class LinkCheckerTimeout:
+    each: int = 5
+    total: int = 10
+
+
 class MetadataManager:
     @property
     def vshortname(self) -> str | None:
@@ -96,6 +102,7 @@ class MetadataManager:
         self.issues: list[tuple[str, str]] = []
         self.issueTrackerTemplate: str | None = None
         self.lineNumbers: bool = False
+        self.linkCheckerTimeout: LinkCheckerTimeout = LinkCheckerTimeout()
         self.linkDefaults: t.LinkDefaultsT = defaultdict(list)
         self.localBoilerplate: config.BoolSet = config.BoolSet(default=False)
         self.logo: str | None = None
@@ -1041,6 +1048,20 @@ def parseIgnoreMdnFailure(key: str, val: str, lineNum: str | int | None) -> list
     return vals
 
 
+def parseLinkCheckerTimeout(key: str, val: str, lineNum: str | int | None) -> LinkCheckerTimeout:
+    vals = val.strip().split()
+    if len(vals) != 2:
+        m.die(f"Link Checker Timeout metadata needs exactly two integers. Got: '{val}'.", lineNum=lineNum)
+        return LinkCheckerTimeout()
+    try:
+        each = int(vals[0])
+        total = int(vals[1])
+    except ValueError:
+        m.die(f"Link Checker Timeout metadata needs exactly two integers. Got: '{val}'.", lineNum=lineNum)
+        return LinkCheckerTimeout()
+    return LinkCheckerTimeout(each, total)
+
+
 def parse(lines: t.Sequence[Line]) -> tuple[list[Line], MetadataManager]:
     # Given HTML document text, in the form of an array of text lines,
     # extracts all <pre class=metadata> lines and parses their contents.
@@ -1416,6 +1437,7 @@ KNOWN_KEYS = {
     "Issue Tracking": Metadata("Issue Tracking", "issues", joinList, parseLinkedText),
     "Level": Metadata("Level", "level", joinValue, parseLevel),
     "Line Numbers": Metadata("Line Numbers", "lineNumbers", joinValue, parseBoolean),
+    "Link Checker Timeout": Metadata("Link Checker Timeout", "linkCheckerTimeout", joinValue, parseLinkCheckerTimeout),
     "Link Defaults": Metadata("Link Defaults", "linkDefaults", joinDdList, parseLinkDefaults),
     "Local Boilerplate": Metadata(
         "Local Boilerplate",
