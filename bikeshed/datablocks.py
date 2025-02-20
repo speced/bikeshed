@@ -744,28 +744,30 @@ def processAnchors(anchors: InfoTreeT, doc: t.SpecT, lineNum: int | None = None)
         else:
             status = "anchor-block"
         aType = anchor["type"][0].lower()
-        displayText = anchor["text"][0]
-        if aType in config.lowercaseTypes:
-            aText = displayText.lower()
-        else:
-            aText = displayText
-        doc.refs.anchorBlockRefs.refs[aText].append(
-            refs.RefWrapper(
-                aText,
-                displayText,
-                {
-                    "type": aType,
-                    "url": url,
-                    "shortname": shortname.lower() if shortname is not None else doc.md.shortname,
-                    "level": level if level is not None else doc.md.level,
-                    "for_": anchor.get("for", []),
-                    "export": True,
-                    "normative": True,
-                    "status": status,
-                    "spec": spec.lower() if spec is not None else "",
-                },
-            ),
-        )
+        refData = {
+            "type": aType,
+            "url": url,
+            "shortname": shortname.lower() if shortname is not None else doc.md.shortname,
+            "level": level if level is not None else doc.md.level,
+            "for_": anchor.get("for", []),
+            "export": True,
+            "normative": True,
+            "status": status,
+            "spec": spec.lower() if spec is not None else "",
+            "uniquifier": h.uniqueID(url, *anchor["text"], *anchor["for"]),
+        }
+        for displayText in anchor["text"]:
+            if aType in config.lowercaseTypes:
+                aText = displayText.lower()
+            else:
+                aText = displayText
+            doc.refs.anchorBlockRefs.refs[aText].append(
+                refs.RefWrapper(
+                    aText,
+                    displayText,
+                    refData
+                ),
+            )
         methodishStart = re.match(r"([^(]+\()[^)]", anchor["text"][0])
         if methodishStart:
             doc.refs.anchorBlockRefs.addMethodVariants(anchor["text"][0], anchor.get("for", []), doc.md.shortname)
