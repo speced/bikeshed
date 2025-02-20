@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 
-from .. import t
+from .. import t, h
 
 if t.TYPE_CHECKING:
     # Need to use function form due to "for" key
@@ -79,6 +79,9 @@ class RefWrapper:
     @property
     def el(self) -> t.ElementT | None:
         return self._ref.get("el", None)
+
+    def refKey(self) -> str:
+        return h.uniqueID(self.url, self.text, *self.for_)
 
     def __json__(self) -> t.JSONT:
         return {

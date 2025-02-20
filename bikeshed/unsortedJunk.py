@@ -775,8 +775,19 @@ def processAutolinks(doc: t.SpecT) -> None:
                 el.text = replacementText
             decorateAutolink(doc, el, linkType=linkType, linkText=linkText, ref=ref)
 
-            if ref.url not in refsJSON:
+            # Store the ref so ref-hint panels can get generated for it
+            cachedRef = refsJSON.get(ref.url)
+            if cachedRef is None:
                 refsJSON[ref.url] = ref
+            elif cachedRef != ref:
+                # whoops, multiple refs with the same URL
+                subKey = ref.refKey()+"_"+ref.url
+                if subKey not in refsJSON:
+                    refsJSON[subKey] = ref
+                el.set("data-refhint-key", ref.refKey())
+            else:
+                # Ref was already stored
+                pass 
         else:
             if linkType == "maybe":
                 el.tag = "css"
