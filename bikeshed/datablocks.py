@@ -744,21 +744,23 @@ def processAnchors(anchors: InfoTreeT, doc: t.SpecT, lineNum: int | None = None)
         else:
             status = "anchor-block"
         aType = anchor["type"][0].lower()
-        refData = {
-            "type": aType,
-            "url": url,
-            "shortname": shortname.lower() if shortname is not None else doc.md.shortname,
-            "level": level if level is not None else doc.md.level,
-            "for_": anchor.get("for", []),
-            "export": True,
-            "normative": True,
-            "status": status,
-            "spec": spec.lower() if spec is not None else "",
-            # anchor-block refs sometimes share URLs between different refs
-            # (for example, just linking them all to an ID-less PDF)
-            # so add a uniquifier other code can rely on to tell them apart.
-            "uniquifier": h.uniqueID(url, *anchor["text"], *anchor["for"]),
-        }
+        refData = refs.RefDataT(
+            {
+                "type": aType,
+                "url": url,
+                "shortname": shortname.lower() if shortname is not None else doc.md.shortname,
+                "level": level if level is not None else doc.md.level,
+                "for_": anchor.get("for", []),
+                "export": True,
+                "normative": True,
+                "status": status,
+                "spec": spec.lower() if spec is not None else "",
+                # anchor-block refs sometimes share URLs between different refs
+                # (for example, just linking them all to an ID-less PDF)
+                # so add a uniquifier other code can rely on to tell them apart.
+                "uniquifier": h.uniqueID(url, *anchor["text"], *anchor["for"]),
+            },
+        )
         for displayText in anchor["text"]:
             if aType in config.lowercaseTypes:
                 aText = displayText.lower()
@@ -768,7 +770,7 @@ def processAnchors(anchors: InfoTreeT, doc: t.SpecT, lineNum: int | None = None)
                 refs.RefWrapper(
                     aText,
                     displayText,
-                    refData
+                    refData,
                 ),
             )
         methodishStart = re.match(r"([^(]+\()[^)]", anchor["text"][0])

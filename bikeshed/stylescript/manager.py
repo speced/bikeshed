@@ -110,7 +110,7 @@ class JCManager:
                 Path(config.scriptPath("stylescript/var-click-highlighting.css")),
             )
 
-    def addRefHints(self) -> t.JSONT:
+    def addRefHints(self) -> dict[str, t.Any]:
         script = self._addJS("ref-hints", "refs")
         if not script.style:
             script.style = Style("ref-hints", Path(config.scriptPath("refs/ref-hints.css")))
@@ -120,7 +120,7 @@ class JCManager:
             script.data = ("refsData", {})
         return script.data[1]
 
-    def addLinkTitles(self) -> t.JSONT:
+    def addLinkTitles(self) -> dict[str, t.Any]:
         script = self._addJS("link-titles")
         if not script.data:
             script.data = ("linkTitleData", {})
@@ -146,7 +146,7 @@ class JCManager:
         if paths:
             script.data[1]["paths"] = sorted(set(script.data[1]["paths"] + paths))
 
-    def addDfnPanels(self) -> t.JSONT:
+    def addDfnPanels(self) -> dict[str, t.Any]:
         script = self._addJS("dfn-panel", "dfnpanels")
         if not script.style:
             script.style = Style("dfn-panel", Path(config.scriptPath("dfnpanels/dfn-panel.css")))
@@ -175,7 +175,7 @@ class Script(JCResource):
     path: Path
     libraries: dict[str, Library] = dataclasses.field(default_factory=dict)
     style: Style | None = None
-    data: tuple[str, t.Any] | None = None
+    data: tuple[str, dict[str, t.Any]] | None = None
 
     def insertable(self, allowList: t.BoolSet) -> bool:
         if f"script-{self.name}" not in allowList:

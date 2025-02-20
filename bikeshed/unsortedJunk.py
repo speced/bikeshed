@@ -781,13 +781,13 @@ def processAutolinks(doc: t.SpecT) -> None:
                 refsJSON[ref.url] = ref
             elif cachedRef != ref:
                 # whoops, multiple refs with the same URL
-                subKey = ref.refKey()+"_"+ref.url
+                subKey = ref.refKey() + "_" + ref.url
                 if subKey not in refsJSON:
                     refsJSON[subKey] = ref
                 el.set("data-refhint-key", ref.refKey())
             else:
                 # Ref was already stored
-                pass 
+                pass
         else:
             if linkType == "maybe":
                 el.tag = "css"
