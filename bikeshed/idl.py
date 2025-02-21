@@ -37,7 +37,7 @@ class IDLUI:
         return ret
 
     def formatMessage(self, msg: str) -> m.MessageOptions:
-        match = re.match(r"IDL ERROR LINE: (\d+) - (.*)", msg.strip())
+        match = re.match(r".*?LINE: (\d+) - (.*)", msg.strip())
         if not match:
             return m.MessageOptions(msg.rstrip())
         localLineNum = int(match[1])
