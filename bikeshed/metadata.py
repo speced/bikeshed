@@ -109,7 +109,7 @@ class MetadataManager:
         self.mailingList: str | None = None
         self.mailingListArchives: str | None = None
         self.markupShorthands: config.BoolSet = config.BoolSet(
-            ["css", "dfn", "biblio", "markup", "http", "idl", "algorithm"],
+            ["css", "dfn", "biblio", "markup", "http", "idl", "algorithm", "repository-links"],
         )
         self.maxToCDepth: int | float | None = float("inf")
         self.metadataInclude: config.BoolSet = config.BoolSet(default=True)
@@ -772,6 +772,7 @@ def parseMarkupShorthands(key: str, val: str, lineNum: str | int | None) -> conf
             "markdown",
             "markdown-escapes",
             "markup",
+            "repository-links",
         ],
     )
     for v in vals:

@@ -209,16 +209,21 @@ def parseNode(
             node = RawText.fromStream(s, start, i, f"&#{ord(ch)};")
             return Result(node, i)
 
+    if first1 == "<" and s.config.repositoryLinks:
+        repolink, i = parseRepositoryLink(s, start).vi
+        if repolink is not None:
+            return Result(repolink, i)
+
     if first1 == "<":
         node, i = parseAngleStart(s, start).vi
         if node is not None:
             return Result(node, i)
 
-    # This isn't quite correct to handle here,
-    # but it'll have to wait until I munge
-    # the markdown and HTML parsers together.
     el: ParserNode | None
     if first1 in ("`", "~"):
+        # This isn't quite correct to handle here,
+        # but it'll have to wait until I munge
+        # the markdown and HTML parsers together.
         el, i = parseFencedCodeBlock(s, start).vi
         if el is not None:
             return Result(el, i)
@@ -467,6 +472,28 @@ def parseLToEnd(s: Stream, start: int, lTag: StartTag) -> Result[ParserNode | li
 
     # Now just return the autolink, but with cursor set past the </l>
     return Result(nodes, i)
+
+
+REPOSITORY_LINK_RE = re.compile(r"(?:([\w-]+)/([\w-]+))?#(\d+)>")
+
+
+def parseRepositoryLink(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
+    i = start + 1
+    match, i = s.matchRe(i, REPOSITORY_LINK_RE).vi
+    if match is None:
+        return Result.fail(start)
+    org, repo, num = match.groups()
+    if org:
+        text = f"{org}/{repo} issue #{num}"
+        issueID = f"{org}/{repo}#{num}"
+    else:
+        text = f"issue #{num}"
+        issueID = f"#{num}"
+    startTag = StartTag.fromStream(s, start, start + 1, "a", {"data-remote-issue-id": issueID})
+    return Result(
+        [startTag, SafeText.fromStream(s, start + 1, i - 1, text), EndTag.fromStream(s, i - 1, i, startTag)],
+        i,
+    )
 
 
 def parseAngleStart(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:

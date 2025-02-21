@@ -873,42 +873,44 @@ def processIssuesAndExamples(doc: t.SpecT) -> None:
     # examples, and link to remote issues if possible:
     for el in h.findAll(".issue:not([id])", doc):
         el.set("id", h.safeID(doc, "issue-" + h.hashContents(el)))
-        remoteIssueID = el.get("data-remote-issue-id")
-        if remoteIssueID:
-            del el.attrib["data-remote-issue-id"]
-            # Eventually need to support a way to trigger other repo url structures,
-            # but defaulting to GH is fine for now.
-            githubMatch = re.match(r"\s*([\w-]+)/([\w-]+)#(\d+)\s*$", remoteIssueID)
-            numberMatch = re.match(r"\s*(\d+)\s*$", remoteIssueID)
-            remoteIssueURL = None
-            if githubMatch:
-                remoteIssueURL = "https://github.com/{}/{}/issues/{}".format(*githubMatch.groups())
-                if doc.md.inlineGithubIssues:
-                    el.set(
-                        "data-inline-github",
-                        "{} {} {}".format(*githubMatch.groups()),
-                    )
-            elif numberMatch and isinstance(doc.md.repository, repository.GithubRepository):
-                remoteIssueURL = doc.md.repository.formatIssueUrl(numberMatch.group(1))
-                if doc.md.inlineGithubIssues:
-                    el.set(
-                        "data-inline-github",
-                        "{} {} {}".format(
-                            doc.md.repository.user,
-                            doc.md.repository.repo,
-                            numberMatch.group(1),
-                        ),
-                    )
-            elif doc.md.issueTrackerTemplate:
-                remoteIssueURL = doc.md.issueTrackerTemplate.format(remoteIssueID)
-            if remoteIssueURL:
+    for el in h.findAll(".example:not([id])", doc):
+        el.set("id", h.safeID(doc, "example-" + h.hashContents(el)))
+    for el in h.findAll("[data-remote-issue-id]", doc):
+        remoteIssueID = el.get("data-remote-issue-id", "").strip()
+        del el.attrib["data-remote-issue-id"]
+        # Eventually need to support a way to trigger other repo url structures,
+        # but defaulting to GH is fine for now.
+        githubMatch = re.match(r"([\w-]+)/([\w-]+)#(\d+)$", remoteIssueID)
+        numberMatch = re.match(r"#?(\d+)$", remoteIssueID)
+        remoteIssueURL = None
+        if githubMatch:
+            org, repo, num = githubMatch.groups()
+            text = f"[{org}/{repo} Issue #{num}]"
+            remoteIssueURL = f"https://github.com/{org}/{repo}/issues/{num}"
+            if doc.md.inlineGithubIssues:
+                el.set("data-inline-github", f"{org} {repo} {num}")
+        elif numberMatch and isinstance(doc.md.repository, repository.GithubRepository):
+            remoteIssueURL = doc.md.repository.formatIssueUrl(numberMatch.group(1))
+            num = numberMatch.group(1)
+            text = f"[Issue #{num}]"
+            if doc.md.inlineGithubIssues:
+                org = doc.md.repository.user
+                repo = doc.md.repository.repo
+                el.set("data-inline-github", f"{org} {repo} {num}")
+        elif doc.md.issueTrackerTemplate:
+            remoteIssueURL = doc.md.issueTrackerTemplate.format(remoteIssueID)
+        else:
+            m.die(f"Can't parse '{remoteIssueID}' as an issue ID.", el=el)
+            continue
+        if remoteIssueURL:
+            if h.tagName(el) == "a":
+                el.set("href", remoteIssueURL)
+            else:
                 h.appendChild(
                     el,
                     " ",
-                    h.E.a({"href": remoteIssueURL}, _t("[Issue #{number}]").format(number=remoteIssueID)),
+                    h.E.a({"href": remoteIssueURL}, text),
                 )
-    for el in h.findAll(".example:not([id])", doc):
-        el.set("id", h.safeID(doc, "example-" + h.hashContents(el)))
     h.fixupIDs(doc, h.findAll(".issue, .example", doc))
 
 
