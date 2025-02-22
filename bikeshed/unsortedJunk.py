@@ -898,6 +898,7 @@ def processIssuesAndExamples(doc: t.SpecT) -> None:
                 repo = doc.md.repository.repo
                 el.set("data-inline-github", f"{org} {repo} {num}")
         elif doc.md.issueTrackerTemplate:
+            text = f"[Issue {remoteIssueID}]"
             remoteIssueURL = doc.md.issueTrackerTemplate.format(remoteIssueID)
         else:
             m.die(f"Can't parse '{remoteIssueID}' as an issue ID.", el=el)
