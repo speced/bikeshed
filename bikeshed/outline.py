@@ -4,7 +4,6 @@ import dataclasses
 import os
 
 from . import h, t
-from . import unsortedJunk as u  # noqa: N813
 
 
 @dataclasses.dataclass
