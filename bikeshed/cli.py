@@ -430,7 +430,13 @@ def main() -> None:
         help="Save the graph to a specified SVG file, rather than outputting with xdot immediately.",
     )
 
-    subparsers.add_parser("template", help="Outputs a skeleton .bs file for you to start with.")
+    templateParser = subparsers.add_parser("template", help="Outputs a skeleton .bs file for you to start with.")
+    templateParser.add_argument(
+        "variant",
+        choices=["base", "minimal", "test"],
+        nargs="?",
+        default="base",
+    )
 
     wptParser = subparsers.add_parser("wpt", help="Tools for writing Web Platform Tests.")
     wptParser.add_argument(
@@ -488,7 +494,7 @@ def main() -> None:
     elif options.subparserName == "profile":
         handleProfile(options)
     elif options.subparserName == "template":
-        handleTemplate()
+        handleTemplate(options)
     elif options.subparserName == "wpt":
         handleWpt(options)
 
@@ -711,9 +717,10 @@ def handleProfile(options: argparse.Namespace) -> None:
         )
 
 
-def handleTemplate() -> None:
-    m.p(
-        """<pre class='metadata'>
+def handleTemplate(options: argparse.Namespace) -> None:
+    if options.variant == "base":
+        m.p(
+            """<pre class='metadata'>
 Title: Your Spec Title
 Shortname: your-spec
 Level: 1
@@ -732,14 +739,42 @@ Introduction {#intro}
 
 Introduction here.
 """,
-    )
+        )
+    elif options.variant == "minimal":
+        m.p(
+            """<pre class='metadata'>
+Title: Test
+Editor: test
+Abstract: test
+Group: test
+Status: ls
+Shortname: test
+Boilerplate: style-autolinks off, style-colors off, style-counters off, style-selflinks off, style-issues off, style-md-lists off, style-dfn-panel off, script-dfn-panel off, script-dfn-panel-json off, script-dom-helper off, style-ref-hints off, script-ref-hints off, script-link-titles off, table-of-contents off, abstract off, index off, references off
+Markup Shorthands: markdown on
+</pre>
+""",
+        )
+    elif options.variant == "test":
+        m.p(
+            """<pre class=metadata>
+Group: test
+Shortname: foo
+Level: 1
+Status: LS
+ED: http://example.com/foo
+Editor: Example Editor
+Date: 1970-01-01
+Title: Test Title
+Abstract: Test Description
+</pre>
+""",
+        )
 
 
 def handleWpt(options: argparse.Namespace) -> None:
     if options.template:
         m.p(
-            """
-<!DOCTYPE html>
+            """<!DOCTYPE html>
 <meta charset=utf-8>
 <title>window.offscreenBuffering</title>
 <link rel=author title="AUTHOR NAME HERE" href="mailto:AUTHOR EMAIL HERE">
@@ -750,13 +785,13 @@ def handleWpt(options: argparse.Namespace) -> None:
 /* Choose the test type you want: */
 
 
-/* Standard, synchronous test */
+/* 1. Standard, synchronous test */
 test(function() {
     /* test code here */
 }, "TEST NAME HERE / SHORT DESCRIPTION PHRASE");
 
 
-/* Async test */
+/* 2. Async test */
 let t = async_test("TEST NAME HERE / SHORT DESCRIPTION PHRASE");
 somethingWithACallback( function(){ t.step(()=>{ /* test code here */}) );
 something.addEventListener('foo', t.step_func(()=>{ /* test code here */}));
@@ -765,7 +800,7 @@ t.done(); // when all tests are finished running
 something.addEventListener('foo', t.step_func_done(()=>{ /* test code here */}));
 
 
-/* Promise test */
+/* 3. Promise test */
 promise_test(function(){
     return somePromiseFunc().then(()=>{ /* test code here */ });
 }, "TEST NAME HERE / SHORT DESCRIPTION PHRASE");
