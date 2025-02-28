@@ -373,6 +373,12 @@ def main() -> None:
         action="store_true",
         help="Finds HTML comments containing 'Big Text: foo' and turns them into comments containing 'foo' in big text.",
     )
+    sourceParser.add_argument(
+        "--outline",
+        dest="outline",
+        action="store_true",
+        help="Generates a document outline and prints to stdout.",
+    )
     sourceParser.add_argument("infile", nargs="?", default=None, help="Path to the source file.")
     sourceParser.add_argument("outfile", nargs="?", default=None, help="Path to the output file.")
 
@@ -671,9 +677,14 @@ def handleIssuesList(options: argparse.Namespace) -> None:
 
 
 def handleSource(options: argparse.Namespace) -> None:
-    if not options.bigText:  # If no options are given, do all options.
-        options.bigText = True
-    if options.bigText:
+    if options.outline:
+        from . import outline
+        from .Spec import Spec
+
+        with m.messagesSilent() as _:
+            doc = Spec(inputFilename=options.infile).preprocess()
+        m.say(outline.printOutline(doc))
+    else:
         from . import fonts
 
         try:
