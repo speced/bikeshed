@@ -373,14 +373,11 @@ def main() -> None:
         action="store_true",
         help="Finds HTML comments containing 'Big Text: foo' and turns them into comments containing 'foo' in big text.",
     )
-    sourceParser.add_argument(
-        "--outline",
-        dest="outline",
-        action="store_true",
-        help="Generates a document outline and prints to stdout.",
-    )
     sourceParser.add_argument("infile", nargs="?", default=None, help="Path to the source file.")
     sourceParser.add_argument("outfile", nargs="?", default=None, help="Path to the output file.")
+
+    outlineParser = subparsers.add_parser("outline", help="Generates an outline for the spec.")
+    outlineParser.add_argument("infile", nargs="?", default=None, help="Path to the source file.")
 
     testParser = subparsers.add_parser("test", help="Tools for running Bikeshed's testsuite.")
     testParser.add_argument(
@@ -495,6 +492,8 @@ def main() -> None:
         handleIssuesList(options)
     elif options.subparserName == "source":
         handleSource(options)
+    elif options.subparserName == "outline":
+        handleOutline(options)
     elif options.subparserName == "test":
         handleTest(options, extras)
     elif options.subparserName == "profile":
@@ -683,23 +682,27 @@ def handleIssuesList(options: argparse.Namespace) -> None:
 
 
 def handleSource(options: argparse.Namespace) -> None:
-    if options.outline:
-        from . import outline
-        from .Spec import Spec
+    from . import fonts
 
-        with m.messagesSilent() as _:
-            doc = Spec(inputFilename=options.infile).preprocess()
-        m.say(outline.printOutline(doc))
-    else:
-        from . import fonts
+    try:
+        fontPath = config.scriptPath("fonts", "smallblocks.bsfont")
+        font = fonts.Font.fromPath(fontPath)
+        fonts.replaceComments(font=font, inputFilename=options.infile, outputFilename=options.outfile)
+    except Exception as e:
+        m.die(f"Error trying to embiggen text:\n{e}")
+        return
 
-        try:
-            fontPath = config.scriptPath("fonts", "smallblocks.bsfont")
-            font = fonts.Font.fromPath(fontPath)
-            fonts.replaceComments(font=font, inputFilename=options.infile, outputFilename=options.outfile)
-        except Exception as e:
-            m.die(f"Error trying to embiggen text:\n{e}")
-            return
+
+def handleOutline(options: argparse.Namespace) -> None:
+    from . import outline
+    from .Spec import Spec
+
+    doc = Spec(inputFilename=options.infile)
+    if not doc.valid:
+        return
+    with m.messagesSilent() as _:
+        doc.preprocess()
+    m.say(outline.printOutline(doc))
 
 
 def handleTest(options: argparse.Namespace, extras: list[str]) -> None:

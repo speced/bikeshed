@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import os
 
 from . import h, t
 from . import unsortedJunk as u  # noqa: N813
@@ -18,13 +19,17 @@ def printOutline(doc: t.Spec) -> str:
     entries = generateOutline(doc)
     lineNumWidth = max(len(str(e.lineNum)) for e in entries)
     idWidth = max(len(str(e.id or "")) for e in entries)
+    consoleWidth = os.get_terminal_size().columns
     lines = []
     for entry in entries:
         if entry.level == 2:
             prefix = ""
         else:
             prefix = " " * (entry.level - 2)
-        lines.append(f"{entry.lineNum:{lineNumWidth}} | #{entry.id:{idWidth}} | {prefix}{entry.text}")
+        line = f"{entry.lineNum:{lineNumWidth}} | #{entry.id:{idWidth}} | {prefix}{entry.text}"
+        if len(line) > consoleWidth:
+            line = line[: consoleWidth - 2] + "…"
+        lines.append(line)
     return "\n".join(lines)
 
 
@@ -35,11 +40,14 @@ def generateOutline(doc: t.Spec) -> list[OutlineEntry]:
         id = el.get("id", None)
         level = int((h.tagName(el) or "h0")[1])
         try:
-            num,_,rest = el.get("bs-line-number").partition(":")
-            lineNum = int(num)
-            int(rest)
+            lineNum = int(el.get("bs-line-number", ""))
         except:
-            continue
+            try:
+                num, _, rest = el.get("bs-line-number", "").partition(":")
+                lineNum = int(num)
+                int(rest)
+            except:  # noqa: S112
+                continue
         entries.append(OutlineEntry(text, id, level, lineNum))
     return entries
 
