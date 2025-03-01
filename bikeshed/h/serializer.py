@@ -233,7 +233,11 @@ class Serializer:
 
     def _writeInlineElement(self, tag: str, el: Nodes, write: WriterFn, inline: bool) -> None:
         self.startTag(tag, el, write)
-        for node in dom.childNodes(el, mergeText=True):
+        if isinstance(el, list):
+            children = el
+        else:
+            children = dom.childNodes(el, mergeText=True)
+        for node in children:
             if self.isElement(node):
                 self._serializeEl(node, write, inline=inline)
             else:
@@ -256,7 +260,7 @@ class Serializer:
             return "empty", None
 
         # See if there are any block children
-        children = dom.childNodes(el, clear=True, mergeText=True)
+        children = list(dom.childNodes(el, mergeText=True))
         for child in children:
             if self.isElement(child) and self.isBlockElement(child.tag):
                 return "blocks", self._blocksFromChildren(children)

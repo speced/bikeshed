@@ -397,7 +397,7 @@ class Spec:
                     m.die(f"Something prevented me from saving the output document to {outputFilename}:\n{e}")
         else:
             if outputFilename == "-":
-                m.die(f"Can't do multipage output to stdout.")
+                m.die("Can't do multipage output to stdout.")
                 return
             pages = multipage.serializePages(self, outputFilename)
             if pages and not constants.dryRun:

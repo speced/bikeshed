@@ -6,14 +6,14 @@ from .. import messages as m
 
 def serializePages(doc: t.SpecT, mainFilename: str) -> dict[str, str]:
     main = h.find("main", doc)
+    assert main is not None
     pages = collectIntoPages(list(h.childNodes(main, clear=True)), mainFilename)
     ret = {}
     serializer = h.Serializer(doc.md.opaqueElements, doc.md.blockElements)
     for filename, nodes in pages.items():
-        h.replaceContents(main, nodes)
+        h.childNodes(main, clear=True)
+        h.appendChild(main, nodes)
         ret[filename] = serializer.serialize(doc.document)
-        print(filename + " " + str(len(nodes)) + " nodes; " + str(len(ret[filename].split("\n"))) + " lines")
-        #print(ret[filename][0:80])
     return ret
 
 
@@ -29,8 +29,6 @@ def collectIntoPages(nodes: list[t.NodeT], mainFilename: str) -> dict[str, list[
                 return {}
             filename = id + ".html"
             pages[filename] = []
-        #if h.isElement(node):
-        #    print(f"{filename} {h.tagName(node)} {node.get('bs-line-number')}")
         pages[filename].append(node)
     return pages
 
