@@ -114,6 +114,7 @@ class MetadataManager:
         self.maxToCDepth: int | float | None = float("inf")
         self.metadataInclude: config.BoolSet = config.BoolSet(default=True)
         self.metadataOrder: list[str] = ["*", "!*"]
+        self.multipage: bool = False
         self.noAbstract: bool = False
         self.noEditor: bool = False
         self.noteClass: str = "note"
@@ -1458,6 +1459,7 @@ KNOWN_KEYS = {
         partial(parseBoolishList, default=True),
     ),
     "Metadata Order": Metadata("Metadata Order", "metadataOrder", joinValue, parseMetadataOrder),
+    "Multipage": Metadata("Multipage", "multipage", joinValue, parseBoolean),
     "No Abstract": Metadata("No Abstract", "noAbstract", joinValue, parseBoolean),
     "No Editor": Metadata("No Editor", "noEditor", joinValue, parseBoolean),
     "Note Class": Metadata("Note Class", "noteClass", joinValue, parseLiteral),

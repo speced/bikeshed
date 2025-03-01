@@ -32,6 +32,7 @@ from . import (
     markdown,
     mdn,
     metadata,
+    multipage,
     refs,
     retrieve,
     shorthands,
@@ -383,16 +384,32 @@ class Spec:
         catchArgparseBug(outputFilename)
         self.printResultMessage()
         outputFilename = self.fixMissingOutputFilename(outputFilename)
-        rendered = self.serialize()
-        if rendered and not constants.dryRun:
-            try:
-                if outputFilename == "-":
-                    sys.stdout.write(rendered)
-                else:
-                    with open(outputFilename, "w", encoding="utf-8", newline=newline) as f:
-                        f.write(rendered)
-            except Exception as e:
-                m.die(f"Something prevented me from saving the output document to {outputFilename}:\n{e}")
+        if not self.md.multipage:
+            rendered = self.serialize()
+            if rendered and not constants.dryRun:
+                try:
+                    if outputFilename == "-":
+                        sys.stdout.write(rendered)
+                    else:
+                        with open(outputFilename, "w", encoding="utf-8", newline=newline) as f:
+                            f.write(rendered)
+                except Exception as e:
+                    m.die(f"Something prevented me from saving the output document to {outputFilename}:\n{e}")
+        else:
+            if outputFilename == "-":
+                m.die(f"Can't do multipage output to stdout.")
+                return
+            pages = multipage.serializePages(self, outputFilename)
+            if pages and not constants.dryRun:
+                for filename, rendered in pages.items():
+                    try:
+                        if filename == "-":
+                            sys.stdout.write(rendered)
+                        else:
+                            with open(filename, "w", encoding="utf-8", newline=newline) as f:
+                                f.write(rendered)
+                    except Exception as e:
+                        m.die(f"Something prevented me from saving the output document to {filename}:\n{e}")
 
     def printResultMessage(self) -> None:
         # If I reach this point, I've succeeded, but maybe with reservations.
