@@ -1857,7 +1857,7 @@ def parseAutolinkCddl(s: Stream, start: int) -> Result[ParserNode | list[ParserN
         linkType = "cddl"
     else:
         m.die(
-            f"CDDL autolink {{{{{innerText}}}}} gave its type as '{linkType}', but only CDDL types are allowed.",
+            f"CDDL autolink {{^{innerText}^}} gave its type as '{linkType}', but only CDDL types are allowed.",
             lineNum=s.loc(start),
         )
         linkType = "cddl"
