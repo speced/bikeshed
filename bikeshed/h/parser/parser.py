@@ -1845,24 +1845,19 @@ def parseAutolinkCddl(s: Stream, start: int) -> Result[ParserNode | list[ParserN
         return Result.fail(start)
     innerStart = start + 2
 
-    # Otherwise we're locked in, this opener is a very strong signal.
-    match, innerEnd = s.searchRe(innerStart, AUTOLINK_CDDL_RE).vi
-    if match is None:
-        m.die(
-            "CDDL autolink was opened, but no closing ^} was found. Either close your autolink, or escape the initial { as &#123;",
-            lineNum=s.loc(start),
-        )
+    data, innerEnd = parseLinkInfo(s, innerStart, "{^", "^}", AUTOLINK_CDDL_RE).vi
+    innerText = s[innerStart:innerEnd]
+    if data is None:
         return Result.fail(start)
+    lt, linkFor, linkType = dataclasses.astuple(data)
 
-    innerText = match[0]
-    lt, linkFor, linkType = parseLinkInfo(s, innerStart, innerText, "{^", "^}")
     if linkType in config.cddlTypes:
         pass
     elif linkType is None:
         linkType = "cddl"
     else:
         m.die(
-            f"CDDL autolink {{{{{s[start+1:innerEnd]}}}}} gave its type as '{linkType}', but only CDDL types are allowed.",
+            f"CDDL autolink {{{{{innerText}}}}} gave its type as '{linkType}', but only CDDL types are allowed.",
             lineNum=s.loc(start),
         )
         linkType = "cddl"
