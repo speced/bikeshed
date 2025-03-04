@@ -74,6 +74,7 @@ class Result(t.Generic[ResultT_co]):
 class ParseConfig:
     algorithm: bool = False
     biblio: bool = False
+    cddl: bool = False
     css: bool = False
     dfn: bool = False
     header: bool = False
@@ -92,6 +93,7 @@ class ParseConfig:
         return ParseConfig(
             algorithm="algorithm" in doc.md.markupShorthands,
             biblio="biblio" in doc.md.markupShorthands,
+            cddl="cddl" in doc.md.markupShorthands,
             css="css" in doc.md.markupShorthands,
             dfn="dfn" in doc.md.markupShorthands,
             header="http" in doc.md.markupShorthands,
