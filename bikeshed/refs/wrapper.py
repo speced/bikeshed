@@ -4,20 +4,19 @@ import dataclasses
 
 from .. import t
 
-if t.TYPE_CHECKING:
-    # Need to use function form due to "for" key
-    # being invalid as a property name
-    class RefDataT(t.TypedDict, total=False):
-        type: t.Required[str]
-        spec: t.Required[str | None]
-        shortname: t.Required[str | None]
-        level: t.Required[str | None]
-        status: t.Required[str]
-        url: t.Required[str]
-        export: t.Required[bool]
-        normative: t.Required[bool]
-        for_: t.Required[list[str]]
-        el: t.ElementT | None
+
+class RefDataT(t.TypedDict, total=False):
+    type: t.Required[str]
+    spec: t.Required[str | None]
+    shortname: t.Required[str | None]
+    level: t.Required[str | None]
+    status: t.Required[str]
+    url: t.Required[str]
+    export: t.Required[bool]
+    normative: t.Required[bool]
+    for_: t.Required[list[str]]
+    uniquifier: str | None
+    el: t.ElementT | None
 
 
 @dataclasses.dataclass
@@ -79,6 +78,18 @@ class RefWrapper:
     @property
     def el(self) -> t.ElementT | None:
         return self._ref.get("el", None)
+
+    @property
+    def uniquifier(self) -> str | None:
+        return self._ref.get("uniquifier", None)
+
+    def refKey(self) -> str:
+        return self.uniquifier or self.url
+
+    def __eq__(self, other: t.Any) -> bool:
+        if not isinstance(other, RefWrapper):
+            return NotImplemented
+        return self._ref == other._ref
 
     def __json__(self) -> t.JSONT:
         return {

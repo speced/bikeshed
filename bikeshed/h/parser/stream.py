@@ -83,6 +83,7 @@ class ParseConfig:
     markdown: bool = False
     markdownEscapes: bool = False
     markup: bool = False
+    repositoryLinks: bool = False
     macros: dict[str, str] = field(default_factory=dict)
     context: str | None = None
     opaqueElements: set[str] = field(default_factory=lambda: {"pre", "xmp", "script", "style"})
@@ -101,6 +102,7 @@ class ParseConfig:
             markdown="markdown" in doc.md.markupShorthands,
             markdownEscapes="markdown-escapes" in doc.md.markupShorthands,
             markup="markup" in doc.md.markupShorthands,
+            repositoryLinks="repository-links" in doc.md.markupShorthands,
             macros=doc.macros,
             context=context,
             opaqueElements=set(doc.md.opaqueElements),
@@ -141,9 +143,9 @@ class Stream:
             if key < 0:
                 return ""
         else:
-            if key.start < 0:
+            if key.start and key.start < 0:
                 key = slice(0, key.stop, key.step)
-            if key.stop < 0:
+            if key.stop and key.stop < 0:
                 key = slice(key.start, 0, key.step)
         try:
             return self._chars[key]

@@ -16,13 +16,14 @@ def brokenLinks(doc: t.SpecT) -> None:
         return
     import requests
 
+    timeout = doc.md.linkCheckerTimeout
+
     m.say("Checking links, this may take a while...")
     logging.captureWarnings(True)  # Silence the requests library :/
     startTime = time.time()
-    globalTimeout = 10  # seconds
     for el in h.findAll("a", doc):
-        if time.time() - startTime > globalTimeout:
-            m.lint(f"Link checking took longer than {globalTimeout} seconds, skipping the rest.")
+        if time.time() - startTime > timeout.total:
+            m.lint(f"Link checking took longer than {timeout.total} seconds, skipping the rest.")
             break
         href = el.get("href")
         if not href or href[0] == "#":
@@ -32,7 +33,7 @@ def brokenLinks(doc: t.SpecT) -> None:
             # Can't check mailto links
             continue
         try:
-            res = requests.get(href, timeout=5)
+            res = requests.get(href, timeout=timeout.each)
         except requests.exceptions.Timeout:
             m.lint(f"Checking the following link timed out:\n{href}", lineNum=el)
             continue

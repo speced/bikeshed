@@ -24,6 +24,12 @@ if t.TYPE_CHECKING:
         pass
 
 
+@dataclasses.dataclass
+class LinkCheckerTimeout:
+    each: int = 5
+    total: int = 10
+
+
 class MetadataManager:
     @property
     def vshortname(self) -> str | None:
@@ -96,13 +102,14 @@ class MetadataManager:
         self.issues: list[tuple[str, str]] = []
         self.issueTrackerTemplate: str | None = None
         self.lineNumbers: bool = False
+        self.linkCheckerTimeout: LinkCheckerTimeout = LinkCheckerTimeout()
         self.linkDefaults: t.LinkDefaultsT = defaultdict(list)
         self.localBoilerplate: config.BoolSet = config.BoolSet(default=False)
         self.logo: str | None = None
         self.mailingList: str | None = None
         self.mailingListArchives: str | None = None
         self.markupShorthands: config.BoolSet = config.BoolSet(
-            ["css", "dfn", "biblio", "markup", "http", "idl", "cddl", "algorithm"],
+            ["css", "dfn", "biblio", "markup", "http", "idl", "cddl", "algorithm", "repository-links"],
         )
         self.maxToCDepth: int | float | None = float("inf")
         self.metadataInclude: config.BoolSet = config.BoolSet(default=True)
@@ -766,6 +773,7 @@ def parseMarkupShorthands(key: str, val: str, lineNum: str | int | None) -> conf
             "markdown",
             "markdown-escapes",
             "markup",
+            "repository-links",
         ],
     )
     for v in vals:
@@ -1040,6 +1048,20 @@ def parseIgnoreMdnFailure(key: str, val: str, lineNum: str | int | None) -> list
     vals = [x.strip() for x in val.split(",")]
     vals = [x[1:] if x.startswith("#") else x for x in vals]
     return vals
+
+
+def parseLinkCheckerTimeout(key: str, val: str, lineNum: str | int | None) -> LinkCheckerTimeout:
+    vals = val.strip().split()
+    if len(vals) != 2:
+        m.die(f"Link Checker Timeout metadata needs exactly two integers. Got: '{val}'.", lineNum=lineNum)
+        return LinkCheckerTimeout()
+    try:
+        each = int(vals[0])
+        total = int(vals[1])
+    except ValueError:
+        m.die(f"Link Checker Timeout metadata needs exactly two integers. Got: '{val}'.", lineNum=lineNum)
+        return LinkCheckerTimeout()
+    return LinkCheckerTimeout(each, total)
 
 
 def parse(lines: t.Sequence[Line]) -> tuple[list[Line], MetadataManager]:
@@ -1417,6 +1439,7 @@ KNOWN_KEYS = {
     "Issue Tracking": Metadata("Issue Tracking", "issues", joinList, parseLinkedText),
     "Level": Metadata("Level", "level", joinValue, parseLevel),
     "Line Numbers": Metadata("Line Numbers", "lineNumbers", joinValue, parseBoolean),
+    "Link Checker Timeout": Metadata("Link Checker Timeout", "linkCheckerTimeout", joinValue, parseLinkCheckerTimeout),
     "Link Defaults": Metadata("Link Defaults", "linkDefaults", joinDdList, parseLinkDefaults),
     "Local Boilerplate": Metadata(
         "Local Boilerplate",

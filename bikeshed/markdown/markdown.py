@@ -563,10 +563,7 @@ def parseParagraph(stream: TokenStream) -> list[l.Line]:
         match = re.match(r"issue\(([^)]+)\):(.*)", line, re.I)
         if match:
             line = match.group(2)
-            p = "<p bs-line-number={} data-remote-issue-id='{}' class='replace-with-issue-class'>".format(
-                i,
-                match.group(1),
-            )
+            p = f"<p bs-line-number={i} data-remote-issue-id='{match.group(1)}' class='replace-with-issue-class'>"
         else:
             p = f"<p bs-line-number={i}>"
     lines = [lineFromStream(stream, f"{p}{line}\n")]

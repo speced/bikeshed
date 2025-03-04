@@ -146,20 +146,29 @@ def main() -> None:
         help="Process a spec source file into a valid output file and publish it according to certain automatic protocols.",
     )
     echidnaParser.add_argument("infile", nargs="?", default=None, help="Path to the source file.")
-    echidnaParser.add_argument(
-        "--gh-token",
-        dest="ghToken",
-        nargs="?",
-        help="GitHub access token. Useful to avoid API rate limits. Generate tokens: https://github.com/settings/tokens.",
-    )
     echidnaParser.add_argument("--u", dest="un", metavar="USERNAME", required=False, help="W3C username.")
     echidnaParser.add_argument("--p", dest="pw", metavar="PASSWORD", required=False, help="W3C password.")
     echidnaParser.add_argument(
         "--decision",
         dest="decision",
-        metavar="DECISION_URL",
+        metavar="URL",
         required=False,
         help="URL recording the decision to publish.",
+    )
+    echidnaParser.add_argument(
+        "--gh-token",
+        dest="ghToken",
+        required=False,
+        help="GitHub access token. Useful to avoid API rate limits. Generate tokens: https://github.com/settings/tokens.",
+    )
+    echidnaParser.add_argument(
+        "--timeout",
+        dest="timeout",
+        metavar="SECONDS",
+        required=False,
+        default=3,
+        type=float,
+        help="The timeout for contacting the publication service (default 3s).",
     )
     echidnaParser.add_argument(
         "--editorial",
@@ -367,6 +376,9 @@ def main() -> None:
     sourceParser.add_argument("infile", nargs="?", default=None, help="Path to the source file.")
     sourceParser.add_argument("outfile", nargs="?", default=None, help="Path to the output file.")
 
+    outlineParser = subparsers.add_parser("outline", help="Generates an outline for the spec.")
+    outlineParser.add_argument("infile", nargs="?", default=None, help="Path to the source file.")
+
     testParser = subparsers.add_parser("test", help="Tools for running Bikeshed's testsuite.")
     testParser.add_argument(
         "--rebase",
@@ -421,7 +433,13 @@ def main() -> None:
         help="Save the graph to a specified SVG file, rather than outputting with xdot immediately.",
     )
 
-    subparsers.add_parser("template", help="Outputs a skeleton .bs file for you to start with.")
+    templateParser = subparsers.add_parser("template", help="Outputs a skeleton .bs file for you to start with.")
+    templateParser.add_argument(
+        "variant",
+        choices=["base", "minimal", "test"],
+        nargs="?",
+        default="base",
+    )
 
     wptParser = subparsers.add_parser("wpt", help="Tools for writing Web Platform Tests.")
     wptParser.add_argument(
@@ -474,12 +492,14 @@ def main() -> None:
         handleIssuesList(options)
     elif options.subparserName == "source":
         handleSource(options)
+    elif options.subparserName == "outline":
+        handleOutline(options)
     elif options.subparserName == "test":
         handleTest(options, extras)
     elif options.subparserName == "profile":
         handleProfile(options)
     elif options.subparserName == "template":
-        handleTemplate()
+        handleTemplate(options)
     elif options.subparserName == "wpt":
         handleWpt(options)
 
@@ -548,6 +568,7 @@ def handleEchidna(options: argparse.Namespace, extras: list[str]) -> None:
             additionalDirectories=addDirs,
             cc=options.cc,
             editorial=options.editorial,
+            timeout=options.timeout,
         )
 
 
@@ -661,18 +682,27 @@ def handleIssuesList(options: argparse.Namespace) -> None:
 
 
 def handleSource(options: argparse.Namespace) -> None:
-    if not options.bigText:  # If no options are given, do all options.
-        options.bigText = True
-    if options.bigText:
-        from . import fonts
+    from . import fonts
 
-        try:
-            fontPath = config.scriptPath("fonts", "smallblocks.bsfont")
-            font = fonts.Font.fromPath(fontPath)
-            fonts.replaceComments(font=font, inputFilename=options.infile, outputFilename=options.outfile)
-        except Exception as e:
-            m.die(f"Error trying to embiggen text:\n{e}")
-            return
+    try:
+        fontPath = config.scriptPath("fonts", "smallblocks.bsfont")
+        font = fonts.Font.fromPath(fontPath)
+        fonts.replaceComments(font=font, inputFilename=options.infile, outputFilename=options.outfile)
+    except Exception as e:
+        m.die(f"Error trying to embiggen text:\n{e}")
+        return
+
+
+def handleOutline(options: argparse.Namespace) -> None:
+    from . import outline
+    from .Spec import Spec
+
+    doc = Spec(inputFilename=options.infile)
+    if not doc.valid:
+        return
+    with m.messagesSilent() as _:
+        doc.preprocess()
+    m.say(outline.printOutline(doc))
 
 
 def handleTest(options: argparse.Namespace, extras: list[str]) -> None:
@@ -701,9 +731,10 @@ def handleProfile(options: argparse.Namespace) -> None:
         )
 
 
-def handleTemplate() -> None:
-    m.p(
-        """<pre class='metadata'>
+def handleTemplate(options: argparse.Namespace) -> None:
+    if options.variant == "base":
+        m.p(
+            """<pre class='metadata'>
 Title: Your Spec Title
 Shortname: your-spec
 Level: 1
@@ -722,14 +753,42 @@ Introduction {#intro}
 
 Introduction here.
 """,
-    )
+        )
+    elif options.variant == "minimal":
+        m.p(
+            """<pre class='metadata'>
+Title: Test
+Editor: test
+Abstract: test
+Group: test
+Status: ls
+Shortname: test
+Boilerplate: style-autolinks off, style-colors off, style-counters off, style-selflinks off, style-issues off, style-md-lists off, style-dfn-panel off, script-dfn-panel off, script-dfn-panel-json off, script-dom-helper off, style-ref-hints off, script-ref-hints off, script-link-titles off, table-of-contents off, abstract off, index off, references off
+Markup Shorthands: markdown on
+</pre>
+""",
+        )
+    elif options.variant == "test":
+        m.p(
+            """<pre class=metadata>
+Group: test
+Shortname: foo
+Level: 1
+Status: LS
+ED: http://example.com/foo
+Editor: Example Editor
+Date: 1970-01-01
+Title: Test Title
+Abstract: Test Description
+</pre>
+""",
+        )
 
 
 def handleWpt(options: argparse.Namespace) -> None:
     if options.template:
         m.p(
-            """
-<!DOCTYPE html>
+            """<!DOCTYPE html>
 <meta charset=utf-8>
 <title>window.offscreenBuffering</title>
 <link rel=author title="AUTHOR NAME HERE" href="mailto:AUTHOR EMAIL HERE">
@@ -740,13 +799,13 @@ def handleWpt(options: argparse.Namespace) -> None:
 /* Choose the test type you want: */
 
 
-/* Standard, synchronous test */
+/* 1. Standard, synchronous test */
 test(function() {
     /* test code here */
 }, "TEST NAME HERE / SHORT DESCRIPTION PHRASE");
 
 
-/* Async test */
+/* 2. Async test */
 let t = async_test("TEST NAME HERE / SHORT DESCRIPTION PHRASE");
 somethingWithACallback( function(){ t.step(()=>{ /* test code here */}) );
 something.addEventListener('foo', t.step_func(()=>{ /* test code here */}));
@@ -755,7 +814,7 @@ t.done(); // when all tests are finished running
 something.addEventListener('foo', t.step_func_done(()=>{ /* test code here */}));
 
 
-/* Promise test */
+/* 3. Promise test */
 promise_test(function(){
     return somePromiseFunc().then(()=>{ /* test code here */ });
 }, "TEST NAME HERE / SHORT DESCRIPTION PHRASE");

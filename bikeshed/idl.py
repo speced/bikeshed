@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import re
 
 import widlparser
@@ -8,12 +9,46 @@ from . import config, h, t
 from . import messages as m
 
 
+@dataclasses.dataclass
 class IDLUI:
+    lineStart: int | None
+    parseContext: str | None = None
+
+    @staticmethod
+    def fromEl(el: t.ElementT) -> IDLUI:
+        lineNum = el.get("bs-line-number", None)
+        try:
+            if lineNum is None:
+                num = None
+            elif ":" in lineNum:
+                lineNum, _, _ = lineNum.partition(":")
+                num = int(lineNum)
+            else:
+                num = int(lineNum)
+        except ValueError:
+            lineNum = None
+        context = el.get("bs-parse-context", None)
+        return IDLUI(lineStart=num, parseContext=context)
+
+    def formatLineNum(self, localNum: int) -> str:
+        ret = str((self.lineStart or 0) + localNum)
+        if self.parseContext:
+            ret += f" of {self.parseContext}"
+        return ret
+
+    def formatMessage(self, msg: str) -> m.MessageOptions:
+        match = re.match(r".*?LINE: (\d+) - (.*)", msg.strip())
+        if not match:
+            return m.MessageOptions(msg.rstrip())
+        localLineNum = int(match[1])
+        detail = match[2]
+        return m.MessageOptions(detail, lineNum=self.formatLineNum(localLineNum))
+
     def warn(self, msg: str) -> None:
-        m.die(msg.rstrip())
+        self.formatMessage(msg).die()
 
     def note(self, msg: str) -> None:
-        m.warn(msg.rstrip())
+        self.formatMessage(msg).warn()
 
 
 class IDLSilent:
@@ -377,7 +412,7 @@ def markupIDL(doc: t.SpecT) -> None:
         if h.isNormative(doc, el):
             text = h.textContent(el)
             # Parse once with a fresh parser, so I can spit out just this <pre>'s markup.
-            widl = widlparser.parser.Parser(text, ui=IDLUI(), symbol_table=symbolTable)
+            widl = widlparser.parser.Parser(text, ui=IDLUI.fromEl(el), symbol_table=symbolTable)
             marker = DebugMarker() if doc.debug else IDLMarker()
 
             h.replaceContents(el, h.parseHTML(str(widl.markup(marker))))

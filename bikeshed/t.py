@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 
 # The only things that should be available during runtime.
-from typing import TYPE_CHECKING, Generic, TypeVar, cast, overload
+from typing import TYPE_CHECKING, Generic, TypedDict, TypeVar, cast, overload
 
 # Only available in 3.11, so stub them out for earlier versions
 if sys.version_info >= (3, 11):
@@ -39,7 +39,6 @@ if TYPE_CHECKING:
         TextIO,
         Type,
         TypeAlias,
-        TypedDict,
         TypeGuard,
     )
 

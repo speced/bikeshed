@@ -105,6 +105,12 @@ def linkTextVariations(str: str, linkType: str | None) -> t.Generator[str, None,
         else:
             yield str + "s"
 
+        # Bikeshed(s) <-> Bikeshed
+        if last3 == "(s)":
+            yield str[:-3]
+        else:
+            yield str + "(s)"
+
         # Bikesheds <-> Bikesheds'
         if last1 in ("'", "’"):
             yield str[:-1]

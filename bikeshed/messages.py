@@ -34,6 +34,25 @@ PRINT_MODES = [
 ]
 
 
+@dataclasses.dataclass
+class MessageOptions:
+    msg: str
+    lineNum: int | str | None = None
+    el: t.ElementT | None = None
+
+    def die(self) -> None:
+        die(**dataclasses.asdict(self))
+
+    def linkerror(self) -> None:
+        linkerror(**dataclasses.asdict(self))
+
+    def lint(self) -> None:
+        lint(**dataclasses.asdict(self))
+
+    def warn(self) -> None:
+        warn(**dataclasses.asdict(self))
+
+
 @dataclasses.dataclass()
 class MessagesState:
     # What message category (or higher) to stop processing on
