@@ -69,6 +69,7 @@ from .dom import (
     replaceMacrosTextly,
     replaceNode,
     replaceWithContents,
+    rootElement,
     safeID,
     scopingElements,
     sectionName,

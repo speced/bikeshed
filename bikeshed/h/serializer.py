@@ -95,7 +95,7 @@ class Serializer:
         self.opaqueEls = frozenset(opaqueElements)
         self.blockEls = frozenset(blockElements)
 
-    def serialize(self, tree: t.DocumentT) -> str:
+    def serialize(self, tree: t.ElementTreeT) -> str:
         output = io.StringIO()
         writer = output.write
         writer("<!doctype html>")

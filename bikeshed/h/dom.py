@@ -31,8 +31,9 @@ def unescape(string: str) -> str:
     return html.unescape(string)
 
 
-def findAll(sel: str, context: t.SpecT | t.ElementT | t.DocumentT) -> list[t.ElementT]:
-    context = t.cast("t.ElementT", getattr(context, "document", context))
+def findAll(sel: str, context: t.SpecT | t.ElementT | t.ElementTreeT) -> list[t.ElementT]:
+    if isSpec(context):
+        context = context.document
     try:
         return t.cast("list[t.ElementT]", CSSSelector(sel, namespaces={"svg": "http://www.w3.org/2000/svg"})(context))
     except Exception as e:
@@ -40,7 +41,7 @@ def findAll(sel: str, context: t.SpecT | t.ElementT | t.DocumentT) -> list[t.Ele
         return []
 
 
-def find(sel: str, context: t.SpecT | t.ElementT | t.DocumentT) -> t.ElementT | None:
+def find(sel: str, context: t.SpecT | t.ElementT | t.ElementTreeT) -> t.ElementT | None:
     result = findAll(sel, context)
     if result:
         return result[0]
@@ -270,9 +271,9 @@ def parseHTML(text: str) -> list[t.ElementT]:
         return []
 
 
-def parseDocument(text: str) -> t.DocumentT:
+def parseDocument(text: str) -> t.ElementTreeT:
     doc = html5lib.parse(text, treebuilder="lxml", namespaceHTMLElements=False)
-    return t.cast("t.DocumentT", doc)
+    return t.cast("t.ElementTreeT", doc)
 
 
 def escapeHTML(text: str) -> str:
@@ -537,11 +538,25 @@ def scopingElements(startEl: t.ElementT, tags: list[str]) -> t.Generator[t.Eleme
                 yield sib
 
 
+def rootElement(el: t.ElementT | t.ElementTreeT | t.SpecT) -> t.ElementT:
+    if isElement(el):
+        root = el.getroottree().getroot()
+    elif isElementTree(el):
+        root = el.getroot()
+    elif isSpec(el):
+        root = el.root
+    else:
+        t.assert_never(el)
+        root = None
+    assert root is not None
+    return root
+
+
 def previousElements(startEl: t.ElementT, tag: str | None = None, *tags: str) -> list[t.ElementT]:
     # Elements preceding the startEl in document order.
     # Like .iter(), but in the opposite direction.
     els: list[t.ElementT] = []
-    for el in startEl.getroottree().getroot().iter(tag, *tags):
+    for el in rootElement(startEl).iter(tag, *tags):
         if el == startEl:
             return list(reversed(els))
         els.append(el)
@@ -652,7 +667,7 @@ def nodeIter(el: t.ElementT, clear: bool = False, skipOddNodes: bool = True) -> 
         yield el
         return
     if isinstance(el, etree.t.ElementTree):
-        el = el.getroot()
+        el = rootElement(el)
     text = el.text
     tail = el.tail
     if clear:
@@ -782,21 +797,29 @@ def removeClass(el: t.ElementT, cls: str) -> t.ElementT:
     return el
 
 
-def isElement(node: t.Any) -> t.TypeGuard[t.ElementT]:
+def isElement(node: t.Any) -> t.TypeIs[t.ElementT]:
     # LXML HAS THE DUMBEST XML TREE DATA MODEL IN THE WORLD
     return etree.iselement(node) and isinstance(node.tag, str)
 
 
-def isNode(node: t.Any) -> t.TypeGuard[t.NodeT]:
+def isNode(node: t.Any) -> t.TypeIs[t.NodeT]:
     return isElement(node) or isinstance(node, str)
 
 
-def isNodes(nodes: t.Any) -> t.TypeGuard[t.NodesT]:
+def isNodes(nodes: t.Any) -> t.TypeIs[t.NodesT]:
     if isNode(nodes):
         return True
     if not isinstance(nodes, list):
         return False
     return all(isNodes(child) for child in nodes)
+
+
+def isSpec(obj: t.Any) -> t.TypeIs[t.SpecT]:
+    return type(obj).__name__ == "Spec"
+
+
+def isElementTree(obj: t.Any) -> t.TypeIs[t.ElementTreeT]:
+    return isinstance(obj, etree._ElementTree)
 
 
 def isOddNode(node: t.Any) -> bool:

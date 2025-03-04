@@ -244,10 +244,13 @@ class Spec:
 
         # Build the document
         self.document = h.parseDocument(self.html)
-        headEl = h.find("head", self)
-        bodyEl = h.find("body", self)
+        rootEl = h.rootElement(self.document)
+        headEl = rootEl[0]
+        bodyEl = rootEl[1]
+        assert rootEl is not None
         assert headEl is not None
         assert bodyEl is not None
+        self.root = rootEl
         self.head = headEl
         self.body = bodyEl
         u.correctFrontMatter(self)

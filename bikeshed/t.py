@@ -48,10 +48,11 @@ if TYPE_CHECKING:
         NotRequired,
         Required,
         Self,
+        TypeIs,
     )
 
     ElementT: TypeAlias = etree._Element
-    DocumentT: TypeAlias = etree._ElementTree
+    ElementTreeT: TypeAlias = etree._ElementTree
     NodeT: TypeAlias = str | ElementT
 
     # In many places I treat lists as an "anonymous" element
