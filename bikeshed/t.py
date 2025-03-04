@@ -7,7 +7,6 @@ import sys
 # The only things that should be available during runtime.
 from typing import TYPE_CHECKING, Generic, TypedDict, TypeVar, cast, overload
 
-# Only available in 3.11, so stub them out for earlier versions
 if sys.version_info >= (3, 11):
     from typing import assert_never, assert_type
 else:
