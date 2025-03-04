@@ -402,17 +402,19 @@ class Spec:
             if outputFilename == "-":
                 m.die("Can't do multipage output to stdout.")
                 return
-            pages = multipage.serializePages(self, outputFilename)
+            justDir, justFilename = os.path.split(outputFilename)
+            pages = multipage.serializePages(self, justFilename)
             if pages and not constants.dryRun:
                 for filename, rendered in pages.items():
+                    pagePath = os.path.join(justDir, filename)
                     try:
                         if filename == "-":
                             sys.stdout.write(rendered)
                         else:
-                            with open(filename, "w", encoding="utf-8", newline=newline) as f:
+                            with open(pagePath, "w", encoding="utf-8", newline=newline) as f:
                                 f.write(rendered)
                     except Exception as e:
-                        m.die(f"Something prevented me from saving the output document to {filename}:\n{e}")
+                        m.die(f"Something prevented me from saving the output document to {pagePath}:\n{e}")
 
     def printResultMessage(self) -> None:
         # If I reach this point, I've succeeded, but maybe with reservations.
