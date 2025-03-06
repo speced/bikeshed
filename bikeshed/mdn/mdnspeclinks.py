@@ -133,7 +133,7 @@ def panelsFromData(doc: t.SpecT, data: MdnDataT) -> list[t.ElementT]:
                         "class": "less-than-two-engines-flag",
                         "title": _t("This feature is in less than two current engines."),
                     },
-                    "\u26A0",
+                    "\u26a0",
                 ),
             )
         elif allEngines > 0 and lessThanTwoEngines == 0 and onlyTwoEngines == 0:
