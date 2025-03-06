@@ -191,63 +191,6 @@ class AliasBiblioEntry(BiblioEntry):
         return [h.E.small({}, f"(alias of {self.aliasOf})")]
 
 
-def processReferBiblioFile(lines: t.Sequence[str], storage: t.BiblioStorageT, order: int) -> t.BiblioStorageT:
-    singularReferCodes = {
-        "U": "snapshotURL",
-        "T": "title",
-        "D": "date",
-        "S": "status",
-        "L": "linkText",
-        "O": "other",
-    }
-    pluralReferCodes = {
-        "A": "authors",
-        "Q": "authors",
-    }
-    unusedReferCodes = set("BCIJNPRVX")
-
-    for group in groupsFromReferFile(lines):
-        biblio: dict[str, t.Any] = {"order": order}
-        for line in group:
-            match = re.match(r"%(\w)\s+(.*)", line)
-            if match:
-                letter, value = match.groups()
-            else:
-                m.die(f"Biblio line in unexpected format:\n{line}")
-                continue
-
-            if letter in singularReferCodes:
-                biblio[singularReferCodes[letter]] = value
-            elif letter in pluralReferCodes:
-                biblio.setdefault(pluralReferCodes[letter], []).append(value)
-            elif letter in unusedReferCodes:
-                pass
-            else:
-                m.die(f"Unknown line type {letter}:\n{line}")
-                continue
-        storage[biblio["linkText"].lower()].append(NormalBiblioEntry(**biblio))
-    return storage
-
-
-def groupsFromReferFile(lines: t.Sequence[str]) -> t.Generator[list[str], None, None]:
-    group: list[str] = []
-    for line in lines:
-        line = line.strip()
-
-        if line == "":
-            if group:
-                yield group
-                group = []
-        elif line.startswith("#") or line.startswith("%#"):
-            # Comment
-            continue
-        else:
-            group.append(line)
-    # yield the final group, if there wasn't a trailing blank line
-    if group:
-        yield group
-
-
 def processSpecrefBiblioFile(text: str, storage: t.BiblioStorageT, order: int) -> t.BiblioStorageT:
     r"""
     A SpecRef file is a JSON object, where keys are ids

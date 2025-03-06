@@ -16,7 +16,6 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
     biblios: t.BiblioStorageT = defaultdict(list)
     biblio.processSpecrefBiblioFile(getSpecrefData(), biblios, order=3)
     biblio.processSpecrefBiblioFile(getWG21Data(), biblios, order=3)
-    biblio.processReferBiblioFile(getCSSWGData(), biblios, order=4)
     writtenPaths: set[str] = set()
     if not dryRun:
         groupedBiblios, allNames = groupBiblios(biblios)
