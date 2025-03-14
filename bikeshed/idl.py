@@ -201,10 +201,10 @@ class IDLMarker(widlparser.protocols.Marker):
             # the "value" is a DOMString attr
             member = construct.parent.member  # type: ignore
             if hasattr(member, "rest"):
-                type = member.rest.type
+                memberType = member.rest.type
             elif hasattr(member, "attribute"):
-                type = member.attribute.type
-            typeName = str(type).strip()
+                memberType = member.attribute.type
+            typeName = str(memberType).strip()
             if typeName.endswith("?"):
                 typeName = typeName[:-1]
             return (
@@ -221,10 +221,9 @@ class IDLMarker(widlparser.protocols.Marker):
             )
 
         if construct.idl_type == "constructor":
-            # This shows up for the method name in a [NamedConstructor] extended attribute.
-            # The "NamedConstructor" Name already got markup up, so ignore this one.
-            return (None, None)
-
+            interfaceName = construct.parent.name
+            methodName = construct.name
+            return (f"<idl data-idl-type=constructor data-idl-for='{interfaceName}' data-lt='{methodName}()'>", "</idl>")
         return ('<a data-link-type="idl-name">', "</a>")
 
     def markup_keyword(self, text: str, construct: widlparser.Construct) -> MarkupReturnT:
@@ -273,11 +272,14 @@ class IDLMarker(widlparser.protocols.Marker):
             return (None, None)
 
         if idlType == "constructor":
-            # the [Constructor] extended attr, now deprecated
-            m.die(
-                f"The [Constructor] extended attribute (on {construct.parent.name}) is deprecated, please switch to a constructor() method.",
-            )
-            return (None, None)
+            # one of the constructor extended attr, now deprecated
+            if text == "Constructor":
+                m.die(
+                    f"The [Constructor] extended attribute (on {construct.parent.name}) is deprecated, please switch to a constructor() method.",
+                )
+                return (None, None)
+            # Otherwise it's [LegacyNamedConstructor], which is allowed
+            return ("<a data-link-type=extended-attribute data-link-for>", "</a>")
 
         if idlType == "argument" and construct.parent.idl_type == "constructor":
             # Don't mark up the arguments to [Constructor] either
