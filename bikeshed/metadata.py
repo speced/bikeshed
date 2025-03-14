@@ -1194,8 +1194,10 @@ def inferIndent(lines: t.Sequence[Line]) -> IndentInfo:
 
 def spaceIndentFromLine(line: str) -> int:
     # Returns just the whitespace prefix of a line
-    for i in range(len(line)):
-        if line[i] == " ":
+    if line[0] != " ":
+        return 0
+    for i, ch in enumerate(line):
+        if ch == " ":
             continue
         return i
     return len(line)
