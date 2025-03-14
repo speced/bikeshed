@@ -1154,9 +1154,10 @@ def inferIndent(lines: t.Sequence[Line]) -> IndentInfo:
     for line in lines:
         # Purposely require at least two spaces; I don't
         # auto-detect single-space indents. Get help.
-        match = re.match("( {2,})", line.text)
-        if match:
-            indentSizes[len(match.group(1))] += 1
+
+        spaceCount = spaceIndentFromLine(line.text)
+        if spaceCount >= 2:
+            indentSizes[spaceCount] += 1
             info.spaceLines += 1
         elif line.text[0:1] == "\t":
             info.tabLines += 1
@@ -1189,6 +1190,15 @@ def inferIndent(lines: t.Sequence[Line]) -> IndentInfo:
         if evenDivisions:
             info.size = evenDivisions.most_common(1)[0][0]
     return info
+
+
+def spaceIndentFromLine(line: str) -> int:
+    # Returns just the whitespace prefix of a line
+    for i in range(len(line)):
+        if line[i] == " ":
+            continue
+        return i
+    return len(line)
 
 
 def fromCommandLine(overrides: list[str]) -> MetadataManager:
