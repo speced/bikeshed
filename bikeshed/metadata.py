@@ -1076,14 +1076,16 @@ def parse(lines: t.Sequence[Line]) -> tuple[list[Line], MetadataManager]:
     endTag = None
     md = MetadataManager()
     for line in lines:
-        if not inMetadata and re.match(r"<(pre|xmp) [^>]*class=[^>]*metadata[^>]*>", line.text):
-            inMetadata = True
-            md.hasMetadata = True
-            if line.text.startswith("<pre"):
-                endTag = r"</pre>\s*"
-            else:
-                endTag = r"</xmp>\s*"
-            continue
+        if not inMetadata and ("<pre" in line.text or "<xmp" in line.text) and "metadata" in line.text:
+            match = re.match(r"<(pre|xmp) [^>]*class=[^>]*metadata[^>]*>", line.text)
+            if match:
+                inMetadata = True
+                md.hasMetadata = True
+                if line.text.startswith("<pre"):
+                    endTag = r"</pre>\s*"
+                else:
+                    endTag = r"</xmp>\s*"
+                continue
         if inMetadata and re.match(t.cast(str, endTag), line.text):
             inMetadata = False
             continue
@@ -1094,29 +1096,28 @@ def parse(lines: t.Sequence[Line]) -> tuple[list[Line], MetadataManager]:
             if lastKey and (line.text.strip() == "" or re.match(r"\s+", line.text)):
                 # empty lines, or lines that start with 1+ spaces, continue previous key
                 md.addData(lastKey, line.text, lineNum=line.i)
-            elif re.match(r"([^:]+):(.*)", line.text):
-                match = re.match(r"([^:]+):(.*)", line.text)
-                assert match is not None
-                key = match[1].strip()
-                val = match[2].strip()
-                if key in KNOWN_KEYS and KNOWN_KEYS[key].multiline:
-                    multilineVal = True
-                elif key[0] == "!":
-                    multilineVal = True
-                else:
-                    multilineVal = False
-                md.addData(key, val, lineNum=line.i)
-                lastKey = match[1]
             else:
-                m.die(
-                    f"Incorrectly formatted metadata line:\n{line.text}",
-                    lineNum=line.i,
-                )
-                continue
-        elif re.match(r"\s*<h1[^>]*>.*?</h1>", line.text):
-            if md.title is None:
-                match = re.match(r"\s*<h1[^>]*>(.*?)</h1>", line.text)
-                assert match is not None
+                match = re.match(r"([^:]+):(.*)", line.text)
+                if match:
+                    key = match[1].strip()
+                    val = match[2].strip()
+                    if key in KNOWN_KEYS and KNOWN_KEYS[key].multiline:
+                        multilineVal = True
+                    elif key[0] == "!":
+                        multilineVal = True
+                    else:
+                        multilineVal = False
+                    md.addData(key, val, lineNum=line.i)
+                    lastKey = match[1]
+                else:
+                    m.die(
+                        f"Incorrectly formatted metadata line:\n{line.text}",
+                        lineNum=line.i,
+                    )
+                    continue
+        elif "<h1" in line.text and md.title is None:
+            match = re.match(r"\s*<h1[^>]*>(.*?)</h1>", line.text)
+            if match:
                 title = match[1]
                 md.addData("Title", title, lineNum=line.i)
             newlines.append(line)
