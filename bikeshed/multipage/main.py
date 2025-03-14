@@ -68,8 +68,8 @@ def fixupLocalRefs(el: t.ElementT, currentPage: Page, pages: list[Page]) -> None
             fixupLocalRefs(child, currentPage, pages)
 
 
-def printRedir(currentPageName: str, pageName: str, id: str, el: t.ElementT) -> str:
-    print(f"{simpleLineNum(el):5}: {currentPageName:20} {pageName:20} #{id}")
+def printRedir(currentPageName: str, pageName: str, id: str, el: t.ElementT) -> None:
+    print(f"{simpleLineNum(el):5}: {currentPageName:20} {pageName:20} #{id}")  # noqa: T201
 
 
 def findID(id: str, pages: list[Page]) -> Page | None:
@@ -84,7 +84,7 @@ def collectIDs(nodes: t.NodesT, page: Page) -> Page:
         if h.isElement(node):
             if node.get("id"):
                 page.ids.add(t.cast(str, node.get("id")))
-            collectIDs(h.childElements(node), page)
+            collectIDs(list(h.childElements(node)), page)
     return page
 
 
@@ -117,12 +117,13 @@ def headingLevel(el: t.ElementT) -> int:
         return 0
     return int(tag[1])
 
+
 def simpleLineNum(el: t.ElementT) -> str:
     lineNum = el.get("bs-line-number")
     if lineNum:
         if parsesAsInt(lineNum):
             return lineNum
-        num, _, rest = lineNum.partition(":")
+        num, _, _ = lineNum.partition(":")
         if parsesAsInt(num):
             return num
         return "nil"

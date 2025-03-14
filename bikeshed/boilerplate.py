@@ -120,19 +120,40 @@ def addSpecVersion(doc: t.SpecT) -> None:
 def addHeaderFooter(doc: t.SpecT) -> None:
     header = retrieve.retrieveBoilerplateFile(doc, "header") if "header" in doc.md.boilerplate else ""
     footer = retrieve.retrieveBoilerplateFile(doc, "footer") if "footer" in doc.md.boilerplate else ""
-
-    doc.html = "\n".join(
-        [
-            h.parseText(header, h.ParseConfig.fromSpec(doc, context="header.include")),
-            doc.html,
-            h.parseText(footer, h.ParseConfig.fromSpec(doc, context="footer.include")),
-        ],
+    templateDoc = h.parseDocument(
+        h.parseText(header, h.ParseConfig.fromSpec(doc, context="header.include"))
+        + "\n"
+        + h.parseText(footer, h.ParseConfig.fromSpec(doc, context="footer.include")),
     )
+    if doc.h1 is not None:
+        templateH1 = h.find("h1", templateDoc)
+        if templateH1 is not None:
+            h.replaceNode(templateH1, doc.h1)
+    templateMain = h.find("main", templateDoc)
+    if templateMain is None:
+        m.die("header.include/footer.include need to define a <main> element to insert the spec contents.")
+        return
+    templateRoot = h.rootElement(templateDoc)
+    templateHead = templateRoot[0]
+    templateBody = templateRoot[1]
+    docMain = doc.body[0]
+    assert docMain is not None
+    docRest = doc.body[1:]  # type: ignore
+    h.appendContents(templateHead, doc.head)
+    h.replaceContents(templateMain, docMain)
+    h.appendChild(templateBody, docRest)
+    doc.document = templateDoc
+    doc.root = templateRoot
+    doc.head = templateHead
+    doc.body = templateBody
 
 
 def fillWith(tag: str, newElements: t.NodesT, doc: t.SpecT) -> None:
-    for el in doc.fillContainers[tag]:
-        h.replaceContents(el, newElements)
+    if tag in doc.fillContainers:
+        h.replaceContents(doc.fillContainers[tag], newElements)
+    else:
+        placeholder = h.E.div({"boilerplate": tag}, newElements)
+        h.appendChild(doc.boilerplate, placeholder)
 
 
 def getFillContainer(tag: str, doc: t.SpecT, default: bool = False) -> t.ElementT | None:
@@ -152,8 +173,8 @@ def getFillContainer(tag: str, doc: t.SpecT, default: bool = False) -> t.Element
         return None
 
     # If a fill-with is found, fill that
-    if doc.fillContainers[tag]:
-        return doc.fillContainers[tag][0]
+    if tag in doc.fillContainers:
+        return doc.fillContainers[tag]
 
     # Otherwise, append to the end of the document,
     # unless you're in the byos group
@@ -226,17 +247,16 @@ def addStyles(doc: t.SpecT) -> None:
 
 def addCustomBoilerplate(doc: t.SpecT) -> None:
     for el in h.findAll("[boilerplate]", doc):
-        tag = el.get("boilerplate", "")
-        if doc.fillContainers[tag]:
-            h.replaceContents(doc.fillContainers[tag][0], el)
+        tag = el.get("boilerplate")
+        if tag in doc.fillContainers:
+            h.replaceContents(doc.fillContainers[tag], h.childNodes(el, clear=True))
             h.removeNode(el)
 
 
 def removeUnwantedBoilerplate(doc: t.SpecT) -> None:
-    for tag, els in doc.fillContainers.items():
+    for tag, el in doc.fillContainers.items():
         if tag not in doc.md.boilerplate:
-            for el in els:
-                h.removeNode(el)
+            h.removeNode(el)
 
 
 def w3cStylesheetInUse(doc: t.SpecT) -> bool:
@@ -1025,9 +1045,7 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
         else:
             otherMd[k] = t.cast("list[t.NodesT|None]", parsed)
 
-    el = h.E.div(htmlFromMd(md, otherMd, doc))
-
-    fillWith("spec-metadata", el, doc=doc)
+    fillWith("spec-metadata", htmlFromMd(md, otherMd, doc), doc=doc)
 
 
 def createMdEntry(key: str, dirtyVals: t.Sequence[MetadataValueT], doc: t.SpecT) -> t.NodesT:

@@ -149,7 +149,7 @@ def outerHTML(el: t.NodesT | None, literal: bool = False, with_tail: bool = Fals
     return t.cast(str, tostring(el, with_tail=with_tail, encoding="unicode"))
 
 
-def printNodeTree(node: t.NodeT | str) -> str:
+def printNodeTree(node: t.NodeT | str, maxDepth: int|None = None, depth: int = 0) -> str:
     # Debugging tool
     if isinstance(node, str):
         return "#text: " + repr(node)
@@ -159,16 +159,17 @@ def printNodeTree(node: t.NodeT | str) -> str:
         s = "[]"
     else:
         s = f"{serializeTag(node)}"
-    linesPerChild = [printNodeTree(child).split("\n") for child in childNodes(node, skipOddNodes=False)]
-    if linesPerChild:
-        for childLines in linesPerChild[:-1]:
-            childLines[0] = " ├" + childLines[0]
-            childLines[1:] = [" │" + line for line in childLines[1:]]
+    if maxDepth is None or depth < maxDepth:
+        linesPerChild = [printNodeTree(child, maxDepth, depth+1).split("\n") for child in childNodes(node, skipOddNodes=False)]
+        if linesPerChild:
+            for childLines in linesPerChild[:-1]:
+                childLines[0] = " ├" + childLines[0]
+                childLines[1:] = [" │" + line for line in childLines[1:]]
+                s += "\n" + "\n".join(childLines)
+            childLines = linesPerChild[-1]
+            childLines[0] = " ╰" + childLines[0]
+            childLines[1:] = ["  " + line for line in childLines[1:]]
             s += "\n" + "\n".join(childLines)
-        childLines = linesPerChild[-1]
-        childLines[0] = " ╰" + childLines[0]
-        childLines[1:] = ["  " + line for line in childLines[1:]]
-        s += "\n" + "\n".join(childLines)
     return s
 
 

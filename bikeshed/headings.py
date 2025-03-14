@@ -26,6 +26,20 @@ def processHeadings(doc: t.SpecT, scope: str = "doc") -> None:
         checkPrivacySecurityHeadings(doc, h.findAll(".heading", doc))
 
 
+def stashH1(doc: t.SpecT) -> None:
+    # If there's an <h1> in the body, pull it off and save it for later,
+    # when we actually have boilerplate,
+    # at which point we'll replace the boilerplate's <h1> with this one.
+    h1s = h.findAll("h1", doc)
+    if not h1s:
+        doc.h1 = None
+        return
+    doc.h1 = h1s[0]
+    h.removeNode(doc.h1)
+    if len(h1s) > 1:
+        m.die(f"Your document has {len(h1s)} <h1> elements. Only use one (and preferably leave it to the boilerplate.)")
+
+
 def resetHeadings(headings: list[t.ElementT]) -> None:
     for header in headings:
         content = h.E.span({"class": "content"})

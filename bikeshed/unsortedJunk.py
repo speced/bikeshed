@@ -1443,9 +1443,9 @@ def lineNumberFromBsLineNumber(value: str | None) -> int:
 
 
 def locateFillContainers(doc: t.SpecT) -> t.FillContainersT:
-    fillContainers = defaultdict(list)
+    fillContainers = {}
     for el in h.findAll("[data-fill-with]", doc):
-        fillContainers[t.cast(str, el.get("data-fill-with"))].append(el)
+        fillContainers[t.cast(str, el.get("data-fill-with"))] = el
     return fillContainers
 
 

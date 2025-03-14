@@ -240,20 +240,24 @@ class Spec:
 
         # Convert to a single string of html now, for convenience.
         self.html = "".join(x.text for x in self.lines)
-        boilerplate.addHeaderFooter(self)
 
         # Build the document
-        self.document = h.parseDocument(self.html)
+        self.document = h.parseDocument(
+            "<!doctype html><body><bs-main>" + self.html + "</bs-main>"
+        )
         rootEl = h.rootElement(self.document)
         headEl = rootEl[0]
         bodyEl = rootEl[1]
+        boilerplateEl = h.appendChild(bodyEl, h.createElement("bs-boilerplate", {}))
         assert rootEl is not None
         assert headEl is not None
         assert bodyEl is not None
+        assert boilerplateEl is not None
         self.root = rootEl
         self.head = headEl
         self.body = bodyEl
-        u.correctFrontMatter(self)
+        self.boilerplate = boilerplateEl
+        self.h1: t.ElementT | None = None
         includes.processInclusions(self)
         metadata.parseDoc(self)
         return self
@@ -261,10 +265,12 @@ class Spec:
     def processDocument(self) -> Spec:
         # Fill in and clean up a bunch of data
         conditional.processConditionals(self)
-        self.fillContainers: t.FillContainersT = u.locateFillContainers(self)
-        lint.exampleIDs(self)
-        wpt.processWptElements(self)
+        self.fillContainers = u.locateFillContainers(self)
 
+        headings.stashH1(self)
+        boilerplate.addSpecMetadataSection(self)
+        boilerplate.addAbstract(self)
+        boilerplate.addAtRisk(self)
         boilerplate.addBikeshedVersion(self)
         boilerplate.addCanonicalURL(self)
         boilerplate.addFavicon(self)
@@ -272,11 +278,13 @@ class Spec:
         boilerplate.addStatusSection(self)
         boilerplate.addLogo(self)
         boilerplate.addCopyright(self)
-        boilerplate.addSpecMetadataSection(self)
-        boilerplate.addAbstract(self)
         boilerplate.addExpiryNotice(self)
         boilerplate.addObsoletionNotice(self)
-        boilerplate.addAtRisk(self)
+        boilerplate.addBikeshedBoilerplate(self)
+        boilerplate.addDarkmodeIndicators(self)
+        lint.exampleIDs(self)
+        wpt.processWptElements(self)
+
         u.addNoteHeaders(self)
         boilerplate.removeUnwantedBoilerplate(self)
         shorthands.run(self)
@@ -308,10 +316,8 @@ class Spec:
         boilerplate.addPropertyIndex(self)
         boilerplate.addIDLSection(self)
         boilerplate.addIssuesSection(self)
-        boilerplate.addCustomBoilerplate(self)
         headings.processHeadings(self, "all")  # again
         boilerplate.removeUnwantedBoilerplate(self)
-        boilerplate.addTOCSection(self)
         u.addSelfLinks(self)
         u.processAutolinks(self)
         boilerplate.removeUnwantedBoilerplate(self)
@@ -319,20 +325,26 @@ class Spec:
         mdn.addMdnPanels(self)
         caniuse.addCanIUsePanels(self)
         highlight.addSyntaxHighlighting(self)
-        boilerplate.addBikeshedBoilerplate(self)
-        boilerplate.addDarkmodeIndicators(self)
         fingerprinting.addTrackingVector(self)
         u.fixIntraDocumentReferences(self)
         u.fixInterDocumentReferences(self)
         u.verifyUsageOfAllLocalBiblios(self)
         u.removeMultipleLinks(self)
-        u.forceCrossorigin(self)
         addDomintroStyles(self)
         lint.brokenLinks(self)
         lint.accidental2119(self)
         lint.missingExposed(self)
         lint.requiredIDs(self)
         lint.unusedInternalDfns(self)
+
+        boilerplate.addHeaderFooter(self)
+        conditional.processConditionals(self)
+        self.fillContainers = u.locateFillContainers(self)
+        boilerplate.addTOCSection(self)
+        headings.processHeadings(self, scope="all")
+        boilerplate.addCustomBoilerplate(self)
+        h.removeNode(self.boilerplate)
+        u.forceCrossorigin(self)
 
         # Any final HTML cleanups
         u.cleanupHTML(self)

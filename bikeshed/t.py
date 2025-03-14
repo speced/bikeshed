@@ -79,6 +79,6 @@ if TYPE_CHECKING:
 
     BiblioStorageT: TypeAlias = DefaultDict[str, list[BiblioEntry]]
 
-    FillContainersT: TypeAlias = DefaultDict[str, list[ElementT]]
+    FillContainersT: TypeAlias = dict[str, ElementT]
 
     LinkDefaultsT: TypeAlias = DefaultDict[str, list[tuple[str, str, str | None, str | None]]]
