@@ -8,7 +8,7 @@ from urllib import parse
 
 from PIL import Image
 
-from . import biblio, config, dfnpanels, h, idl, printjson, repository, t
+from . import biblio, cddl, config, dfnpanels, h, idl, printjson, repository, t
 from . import messages as m
 from .translate import _t
 
@@ -519,7 +519,7 @@ def classifyDfns(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
             if attr is not None:
                 el.set(attr, "")
             else:
-                if dfnType == "dfn":
+                if dfnType == "dfn" or dfnType in config.cddlTypes:
                     el.set("data-noexport", "by-default")
                 else:
                     el.set("data-export", "by-default")
@@ -1045,6 +1045,10 @@ def cleanupHTML(doc: t.SpecT) -> None:
         if el.tag == "pre" and h.hasClass(doc, el, "idl") and not h.hasClass(doc, el, "def"):
             h.addClass(doc, el, "def")
 
+        # Mark pre.cddl blocks as .def, for styling
+        if el.tag == "pre" and h.hasClass(doc, el, "cddl") and not h.hasClass(doc, el, "def"):
+            h.addClass(doc, el, "def")
+
         # Tag classes on wide types of dfns/links
         if el.tag in config.dfnElements:
             if el.get("data-dfn-type") in config.idlTypes:
@@ -1553,6 +1557,22 @@ def processIDL(doc: t.SpecT) -> None:
         localDfns.update(idl.markupIDLBlock(pre, doc))
 
     dfns = h.findAll("pre.idl:not([data-no-idl]) dfn, xmp.idl:not([data-no-idl]) dfn", doc) + list(localDfns)
+    dfns = sorted(dfns, key=lambda x: (x.get("bs-line-number") or "", h.textContent(x)))
+    classifyDfns(doc, dfns)
+    h.fixupIDs(doc, dfns)
+    doc.refs.addLocalDfns(doc, (dfn for dfn in dfns if dfn.get("id") is not None))
+
+
+def processCDDL(doc: t.SpecT) -> None:
+    localDfns = set()
+    for pre in h.findAll("pre.cddl, xmp.cddl", doc):
+        if pre.get("data-no-cddl") is not None:
+            continue
+        if not h.isNormative(doc, pre):
+            continue
+        localDfns.update(cddl.markupCDDLBlock(pre, doc))
+
+    dfns = h.findAll("pre.cddl:not([data-no-cddl]) dfn, xmp.cddl:not([data-no-cddl]) dfn", doc) + list(localDfns)
     dfns = sorted(dfns, key=lambda x: (x.get("bs-line-number") or "", h.textContent(x)))
     classifyDfns(doc, dfns)
     h.fixupIDs(doc, dfns)
