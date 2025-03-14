@@ -970,7 +970,7 @@ def addOldIDs(els: t.Iterable[t.ElementT]) -> None:
             continue
         oldIDs = [id.strip() for id in oldIdAttr.strip().split(",")]
         for oldID in oldIDs:
-            appendChild(el, E.span({"id": oldID}))
+            prependChild(el, E.span({"id": oldID, "class": "bs-old-id"}))
         removeAttr(el, "oldids")
 
 
