@@ -615,4 +615,3 @@ def FIXMEreplaceMarkdownBlockquotes(text: str) -> str:
         else:
             i += 1
     return "\n".join(lines)
-    return "\n".join(lines)

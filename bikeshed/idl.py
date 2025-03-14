@@ -204,6 +204,8 @@ class IDLMarker(widlparser.protocols.Marker):
                 memberType = member.rest.type
             elif hasattr(member, "attribute"):
                 memberType = member.attribute.type
+            else:
+                assert False, "unreachable"
             typeName = str(memberType).strip()
             if typeName.endswith("?"):
                 typeName = typeName[:-1]
@@ -223,7 +225,10 @@ class IDLMarker(widlparser.protocols.Marker):
         if construct.idl_type == "constructor":
             interfaceName = construct.parent.name
             methodName = construct.name
-            return (f"<idl data-idl-type=constructor data-idl-for='{interfaceName}' data-lt='{methodName}()'>", "</idl>")
+            return (
+                f"<idl data-idl-type=constructor data-idl-for='{interfaceName}' data-lt='{methodName}()'>",
+                "</idl>",
+            )
         return ('<a data-link-type="idl-name">', "</a>")
 
     def markup_keyword(self, text: str, construct: widlparser.Construct) -> MarkupReturnT:
