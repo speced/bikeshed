@@ -50,7 +50,7 @@ class RawText(Text):
             loc=s.loc(start),
             endLoc=s.loc(end),
             context=s.context,
-            text=text if text is not None else s[start:end],
+            text=text if text is not None else s.slice(start, end),
         )
 
     def curlifyApostrophes(self, lastNode: ParserNode | None) -> RawText:
@@ -88,7 +88,7 @@ class SafeText(Text):
             loc=s.loc(start),
             endLoc=s.loc(end),
             context=s.context,
-            text=text if text is not None else s[start:end],
+            text=text if text is not None else s.slice(start, end),
         )
 
 
