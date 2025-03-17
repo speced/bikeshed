@@ -19,7 +19,7 @@ from .nodes import (
     StartTag,
     escapeAttr,
 )
-from .preds import charRefs, isControl, isWhitespace
+from .preds import charRefs, isControl, isDigit, isWhitespace
 from .stream import Result, Stream
 
 VOID_ELEMENTS = {
@@ -208,11 +208,6 @@ def parseNode(
         if ch is not None:
             node = RawText.fromStream(s, start, i, f"&#{ord(ch)};")
             return Result(node, i)
-
-    if first1 == "<" and s.config.repositoryLinks:
-        repolink, i = parseRepositoryLink(s, start).vi
-        if repolink is not None:
-            return Result(repolink, i)
 
     if first1 == "<":
         node, i = parseAngleStart(s, start).vi
@@ -477,12 +472,43 @@ def parseLToEnd(s: Stream, start: int, lTag: StartTag) -> Result[ParserNode | li
 REPOSITORY_LINK_RE = re.compile(r"(?:([\w-]+)/([\w-]+))?#(\d+)>")
 
 
-def parseRepositoryLink(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
-    i = start + 1
-    match, i = s.matchRe(i, REPOSITORY_LINK_RE).vi
-    if match is None:
+def parseRepositoryLink(
+    s: Stream,
+    start: int,
+    org: str | None = None,
+    originalStart: int | None = None,
+) -> Result[list[ParserNode]]:
+    # Parses <#123> and <org/repo#123>.
+
+    # parseStartTag() can enter this method with the (potential) org already parsed,
+    # to avoid repeating parsing work.
+    repo: str | None
+    if org is None:
+        if s[start] != "<":
+            return Result.fail(start)
+        i = start + 1
+        repoStart, i = parseRepositoryStart(s, i).vi
+        if repoStart:
+            org, repo = repoStart
+        # failure is fine, just means it might be <#123>
+    else:
+        # Already parsed the `<org/` part...
+        assert originalStart is not None
+        repo, i = parseTagName(s, start).vi
+        # Since I'm already committed to org/repo, failure is failure.
+        if not repo:
+            return Result.fail(start)
+        start = originalStart
+    if s[i] != "#":
         return Result.fail(start)
-    org, repo, num = match.groups()
+    i += 1
+    num, i = parseDigits(s, i).vi
+    if num is None:
+        return Result.fail(start)
+    if s[i] != ">":
+        return Result.fail(start)
+    i += 1
+
     if org:
         text = f"{org}/{repo} issue #{num}"
         issueID = f"{org}/{repo}#{num}"
@@ -494,6 +520,32 @@ def parseRepositoryLink(s: Stream, start: int) -> Result[ParserNode | list[Parse
         [startTag, SafeText.fromStream(s, start + 1, i - 1, text), EndTag.fromStream(s, i - 1, i, startTag)],
         i,
     )
+
+
+def parseRepositoryStart(s: Stream, start: int) -> Result[tuple[str, str]]:
+    org, i = parseTagName(s, start).vi
+    if not org:
+        return Result.fail(start)
+    if s[i] != "/":
+        return Result.fail(start)
+    i += 1
+    repo, i = parseTagName(s, i).vi
+    if not repo:
+        return Result.fail(start)
+    return Result((org, repo), i)
+
+
+def parseDigits(s: Stream, start: int) -> Result[str]:
+    i = start
+    while not s.eof(i):
+        if not isDigit(s[i]):
+            break
+        if i > (start + 10):
+            return Result.fail(start)
+        i += 1
+    if i == start:
+        return Result.fail(start)
+    return Result(s[start:i], i)
 
 
 def parseAngleStart(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
@@ -510,7 +562,7 @@ def parseAngleStart(s: Stream, start: int) -> Result[ParserNode | list[ParserNod
 
     startTag, i = parseStartTag(s, start).vi
     if startTag is not None:
-        if isinstance(startTag, SelfClosedTag):
+        if isinstance(startTag, (SelfClosedTag, list)):
             return Result(startTag, i)
         if startTag.tag == "l":
             nodes, i = parseLToEnd(s, i, startTag).vi
@@ -565,6 +617,11 @@ def parseAngleStart(s: Stream, start: int) -> Result[ParserNode | list[ParserNod
             endTag.tag = "span"
         return Result(endTag, i)
 
+    if s.config.repositoryLinks:
+        repolink, i = parseRepositoryLink(s, start).vi
+        if repolink is not None:
+            return Result(repolink, i)
+
     return Result.fail(start)
 
 
@@ -589,7 +646,7 @@ def isDatablockPre(tag: StartTag) -> bool:
     return any(x in tag.classes for x in datablockClasses)
 
 
-def parseStartTag(s: Stream, start: int) -> Result[StartTag | SelfClosedTag]:
+def parseStartTag(s: Stream, start: int) -> Result[StartTag | SelfClosedTag | list[ParserNode]]:
     if s[start] != "<":
         return Result.fail(start)
     else:
@@ -599,8 +656,18 @@ def parseStartTag(s: Stream, start: int) -> Result[StartTag | SelfClosedTag]:
     if tagname is None:
         return Result.fail(start)
 
+    # At this point it might be an <org/repo#123> repo link,
+    # so guard against that before going further.
+    if s[i] == "/" and s.config.repositoryLinks:
+        repoLink, i = parseRepositoryLink(s, i + 1, org=tagname, originalStart=start).vi
+        if repoLink:
+            return Result(repoLink, i)
+        # If that failed, this'll just hit the "bad self-closing syntax" error path,
+        # which is fine, so let it just run its course.
+
     # After this point we're committed to a start tag,
     # so failure will really be a parse error.
+    # Or an <org/repo#123> shortlink, possibly.
 
     attrs, i = parseAttributeList(s, i).vi
     if attrs is None:
@@ -767,9 +834,6 @@ def parseQuotedAttrValue(s: Stream, start: int) -> Result[str]:
     while s[i] != endChar:
         if s.eof(i):
             m.die("Quoted attribute was never closed", lineNum=s.loc(start))
-            return Result.fail(start)
-        if ord(s[i]) == 0:
-            m.die("Unexpected U+0000 while parsing attribute value.", lineNum=s.loc(i))
             return Result.fail(start)
         if s[i] == "&":
             startRef = i
@@ -2475,7 +2539,7 @@ def parseMetadataBlock(s: Stream, start: int) -> Result[RawElement]:
     startTag, i = parseStartTag(s, start).vi
     if startTag is None:
         return Result.fail(start)
-    if isinstance(startTag, SelfClosedTag):
+    if isinstance(startTag, (SelfClosedTag, list)):
         return Result.fail(start)
     if startTag.tag not in ("pre", "xmp"):
         return Result.fail(start)
