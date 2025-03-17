@@ -289,7 +289,6 @@ class ReferenceManager:
                 linkTexts = e.allTexts
             for linkText in linkTexts:
                 linkText = h.unfixTypography(linkText)
-                linkText = re.sub(r"\s+", " ", linkText)
                 linkType = h.treeAttr(el, "data-dfn-type")
                 if linkType not in config.dfnTypes:
                     m.die(f"Unknown local dfn type '{linkType}':\n  {h.outerHTML(el)}", el=el)
