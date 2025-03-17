@@ -127,7 +127,7 @@ class Stream:
         self.startLine = startLine
         self.config = config
         self.depth = depth
-        self.openEls = TagStack()
+        self.openEls = TagStack(opaqueTags=config.opaqueElements)
         for i, char in enumerate(chars):
             if char == "\n":
                 self._lineBreaks.append(i)
@@ -289,7 +289,7 @@ class Stream:
         self.openEls.cancelShorthandOpen(startTag, sigils)
 
     def inOpaqueElement(self) -> bool:
-        return self.openEls.inOpaqueElement(self.config.opaqueElements)
+        return self.openEls.inOpaqueElement()
 
     def inTagContext(self, tagName: str) -> bool:
         return self.openEls.inTagContext(tagName)
