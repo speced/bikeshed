@@ -329,10 +329,10 @@ def parseNode(
     if s.config.cddl and not inOpaque:
         if first3 == "\\{^":
             node = RawText.fromStream(s, start, start + 3, "{^")
-            return Result(node, start + 3)
+            return Ok(node, start + 3)
         if first2 == "{^":
             cddlRes = parseAutolinkCddl(s, start)
-            if cddlRes.valid:
+            if isOk(cddlRes):
                 if inA:
                     m.die(
                         "Parsed a CDDL autolink ({^...^}) inside of an <a>. Either close the <a> properly, or escape the autolink.",
@@ -1905,15 +1905,15 @@ def parseAutolinkIdl(s: Stream, start: int) -> ResultT[ParserNode | list[ParserN
 AUTOLINK_CDDL_RE = re.compile(r".*?(?=\||\^})", flags=re.DOTALL)
 
 
-def parseAutolinkCddl(s: Stream, start: int) -> Result[ParserNode | list[ParserNode]]:
-    if s[start : start + 2] != "{^":
-        return Result.fail(start)
+def parseAutolinkCddl(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNode]]:
+    if s.slice(start, start + 2) != "{^":
+        return Err(start)
     innerStart = start + 2
 
-    data, innerEnd = parseLinkInfo(s, innerStart, "{^", "^}", AUTOLINK_CDDL_RE).vi
-    innerText = s[innerStart:innerEnd]
+    data, innerEnd, _ = parseLinkInfo(s, innerStart, "{^", "^}", AUTOLINK_CDDL_RE)
+    innerText = s.slice(innerStart, innerEnd)
     if data is None:
-        return Result.fail(start)
+        return Err(start)
     lt, linkFor, linkType = dataclasses.astuple(data)
 
     if linkType in config.cddlTypes:
@@ -1937,7 +1937,7 @@ def parseAutolinkCddl(s: Stream, start: int) -> Result[ParserNode | list[ParserN
         {
             "data-link-type": linkType,
             "data-lt": escapeAttr(lt),
-            "bs-autolink-syntax": escapeAttr(s[start : innerEnd + 2]),
+            "bs-autolink-syntax": escapeAttr(s.slice(start, innerEnd + 2)),
         },
     )
     if linkFor is not None:
@@ -1953,10 +1953,10 @@ def parseAutolinkCddl(s: Stream, start: int) -> Result[ParserNode | list[ParserN
     ).finalize()
 
     if s[innerEnd] == "|":
-        rest, nodeEnd = parseLinkText(s, innerEnd + 1, "{^", "^}", startTag).vi
+        rest, nodeEnd, _ = parseLinkText(s, innerEnd + 1, "{^", "^}", startTag)
         if rest is not None:
             endCode = EndTag.fromStream(s, nodeEnd, nodeEnd, startCode)
-            return Result([startCode, startTag, *rest, endCode], nodeEnd)
+            return Ok([startCode, startTag, *rest, endCode], nodeEnd)
         else:
             nodeEnd = innerEnd + 1
     else:
@@ -1964,7 +1964,7 @@ def parseAutolinkCddl(s: Stream, start: int) -> Result[ParserNode | list[ParserN
     middleText = RawText.fromStream(s, innerStart, innerEnd, visibleText)
     endTag = EndTag.fromStream(s, innerEnd, nodeEnd, startTag)
     endCode = EndTag.fromStream(s, nodeEnd, nodeEnd, startCode)
-    return Result([startCode, startTag, middleText, endTag, endCode], nodeEnd)
+    return Ok([startCode, startTag, middleText, endTag, endCode], nodeEnd)
 
 
 AUTOLINK_ELEMENT_RE = re.compile(r".*?(?=\||}>)", flags=re.DOTALL)
