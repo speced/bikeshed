@@ -126,6 +126,9 @@ class JCManager:
             script.data = ("linkTitleData", {})
         return script.data[1]
 
+    def addCDDLHighlighting(self) -> None:
+        self._addCSS("cddl-highlighting")
+
     def addIDLHighlighting(self) -> None:
         self._addCSS("idl-highlighting")
 
