@@ -154,6 +154,7 @@ def checkVarHygiene(doc: t.SpecT) -> None:
         for heading in h.relevantHeadings(el):
             if isAlgo(heading):
                 return heading
+            break
         return None
 
     def algoName(el: t.ElementT) -> str | None:

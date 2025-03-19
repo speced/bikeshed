@@ -1077,14 +1077,16 @@ def parse(lines: t.Sequence[Line]) -> tuple[list[Line], MetadataManager]:
     endTag = None
     md = MetadataManager()
     for line in lines:
-        if not inMetadata and re.match(r"<(pre|xmp) [^>]*class=[^>]*metadata[^>]*>", line.text):
-            inMetadata = True
-            md.hasMetadata = True
-            if line.text.startswith("<pre"):
-                endTag = r"</pre>\s*"
-            else:
-                endTag = r"</xmp>\s*"
-            continue
+        if not inMetadata and ("<pre" in line.text or "<xmp" in line.text) and "metadata" in line.text:
+            match = re.match(r"<(pre|xmp) [^>]*class=[^>]*metadata[^>]*>", line.text)
+            if match:
+                inMetadata = True
+                md.hasMetadata = True
+                if line.text.startswith("<pre"):
+                    endTag = r"</pre>\s*"
+                else:
+                    endTag = r"</xmp>\s*"
+                continue
         if inMetadata and re.match(t.cast(str, endTag), line.text):
             inMetadata = False
             continue
@@ -1095,29 +1097,28 @@ def parse(lines: t.Sequence[Line]) -> tuple[list[Line], MetadataManager]:
             if lastKey and (line.text.strip() == "" or re.match(r"\s+", line.text)):
                 # empty lines, or lines that start with 1+ spaces, continue previous key
                 md.addData(lastKey, line.text, lineNum=line.i)
-            elif re.match(r"([^:]+):(.*)", line.text):
-                match = re.match(r"([^:]+):(.*)", line.text)
-                assert match is not None
-                key = match[1].strip()
-                val = match[2].strip()
-                if key in KNOWN_KEYS and KNOWN_KEYS[key].multiline:
-                    multilineVal = True
-                elif key[0] == "!":
-                    multilineVal = True
-                else:
-                    multilineVal = False
-                md.addData(key, val, lineNum=line.i)
-                lastKey = match[1]
             else:
-                m.die(
-                    f"Incorrectly formatted metadata line:\n{line.text}",
-                    lineNum=line.i,
-                )
-                continue
-        elif re.match(r"\s*<h1[^>]*>.*?</h1>", line.text):
-            if md.title is None:
-                match = re.match(r"\s*<h1[^>]*>(.*?)</h1>", line.text)
-                assert match is not None
+                match = re.match(r"([^:]+):(.*)", line.text)
+                if match:
+                    key = match[1].strip()
+                    val = match[2].strip()
+                    if key in KNOWN_KEYS and KNOWN_KEYS[key].multiline:
+                        multilineVal = True
+                    elif key[0] == "!":
+                        multilineVal = True
+                    else:
+                        multilineVal = False
+                    md.addData(key, val, lineNum=line.i)
+                    lastKey = match[1]
+                else:
+                    m.die(
+                        f"Incorrectly formatted metadata line:\n{line.text}",
+                        lineNum=line.i,
+                    )
+                    continue
+        elif "<h1" in line.text and md.title is None:
+            match = re.match(r"\s*<h1[^>]*>(.*?)</h1>", line.text)
+            if match:
                 title = match[1]
                 md.addData("Title", title, lineNum=line.i)
             newlines.append(line)
@@ -1154,9 +1155,10 @@ def inferIndent(lines: t.Sequence[Line]) -> IndentInfo:
     for line in lines:
         # Purposely require at least two spaces; I don't
         # auto-detect single-space indents. Get help.
-        match = re.match("( {2,})", line.text)
-        if match:
-            indentSizes[len(match.group(1))] += 1
+
+        spaceCount = spaceIndentFromLine(line.text)
+        if spaceCount >= 2:
+            indentSizes[spaceCount] += 1
             info.spaceLines += 1
         elif line.text[0:1] == "\t":
             info.tabLines += 1
@@ -1189,6 +1191,17 @@ def inferIndent(lines: t.Sequence[Line]) -> IndentInfo:
         if evenDivisions:
             info.size = evenDivisions.most_common(1)[0][0]
     return info
+
+
+def spaceIndentFromLine(line: str) -> int:
+    # Returns just the whitespace prefix of a line
+    if line[0] != " ":
+        return 0
+    for i, ch in enumerate(line):
+        if ch == " ":
+            continue
+        return i
+    return len(line)
 
 
 def fromCommandLine(overrides: list[str]) -> MetadataManager:

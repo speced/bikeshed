@@ -7,67 +7,10 @@ from dataclasses import dataclass, field
 
 from ... import t
 from .nodes import TagStack
+from .result import Err, Ok, OkT, ResultT, isOk
 
 if t.TYPE_CHECKING:
     from .nodes import ParserNode, StartTag
-
-
-@dataclass
-class Failure:
-    pass
-
-
-@dataclass
-class ParseFailure(Failure):
-    details: str
-    s: Stream
-    index: int
-
-    def __str__(self) -> str:
-        return f"{self.s.loc(self.index)} {self.details}"
-
-
-ResultT_co = t.TypeVar("ResultT_co", covariant=True)
-
-
-@dataclass
-class Result(t.Generic[ResultT_co]):
-    value: ResultT_co | None
-    i: int
-    err: Failure | None = None
-
-    @property
-    def valid(self) -> bool:
-        return self.err is None
-
-    @staticmethod
-    def fail(index: int) -> Result[ResultT_co]:
-        return Result(None, index, Failure())
-
-    @staticmethod
-    def parseerror(s: Stream, index: int, details: str) -> Result[ResultT_co]:
-        return Result(None, index, ParseFailure(details, s, index))
-
-    @property
-    def vi(self) -> tuple[ResultT_co | None, int]:
-        # Returns a tuple of the value and index for easy
-        # destructuring.
-        # If error, value is None for simple detection;
-        # use .vie if None is a valid value.
-        if self.err:
-            value = None
-        else:
-            value = self.value
-        return (value, self.i)
-
-    @property
-    def vie(self) -> tuple[ResultT_co | None, int, Failure | None]:
-        # Like .vi, but returns the error as the third tuple item.
-        if self.err:
-            value = None
-        else:
-            value = self.value
-        return (value, self.i, self.err)
 
 
 @dataclass
@@ -129,7 +72,7 @@ class Stream:
         self.startLine = startLine
         self.config = config
         self.depth = depth
-        self.openEls = TagStack()
+        self.openEls = TagStack(opaqueTags=config.opaqueElements)
         for i, char in enumerate(chars):
             if char == "\n":
                 self._lineBreaks.append(i)
@@ -138,19 +81,17 @@ class Stream:
         newConfig = dataclasses.replace(self.config, context=context)
         return Stream(chars, config=newConfig, startLine=startLine, depth=self.depth + 1)
 
-    def __getitem__(self, key: int | slice) -> str:
-        if isinstance(key, int):
-            if key < 0:
-                return ""
-        else:
-            if key.start and key.start < 0:
-                key = slice(0, key.stop, key.step)
-            if key.stop and key.stop < 0:
-                key = slice(key.start, 0, key.step)
-        try:
-            return self._chars[key]
-        except IndexError:
+    def __getitem__(self, key: int) -> str:
+        if key < 0 or key >= self._len:
             return ""
+        return self._chars[key]
+
+    def slice(self, start: int | None, stop: int | None) -> str:
+        if start is not None and start < 0:
+            start = 0
+        if stop is not None and stop < 0:
+            stop = 0
+        return self._chars[start:stop]
 
     def eof(self, index: int) -> bool:
         return index >= self._len
@@ -180,50 +121,50 @@ class Stream:
             return rc
         return f"{rc} of {self.config.context}"
 
-    def skipTo(self, start: int, text: str) -> Result[str]:
+    def skipTo(self, start: int, text: str) -> ResultT[str]:
         # Skip forward until encountering `text`.
         # Produces the text encountered before this point.
         i = start
         textLen = len(text)
         while not self.eof(i):
-            if self[i : i + textLen] == text:
+            if self.slice(i, i + textLen) == text:
                 break
             i += 1
-        if self[i : i + textLen] == text:
-            return Result(self[start:i], i)
+        if self.slice(i, i + textLen) == text:
+            return Ok(self.slice(start, i), i)
         else:
-            return Result.fail(start)
+            return Err(start)
 
-    def skipToSameLine(self, start: int, text: str) -> Result[str]:
+    def skipToSameLine(self, start: int, text: str) -> ResultT[str]:
         # Skips forward, but no further than the end of the current line.
         # Produces the text encounted before this point.
         i = start
         textLen = len(text)
         while not self.eof(i) and self[i] != "\n":
-            if self[i : i + textLen] == text:
-                return Result(self[start:i], i)
+            if self.slice(i, i + textLen) == text:
+                return Ok(self.slice(start, i), i)
             i += 1
-        return Result.fail(start)
+        return Err(start)
 
-    def matchRe(self, start: int, pattern: re.Pattern) -> Result[re.Match]:
+    def matchRe(self, start: int, pattern: re.Pattern) -> ResultT[re.Match]:
         match = pattern.match(self._chars, start)
         if match:
-            return Result(match, match.end())
+            return Ok(match, match.end())
         else:
-            return Result.fail(start)
+            return Err(start)
 
-    def searchRe(self, start: int, pattern: re.Pattern) -> Result[re.Match]:
+    def searchRe(self, start: int, pattern: re.Pattern) -> ResultT[re.Match]:
         match = pattern.search(self._chars, start)
         if match:
-            return Result(match, match.end())
+            return Ok(match, match.end())
         else:
-            return Result.fail(start)
+            return Err(start)
 
-    def skipToNextLine(self, start: int) -> Result[str]:
+    def skipToNextLine(self, start: int) -> OkT[str]:
         # Skips to the next line.
         # Produces the leftover text on the current line.
         textAfter = self.remainingTextOnLine(start)
-        return Result(textAfter, start + len(textAfter))
+        return Ok(textAfter, start + len(textAfter))
 
     def precedingLinebreakIndex(self, start: int) -> int:
         # Index in self._lineBreaks of the linebreak preceding `start`.
@@ -255,21 +196,21 @@ class Stream:
 
     def precedingTextOnLine(self, start: int) -> str:
         # The text on the current line before the start point.
-        return self[self.currentLineStart(start) : start]
+        return self.slice(self.currentLineStart(start), start)
 
     def remainingTextOnLine(self, start: int) -> str:
         # The text on the current line from the start point on.
         # Includes the newline, if present.
-        return self[start : self.nextLineStart(start)]
+        return self.slice(start, self.nextLineStart(start))
 
-    def observeResult(self, res: Result[ParserNode | list[ParserNode]]) -> Result[ParserNode | list[ParserNode]]:
-        if res.value is None:
-            pass
-        elif isinstance(res.value, list):
-            for node in res.value:
-                self.observeNode(node)
-        else:
-            self.observeNode(res.value)
+    def observeResult(self, res: ResultT[ParserNode | list[ParserNode]]) -> ResultT[ParserNode | list[ParserNode]]:
+        if isOk(res):
+            val, _, _ = res
+            if isinstance(val, list):
+                for node in val:
+                    self.observeNode(node)
+            else:
+                self.observeNode(val)
         return res
 
     def observeNode(self, node: ParserNode) -> ParserNode:
@@ -291,7 +232,7 @@ class Stream:
         self.openEls.cancelShorthandOpen(startTag, sigils)
 
     def inOpaqueElement(self) -> bool:
-        return self.openEls.inOpaqueElement(self.config.opaqueElements)
+        return self.openEls.inOpaqueElement()
 
     def inTagContext(self, tagName: str) -> bool:
         return self.openEls.inTagContext(tagName)

@@ -48,6 +48,7 @@ if TYPE_CHECKING:
         NotRequired,
         Required,
         Self,
+        TypeIs,
     )
 
     ElementT: TypeAlias = etree._Element

@@ -3,7 +3,8 @@ from __future__ import annotations
 import dataclasses
 import re
 from abc import ABCMeta, abstractmethod
-from dataclasses import dataclass, field
+from collections import Counter
+from dataclasses import InitVar, dataclass, field
 
 from ... import messages as m
 from ... import t
@@ -49,7 +50,7 @@ class RawText(Text):
             loc=s.loc(start),
             endLoc=s.loc(end),
             context=s.context,
-            text=text if text is not None else s[start:end],
+            text=text if text is not None else s.slice(start, end),
         )
 
     def curlifyApostrophes(self, lastNode: ParserNode | None) -> RawText:
@@ -87,7 +88,7 @@ class SafeText(Text):
             loc=s.loc(start),
             endLoc=s.loc(end),
             context=s.context,
-            text=text if text is not None else s[start:end],
+            text=text if text is not None else s.slice(start, end),
         )
 
 
@@ -325,17 +326,30 @@ def escapeAttr(text: str) -> str:
 @dataclass
 class TagStack:
     tags: list[TagStackEntry] = field(default_factory=list)
+    opaqueTags: set[str] = field(default_factory=lambda: {"pre", "xmp", "script", "style"})
+    _opaqueCount: int = 0
+    _tagCounts: Counter[str] = field(default_factory=Counter)
 
     def printOpenTags(self) -> list[str]:
         return [f"{x.name} at {x.startTag.loc}" for x in self.tags]
 
-    def inOpaqueElement(self, opaqueTags: t.Collection[str] | None = None) -> bool:
-        if opaqueTags is None:
-            opaqueTags = {"pre", "xmp", "script", "style"}
-        return any(x.startTag.tag in opaqueTags or "bs-opaque" in x.startTag.attrs for x in self.tags)
+    def inOpaqueElement(self) -> bool:
+        return self._opaqueCount > 0
 
     def inTagContext(self, tagName: str) -> bool:
-        return any(x.startTag.tag == tagName for x in self.tags)
+        return self._tagCounts[tagName] > 0
+
+    def pushEntry(self, entry: TagStackEntry) -> None:
+        self.tags.append(entry)
+        if entry.isOpaque:
+            self._opaqueCount += 1
+        self._tagCounts[entry.startTag.tag] += 1
+
+    def popEntry(self) -> None:
+        entry = self.tags.pop()
+        if entry.isOpaque:
+            self._opaqueCount -= 1
+        self._tagCounts[entry.startTag.tag] -= 1
 
     def update(self, node: ParserNode) -> None:
         # Updates the stack based on the passed node.
@@ -343,7 +357,7 @@ class TagStack:
         # Auto-closing tags mean start tags can also pop from the stack.
         if isinstance(node, StartTag):
             self.autoCloseStart(node.tag)
-            self.tags.append(TagStackEntry(node))
+            self.pushEntry(TagStackEntry(node, self.opaqueTags))
             return
         elif isinstance(node, EndTag):
             self.autoCloseEnd(node.tag)
@@ -352,7 +366,7 @@ class TagStack:
                 and self.tags[-1].startTag.tag == node.tag
                 and not isinstance(self.tags[-1], TagStackShorthandEntry)
             ):
-                self.tags.pop()
+                self.popEntry()
             else:
                 if node.tag in ("html", "head", "body", "main"):
                     # If your boilerplate closes these for safety,
@@ -376,12 +390,11 @@ class TagStack:
             self.autoCloseStart(node.tag)
 
     def updateShorthandOpen(self, startTag: StartTag, sigils: tuple[str, str]) -> None:
-        entry = TagStackShorthandEntry(startTag, sigils)
-        self.tags.append(entry)
+        self.pushEntry(TagStackShorthandEntry(startTag, self.opaqueTags, sigils))
 
     def updateShorthandClose(self, loc: str, startTag: StartTag, sigils: tuple[str, str]) -> None:
         if self.tags and self.tags[-1].startTag == startTag:
-            self.tags.pop()
+            self.popEntry()
             return
         shorthand = sigils[0] + "..." + sigils[1]
         if any(x.startTag == startTag for x in self.tags):
@@ -390,9 +403,9 @@ class TagStack:
                 lineNum=loc,
             )
             while self.tags and self.tags[-1].startTag != startTag:
-                self.tags.pop()
+                self.popEntry()
             if self.tags:
-                self.tags.pop()
+                self.popEntry()
         else:
             m.die(
                 f"PROGRAMMING ERROR: Tried to close a {shorthand} shorthand, but there's no matching open tag on the stack of open elements. Please report this!",
@@ -408,8 +421,8 @@ class TagStack:
             )
             return
         while self.tags and self.tags[-1].startTag != startTag:
-            self.tags.pop()
-        self.tags.pop()
+            self.popEntry()
+        self.popEntry()
 
     def autoCloseStart(self, tag: str) -> None:
         # Handle any auto-closing that occurs as a result
@@ -578,12 +591,20 @@ class TagStack:
         if not self.tags:
             return
         if self.tags[-1].startTag.tag in tags:
-            self.tags.pop()
+            self.popEntry()
 
 
 @dataclass
 class TagStackEntry:
     startTag: StartTag
+    opaqueTags: InitVar[set[str]]
+    isOpaque: bool = field(init=False)
+
+    def __post_init__(self, opaqueTags: set[str]) -> None:
+        if self.startTag.tag in opaqueTags or "bs-opaque" in self.startTag.attrs:
+            self.isOpaque = True
+        else:
+            self.isOpaque = False
 
     @property
     def name(self) -> str:

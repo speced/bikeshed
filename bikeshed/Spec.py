@@ -582,9 +582,9 @@ def checkForMixedIndents(lines: t.Sequence[l.Line], info: metadata.IndentInfo) -
             continue
         if line.text.startswith(badIndentChar):
             if info.char == " ":
-                m.lint(f"Your document appears to use spaces to indent, but line {line.i} starts with tabs.")
+                m.lint("Line starts with tabs, but document is space-indented", lineNum=line.i)
             else:
-                m.lint(f"Your document appears to use tabs to indent, but line {line.i} starts with spaces.")
+                m.lint("Line starts with spaces, but document is tab-indented", lineNum=line.i)
         if re.match(r"(\t+ +\t)|( +\t)", line.text):
             m.lint(f"Line {line.i}'s indent contains tabs after spaces.")
 

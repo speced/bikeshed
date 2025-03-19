@@ -1,3 +1,4 @@
+from . import result
 from .main import (
     debugNodes,
     initialDocumentParse,
@@ -22,9 +23,6 @@ from .nodes import (
     Text,
 )
 from .stream import (
-    Failure,
     ParseConfig,
-    ParseFailure,
-    Result,
     Stream,
 )
