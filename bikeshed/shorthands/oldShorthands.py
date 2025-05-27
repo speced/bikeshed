@@ -38,7 +38,7 @@ def transformMarkdownIB(doc: t.SpecT) -> None:
                 addedNodes.append(node)
         return nodes
 
-    transformElement(doc.document.getroot())
+    transformElement(doc.document)
     for node in addedNodes:
         if h.isElement(node):
             addLineNumber(node)

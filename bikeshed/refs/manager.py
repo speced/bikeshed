@@ -685,7 +685,7 @@ class ReferenceManager:
         depth: int = 0,
     ) -> biblio.BiblioEntry | None:
         if depth > 100:
-            m.die(f"Data error in biblio files; infinitely recursing trying to find [{text}].")
+            m.die(f"Data error in biblio files; infinitely recursing trying to find [{text}].", el=el)
             return None
         key = text.lower()
         if status is None:
@@ -723,6 +723,7 @@ class ReferenceManager:
                 numericSuffixes = self.biblioNumericSuffixes[unversionedKey]
                 m.die(
                     f"A biblio link references {text}, but only {config.englishFromList(numericSuffixes)} exists in SpecRef.",
+                    el=el,
                 )
             return None
 
@@ -735,7 +736,7 @@ class ReferenceManager:
             newBib = self.getBiblioRef(bib.aliasOf, status=status, el=el, quiet=True, depth=depth + 1)
             if newBib is None:
                 if not quiet:
-                    m.die(f"Biblio ref [{text}] claims to be an alias of [{bib.aliasOf}], which doesn't exist.")
+                    m.die(f"Biblio ref [{text}] claims to be an alias of [{bib.aliasOf}], which doesn't exist.", el=el)
                 return None
             else:
                 bib = newBib
@@ -755,11 +756,13 @@ class ReferenceManager:
                     if not quiet:
                         m.die(
                             f"[{bib.linkText}] claims to be obsoleted by [{bib.obsoletedBy}], which doesn't exist. Either change the reference, of use [{bib.linkText} obsolete] to ignore the obsoletion chain.",
+                            el=el,
                         )
                     return None
                 if not quiet:
                     m.linkerror(
                         f"Obsolete biblio ref: [{bib.linkText}] is replaced by [{newBib.linkText}]. Either update the reference, or use [{bib.linkText} obsolete] if this is an intentionally-obsolete reference.",
+                        el=el,
                     )
                 bib = newBib
 

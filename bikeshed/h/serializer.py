@@ -95,11 +95,11 @@ class Serializer:
         self.opaqueEls = frozenset(opaqueElements)
         self.blockEls = frozenset(blockElements)
 
-    def serialize(self, tree: t.DocumentT) -> str:
+    def serialize(self, root: t.ElementT) -> str:
         output = io.StringIO()
         writer = output.write
         writer("<!doctype html>")
-        self._serializeEl(tree.getroot(), writer)
+        self._serializeEl(root, writer)
         s = output.getvalue()
         output.close()
         return s
@@ -107,7 +107,9 @@ class Serializer:
     def unfuckName(self, n: str) -> str:
         # LXML does namespaces stupidly
         if n.startswith("{"):
-            return n.partition("}")[2]
+            n = n.partition("}")[2]
+        if n == "clippath":
+            n = "clipPath"
         return n
 
     def groupIntoBlocks(self, nodes: t.Iterable[t.NodeT]) -> Blocks:
@@ -138,6 +140,8 @@ class Serializer:
                 # Skip bs- prefixed attributes, as they're used
                 # for Bikeshed-internal purposes.
                 continue
+            if attrName == "viewbox":
+                attrName = "viewBox"
             if attrVal == "":
                 strs.append(" " + self.unfuckName(str(attrName)))
             elif attrName == "class" and " " in attrVal:

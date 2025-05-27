@@ -29,14 +29,64 @@ def nodesFromHtml(data: str, config: ParseConfig, startLine: int = 1) -> t.Gener
     yield from nodesFromStream(s, 0)
 
 
-def initialDocumentParse(text: str, config: ParseConfig, startLine: int = 1) -> list[ParserNode]:
+def initialDocumentParse(
+    text: str,
+    config: ParseConfig,
+    startLine: int = 1,
+) -> tuple[list[ParserNode], list[StartTag]]:
     # Just do a document parse.
-    # This will add `bs-line-number` attributes,
-    # normalize any difficult shorthands
-    # (ones that look like tags, or that contain raw text),
-    # and blank out comments.
+    # * adds `bs-line-number` and `bs-parse-context` attributes, for error messages
+    # * converts any inline Bikeshed-isms into HTML (autolinks, markdown, etc)
+    # * blank out comments so they can't interfere with other passes
+    # * close any left-open elements, logging an error
+    # * check if there are any html/head/body elements and error
 
-    return list(nodesFromHtml(text, config, startLine=startLine))
+    s = Stream(text, startLine=startLine, config=config)
+    nodes = list(nodesFromStream(s, 0))
+    nodes.extend(closeOpenElements(s))
+    for node in nodes:
+        if isinstance(node, StartTag) and node.tag in ("html", "head", "body"):
+            return extractStructuralNodes(nodes)
+    return nodes, []
+
+
+def extractStructuralNodes(nodes: list[ParserNode]) -> tuple[list[ParserNode], list[StartTag]]:
+    # The html5lib parser properly merged html/head/body elements together,
+    # but lxml parser doesn't. So I need to instead yank those tags out of
+    # the document, so they can be manually merged in later and won't screw
+    # with parsing otherwise.
+    normalNodes: list[ParserNode] = []
+    structuralNodes: list[StartTag] = []
+    for node in nodes:
+        if isinstance(node, StartTag) and node.tag in ("html", "head", "body"):
+            structuralNodes.append(node)
+        elif isinstance(node, EndTag) and node.tag in ("html", "head", "body"):
+            pass
+        else:
+            normalNodes.append(node)
+    return normalNodes, structuralNodes
+
+
+def closeOpenElements(s: Stream) -> list[EndTag]:
+    nodes = []
+    i = s._len
+    if s.openEls.tags and s.openEls.tags[-1].startTag.tag == "p":
+        # A final open <p> is fine, it's meant to auto-close itself
+        entry = s.openEls.popEntry()
+        nodes.append(EndTag.fromStream(s, i, i, entry.startTag))
+    # If there's still stuff open, tho, that's a problem
+    if s.openEls.tags:
+        if len(s.openEls.tags) == 1:
+            entry = s.openEls.tags[0]
+            msg = f"<{entry.startTag.tag}> element was still open at the end of your document."
+            m.die(msg, lineNum=entry.startTag.loc)
+        else:
+            msg = f"{len(s.openEls.tags)} elements were still open at the end of your document.\nOpen tags: {', '.join(s.openEls.printOpenTags())}"
+            m.die(msg)
+        while s.openEls.tags:
+            entry = s.openEls.popEntry()
+            nodes.append(EndTag.fromStream(s, i, i, entry.startTag))
+    return nodes
 
 
 def strFromNodes(nodes: t.Iterable[ParserNode], withIlcc: bool = False) -> str:

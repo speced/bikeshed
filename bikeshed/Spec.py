@@ -143,7 +143,7 @@ class Spec:
         #       I should do something about that
         # TODO: Pure textual hack, no way to, say, put a block
         #       in a markdown code span or an <xmp> to show off.
-        _, self.mdDocument = metadata.parse(lines=inputContent.lines)
+        self.lines, self.mdDocument = metadata.parse(lines=inputContent.lines)
 
         # Combine the data so far, and compute the doctype
         # (the other md sources need the doctype in order to be found)
@@ -188,7 +188,8 @@ class Spec:
 
     def earlyParse(self, inputContent: InputSource.InputContent) -> list[l.Line]:
         text = FIXMEreplaceMarkdownBlockquotes(inputContent.content)
-        nodes = h.initialDocumentParse(text, h.ParseConfig.fromSpec(self))
+        nodes, structuralNodes = h.initialDocumentParse(text, h.ParseConfig.fromSpec(self))
+        self.structuralNodes = structuralNodes
         if self.debug:
             h.debugNodes(nodes)
         text = h.strFromNodes(nodes, withIlcc=True)
@@ -214,6 +215,7 @@ class Spec:
 
         # Remove the metadata
         # FIXME: This should be done the first time I parse metadata.
+        # It's just a little awkward due to the data structures I'm working with.
         self.lines, _ = metadata.parse(lines=self.lines)
         extensions.load(self)
 
@@ -227,7 +229,8 @@ class Spec:
 
         # Deal with further <pre> blocks, and markdown
         self.lines = datablocks.transformDataBlocks(self, self.lines)
-
+        if self.debug:
+            print("".join(x.text for x in self.lines))  # noqa: T201
         if "markdown-block" in self.md.markupShorthands:
             markdownFeatures: set[str] = {"headings"}
             self.lines = markdown.parse(
@@ -245,13 +248,8 @@ class Spec:
         boilerplate.addHeaderFooter(self)
 
         # Build the document
-        self.document = h.parseDocument(self.html)
-        headEl = h.find("head", self)
-        bodyEl = h.find("body", self)
-        assert headEl is not None
-        assert bodyEl is not None
-        self.head = headEl
-        self.body = bodyEl
+        self.document, self.head, self.body = h.parseDocument(self.html, self.structuralNodes)
+        # print(h.printNodeTree(self.document))
         u.correctFrontMatter(self)
         includes.processInclusions(self)
         metadata.parseDoc(self)

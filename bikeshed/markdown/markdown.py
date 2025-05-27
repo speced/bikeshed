@@ -3,7 +3,7 @@ from __future__ import annotations
 import functools
 import re
 
-from .. import constants, h, t
+from .. import constants, t
 from .. import line as l
 from .. import messages as m
 
@@ -69,11 +69,17 @@ def parse(
         opaqueElements=opaqueElements,
         blockElements=blockElements,
     )
-    html = parseTokens(tokens, numSpacesForIndentation)
+    parsedLines = parseTokens(tokens, numSpacesForIndentation)
+    for line in parsedLines:
+        if constants.virtualEndTagStartChar in line.text:
+            line.text = line.text.replace(constants.virtualEndTagStartChar, "").replace(
+                constants.virtualEndTagEndChar,
+                "",
+            )
     if fromStrings:
-        return [x.text for x in html]
+        return [x.text for x in parsedLines]
     else:
-        return html
+        return parsedLines
 
 
 def tokenizeLines(
@@ -152,20 +158,26 @@ def tokenizeLines(
 
     tokens: list[TokenT] = []
     rawStack: list[RawTokenT] = []
-    rawElements = "|".join(re.escape(x) for x in opaqueElements)
+    rawElementStartRe = re.compile(
+        rf"""
+        \s*
+        (?={constants.virtualEndTagStartChar}</\w+>{constants.virtualEndTagEndChar})*
+        <({"|".join(opaqueElements)})[ >]
+        """,
+        re.X,
+    )
 
     for i, line in enumerate(lines):
         # Skip lines that are entirely a censored comment.
         if line.text.strip() == constants.bsComment:
             continue
 
-        # Three kinds of "raw" elements, which prevent markdown processing inside of them.
+        # Two kinds of "raw" elements, which prevent markdown processing inside of them.
         # 1. <pre> and manual opaque elements, which can contain markup and so can nest.
-        # 2. <xmp>, <script>, and <style>, which contain raw text, can't nest.
-        # 3. Markdown code blocks, which contain raw text, can't nest.
+        # 2. <script>, and <style>, which contain raw text, can't nest.
         #
         # The rawStack holds tokens like
-        # {"type":"fenced", "tag":"````", "nest":False}
+        # {"type":"element", "tag":"</script>`", "nest":False}
 
         # TODO: when i pop the last rawstack, collect all the raw tokens in sequence and remove their indentation. gonna need to track the index explicitly, since a raw might end on one line and start on the next again, so i can't just walk backwards.
         if rawStack:
@@ -174,9 +186,6 @@ def tokenizeLines(
             endTag = rawStack[-1]
             if lineEndsRawBlock(line, endTag):
                 rawStack.pop()
-                if endTag["type"] == "fenced":
-                    stripCommonWsPrefix(tokens[endTag["start"] + 1 :])
-                    line.text = "</xmp>"
                 tokens.append({"type": "raw", "prefixlen": float("inf"), "line": line})
                 continue
             elif not endTag["nest"]:
@@ -187,28 +196,9 @@ def tokenizeLines(
 
         # We're either in a nesting raw element or not in a raw element at all,
         # so check if the line starts a new element.
-        match = re.match(r"(\s*)(`{3,}|~{3,})([^`]*)$", line.text)
+        match = re.match(rawElementStartRe, line.text)
         if match:
-            ws, tag, infoString = match.groups()
-            rawStack.append({"type": "fenced", "tag": tag, "nest": False, "start": i})
-            infoString = infoString.strip()
-            if infoString:
-                # For now, I only care about lang
-                lang = infoString.split(" ")[0]
-                classAttr = f" class='language-{h.escapeAttr(lang)}'"
-            else:
-                classAttr = ""
-            line.text = f"{ws}<xmp{classAttr}>"
-            tokens.append(
-                {
-                    "type": "raw",
-                    "prefixlen": prefixCount(ws, numSpacesForIndentation),
-                    "line": line,
-                },
-            )
-            continue
-        match = re.match(rf"\s*<({rawElements})[ >]", line.text)
-        if match:
+            tagName = match[1]
             tokens.append(
                 {
                     "type": "raw",
@@ -216,7 +206,7 @@ def tokenizeLines(
                     "line": line,
                 },
             )
-            if re.search(r"</({})>".format(match.group(1)), line.text):
+            if re.search(rf"</({tagName})>", line.text):
                 # Element started and ended on same line, cool, don't need to do anything.
                 pass
             else:
@@ -224,7 +214,7 @@ def tokenizeLines(
                 rawStack.append(
                     {
                         "type": "element",
-                        "tag": "</{}>".format(match.group(1)),
+                        "tag": "</{}>".format(tagName),
                         "nest": nest,
                     },
                 )
@@ -295,7 +285,7 @@ def tokenizeLines(
             assert match is not None
             token = {"type": "blockquote", "text": match.group(1)}
         elif re.match(r"<", lineText):
-            if re.match(r"<<|<\{", lineText) or inlineElementStart(lineText):
+            if inlineElementStart(lineText):
                 token = {"type": "text", "text": lineText}
             else:
                 token = {"type": "htmlblock"}
@@ -314,7 +304,7 @@ def tokenizeLines(
             print(  # noqa: T201
                 f"{' '*(2-len(str(i)))}{i} {' ' * (11 - len(token['type']))}{token['type']}: {token['line'].text.rstrip()}",
             )
-
+        print("==================")  # noqa: T201
     return tokens
 
 
@@ -361,12 +351,7 @@ def stripPrefix(token: TokenT, numSpacesForIndentation: int, len: int) -> str:
 
 
 def lineEndsRawBlock(line: l.Line, rawToken: RawTokenT) -> bool:
-    elementEnds = bool(rawToken["type"] == "element" and re.search(rawToken["tag"], line.text))
-    fencedEnds = bool(
-        rawToken["type"] == "fenced"
-        and re.match(r"\s*{}{}*\s*$".format(rawToken["tag"], rawToken["tag"][0]), line.text),
-    )
-    return elementEnds or fencedEnds
+    return rawToken["type"] == "element" and rawToken["tag"] in line.text
 
 
 def stripCommonWsPrefix(tokens: list[TokenT]) -> list[TokenT]:
