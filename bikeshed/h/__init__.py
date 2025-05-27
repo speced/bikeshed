@@ -56,6 +56,7 @@ from .dom import (
     outerHTML,
     parentElement,
     parseDocument,
+    parseElements,
     parseHTML,
     prependChild,
     previousElements,

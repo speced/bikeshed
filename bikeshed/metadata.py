@@ -26,8 +26,8 @@ if t.TYPE_CHECKING:
 
 @dataclasses.dataclass
 class LinkCheckerTimeout:
-    each: int = 5
-    total: int = 10
+    each: int | float = 5
+    total: int | float = 10
 
 
 class MetadataManager:
@@ -1056,13 +1056,13 @@ def parseIgnoreMdnFailure(key: str, val: str, lineNum: str | int | None) -> list
 def parseLinkCheckerTimeout(key: str, val: str, lineNum: str | int | None) -> LinkCheckerTimeout:
     vals = val.strip().split()
     if len(vals) != 2:
-        m.die(f"Link Checker Timeout metadata needs exactly two integers. Got: '{val}'.", lineNum=lineNum)
+        m.die(f"Link Checker Timeout metadata needs exactly two numbers. Got: '{val}'.", lineNum=lineNum)
         return LinkCheckerTimeout()
     try:
-        each = int(vals[0])
-        total = int(vals[1])
+        each = float(vals[0])
+        total = float(vals[1])
     except ValueError:
-        m.die(f"Link Checker Timeout metadata needs exactly two integers. Got: '{val}'.", lineNum=lineNum)
+        m.die(f"Link Checker Timeout metadata needs exactly two numbers. Got: '{val}'.", lineNum=lineNum)
         return LinkCheckerTimeout()
     return LinkCheckerTimeout(each, total)
 

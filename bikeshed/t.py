@@ -52,7 +52,6 @@ if TYPE_CHECKING:
     )
 
     ElementT: TypeAlias = etree._Element
-    DocumentT: TypeAlias = etree._ElementTree
     NodeT: TypeAlias = str | ElementT
 
     # In many places I treat lists as an "anonymous" element

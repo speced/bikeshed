@@ -1,12 +1,11 @@
 # pylint: disable=unused-argument
 from __future__ import annotations
 
+import dataclasses
 import io
 import re
 from collections import OrderedDict, defaultdict
 from functools import reduce
-
-import attr
 
 from . import biblio, config, constants, h, printjson, railroadparser, refs, t
 from . import messages as m
@@ -31,6 +30,14 @@ if t.TYPE_CHECKING:
             lineNum: int | None,
             doc: t.SpecT,
         ) -> list[str]: ...
+
+
+def processRawElement(node: h.parser.RawElement, s: h.parser.Stream, start: int) -> h.parser.RawElement:
+    # FIXME: Move datablock transforming here (invoked from the parser)
+    # rather than doing an additional pass of my own.
+    # Doing it myself is fragile, as it's currently affecting things in
+    # <script> tags, for example.
+    return node
 
 
 if t.TYPE_CHECKING:
@@ -92,13 +99,14 @@ def transformDataBlocks(doc: t.SpecT, lines: list[Line] | list[str]) -> list[Lin
         if line.text.strip() == constants.bsComment:
             continue
         # Look for the start of a block.
-        match = re.match(r"\s*<(pre|xmp)[\s>]", line.text, re.I)
+        match = re.search(r"<(pre|xmp)[\s>].*", line.text, re.I)
         # Note that, by design, I don't pay attention to anything on the same line as the start tag,
         # unless it's single-line.
         if match and not inBlock:
+            tagToEnd = match[0]
             inBlock = True
-            tagName = match.group(1)
-            blockClasses = classesFromLine(line)
+            tagName = match[1]
+            blockClasses = classesFromLine(tagToEnd, line.i)
             seenClasses: list[str] = []
             for blockType in blockTypes:
                 if blockType in blockClasses:
@@ -122,21 +130,22 @@ def transformDataBlocks(doc: t.SpecT, lines: list[Line] | list[str]) -> list[Lin
             inBlock = False
             if len(blockLines) == 0:
                 # Single-line <pre>.
-                match = re.match(r"(\s*<{0}[^>]*>)(.*)</{0}>(.*)".format(tagName), line.text, re.I)
+                match = re.match(r"(\s*)(.*?)(<{0}[^>]*>)(.*)</{0}>(.*)".format(tagName), line.text, re.I)
                 if not match:
                     m.die(f"Can't figure out how to parse this datablock line:\n{line.text}", lineNum=line.i)
                     blockLines = []
                     continue
+                indent, beforeStartTag, startTag, tagContent, afterEndTag = match.groups()
                 repl = blockTypes[blockType](
-                    lines=[match.group(2)],
+                    lines=[tagContent],
                     tagName=tagName,
-                    firstLine=match.group(1),
+                    firstLine=indent + startTag,
                     lineNum=line.i,
                     doc=doc,
                 )
+                newLines.append(Line(line.i, beforeStartTag))
                 newLines.extend(Line(line.i, x) for x in repl)
-                line.text = match.group(3)
-                newLines.append(line)
+                newLines.append(Line(line.i, afterEndTag))
             elif re.match(r"^\s*$", match.group(1)):
                 # End tag was the first tag on the line.
                 # Remove the tag from the line.
@@ -256,7 +265,8 @@ def transformSimpleDef(lines: list[str], tagName: str, firstLine: str, lineNum: 
     lineNumAttr = ""
     if lineNum is not None:
         lineNumAttr = f" bs-line-number={lineNum}"
-    ret = [f"<table class='def'{lineNumAttr}>"]
+    ret = [f"<table class='def'{lineNumAttr}><tbody>"]
+    # parseConfig = h.ParseConfig.fromSpec(doc, f"generated table from simpledef block (on line {lineNum})")
     for key, val in rows.items():
         ret.append(f"<tr><th>{key}<td>{val}")
     ret.append("</table>")
@@ -285,7 +295,7 @@ def transformPropdef(lines: list[str], tagName: str, firstLine: str, lineNum: in
         attrs["Name"] = None
         attrs["New values"] = None
         ret = [
-            "<table class='def propdef partial'{forHint}{lineNumAttr}>".format(
+            "<table class='def propdef partial'{forHint}{lineNumAttr}><tbody>".format(
                 forHint=forHint,
                 lineNumAttr=lineNumAttr,
             ),
@@ -303,7 +313,9 @@ def transformPropdef(lines: list[str], tagName: str, firstLine: str, lineNum: in
         ]:
             attrs[defaultKey] = "see individual properties"
         attrs["Canonical order"] = "per grammar"
-        ret = ["<table class='def propdef'{forHint}{lineNumAttr}>".format(forHint=forHint, lineNumAttr=lineNumAttr)]
+        ret = [
+            "<table class='def propdef'{forHint}{lineNumAttr}><tbody>".format(forHint=forHint, lineNumAttr=lineNumAttr),
+        ]
     else:
         attrs["Name"] = None
         attrs["Value"] = None
@@ -314,7 +326,9 @@ def transformPropdef(lines: list[str], tagName: str, firstLine: str, lineNum: in
         attrs["Computed value"] = "as specified"
         attrs["Canonical order"] = "per grammar"
         attrs["Animation type"] = None
-        ret = ["<table class='def propdef'{forHint}{lineNumAttr}>".format(forHint=forHint, lineNumAttr=lineNumAttr)]
+        ret = [
+            "<table class='def propdef'{forHint}{lineNumAttr}><tbody>".format(forHint=forHint, lineNumAttr=lineNumAttr),
+        ]
     # We are in the process of migrating specs from using 'Animatable' to
     # using 'Animation type'. If we find 'Animatable' in the parsed attributes,
     # drop the default 'Animation type' entry.
@@ -388,7 +402,7 @@ def transformDescdef(lines: list[str], tagName: str, firstLine: str, lineNum: in
     if "partial" in firstLine or "New values" in vals:
         requiredKeys = ["Name", "For"]
         ret = [
-            "<table class='def descdef partial' data-dfn-for='{0}'{lineNumAttr}>".format(
+            "<table class='def descdef partial' data-dfn-for='{0}'{lineNumAttr}><tbody>".format(
                 vals.get("For", ""),
                 lineNumAttr=lineNumAttr,
             ),
@@ -396,7 +410,7 @@ def transformDescdef(lines: list[str], tagName: str, firstLine: str, lineNum: in
     if "mq" in firstLine:
         requiredKeys = ["Name", "For", "Value"]
         ret = [
-            "<table class='def descdef mq' data-dfn-for='{0}'{lineNumAttr}>".format(
+            "<table class='def descdef mq' data-dfn-for='{0}'{lineNumAttr}><tbody>".format(
                 vals.get("For", ""),
                 lineNumAttr=lineNumAttr,
             ),
@@ -404,7 +418,7 @@ def transformDescdef(lines: list[str], tagName: str, firstLine: str, lineNum: in
     else:
         requiredKeys = ["Name", "For", "Value", "Initial"]
         ret = [
-            "<table class='def descdef' data-dfn-for='{0}'{lineNumAttr}>".format(
+            "<table class='def descdef' data-dfn-for='{0}'{lineNumAttr}><tbody>".format(
                 vals.get("For", ""),
                 lineNumAttr=lineNumAttr,
             ),
@@ -466,7 +480,7 @@ def transformElementdef(lines: list[str], tagName: str, firstLine: str, lineNum:
     attrs["Content model"] = None
     attrs["Attributes"] = None
     attrs["Dom interfaces"] = None
-    ret = [f"<table class='def elementdef'{lineNumAttr}>"]
+    ret = [f"<table class='def elementdef'{lineNumAttr}><tbody>"]
     for key, val in attrs.items():
         if key in parsedAttrs or val is not None:
             if key in parsedAttrs:
@@ -531,7 +545,7 @@ def transformArgumentdef(
         if param.startswith("|") and param.endswith("|"):
             del attrs[param]
             attrs["<var>" + param[1:-1] + "</var>"] = desc
-    el = h.parseHTML(firstLine + "</pre>")[0]
+    el = h.parseElements(firstLine + "</pre>")[0]
     if h.hasAttr(el, "for"):
         forValue = t.cast(str, el.get("for"))
         el.set("data-dfn-for", forValue)
@@ -1103,8 +1117,8 @@ def parseInfoTree(lines: list[str], indent: int = 4, lineNum: int | None = 0) ->
     return datas
 
 
-def classesFromLine(line: Line) -> set[str]:
-    tag = parseTag(line.text.strip(), lineNumber=line.i)
+def classesFromLine(line: str, i: int) -> set[str]:
+    tag = parseTag(line.strip(), lineNumber=i)
     if tag is None:
         return set()
     if "class" not in tag.attrs:
@@ -1112,10 +1126,10 @@ def classesFromLine(line: Line) -> set[str]:
     return set(tag.attrs["class"].strip().split())
 
 
-@attr.s(slots=True)
+@dataclasses.dataclass
 class StartTag:
-    tag: str = attr.ib()
-    attrs: dict[str, str] = attr.ib(default=attr.Factory(dict))
+    tag: str
+    attrs: dict[str, str] = dataclasses.field(default_factory=dict)
 
 
 def parseTag(text: str, lineNumber: int | None) -> StartTag | None:

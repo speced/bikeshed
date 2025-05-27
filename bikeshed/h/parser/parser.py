@@ -4,7 +4,7 @@ import dataclasses
 import re
 from enum import Enum
 
-from ... import config, constants, t
+from ... import config, constants, datablocks, t
 from ... import messages as m
 from . import preds
 from .nodes import (
@@ -14,6 +14,7 @@ from .nodes import (
     ParserNode,
     RawElement,
     RawText,
+    SafeElement,
     SafeText,
     SelfClosedTag,
     StartTag,
@@ -105,6 +106,22 @@ def generateNodes(s: Stream, start: int) -> t.Generator[ParserNode, None, None]:
             yield nodes
 
 
+def debugNode(node: ParserNode | list[ParserNode]) -> str:
+    if isinstance(node, list):
+        return "".join(debugNode(x) for x in node)
+    if isinstance(node, StartTag):
+        return f"<{node.tag} {node.loc}>"
+    if isinstance(node, EndTag):
+        return f"</{node.tag} {node.loc}>"
+    if isinstance(node, (RawText, SafeText)):
+        return f'<{type(node).__name__} "{node}" {node.loc}>'
+    if isinstance(node, RawElement):
+        return f"<{node.tag} {node.loc}>...</>"
+    if isinstance(node, SelfClosedTag):
+        return f"<{node.tag} {node.loc} />"
+    return repr(node)
+
+
 def generateResults(
     s: Stream,
     start: int,
@@ -130,11 +147,7 @@ def generateExperimentalNodes(s: Stream, start: int, coll: list[ParserNode]) -> 
     Intended to be used in a for-loop, where you manually break when you detect the end.
     """
     for res in generateResults(s, start, experimental=True):
-        (
-            node,
-            i,
-            _,
-        ) = res
+        node, i, _ = res
         if isinstance(node, list):
             coll.extend(node)
         else:
@@ -159,10 +172,11 @@ def parseAnything(s: Stream, start: int, experimental: bool = False) -> ResultT[
         return Err(start)
     if s[start] in POSSIBLE_NODE_START_CHARS:
         res = parseNode(s, start)
-        if not experimental:
-            s.observeResult(res)
         if isOk(res):
-            return res
+            val, i, err = res
+            if not experimental:
+                val = s.observeResult(res)
+            return (val, i, err)
     i = start + 1
     end = len(s)
     while s[i] not in POSSIBLE_NODE_START_CHARS and i < end:
@@ -209,8 +223,11 @@ def parseNode(
     if first1 == "&":
         ch, i, _ = parseCharRef(s, start, context=CharRefContext.NonAttr)
         if ch is not None:
-            node = RawText.fromStream(s, start, i, f"&#{ord(ch)};")
-            return Ok(node, i)
+            if isinstance(ch, str):
+                node = RawText.fromStream(s, start, i, f"&#{ord(ch)};")
+                return Ok(node, i)
+            else:
+                return Ok(ch, i)
 
     if first1 == "<":
         node, i, _ = parseAngleStart(s, start)
@@ -586,17 +603,19 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
                 return Ok(nodes, i)
             else:
                 startTag.tag = "span"
+        el: ParserNode | None
         if startTag.tag == "pre":
             el, endI, _ = parseMetadataBlock(s, start)
             if el is not None:
                 return Ok(el, endI)
             if isDatablockPre(startTag):
-                text, i, _ = parseRawPreToEnd(s, i)
+                text, i, _ = parseDatablockPreToEnd(s, i)
                 if text is None:
                     return Err(start)
                 if "bs-macros" in startTag.attrs:
                     text = replaceMacrosInText(text, s.config.macros, s, start, context="<pre> contents")
                 el = RawElement.fromStream(s, start, i, startTag, text)
+                el = datablocks.processRawElement(el, s, start)
                 return Ok(el, i)
         if startTag.tag == "script":
             text, i, _ = parseScriptToEnd(s, i)
@@ -615,12 +634,13 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
             el = RawElement.fromStream(s, start, i, startTag, text)
             return Ok(el, i)
         elif startTag.tag == "xmp":
+            startTag.tag = "pre"
             text, i, _ = parseXmpToEnd(s, i)
             if text is None:
                 return Err(start)
             if "bs-macros" in startTag.attrs:
                 text = replaceMacrosInText(text, s.config.macros, s, start, context="<xmp> contents")
-            el = RawElement.fromStream(s, start, i, startTag, text)
+            el = SafeElement.fromStream(s, start, i, startTag, text)
             return Ok(el, i)
         else:
             return Ok(startTag, i)
@@ -895,23 +915,28 @@ def parseUnquotedAttrValue(s: Stream, start: int) -> ResultT[str]:
     return Ok(val, i)
 
 
-def printChAsHexRef(ch: str) -> str:
+def printChAsHexRef(ch: str | SafeText) -> str:
     """
-    Turns a character reference value,
-    aka a value from preds.charRefs,
-    back into a hex char ref for normalization purposes.
-    Sometimes outputs as two refs,
-    since a few of the values are two characters.
+    * If passed a str (which should have been the value of a char ref),
+        prints it back into char refs for normalization purposes.
+        (Sometimes more than one, as some char refs are multi-char.)
+    * If passed a SafeText (which should have been the result of a *failed*
+        char ref parsing, giving some portion of the bad char ref),
+        just stringifies it, since that'll give an escaped & at least.
     """
-    return "".join(f"&#{ord(x)};" for x in ch)
+    if isinstance(ch, str):
+        return "".join(f"&#{ord(x)};" for x in ch)
+    else:
+        return str(ch)
 
 
 class CharRefContext(Enum):
     Attr = "Attr"
     NonAttr = "NonAttr"
+    DatablockPre = "DatablockPre"
 
 
-def parseCharRef(s: Stream, start: int, context: CharRefContext) -> ResultT[str]:
+def parseCharRef(s: Stream, start: int, context: CharRefContext) -> ResultT[str | SafeText]:
     if s[start] != "&":
         return Err(start)
     i = start + 1
@@ -924,7 +949,7 @@ def parseCharRef(s: Stream, start: int, context: CharRefContext) -> ResultT[str]
                 "Saw the start of an &bs...; escape, but couldn't find the ending semicolon. If this wasn't intended, escape the & with &amp;",
                 lineNum=s.loc(start),
             )
-            return Err(start)
+            return Ok(SafeText.fromStream(s, start, i), i)
         if len(bsEscape) == 3 and bsEscape[2] in "`~!@#$%^&*()-_=+[]{}\\|:'\"<>,./?":
             return Ok(bsEscape[2], i)
         elif len(bsEscape) == 2 and s.slice(start, start + 5) == "&bs;;":
@@ -941,13 +966,13 @@ def parseCharRef(s: Stream, start: int, context: CharRefContext) -> ResultT[str]
                 f"&{bsEscape}; isn't a valid Bikeshed character reference. See <https://speced.github.io/bikeshed/#bs-charref>.",
                 lineNum=s.loc(start),
             )
-            return Err(start)
+            return Ok(SafeText.fromStream(s, start, i), i)
     elif preds.isASCIIAlphanum(s[i]):
         i += 1
         while preds.isASCIIAlphanum(s[i]):
             i += 1
         if s[i] == "=":
-            if context is CharRefContext.Attr:
+            if context is CharRefContext.Attr or context is CharRefContext.DatablockPre:
                 # HTML allows you to write <a href="?foo&bar=baz">
                 # without escaping the ampersand, even if it matches
                 # a named charRef so long as there's an `=` after it.
@@ -958,11 +983,11 @@ def parseCharRef(s: Stream, start: int, context: CharRefContext) -> ResultT[str]
                 t.assert_never(context)
         if s[i] != ";":
             m.die(f"Character reference '{s.slice(start, i)}' didn't end in ;.", lineNum=s.loc(start))
-            return Err(start)
+            return Ok(SafeText.fromStream(s, start, i), i)
         i += 1
         if s.slice(start, i) not in charRefs:
             m.die(f"'{s.slice(start, i)} isn't a valid character reference.", lineNum=s.loc(start))
-            return Err(start)
+            return Ok(SafeText.fromStream(s, start, i), i)
         return Ok(charRefs[s.slice(start, i)], i)
     elif s[i] == "#":
         i += 1
@@ -972,39 +997,45 @@ def parseCharRef(s: Stream, start: int, context: CharRefContext) -> ResultT[str]
             while preds.isHexDigit(s[i]):
                 i += 1
             if i == numStart:
-                m.die(f"Malformed numeric character reference '{s.slice(start, i)}'.", lineNum=s.loc(start))
-                return Err(start)
+                m.die(
+                    f"Saw the start of a hex char ref ({s.slice(start, i)}), but no hex digits follow it.",
+                    lineNum=s.loc(start),
+                )
+                return Ok(SafeText.fromStream(s, start, i), i)
             if s[i] != ";":
-                m.die(f"Character reference '{s.slice(start, i)}' didn't end in ;.", lineNum=s.loc(start))
-                return Err(start)
+                m.die(f"Char ref '{s.slice(start, i)}' didn't end in ;.", lineNum=s.loc(start))
+                return Ok(SafeText.fromStream(s, start, i), i)
             cp = int(s.slice(numStart, i), 16)
         else:
             numStart = i
-            while preds.isHexDigit(s[i]):
+            while preds.isDigit(s[i]):
                 i += 1
             if i == numStart:
-                m.die(f"Malformed numeric character reference '{s.slice(start, i)}'.", lineNum=s.loc(start))
-                return Err(start)
+                m.die(
+                    f"Saw the start of a decimal char ref ({s.slice(start, i)}), but no hex digits follow it.",
+                    lineNum=s.loc(start),
+                )
+                return Ok(SafeText.fromStream(s, start, i), i)
             if s[i] != ";":
-                m.die(f"Character reference '{s.slice(start, i)}' didn't end in ;.", lineNum=s.loc(start))
-                return Err(start)
+                m.die(f"Char ref '{s.slice(start, i)}' didn't end in ;.", lineNum=s.loc(start))
+                return Ok(SafeText.fromStream(s, start, i), i)
             cp = int(s.slice(numStart, i), 10)
         i += 1
         if cp == 0:
-            m.die("Char refs can't resolve to null.", lineNum=s.loc(start))
-            return Err(start)
+            m.die("Char refs can't resolve to U+0000 NULL.", lineNum=s.loc(start))
+            return Ok(SafeText.fromStream(s, start, i), i)
         if cp > 0x10FFFF:
             m.die(f"Char ref '{s.slice(start, i)}' is outside of Unicode.", lineNum=s.loc(start))
-            return Err(start)
+            return Ok(SafeText.fromStream(s, start, i), i)
         if 0xD800 <= cp <= 0xDFFF:
             m.die(f"Char ref '{s.slice(start, i)}' is a lone surrogate.", lineNum=s.loc(start))
-            return Err(start)
+            return Ok(SafeText.fromStream(s, start, i), i)
         if preds.isNoncharacter(cp):
             m.die(f"Char ref '{s.slice(start, i)}' is a non-character.", lineNum=s.loc(start))
-            return Err(start)
+            return Ok(SafeText.fromStream(s, start, i), i)
         if cp == 0xD or (preds.isControl(cp) and not preds.isWhitespace(cp)):
             m.die(f"Char ref '{s.slice(start, i)}' is a control character.", lineNum=s.loc(start))
-            return Err(start)
+            return Ok(SafeText.fromStream(s, start, i), i)
         return Ok(chr(cp), i)
     else:
         return Err(start)
@@ -1036,6 +1067,9 @@ def parseEndTag(s: Stream, start: int) -> ResultT[EndTag]:
     tagname, i, _ = parseTagName(s, i)
     if tagname is None:
         m.die("Garbage in an end tag.", lineNum=s.loc(start))
+        return Err(start)
+    if tagname in VOID_ELEMENTS:
+        m.die(f"Saw an end tag </{tagname}> for a void element.", lineNum=s.loc(start))
         return Err(start)
     if s.eof(i):
         m.die(f"Hit EOF in the middle of an end tag </{tagname}>.", lineNum=s.loc(start))
@@ -1140,20 +1174,33 @@ def parseXmpToEnd(s: Stream, start: int) -> OkT[str]:
     assert False
 
 
-def parseRawPreToEnd(s: Stream, start: int) -> ResultT[str]:
-    # Identical to parseScriptToEnd
+def parseDatablockPreToEnd(s: Stream, start: int) -> ResultT[str]:
+    # Identical to parseScriptToEnd, except I need to
+    # convert named HTML entities to numeric ones,
+    # since the lxml parser doesn't understand them.
 
     i = start
+    val = ""
+    startSeg = i
     while True:
-        while s[i] != "<" and not s.eof(i):
-            i += 1
         if s.eof(i):
             m.die("Hit EOF in the middle of a <pre> datablock.", lineNum=s.loc(start))
             return Err(start)
-        if s.slice(i, i + 6) == "</pre>":
-            return Ok(s.slice(start, i), i + 6)
-        i += 1
-    assert False
+        elif s.slice(i, i + 6) == "</pre>":
+            val += s.slice(startSeg, i)
+            break
+        elif s[i] == "&":
+            startRef = i
+            ch, i, _ = parseCharRef(s, i, context=CharRefContext.DatablockPre)
+            if ch is None:
+                i += 1
+                continue
+            val += s.slice(startSeg, startRef) + printChAsHexRef(ch)
+            startSeg = i
+            continue
+        else:
+            i += 1
+    return Ok(val, i + 6)
 
 
 PROD_PROPDESC_RE = re.compile(r"^'(?:(\S*)/)?([\w*-]+)(?:!!([\w-]+))?'$")
@@ -1443,7 +1490,7 @@ def parseMaybeValue(s: Stream, textStart: int) -> ResultT[list[ParserNode]]:
         if s.line(i) > startLine + 3:
             m.die(
                 "CSS-maybe autolink (''foo'') was opened, but no closing '' was found within a few lines. Either close your autolink, switch to the <css></css> element if you need the contents to stretch across that many lines, or escape the initial '' as &bs';&bs'; if it wasn't intended at all.",
-                lineNum=s.loc(i),
+                lineNum=s.loc(textStart),
             )
             return Err(textStart)
         if s.slice(i, i + 2) == "''":
@@ -1537,10 +1584,9 @@ def parseMaybeValue(s: Stream, textStart: int) -> ResultT[list[ParserNode]]:
     else:
         startTag.attrs["bs-replace-text-on-link-success"] = escapeAttr(safeFromDoubleAngles(text))
         s.observeNodes(nodes)
-    s.observeShorthandClose(s.loc(textEnd), startTag, ("''", "''"))
+    virtualEndTags = s.observeShorthandClose(s.loc(textEnd), startTag, ("''", "''"))
     endTag = EndTag.fromStream(s, textEnd, nodeEnd, startTag)
-
-    return Ok([startTag, *nodes, endTag], nodeEnd)
+    return Ok([startTag, *nodes, *virtualEndTags, endTag], nodeEnd)
 
 
 def rawFromDoubleAngles(text: str) -> str:
@@ -1843,6 +1889,13 @@ def parseAutolinkIdl(s: Stream, start: int) -> ResultT[ParserNode | list[ParserN
     innerText = s.slice(innerStart, innerEnd)
     if data is None:
         return Err(start)
+    for badChar in ("{", "}"):
+        if badChar in innerText:
+            m.die(
+                f"IDL autolink ({{{{...}}}}) contained a {badChar} in its data section. If this was not meant to be an autolink, escape it; if it was, switch to the manual <a> syntax to include this character.",
+                lineNum=s.loc(start),
+            )
+            return Err(start)
     lt, linkFor, linkType = dataclasses.astuple(data)
 
     if linkType in config.idlTypes:
@@ -2189,8 +2242,9 @@ def parseLinkText(
             s.observeShorthandClose(s.loc(i), startTag, (startingSigil, endingSigil))
             return Err(start)
         if s.slice(i, i + endingLength) == endingSigil:
-            s.observeShorthandClose(s.loc(i), startTag, (startingSigil, endingSigil))
             endTag = EndTag.fromStream(s, i, i + endingLength, startTag)
+            virtualEndTags = s.observeShorthandClose(s.loc(i), startTag, (startingSigil, endingSigil))
+            content.extend(virtualEndTags)
             content.append(endTag)
             return Ok(content, i + endingLength)
     m.die(
@@ -2379,7 +2433,7 @@ def parseCodeSpan(s: Stream, start: int) -> ResultT[list[ParserNode]]:
 fencedStartRe = re.compile(r"`{3,}|~{3,}")
 
 
-def parseFencedCodeBlock(s: Stream, start: int) -> ResultT[RawElement]:
+def parseFencedCodeBlock(s: Stream, start: int) -> ResultT[SafeElement]:
     if s.precedingTextOnLine(start).strip() != "":
         return Err(start)
 
@@ -2434,12 +2488,12 @@ def parseFencedCodeBlock(s: Stream, start: int) -> ResultT[RawElement]:
         contents += match.group(0)
 
     # At this point i is past the end of the code block.
-    tag = StartTag.fromStream(s, start, start, "xmp")
+    tag = StartTag.fromStream(s, start, start, "pre")
     if infoString:
         tag.attrs["bs-infostring"] = infoString
         lang = infoString.split(" ")[0]
         tag.classes.add(f"language-{lang}")
-    el = RawElement.fromStream(s, start, i, tag, contents)
+    el = SafeElement.fromStream(s, start, i, tag, contents)
     return Ok(el, i)
 
 
@@ -2699,7 +2753,7 @@ def parseMarkdownLink(s: Stream, start: int) -> ResultT[ParserNode | list[Parser
     # Now that we've seen the ](, we're committed.
     s.observeShorthandOpen(startTag, (startingSigil, endingSigil))
     s.observeNodes(nodes)
-    s.observeShorthandClose(s.loc(linkTextEnd), startTag, (startingSigil, endingSigil))
+    virtualEndTags = s.observeShorthandClose(s.loc(linkTextEnd), startTag, (startingSigil, endingSigil))
 
     # I'm not doing bracket-checking in the link text,
     # as CommonMark requires, because I've already lost
@@ -2717,7 +2771,7 @@ def parseMarkdownLink(s: Stream, start: int) -> ResultT[ParserNode | list[Parser
     if title:
         startTag.attrs["title"] = title
     endTag = EndTag.fromStream(s, nodeEnd - 1, nodeEnd, startTag)
-    return Ok([startTag, *nodes, endTag], nodeEnd)
+    return Ok([startTag, *nodes, *virtualEndTags, endTag], nodeEnd)
 
 
 def parseMarkdownLinkDestTitle(s: Stream, start: int) -> ResultT[tuple[str, str]]:
@@ -2784,11 +2838,11 @@ def parseMarkdownLinkWhitespace(s: Stream, start: int) -> ResultT[str]:
     i = start
     while isWhitespace(s[i]):
         if s.eof(i):
-            m.die("Hit EOF while parsing the destination/title of a markdown link", lineNum=s.line(start))
+            m.die("Hit EOF while parsing the destination/title of a markdown link", lineNum=s.loc(start))
             return Err(start)
         if s[i] == "\n":
             if seenLinebreak:
-                m.die("The destination/title of a markdown link can't contain a blank line.", lineNum=s.line(i))
+                m.die("The destination/title of a markdown link can't contain a blank line.", lineNum=s.loc(start))
                 return Err(start)
             else:
                 seenLinebreak = True
@@ -2798,12 +2852,31 @@ def parseMarkdownLinkWhitespace(s: Stream, start: int) -> ResultT[str]:
 
 def parseMarkdownLinkAngleDest(s: Stream, start: int) -> ResultT[str]:
     i = start
+    val = ""
+    startSeg = i
+    ch: str | SafeText | None
     while True:
         if s.eof(i):
             m.die("Hit EOF while parsing the destination of a markdown link", lineNum=s.loc(start - 1))
             return Err(start)
-        elif s.config.markdownEscapes and s[i] == "\\" and s[i + 1] in ("\\", ">", "<"):
-            i += 2
+        elif s.config.markdownEscapes and s[i] == "\\":
+            startEscape = i
+            ch, i, _ = parseMarkdownEscape(s, i)
+            if ch is None:
+                i += 1
+                continue
+            val += s.slice(startSeg, startEscape) + printChAsHexRef(ch)
+            startSeg = i
+            continue
+        elif s[i] == "&":
+            startRef = i
+            ch, i, _ = parseCharRef(s, i, context=CharRefContext.Attr)
+            if ch is None:
+                i += 1
+                continue
+            val += s.slice(startSeg, startRef) + printChAsHexRef(ch)
+            startSeg = i
+            continue
         elif s[i] == ">":
             break
         elif s[i] == "<":
@@ -2813,25 +2886,43 @@ def parseMarkdownLinkAngleDest(s: Stream, start: int) -> ResultT[str]:
             )
             return Err(start)
         elif s[i] == "\n":
-            m.die("The <>-wrapped destination of a markdown link can't contain a newline", lineNum=s.loc(i))
+            m.die("The <>-wrapped destination of a markdown link can't contain a newline", lineNum=s.loc(start))
             return Err(start)
         else:
             i += 1
-    dest = s.slice(start, i)
-    if s.config.markdownEscapes:
-        dest = htmlifyMarkdownEscapes(dest)
-    return Ok(dest, i + 1)
+    val += s.slice(startSeg, i)
+    i += 1
+    return Ok(val, i)
 
 
 def parseMarkdownLinkIdentDest(s: Stream, start: int) -> ResultT[str]:
     i = start
     parenDepth = 0
+    val = ""
+    startSeg = i
+    ch: str | SafeText | None
     while True:
         if s.eof(i):
             m.die("Hit EOF while parsing the destination of a markdown link", lineNum=s.loc(start))
             return Err(start)
-        elif s.config.markdownEscapes and s[i] == "\\" and s[i + 1] in ("\\", "(", ")"):
-            i += 2
+        elif s.config.markdownEscapes and s[i] == "\\":
+            startEscape = i
+            ch, i, _ = parseMarkdownEscape(s, i)
+            if ch is None:
+                i += 1
+                continue
+            val += s.slice(startSeg, startEscape) + printChAsHexRef(ch)
+            startSeg = i
+            continue
+        elif s[i] == "&":
+            startRef = i
+            ch, i, _ = parseCharRef(s, i, context=CharRefContext.Attr)
+            if ch is None:
+                i += 1
+                continue
+            val += s.slice(startSeg, startRef) + printChAsHexRef(ch)
+            startSeg = i
+            continue
         elif isControl(s[i]):
             m.die(
                 f"The destination of a markdown link can't contain ASCII control characters ({hex(ord(s[i]))})",
@@ -2851,10 +2942,9 @@ def parseMarkdownLinkIdentDest(s: Stream, start: int) -> ResultT[str]:
                 i += 1
         else:
             i += 1
-    dest = s.slice(start, i)
-    if s.config.markdownEscapes:
-        dest = htmlifyMarkdownEscapes(dest)
-    return Ok(dest, i)
+    val += s.slice(startSeg, i)
+    # no ending character so no bumping the i
+    return Ok(val, i)
 
 
 def parseMarkdownLinkTitle(s: Stream, start: int, startChar: str) -> ResultT[str]:
@@ -2866,13 +2956,32 @@ def parseMarkdownLinkTitle(s: Stream, start: int, startChar: str) -> ResultT[str
     elif startChar == "(":
         endChar = ")"
     else:
-        assert False
+        assert False, "unreachable"
+    val = ""
+    startSeg = i
+    ch: str | SafeText | None
     while True:
         if s.eof(i):
             m.die("Hit EOF while parsing the title of a markdown link", lineNum=s.line(start))
             return Err(start)
-        elif s.config.markdownEscapes and s[i] == "\\" and s[i + 1] in ("\\", startChar, endChar):
-            i += 2
+        elif s.config.markdownEscapes and s[i] == "\\":
+            startEscape = i
+            ch, i, _ = parseMarkdownEscape(s, i)
+            if ch is None:
+                i += 1
+                continue
+            val += s.slice(startSeg, startEscape) + printChAsHexRef(ch)
+            startSeg = i
+            continue
+        elif s[i] == "&":
+            startRef = i
+            ch, i, _ = parseCharRef(s, i, context=CharRefContext.Attr)
+            if ch is None:
+                i += 1
+                continue
+            val += s.slice(startSeg, startRef) + printChAsHexRef(ch)
+            startSeg = i
+            continue
         elif s[i] == endChar:
             break
         elif s[i] == startChar:
@@ -2887,10 +2996,15 @@ def parseMarkdownLinkTitle(s: Stream, start: int, startChar: str) -> ResultT[str
                 return Err(start)
         else:
             i += 1
-    title = s.slice(start, i)
-    if s.config.markdownEscapes:
-        title = htmlifyMarkdownEscapes(title)
-    return Ok(title, i + 1)
+    val += s.slice(startSeg, i)
+    i += 1
+    return Ok(val, i)
+
+
+def parseMarkdownEscape(s: Stream, start: int) -> ResultT[str]:
+    if isMarkdownEscape(s, start):
+        return Ok(s[start + 1], start + 2)
+    return Err(start)
 
 
 # not escaping * or _ currently, so the slash remains until after HTML parsing,
