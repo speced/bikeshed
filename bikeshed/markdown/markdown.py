@@ -14,6 +14,7 @@ if t.TYPE_CHECKING:
         prefixlen: int | float
         line: l.Line
         text: str
+        virtualPrefix: str
 
     class HeadingTokenT(TokenT, total=False):
         level: t.Required[int]
@@ -161,7 +162,7 @@ def tokenizeLines(
     rawElementStartRe = re.compile(
         rf"""
         \s*
-        (?={constants.virtualEndTagStartChar}</\w+>{constants.virtualEndTagEndChar})*
+        ((?:{constants.virtualEndTagStartChar}</\w+>{constants.virtualEndTagEndChar})*)
         <({"|".join(opaqueElements)})[ >]
         """,
         re.X,
@@ -186,24 +187,26 @@ def tokenizeLines(
             endTag = rawStack[-1]
             if lineEndsRawBlock(line, endTag):
                 rawStack.pop()
-                tokens.append({"type": "raw", "prefixlen": float("inf"), "line": line})
+                tokens.append({"type": "raw", "prefixlen": float("inf"), "line": line, "virtualPrefix":""})
                 continue
             elif not endTag["nest"]:
                 # Just an internal line, but for the no-nesting elements,
                 # so guaranteed no more work needs to be done.
-                tokens.append({"type": "raw", "prefixlen": float("inf"), "line": line})
+                tokens.append({"type": "raw", "prefixlen": float("inf"), "line": line, "virtualPrefix":""})
                 continue
 
         # We're either in a nesting raw element or not in a raw element at all,
         # so check if the line starts a new element.
         match = re.match(rawElementStartRe, line.text)
         if match:
-            tagName = match[1]
+            virtualPrefix = match[1]
+            tagName = match[2]
             tokens.append(
                 {
                     "type": "raw",
                     "prefixlen": prefixCount(line.text, numSpacesForIndentation),
                     "line": line,
+                    "virtualPrefix": virtualPrefix,
                 },
             )
             if re.search(rf"</({tagName})>", line.text):
@@ -216,14 +219,23 @@ def tokenizeLines(
                         "type": "element",
                         "tag": "</{}>".format(tagName),
                         "nest": nest,
+                    "virtualPrefix": virtualPrefix,
                     },
                 )
             continue
         if rawStack:
-            tokens.append({"type": "raw", "prefixlen": float("inf"), "line": line})
+            tokens.append({"type": "raw", "prefixlen": float("inf"), "line": line, "virtualPrefix":""})
             continue
 
         lineText = line.text.strip()
+        virtualPrefix = ""
+        if lineText.startswith(constants.virtualEndTagStartChar):
+            match = re.match(rf"((?:{constants.virtualEndTagStartChar}</\w+>{constants.virtualEndTagEndChar})+)(.*)", lineText)
+            if not match:
+                m.die("PROGRAMMING ERROR: Spotted the start of a virtual end tag, but couldn't find the tag itself.", lineNum=line.i)
+            else:
+                virtualPrefix = match[1]
+                lineText = match[2]
 
         token: TokenT
 
@@ -297,6 +309,7 @@ def tokenizeLines(
         else:
             token["prefixlen"] = prefixCount(line.text, numSpacesForIndentation)
         token["line"] = line
+        token["virtualPrefix"] = virtualPrefix
         tokens.append(token)
 
     if False:  # pylint: disable=using-constant-test
@@ -454,7 +467,7 @@ def parseTokens(tokens: list[TokenT], numSpacesForIndentation: int) -> list[l.Li
 def lineFromStream(stream: TokenStream, text: str) -> l.Line:
     # Shortcut for when you're producing a new line from the currline in the stream,
     # with some modified text.
-    return l.Line(stream.currline().i, text)
+    return l.Line(stream.currline().i, stream.currvirtualPrefix() + text)
 
 
 # Each parser gets passed the stream

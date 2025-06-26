@@ -249,7 +249,8 @@ class Spec:
 
         # Build the document
         self.document, self.head, self.body = h.parseDocument(self.html, self.structuralNodes)
-        # print(h.printNodeTree(self.document))
+        if self.debug:
+            print(h.printNodeTree(self.document))
         u.correctFrontMatter(self)
         includes.processInclusions(self)
         metadata.parseDoc(self)

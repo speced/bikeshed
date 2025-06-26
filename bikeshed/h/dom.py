@@ -162,7 +162,7 @@ def printNodeTree(node: t.NodeT | str, maxDepth: int | None = None, depth: int =
     if isinstance(node, list):
         s = "[]"
     else:
-        s = f"{serializeTag(node)}"
+        s = f"{serializeTag(node, includeBs=True)}"
     if not maxDepth or depth < maxDepth:
         linesPerChild = [
             printNodeTree(child, maxDepth, depth + 1).split("\n") for child in childNodes(node, skipOddNodes=False)
@@ -231,7 +231,7 @@ def firstLinkTextFromElement(el: t.ElementT) -> str | None:
     return texts[0] if len(texts) > 0 else None
 
 
-def serializeTag(el: t.ElementT) -> str:
+def serializeTag(el: t.ElementT, includeBs: bool = False) -> str:
     # Serialize *just* the opening tag for the element.
     # Use when you want to output the HTML,
     # but it might be a container with a lot of content.
@@ -240,7 +240,7 @@ def serializeTag(el: t.ElementT) -> str:
         # Don't output the bs-* attributes, they're added by BS
         # and don't show up in the source, so it's confusing to
         # print them.
-        if t.cast(str, n).startswith("bs-"):
+        if not includeBs and t.cast(str, n).startswith("bs-"):
             continue
         tag += ' {n}="{v}"'.format(n=str(n), v=escapeAttr(str(v)))
     tag += ">"
