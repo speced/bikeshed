@@ -239,7 +239,7 @@ def markupCDDLBlock(pre: t.ElementT, doc: t.SpecT) -> set[t.ElementT]:
                     el=el,
                     error=True,
                 )
-                if ref:
+                if ref and not isinstance(ref, str):
                     url = ref.url
                     break
             if ref:
