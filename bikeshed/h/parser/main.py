@@ -19,6 +19,7 @@ from .nodes import (
     SelfClosedTag,
     StartTag,
     Text,
+    VirtualEndTag,
 )
 from .parser import POSSIBLE_NODE_START_CHARS, nodesFromStream
 from .stream import ParseConfig, Stream

@@ -784,7 +784,7 @@ def makeVirtualEndTag(startTag: StartTag, forcingTag: ParserNode) -> EndTag:
     # tag (`forcingTag`) causes some `startTag` to be auto-closed.
     # The virtual tag masquerades as appearing immediately before
     # `forcingTag` and zero-sized, but in the same context as `startTag`.
-    return EndTag(
+    return VirtualEndTag(
         line=forcingTag.line,
         endLine=forcingTag.line,
         loc=forcingTag.loc,
