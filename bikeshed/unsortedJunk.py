@@ -745,6 +745,14 @@ def processAutolinks(doc: t.SpecT) -> None:
             el=el,
             error=not okayToFail and not ignorable,
         )
+
+        if isinstance(ref, str):
+            # Error message, annotate the link with it and continue.
+            el.tag = "u"
+            h.addClass(doc, el, "link-error")
+            el.set("title", f"LINK ERROR: {ref}")
+            continue
+
         # Capture the reference (and ensure we add a biblio entry) if it
         # points to an external specification.
         if ref and ref.status != "local":

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from enum import Enum
 
 from .. import config, t
 
@@ -200,3 +201,13 @@ def stripLineBreaks(obj: U) -> U:
         elif isinstance(val, (dict, list)):
             stripLineBreaks(val)
     return obj
+
+
+class LinkFailure(Enum):
+    Text = "Text"
+    Type = "Type"
+    Export = "Export"
+    Spec = "Spec"
+    For = "For"
+    Status = "Status"
+    IgnoredSpecs = "IgnoredSpecs"
