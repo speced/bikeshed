@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import dataclasses
+import json
 import os
 import re
 import subprocess
@@ -30,6 +31,18 @@ def loadBoilerplate(doc: t.SpecT, filename: str, bpname: str | None = None) -> N
         bpname = filename
     html = retrieve.retrieveBoilerplateFile(doc, filename)
     el = boilerplateFromHtml(doc, html, context=f"{filename} boilerplate")
+    if doc.md.cgTransitionPlan == True and filename == "status":
+        p = os.path.join(doc.inputSource.directory(), "cg-monitor.json")
+        with open(p, 'r') as f:
+            data = json.load(f)
+
+        html = "<div class=\"note\">"
+        html += "<p>Transition status: " + data["transition_status"] + "</p>"
+        html += "<p>Target organization ("+ data["intended_organization"] +") / group (" + data["intended_group"] + ")</p>"
+        for note in data["notes"]:
+            html += "<p>" + note + "</p>"
+        html += "</div>"
+        el.append(h.parseHTML(html))
     fillWith(bpname, el, doc=doc)
 
 

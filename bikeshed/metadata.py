@@ -66,6 +66,7 @@ class MetadataManager:
         self.boilerplate: config.BoolSet = config.BoolSet(default=True)
         self.canIUseURLs: list[str] = []
         self.canonicalURL: str | None = None
+        self.cgTransitionPlan: bool = False
         self.complainAbout: config.BoolSet = config.BoolSet(["mixed-indents"])
         self.customTextMacros: list[tuple[str, str]] = []
         self.customWarningText: list[str] = []
@@ -1395,6 +1396,7 @@ KNOWN_KEYS = {
     "Boilerplate": Metadata("Boilerplate", "boilerplate", joinBoolSet, parseBoilerplate),
     "Can I Use Url": Metadata("Can I Use URL", "canIUseURLs", joinList, parseLiteralList),
     "Canonical Url": Metadata("Canonical URL", "canonicalURL", joinValue, parseLiteral),
+    "Community Group Transition Plan": Metadata("CG Transition Plan", "cgTransitionPlan", joinValue, parseBoolean),
     "Complain About": Metadata("Complain About", "complainAbout", joinBoolSet, parseComplainAbout),
     "Custom Warning Text": Metadata(
         "Custom Warning Text",
