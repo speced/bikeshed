@@ -31,7 +31,7 @@ def loadBoilerplate(doc: t.SpecT, filename: str, bpname: str | None = None) -> N
         bpname = filename
     html = retrieve.retrieveBoilerplateFile(doc, filename)
     el = boilerplateFromHtml(doc, html, context=f"{filename} boilerplate")
-    if doc.md.cgTransitionPlan == True and filename == "status":
+    if doc.md.cgTransitionPlan and filename == "status":
         p = os.path.join(doc.inputSource.directory(), "cg-monitor.json")
         with open(p, 'r') as f:
             data = json.load(f)
