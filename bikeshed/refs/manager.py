@@ -951,7 +951,7 @@ def errorFromFailureCategory(
         msg = f"No '{linkType}' refs found for '{text}' that are marked for export."
         if oldRefs:
             msg += "\n  (Possible specs this could be from: "
-            msg += config.englishFromList({x.spec for x in oldRefs if x.spec is not None}, "or")
+            msg += config.englishFromList(sorted({x.spec for x in oldRefs if x.spec is not None}), "or")
             msg += ")"
         m.linkerror(msg, el=el)
         return msg
