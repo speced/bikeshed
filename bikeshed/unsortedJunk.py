@@ -368,14 +368,26 @@ def determineDfnType(doc: t.SpecT, dfn: t.ElementT, inferCSS: bool = False) -> s
                 return "value"
             if "@" in text:
                 # Trying to dfn an at-rule production
-                m.die("CSS at-rules must be defined in prose, with <dfn>@foo</dfn>. Remove the dfn from this grammar term.", el=dfn)
+                m.die(
+                    "CSS at-rules must be defined in prose, with <dfn>@foo</dfn>. Remove the dfn from this grammar term.",
+                    el=dfn,
+                )
             elif "(" in text and ")" in text:
                 # Trying to define a function production
-                m.die("CSS functions must be defined in prose, with <dfn>foo(args)</dfn>. Remove the dfn from this grammar term.", el=dfn)
+                m.die(
+                    "CSS functions must be defined in prose, with <dfn>foo(args)</dfn>. Remove the dfn from this grammar term.",
+                    el=dfn,
+                )
             elif "''" in text:
-                m.die("CSS values must be defined in prose, with <dfn value>foo</dfn>. Remove the dfn from this grammar term.", el=dfn)
+                m.die(
+                    "CSS values must be defined in prose, with <dfn value>foo</dfn>. Remove the dfn from this grammar term.",
+                    el=dfn,
+                )
             elif "'" in text:
-                m.die("CSS properties must be defined in prose, with a <pre class=propdef> table or <dfn property>foo</dfn>. Remove the dfn from this grammar term.", el=dfn)
+                m.die(
+                    "CSS properties must be defined in prose, with a <pre class=propdef> table or <dfn property>foo</dfn>. Remove the dfn from this grammar term.",
+                    el=dfn,
+                )
             # Regardless of errors above, return "type""
             return "type"
         if text[0:1] == ":":
