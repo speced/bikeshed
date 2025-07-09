@@ -166,7 +166,7 @@ def scriptPath(*pathSegs: str) -> str:
 def docPath(doc: t.SpecT, *pathSegs: str) -> str | None:
     ret = doc.inputSource.relative(*pathSegs)
     if ret:
-        return ret.sourceName
+        return str(ret)
     return None
 
 
